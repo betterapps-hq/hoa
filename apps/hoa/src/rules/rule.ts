@@ -86,7 +86,9 @@ export const citationSchema = z.object({
   pageIndex: z.number().int().positive(),
   pageLabel: z.string().nullable(),
   quote: z.string(),
-  match: citationMatchSchema
+  match: citationMatchSchema,
+  /** Where the quote is in the page's text: set for citations picked in the document viewer. */
+  range: z.object({ start: z.number().int().nonnegative(), end: z.number().int().positive() }).optional()
 })
 
 export const ruleIssueCodes = [
@@ -148,7 +150,8 @@ export const ruleSchema = z.object({
   ...ruleContentShape,
   appliesWhen: z.array(conditionSchema),
   modifies: z.string().nullable(),
-  citations: z.array(citationSchema).min(1),
+  /** At least one before the rule can be approved; a draft rule can be left without while its citation is replaced. */
+  citations: z.array(citationSchema),
   issues: z.array(ruleIssueSchema),
   extractedHash: z.string().nullable(),
   change: z.enum(["new", "changed", "unchanged"]).nullable(),

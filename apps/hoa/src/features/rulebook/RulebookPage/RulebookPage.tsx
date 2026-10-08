@@ -21,6 +21,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { GoverningDocument } from "@/documents/governingDocument"
+import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import type { RulebookView } from "../rulebook.functions"
@@ -41,6 +42,8 @@ export type RulebookPageProps = {
   onEditPublished: () => Promise<void>
   onDiscardDraft: () => Promise<void>
   actions: RuleCardActions
+  /** The documents citations come from. */
+  source: CitationSource
   onChanged: () => void
 }
 
@@ -68,6 +71,7 @@ export function RulebookPage({
   onEditPublished,
   onDiscardDraft,
   actions,
+  source,
   onChanged
 }: RulebookPageProps) {
   const ready = documents.filter((document) => document.status === "ready")
@@ -239,7 +243,7 @@ export function RulebookPage({
                   </AlertDescription>
                 </Alert>
               ) : null}
-              <RuleTable rules={draft.rules} actions={actions} />
+              <RuleTable rules={draft.rules} actions={actions} source={source} />
             </>
           ) : (
             <Empty>
@@ -293,7 +297,7 @@ export function RulebookPage({
                   </CardAction>
                 </CardHeader>
               </Card>
-              <RuleTable rules={publishedRules} />
+              <RuleTable rules={publishedRules} source={source} />
             </>
           ) : (
             <Empty>

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import { describe, expect, it, vi } from "vitest"
 import type { GoverningDocument } from "@/documents/governingDocument"
+import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import type { Job } from "@/jobs/job"
 import type { Rule } from "@/rules/rule"
 import { fenceRules } from "@/tests/fenceRulebook"
@@ -90,7 +91,10 @@ function setup(overrides: Partial<RulebookPageProps> = {}) {
     review: vi.fn<RuleCardActions["review"]>(async () => undefined),
     save: vi.fn<(ruleId: string, changes: RuleChanges) => Promise<void>>(async () => undefined),
     resolveIssue: vi.fn<RuleCardActions["resolveIssue"]>(async () => undefined),
-    remove: vi.fn<RuleCardActions["remove"]>(async () => undefined)
+    remove: vi.fn<RuleCardActions["remove"]>(async () => undefined),
+    addCitation: vi.fn<RuleCardActions["addCitation"]>(async () => undefined),
+    replaceCitation: vi.fn<RuleCardActions["replaceCitation"]>(async () => undefined),
+    removeCitation: vi.fn<RuleCardActions["removeCitation"]>(async () => undefined)
   }
   const props: RulebookPageProps = {
     draft,
@@ -103,6 +107,17 @@ function setup(overrides: Partial<RulebookPageProps> = {}) {
     onEditPublished: vi.fn<() => Promise<void>>(async () => undefined),
     onDiscardDraft: vi.fn<() => Promise<void>>(async () => undefined),
     actions,
+    source: {
+      documents: [{ id: "guidelines", title: "Design guidelines", pageCount: 56 }],
+      loadPage: vi.fn<CitationSource["loadPage"]>(async (documentId, pageIndex) => ({
+        documentId,
+        title: "Design guidelines",
+        pageCount: 56,
+        pageIndex,
+        pageLabel: String(pageIndex),
+        text: "Fence colors are limited to the following: Trex in Winchester Grey or Saddle."
+      }))
+    },
     onChanged: vi.fn<() => void>(),
     ...overrides
   }
@@ -225,5 +240,49 @@ describe("RulebookPage", () => {
     await user.click(screen.getByRole("button", { name: "Approve all ready (1)" }))
     expect(props.onApproveReady).toHaveBeenCalled()
     expect(props.onChanged).toHaveBeenCalled()
+  })
+
+  it("opens a citation in its document, removes one, and adds one picked from the page", async () => {
+    const twoCitations = {
+      ...colors,
+      citations: [...colors.citations, { ...colors.citations[0]!, quote: "Trex in Winchester Grey or Saddle." }]
+    }
+    const { actions, user } = setup({ draft: { ...draft, rules: [twoCitations, unverified] } })
+    const panel = await openRule(user, "Composite colors")
+    expect(within(panel).queryByRole("textbox", { name: /Quote/ })).not.toBeInTheDocument()
+
+    await user.click(within(panel).getAllByRole("button", { name: "Remove" })[1]!)
+    expect(actions.removeCitation).toHaveBeenCalledWith("composite-colors", 1)
+
+    await user.click(within(panel).getAllByRole("button", { name: "View in document" })[0]!)
+    const viewer = await screen.findByRole("dialog", { name: "Citation in the document" })
+    expect(await within(viewer).findByText(/Fence colors are limited/)).toBeInTheDocument()
+    expect(within(viewer).queryByRole("button", { name: "Add as citation" })).not.toBeInTheDocument()
+    await user.keyboard("{Escape}")
+
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Add citation" }))
+    const picker = await screen.findByRole("dialog", { name: "Add a citation" })
+    expect(within(picker).getByRole("button", { name: "Add as citation" })).toBeDisabled()
+    await user.keyboard("{Escape}")
+
+    await user.click(within(screen.getByRole("dialog")).getAllByRole("button", { name: "Edit citation" })[0]!)
+    const editor = await screen.findByRole("dialog", { name: "Edit the citation" })
+    expect(within(editor).getByRole("button", { name: "Use this passage" })).toBeDisabled()
+  })
+
+  it("lets the last citation go, then asks for one before saving or approving", async () => {
+    const uncited = { ...colors, citations: [] }
+    const { actions, user } = setup({ draft: { ...draft, rules: [uncited, unverified] } })
+    const panel = await openRule(user, "Composite colors")
+    expect(within(panel).getByRole("alert")).toHaveTextContent("No citation.")
+    expect(within(panel).getByRole("button", { name: "Approve" })).toBeDisabled()
+    await user.click(within(panel).getByRole("button", { name: "Edit" }))
+    expect(within(panel).getByRole("button", { name: "Save" })).toBeDisabled()
+    await user.click(within(panel).getByRole("button", { name: "Cancel" }))
+
+    await user.keyboard("{Escape}")
+    const single = await openRule(user, "Posts match")
+    await user.click(within(single).getByRole("button", { name: "Remove" }))
+    expect(actions.removeCitation).toHaveBeenCalledWith("posts", 0)
   })
 })

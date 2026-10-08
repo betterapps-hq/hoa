@@ -1,19 +1,25 @@
 import { describe, expect, it } from "vitest"
 import { newJob } from "@/db/jobRepository"
-import type { Page } from "@/ocr/page"
+import { normalizeForMatching, type Page } from "@/ocr/page"
 import { catalogForPrompt, routingOptions, truncate } from "@/pipeline/catalogPrompt"
 import type { Rule } from "@/rules/rule"
 import { fenceRules } from "@/tests/fenceRulebook"
 import {
+  addCitation,
   applyRuleChanges,
   approvalBlocker,
+  citationFromSelection,
   describeBuildProblem,
   describeCheck,
   describeConditions,
   issueSeverity,
   needsAttention,
+  plainQuote,
   publishBlockers,
-  readyToApprove
+  readyToApprove,
+  removeCitation,
+  replaceCitation,
+  sectionAt
 } from "./rulebookEditing"
 
 const byId = (id: string) => fenceRules.find((rule) => rule.id === id)!
@@ -42,31 +48,103 @@ describe("applyRuleChanges", () => {
     ...byId("composite-colors"),
     issues: [
       { code: "conflict" as const, message: "Differs from the CC&Rs.", resolution: null },
+      { code: "low-confidence" as const, message: "Scan", resolution: null },
       { code: "sanity" as const, message: "Old", resolution: null }
     ]
   }
 
-  it("edits, re-verifies the quote, keeps build issues and puts the rule back to pending", () => {
-    const pages = new Map([["guidelines:17", page("trex winchester grey and saddle")]])
-    const edited = applyRuleChanges(rule, { title: "Colors", quotes: ["Trex Winchester Grey and Saddle"] }, pages)
+  it("edits the fields, keeps build and citation issues, leaves citations alone and puts the rule back to pending", () => {
+    const edited = applyRuleChanges(rule, { title: "Colors" })
     expect(edited).toMatchObject({
       title: "Colors",
       ruleKey: rule.ruleKey,
+      citations: rule.citations,
       review: { status: "pending", isEdited: true }
     })
-    expect(edited.citations[0]?.match.status).toBe("exact")
-    expect(edited.issues.map((issue) => issue.code)).toEqual(["conflict"])
-  })
-
-  it("flags a corrected quote that still isn't on the page", () => {
-    const pages = new Map([["guidelines:17", page("nothing relevant here at all")]])
-    const edited = applyRuleChanges(rule, { quotes: ["Vinyl is approved"] }, pages)
-    expect(edited.issues.map((issue) => issue.code)).toEqual(["conflict", "citation-not-found"])
-    expect(approvalBlocker(edited)).toBe("Correct the quote so it's found on the cited page before approving.")
-    expect(approvalBlocker(rule)).toBeNull()
+    expect(edited.issues.map((issue) => issue.code)).toEqual(["conflict", "low-confidence"])
   })
 })
 
+describe("citations picked from a document", () => {
+  const text =
+    "### 5.4.1 Wood Fence Colors.\n\n(iii)\nFence colors are limited to the following:\n\na)\n**Behr**: Cedar (SC-146)\n"
+  const sourcePage: Page = {
+    ...page(text),
+    normalizedText: normalizeForMatching(text),
+    headings: [{ level: 4, text: "5.4.1 Wood Fence Colors", offset: 0 }]
+  }
+  const listStart = text.indexOf("Fence colors")
+
+  it("quotes exactly the selected text as plain text, with its section, page and range", () => {
+    const citation = citationFromSelection(sourcePage, { start: listStart - 1, end: text.length }, "Guidelines")
+    expect(citation).toMatchObject({
+      documentId: "guidelines",
+      section: "5.4.1 Wood Fence Colors",
+      pageIndex: 17,
+      pageLabel: "17",
+      quote: "Fence colors are limited to the following: a) Behr: Cedar (SC-146)",
+      match: { status: "exact" },
+      range: { start: listStart, end: text.length - 1 }
+    })
+    expect(() => citationFromSelection(sourcePage, { start: 5, end: 5 }, "Guidelines")).toThrow("Select the passage")
+    expect(() => citationFromSelection(sourcePage, { start: 0, end: 9999 }, "Guidelines")).toThrow("Select the passage")
+  })
+
+  it("names the section from the nearest heading above, else the page's section, else the document", () => {
+    expect(sectionAt(sourcePage, 40, "Guidelines")).toBe("5.4.1 Wood Fence Colors")
+    expect(sectionAt({ ...sourcePage, headings: [], sectionAtTop: "5.4 Fence Colors" }, 40, "Guidelines")).toBe(
+      "5.4 Fence Colors"
+    )
+    expect(sectionAt({ ...sourcePage, headings: [] }, 40, "Guidelines")).toBe("Guidelines")
+  })
+
+  it("strips Markdown marks from a quote", () => {
+    expect(plainQuote("## Title <!-- PageBreak -->\n| a | **b** |\n`c`")).toBe("Title a b c")
+  })
+
+  it("adds a citation, refuses a duplicate, and removes any, including the last", () => {
+    const rule = { ...byId("composite-colors"), issues: [] }
+    const citation = citationFromSelection(sourcePage, { start: listStart, end: text.length }, "Guidelines")
+    const cited = addCitation(rule, citation)
+    expect(cited.citations).toHaveLength(rule.citations.length + 1)
+    expect(cited.review).toMatchObject({ status: "pending", isEdited: true })
+    expect(() => addCitation(cited, citation)).toThrow("already cites")
+
+    const wider = { ...citation, quote: "Fence colors are limited to the following: a) Behr" }
+    const replaced = replaceCitation(cited, cited.citations.length - 1, wider)
+    expect(replaced.citations.at(-1)).toEqual(wider)
+    expect(replaced.citations).toHaveLength(cited.citations.length)
+    expect(() => replaceCitation(cited, 0, citation)).toThrow("already cites")
+    expect(() => replaceCitation(cited, 9, citation)).toThrow("doesn't exist")
+
+    const removed = removeCitation(cited, 0)
+    expect(removed.citations).toEqual([citation])
+    const uncited = removeCitation(removed, 0)
+    expect(uncited.citations).toEqual([])
+    expect(approvalBlocker(uncited)).toBe("Add the passage this rule comes from before approving.")
+    expect(publishBlockers([{ ...uncited, review: { ...uncited.review, status: "approved" } }])).toEqual([
+      "1 rule has no citation."
+    ])
+    expect(publishBlockers([uncited, uncited])).toContain("2 rules have no citation.")
+    expect(() => removeCitation(cited, 9)).toThrow("doesn't exist")
+  })
+
+  it("blocks approval while a citation's quote isn't on its page", () => {
+    const missing = {
+      ...byId("composite-colors"),
+      citations: [{ ...citationFromSelection(sourcePage, { start: listStart, end: text.length }, "G"), quote: "Vinyl" }]
+    }
+    const rechecked = removeCitation(
+      addCitation(missing, {
+        ...citationFromSelection(sourcePage, { start: listStart, end: text.length }, "G"),
+        match: { status: "not-found", score: 0, touchesLowConfidence: false }
+      }),
+      0
+    )
+    expect(approvalBlocker(rechecked)).toBe("Replace the citation whose quote isn't on its page before approving.")
+    expect(approvalBlocker(byId("posts"))).toBeNull()
+  })
+})
 describe("readyToApprove", () => {
   it("picks pending rules whose issues are all resolved", () => {
     const pending = { ...byId("posts"), review: { ...byId("posts").review, status: "pending" as const } }

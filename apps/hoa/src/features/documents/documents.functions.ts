@@ -10,8 +10,10 @@ import {
 } from "@/db/documentRepository"
 import { getJob, getLatestJob, insertJob, newJob } from "@/db/jobRepository"
 import { governingDocumentKinds } from "@/documents/governingDocument"
+import { pageSchema } from "@/ocr/page"
 import { requireAdministrator, getRequestContext } from "@/session/requestContext.server"
 import { governingKeys } from "@/storage/keys"
+import { getJson } from "@/storage/objects"
 import { getBucket, getPresigner } from "@/storage/storage.server"
 import { validateUpload } from "@/storage/uploadRules"
 
@@ -139,6 +141,42 @@ export const listDocuments = createServerFn({ method: "GET" }).handler(async () 
   const context = await getRequestContext()
   return listGoverningDocuments(getDb(), context.hoa.id)
 })
+
+export type DocumentPage = {
+  documentId: string
+  title: string
+  pageCount: number
+  pageIndex: number
+  pageLabel: string | null
+  /** The page's text exactly as stored; citations are character ranges into it. */
+  text: string
+}
+
+/** One page of a governing document, for the document viewer and for picking citations. */
+export const getDocumentPage = createServerFn({ method: "GET" })
+  .validator((data: unknown) =>
+    z.object({ documentId: z.string(), pageIndex: z.number().int().positive() }).parse(data)
+  )
+  .handler(async ({ data }): Promise<DocumentPage> => {
+    const context = await getRequestContext()
+    const document = await getGoverningDocument(getDb(), context.hoa.id, data.documentId)
+    if (document?.status !== "ready" || !document.pageCount) {
+      throw new Error("That document isn't ready.")
+    }
+    const pageIndex = Math.min(data.pageIndex, document.pageCount)
+    const page = await getJson(getBucket(), governingKeys(context.hoa.id, document.id).page(pageIndex), pageSchema)
+    if (!page) {
+      throw new Error(`Page ${pageIndex} of ${document.title} is missing.`)
+    }
+    return {
+      documentId: document.id,
+      title: document.title,
+      pageCount: document.pageCount,
+      pageIndex,
+      pageLabel: page.pageLabel,
+      text: page.text
+    }
+  })
 
 export const getJobStatus = createServerFn({ method: "GET" })
   .validator((data: unknown) => z.object({ jobId: z.string() }).parse(data))

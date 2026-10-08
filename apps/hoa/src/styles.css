@@ -17,6 +17,37 @@
   }
 }
 
+/* A governing document page rendered from its OCR Markdown in the document viewer. */
+@layer components {
+  .document-page {
+    @apply flex flex-col gap-3;
+  }
+  .document-page :is(h1, h2) {
+    @apply text-base font-semibold;
+  }
+  .document-page :is(h3, h4, h5, h6) {
+    @apply text-sm font-semibold;
+  }
+  .document-page :is(ul, ol) {
+    @apply flex flex-col gap-1 pl-5;
+  }
+  .document-page ul {
+    @apply list-disc;
+  }
+  .document-page ol {
+    @apply list-decimal;
+  }
+  .document-page table {
+    @apply w-full border-collapse text-xs;
+  }
+  .document-page :is(th, td) {
+    @apply border px-2 py-1 text-left align-top;
+  }
+  .document-page figure {
+    @apply rounded-md border border-dashed p-2 text-muted-foreground;
+  }
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: "Inter Variable", sans-serif;
