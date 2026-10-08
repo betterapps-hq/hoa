@@ -24,11 +24,21 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       # The Worker is named explicitly: on a closed pull request Wrangler didn't always resolve it from the config.
-      # A pull request closed before its preview deployed has nothing to delete.
+      # A pull request closed before its preview deployed has nothing to delete. Merging also deploys the Worker, and
+      # while that runs Cloudflare can report the Worker missing, so that error is retried.
       # An explicit bash shell runs with pipefail, so the delete's own failure reaches the if.
       - shell: bash
         run: |
-          if ! pnpm --filter hoa exec wrangler preview delete --worker-name hoa --name "$PREVIEW_NAME" 2>&1 | tee delete.log; then
-            grep -q "Preview not found" delete.log || exit 1
-            echo "No preview named $PREVIEW_NAME to delete."
-          fi
+          for attempt in 1 2 3 4 5; do
+            if pnpm --filter hoa exec wrangler preview delete --worker-name hoa --name "$PREVIEW_NAME" 2>&1 | tee delete.log; then
+              exit 0
+            fi
+            if grep -q "Preview not found" delete.log; then
+              echo "No preview named $PREVIEW_NAME to delete."
+              exit 0
+            fi
+            grep -q "Worker does not exist" delete.log || exit 1
+            echo "The Worker is being deployed; retrying in 30 seconds."
+            sleep 30
+          done
+          exit 1
