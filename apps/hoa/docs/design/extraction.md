@@ -136,11 +136,14 @@ draft and its rules, and moves the rulebook to `draft` ([rules.md](rules.md#vers
 
 ### 8. Review
 
-The administrator works in the rulebook editor: rules grouped by topic, each showing its citation (with the page text
-one click away), its issues and, for a rebuild, what changed: a `changed` rule shows the previous version beside it, and
-rules that disappeared are listed as removed. A rule whose citation is
-`not-found` can't be approved until the administrator corrects the quote or the citation. Every edit re-runs Verify.
-Administrators can add rules by hand (`provenance.source: "administrator"`); they need a citation like any other rule.
+The administrator works in the rulebook editor: a searchable list of rules, each opening in a side panel with its
+citations, its issues and its actions. **A citation's text is never edited.** "View in document" opens the document
+viewer at the cited page with the passage highlighted; "Add citation" opens the viewer, where the administrator selects
+the passage and adds it. Only the document, page and character range are sent: the server copies the quote from the
+stored page and records the range, so a citation is always the document's own words. A citation can be removed, but a
+rule keeps at least one. A rule whose citation is `not-found` can't be approved until that citation is replaced by one
+picked from the document. Every change puts the rule back to pending. Administrators can add rules by hand
+(`provenance.source: "administrator"`); they need a citation like any other rule.
 
 An administrator resolves an issue (a conflict, an unresolved reference) by rejecting a rule or by dismissing the issue
 with a note, which sets its `resolution`.

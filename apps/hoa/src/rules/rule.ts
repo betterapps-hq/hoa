@@ -86,7 +86,9 @@ export const citationSchema = z.object({
   pageIndex: z.number().int().positive(),
   pageLabel: z.string().nullable(),
   quote: z.string(),
-  match: citationMatchSchema
+  match: citationMatchSchema,
+  /** Where the quote is in the page's text: set for citations picked in the document viewer. */
+  range: z.object({ start: z.number().int().nonnegative(), end: z.number().int().positive() }).optional()
 })
 
 export const ruleIssueCodes = [

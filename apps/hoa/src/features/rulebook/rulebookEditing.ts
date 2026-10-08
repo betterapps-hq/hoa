@@ -12,52 +12,131 @@ export const ruleChangesSchema = z.object({
   obligation: ruleSchema.shape.obligation.optional(),
   discretion: ruleSchema.shape.discretion.optional(),
   isCurable: z.boolean().optional(),
-  check: checkSchema.optional(),
-  quotes: z.array(z.string().trim().min(1)).optional()
+  check: checkSchema.optional()
 })
 export type RuleChanges = z.infer<typeof ruleChangesSchema>
 
-/** The edit form's fields, all required. */
+/** The edit form's fields, all required. Citations aren't edited here: they're picked from documents. */
 export const ruleEditSchema = z.object({
   title: z.string().trim().min(1, "Enter a title."),
   statement: z.string().trim().min(1, "Enter the rule."),
   obligation: ruleSchema.shape.obligation,
   discretion: ruleSchema.shape.discretion,
-  isCurable: z.boolean(),
-  quotes: z.array(z.string().trim().min(1, "Enter the quote."))
+  isCurable: z.boolean()
 })
 
 /** Issues that only the build produces; editing a rule keeps them. */
 const buildIssueCodes = new Set<Rule["issues"][number]["code"]>(["conflict", "duplicate-key", "unresolved-reference"])
 
+/** Issues about the citations themselves, recomputed whenever the citations change. */
+const citationIssueCodes = new Set<Rule["issues"][number]["code"]>(["citation-not-found", "low-confidence"])
+
+const backToPending = (rule: Rule): Rule["review"] => ({
+  ...rule.review,
+  status: "pending",
+  isEdited: true,
+  reviewedBy: null,
+  reviewedAt: null
+})
+
 /**
- * Applies an administrator's edit and re-runs Verify: citations are matched again against their pages, and catalog
- * issues recomputed. Issues from the build (conflicts, duplicate keys) stay. The key never changes.
+ * Applies an administrator's edit and re-runs the catalog checks. Issues from the build (conflicts, duplicate keys)
+ * and the citations' issues stay; the citations themselves never change here. The key never changes.
  */
-export function applyRuleChanges(rule: Rule, changes: RuleChanges, pages: ReadonlyMap<string, Page>): Rule {
-  const { quotes, ...fields } = changes
-  const citations = rule.citations.map((citation, index) => {
-    const quote = quotes?.[index] ?? citation.quote
-    const page = pages.get(`${citation.documentId}:${citation.pageIndex}`)
-    return { ...citation, quote, match: page ? matchQuote(quote, page) : citation.match }
-  })
-  const edited: Rule = { ...rule, ...fields, citations }
+export function applyRuleChanges(rule: Rule, changes: RuleChanges): Rule {
+  const edited: Rule = { ...rule, ...changes }
   const catalogIssues: Rule["issues"] = checkRuleAgainstCatalog(edited).map((issue) => ({ ...issue, resolution: null }))
   return {
     ...edited,
     issues: [
-      ...rule.issues.filter((issue) => buildIssueCodes.has(issue.code)),
-      ...citationIssues(citations),
+      ...rule.issues.filter((issue) => buildIssueCodes.has(issue.code) || citationIssueCodes.has(issue.code)),
       ...catalogIssues
     ],
-    review: { ...rule.review, status: "pending", isEdited: true, reviewedBy: null, reviewedAt: null }
+    review: backToPending(rule)
   }
 }
 
+export type PageSelection = { start: number; end: number }
+
+/** A passage of a page's Markdown as plain text: no heading marks, emphasis, table pipes, tags or extra spaces. */
+export function plainQuote(markdown: string) {
+  return markdown
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/(\*\*|__|`)/g, "")
+    .replace(/\|/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+/** The section a passage belongs to: the last heading above it on the page, else the section the page starts in. */
+export function sectionAt(page: Page, offset: number, fallback: string) {
+  const heading = page.headings.findLast((item) => item.offset <= offset)
+  return heading?.text ?? page.sectionAtTop ?? fallback
+}
+
+/**
+ * A citation of exactly the text an administrator selected on a page. The quote is copied from the stored page by its
+ * character range, never typed, so a citation can't say something the document doesn't.
+ */
+export function citationFromSelection(page: Page, selection: PageSelection, documentTitle: string) {
+  const raw = page.text.slice(selection.start, selection.end)
+  const quote = plainQuote(raw)
+  if (selection.start < 0 || selection.end > page.text.length || selection.start >= selection.end || !quote) {
+    throw new Error("Select the passage to cite on the page.")
+  }
+  const start = selection.start + (raw.length - raw.trimStart().length)
+  const end = selection.end - (raw.length - raw.trimEnd().length)
+  return {
+    documentId: page.documentId,
+    section: sectionAt(page, start, documentTitle),
+    pageIndex: page.pageIndex,
+    pageLabel: page.pageLabel,
+    quote,
+    match: matchQuote(quote, page),
+    range: { start, end }
+  }
+}
+
+function withCitations(rule: Rule, citations: Rule["citations"]): Rule {
+  return {
+    ...rule,
+    citations,
+    issues: [...rule.issues.filter((issue) => !citationIssueCodes.has(issue.code)), ...citationIssues(citations)],
+    review: backToPending(rule)
+  }
+}
+
+/** Adds a citation picked from a document; the rule goes back to pending. */
+export function addCitation(rule: Rule, citation: Rule["citations"][number]): Rule {
+  const isDuplicate = rule.citations.some(
+    (item) =>
+      item.documentId === citation.documentId && item.pageIndex === citation.pageIndex && item.quote === citation.quote
+  )
+  if (isDuplicate) {
+    throw new Error("The rule already cites that passage.")
+  }
+  return withCitations(rule, [...rule.citations, citation])
+}
+
+/** Removes a citation; every rule keeps at least one. The rule goes back to pending. */
+export function removeCitation(rule: Rule, index: number): Rule {
+  if (rule.citations.length <= 1) {
+    throw new Error("A rule needs at least one citation. Add the right one before removing this one.")
+  }
+  if (!rule.citations[index]) {
+    throw new Error("That citation doesn't exist.")
+  }
+  return withCitations(
+    rule,
+    rule.citations.filter((_, position) => position !== index)
+  )
+}
 /** Why a rule can't be approved yet, or null when it can. */
 export function approvalBlocker(rule: Rule): string | null {
   const unverified = rule.issues.find((issue) => issue.code === "citation-not-found" && !issue.resolution)
-  return unverified ? "Correct the quote so it's found on the cited page before approving." : null
+  return unverified ? "Replace the citation whose quote isn't on its page before approving." : null
 }
 
 /**

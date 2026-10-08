@@ -7,6 +7,7 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { ruleTopics, type Rule } from "@/rules/rule"
 import { describeCheck, issueSeverity, needsAttention } from "../rulebookEditing"
 import { RuleCard, type RuleCardActions } from "../RuleCard/RuleCard"
@@ -55,10 +56,12 @@ export type RuleTableProps = {
   rules: Rule[]
   /** With actions the table edits a draft: status filters, issues and the rule's actions in its panel. */
   actions?: RuleCardActions
+  /** The documents citations come from, for opening and adding citations. */
+  source?: CitationSource
 }
 
 /** The rulebook as a searchable list; a rule opens in a side panel with its citations, issues and actions. */
-export function RuleTable({ rules, actions }: RuleTableProps) {
+export function RuleTable({ rules, actions, source }: RuleTableProps) {
   const isEditable = actions !== undefined
   const attentionCount = rules.filter(needsAttention).length
   const [query, setQuery] = useState("")
@@ -193,16 +196,17 @@ export function RuleTable({ rules, actions }: RuleTableProps) {
       </div>
 
       <Sheet open={selected !== null} onOpenChange={(open) => (open ? undefined : setSelectedId(null))}>
-        <SheetContent className="w-full overflow-y-auto data-[side=right]:w-full data-[side=right]:sm:max-w-2xl">
+        <SheetContent className="w-full gap-0 overflow-hidden data-[side=right]:w-full data-[side=right]:sm:max-w-2xl">
           {selected ? (
             <>
               <SheetHeader>
                 <SheetTitle>{topicLabels[selected.topic]}</SheetTitle>
                 <SheetDescription>{selected.citations[0]?.section}</SheetDescription>
               </SheetHeader>
-              <div className="px-4 pb-4">
+              <div className="flex min-h-0 flex-1 flex-col">
                 <RuleCard
                   rule={selected}
+                  source={source}
                   actions={
                     actions
                       ? {
