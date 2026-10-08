@@ -21,9 +21,8 @@ All environments trace to this one project and are told apart by `LANGFUSE_TRACI
 Broadcast sends every OpenRouter request to Langfuse as a generation with its token usage, billed cost and timing. See
 [ai.md](ai.md#tracing-and-cost) for how it nests under the app's spans.
 
-Before the demo is hosted (phase 3), create a second workspace for the demo and previews, with its own key and the same
-Broadcast destination with **privacy mode** on: Langfuse then receives cost, usage and timing but no prompt or
-completion text, because hosted environments can hold real application packets
+The demo and previews use the same key and Broadcast destination as development, with full content in Langfuse. Before
+real HOAs onboard, they move to their own workspace with Broadcast's **privacy mode** on
 ([design/documents.md](design/documents.md#privacy-and-retention)).
 
 ## 3. Azure Document Intelligence
@@ -44,7 +43,7 @@ non-secret values in `wrangler.jsonc` `vars` (preview values in its `previews` b
 
 | Variable | Purpose | Development (`.env`) | Preview | Demo |
 | --- | --- | --- | --- | --- |
-| `OPENROUTER_API_KEY` (secret) | Model calls. Without it, AI features report that it's missing. | Development workspace key | Demo workspace key | Demo workspace key |
+| `OPENROUTER_API_KEY` (secret) | Model calls. Without it, AI features report that it's missing. | hoa key | Same | Same |
 | `OPENROUTER_MODEL` | Main model; defaults to `anthropic/claude-haiku-5.5` | Default | Default | Default |
 | `OPENROUTER_SMALL_MODEL` (phase 1) | Routing, structure and classification; defaults to the main model | Default | Default | Default |
 | `LANGFUSE_PUBLIC_KEY` (secret) | Tracing and prompt management | `arc-review` key | `arc-review` key | `arc-review` key |
@@ -78,7 +77,8 @@ After changing `wrangler.jsonc`, regenerate the binding types with `pnpm --filte
 
 One-time setup for the demo and pull request previews ([design/platform.md](design/platform.md#cicd)):
 
-1. Sign in: `pnpm --filter hoa exec wrangler login`.
+1. Sign in from the app folder (`cd apps/hoa`, then `pnpm exec wrangler login`). Through `pnpm --filter`, Wrangler's
+   login starts twice and fails on its callback port.
 2. Create the R2 buckets: `wrangler r2 bucket create hoa-files` and `wrangler r2 bucket create hoa-preview`.
 3. Set the demo's secrets with `wrangler secret put <name>`, and the previews' with
    `wrangler preview base-config secret put <name>`: `OPENROUTER_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`

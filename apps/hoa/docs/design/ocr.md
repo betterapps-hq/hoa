@@ -13,37 +13,58 @@ Research for this page was done on 2026-10-08; prices and API versions change, s
 | File | Workflow | Started by |
 | --- | --- | --- |
 | Governing document | `DocumentIngest(documentId)`, which sets the document `ready` or `failed` | `completeUpload` |
-| Application file | The first steps of `ApplicationReview(applicationId)` | Submitting the application |
+| Application file | The `ocr` and `visuals` stages of `ApplicationReview(applicationId)` | `runReview` |
 
 A rulebook build only uses documents that are already `ready`, so building or rebuilding a rulebook never re-runs OCR.
-See [platform.md](platform.md#workflows) for the steps.
+
+DocumentIngest's stages, which are also the job's `stage` values (every step name starts with its stage id):
+
+| Stage id | Steps |
+| --- | --- |
+| `resolve-prompts` | `resolve-prompts` |
+| `ocr` | `ocr:hash`, then per range `ocr:submit:{range}`, `ocr:poll:{range}`, `ocr:pages:{range}`, then `ocr:labels` |
+| `visuals` | `visuals:{figureId}` |
+
+ApplicationReview runs the same steps per file, with the file id in each name ([review.md](review.md#stages)).
 
 ## Flow
 
 ```text
-Upload ──> R2 ──presigned GET──> Layout (per page range) ──> raw response ──> R2
-                                                                 │
-                                       page records <────────────┤
-                                       figure PNGs  <── figures API ──> vision model ──> descriptions on the page record
+Upload ──> R2 ──presigned GET──> Layout ──> raw response ──> R2 ──> page records
+                                    │
+                                    └── figures API ──> figure PNGs ──> vision model ──> descriptions
 ```
 
-1. **Hash.** The file is hashed by streaming it from R2. A governing document matching one the HOA already has is
-   refused as a duplicate ([documents.md](documents.md#object-layout)).
-2. **Submit.** One step per page range (`pages=1-50`, `51-100`, ...) calls Layout with a presigned `GET` URL to the file
-   (`urlSource`), so the Worker never holds the file. Requested options: `outputContentFormat=markdown`,
-   `output=figures`, API version `2024-11-30`. The step returns the operation URL. Submitting is its own step so a retry
-   of the polling never analyzes (and bills) the range twice.
-3. **Poll.** A separate step checks the operation, with `step.sleep` between checks. When it succeeds, the response body
-   is streamed to R2 (`ocr/{engine}/{pageRange}.json`) and the step returns only the key.
-4. **Pages.** One step per range reads its raw response from R2 and writes one [page record](documents.md#pages) per
-   page: Markdown text, normalized text, header and footer, headings, checkboxes, figures, printed label and
-   low-confidence spans. Ranges are parsed one at a time to stay well inside a Worker's memory.
-5. **Figures.** For each figure Layout reports, a step fetches its cropped PNG from
-   `/analyzeResults/{resultId}/figures/{figureId}`, stores it at `figures/{figureId}.png`, and sends it to the vision
-   model. Uploaded images are sent as they are. The description is stored on the page record **next to** the OCR text,
-   never merged into it, so quotes stay verbatim.
+1. **Hash.** The file is hashed by streaming it from R2 through `crypto.DigestStream`. A governing document matching
+   one the HOA already has is refused as a duplicate ([documents.md](documents.md#object-layout)).
+2. **Submit.** `ocr:submit:{range}` calls Layout with a presigned `GET` URL to the file (`urlSource`), so the Worker
+   never holds the file. Requested options: `outputContentFormat=markdown`, `output=figures`, API version
+   `2024-11-30`, and for PDFs `pages={range}`. The step returns the operation URL. Submitting is its own step, so a
+   retried poll never analyzes (and bills) a range twice.
+3. **Poll.** `ocr:poll:{range}` checks the operation and throws a retryable "not ready" error while Layout is still
+   running, with `retries: { limit: 180, delay: "5 seconds", backoff: "constant" }` (15 minutes). A Workflow step name
+   is its cache key, so polling must not call the same step name in a loop: that would return the first cached
+   "running" result forever. When the operation succeeds, the step streams the response to R2
+   (`ocr/{engine}/{range}.json`) and returns only the key.
+4. **Pages.** `ocr:pages:{range}` reads that range's raw response and writes one [page record](documents.md#pages) per
+   page: Markdown text, normalized text, header and footer, headings, checkboxes, figures, printed labels from
+   `pageNumber` paragraphs, and low-confidence spans. It returns how many pages it wrote.
 
-Images (JPEG, PNG, TIFF, BMP, HEIF) go through Layout like PDFs and yield one page record each.
+   PDFs are analyzed in **50-page ranges, one after another**, because the Worker can't know a PDF's page count before
+   Layout reads it, and parsing one range at a time keeps memory bounded. The workflow submits `1-50`; if that range
+   came back with 50 pages, it submits `51-100`, and so on, stopping at the first short range or when Layout reports
+   the range is past the end of the file. Past 300 pages the document fails with a `NonRetryableError`. Word files and
+   images are always one call with no `pages` option.
+
+   A final `ocr:labels` step runs once all ranges are written, because it needs the whole document: it computes
+   printed labels from the most common offset for pages with no `pageNumber` paragraph, finds text repeated on more
+   than half the pages (watermarks, recording stamps), and writes both to `layout.json` beside the pages. Page records
+   stay write-once; readers apply `layout.json` when they load pages. It also sets `pageCount`.5. **Visuals.** For each figure Layout reports, `visuals:{figureId}` fetches its cropped PNG from
+   `/analyzeResults/{resultId}/figures/{figureId}`, stores it at `figures/{figureId}.png`, sends it to the vision model,
+   and stores the description at `figures/{figureId}.json`. Uploaded and extracted images (JPEG and PNG only) are sent
+   as they are, as figure `image`. Descriptions are stored beside the page record, never merged into its text, so
+   quotes stay verbatim. Azure deletes analyze results after 24 hours, so a run that needs a figure image again later
+   uses the stored PNG.
 
 ### Word files
 
@@ -52,9 +73,14 @@ Layout reads a Word file's text and headings, but it ignores embedded images and
 
 - The Layout text is stored as one page record, page 1, with no printed label. Citations into Word files name the
   heading or section instead of a page.
-- A step unzips `word/media/*`, stores each image as a derived application file (`parentFileId` set), and processes it
-  like an uploaded image. The sample application's Word appendix holds four images this way: the product photo, the
-  gate, and the current fence.
+- A step (`ocr:media:{fileId}`) walks `word/document.xml` for embedded pictures in document order and resolves each
+  through `word/_rels/document.xml.rels`. Each JPEG or PNG becomes a derived application file with `parentFileId`, its
+  `ordinal` and its `contextText` (the paragraph just before it); other formats, such as EMF drawings, are stored as
+  unreadable. The context goes to the vision and facts prompts, because it's what says what each picture shows.
+- The sample appendix holds four pictures this way: the current fence ("Here's what the current fence looks like"), the
+  proposed product ("Copy of the new fence is attached"), the gate ("Here's a photo of the gate we'll install") and the
+  hand-marked plat map, which is the packet's plot plan.
+- Governing Word documents get the same treatment, so exhibit drawings embedded in them are described too.
 
 ## Why Layout
 
@@ -112,7 +138,7 @@ calling Layout again.
 
 | Prompt | Trace name | Model setting | Variables | Output |
 | --- | --- | --- | --- | --- |
-| `hoa-visual-description` | `visual-description` | `OPENROUTER_MODEL` | `fileKind`, `ocrText` (the page's OCR text, as context), plus the image | `{ description: string; measurements: { label: string; value: string }[] }` |
+| `hoa-visual-description` | `visual-description` | `OPENROUTER_MODEL` | `documentKind` (the governing document's kind, or null for application files), `contextText`, `ocrText` (the page's OCR text), plus the image | `{ description: string; measurements: { label: string; value: string }[] }` |
 
 The description says what the drawing or photo shows (fence route, board orientation, gate, product) without restating
 the OCR text. Model settings are fallbacks; a prompt version's `config.model` takes precedence ([ai.md](../ai.md)).
@@ -162,11 +188,13 @@ What the pipeline must handle on scans:
 
 Still to test, early in phase 1:
 
-- the full documents, and peak Worker memory while parsing the 81-page CC&Rs in 50-page ranges;
-- the application form's checkboxes and the Word appendix's images;
-- whether the hand-marked plot plan page is reported as a figure (if not, the whole page image is needed, which Layout
-  doesn't return, so the plot plan would be sent to the vision model as the original image when the file is an image,
-  or flagged when it's a PDF page).
+- the full guidelines and the 81-page CC&Rs (two ranges), measuring peak Worker memory while parsing a range, and the
+  error Layout returns for a range past the end of the file;
+- the application form's checkboxes;
+- the Word appendix: extracting its four pictures with their context, classifying the plat map as `plot-plan`, and the
+  vision model reading the red route and the gate from it;
+- for other packets, whether a hand-marked plot plan on a PDF page is reported as a figure (if not, its page has no
+  image for the vision model, and the review relies on Layout's text for that page).
 
 The OCR client sits behind one small interface (file in, raw responses out), so the engine can change without touching
 the rest of the pipeline.

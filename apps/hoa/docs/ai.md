@@ -26,8 +26,9 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
 
 ## Tracing and cost
 
-- [`telemetry.server.ts`](../src/ai/telemetry.server.ts) registers OpenTelemetry with Langfuse's span processor. The app
-  traces its own spans; it doesn't trace model generations.
+- [`telemetry.server.ts`](../src/ai/telemetry.server.ts) registers OpenTelemetry with Langfuse's span processor: a
+  `BasicTracerProvider` plus an `AsyncLocalStorage` context manager, because the server runs in Cloudflare's workerd.
+  The app traces its own spans; it doesn't trace model generations.
 - **OpenRouter Broadcast delivers the generations**, with token usage and OpenRouter's billed cost. `runPrompt.ts`
   sends the span's `trace_id` and `parent_span_id` (plus trace name, generation name and environment) in OpenRouter's
   `trace` field, so the generation nests under the feature's span in one Langfuse trace. Don't also enable the AI SDK's
@@ -39,8 +40,8 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
 - Each span records the prompt name and version as metadata, and its output records latency and cost.
 - Read traces through the v2 observations API (`/api/public/v2/observations?traceId=...`). The legacy trace endpoints
   return `410 Gone`.
-- **Trace names.** Name each trace after its feature or pipeline stage: today `model-check`, `rule-extraction` and
-  `application-review`; the pipeline's stage trace names are listed in each design page's "Prompts and models" table.
+- **Trace names.** Name each trace after its feature or pipeline stage: today `model-check`, and the prototype's `rule-extraction`
+  and `application-review`; the pipeline's stage trace names are listed in each design page's "Prompts and models" table.
   A Workflow's calls use the job id as the session ID, so one build or review reads as one Langfuse session.
   Evaluators and dashboards filter on these names.
 
@@ -60,13 +61,17 @@ When a feature needs a production evaluator:
 
 The [design](design/README.md) changes these as phase 1 lands; update this page in the same changes:
 
-- Jobs resolve each prompt label to a version once, and steps fetch prompts by version.
-- A prompt version's `config.model` chooses its model; `OPENROUTER_MODEL` and `OPENROUTER_SMALL_MODEL` are fallbacks.
-- `runPrompt` gains `recordContent: "full" | "summary"`; application stages record summaries, without page text or
-  personal details ([design/documents.md](design/documents.md#privacy-and-retention)).
-- Telemetry moves to a `BasicTracerProvider` with an `AsyncLocalStorage` context manager on Workers
-  ([design/platform.md](design/platform.md#tracing-on-workers)).
+- **Prompts by version.** `PromptLoader` takes `{ label }` or `{ version }` and returns the prompt's `config`, parsed
+  with Zod (`{ model?: string }`). Workflow jobs resolve each label to a version once, in `resolve-prompts`, and steps
+  load by version. Prompt versions are typed `number | "fallback"`; fallback text is fine locally, but hosted jobs fail
+  (retryably) rather than run on it.
+- **Model per prompt.** `runPrompt` receives a model factory and a default model id, picks the model after loading the
+  prompt (its `config.model`, else `OPENROUTER_MODEL` or `OPENROUTER_SMALL_MODEL`), and reports the `modelId` it used.
+- **Flushing in Workflows.** Workflow steps await the telemetry flush at the end of each step, as server functions do
+  before returning.
 
+Not planned for the demo: recording summaries instead of content for application stages, and Broadcast's privacy
+mode. Both are needed before real HOAs onboard ([design/documents.md](design/documents.md#privacy-and-retention)).
 ## New AI feature checklist
 
 - [ ] Prompt registered in `prompts.ts` and created in Langfuse with the serving label.

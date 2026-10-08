@@ -24,11 +24,12 @@ Two model stages have no dataset of their own and are measured through the stage
 
 The gold rulebook comes from the governing documents only: guidelines Article 5 and its exhibits, CC&R Article 4, and
 the HOA's blank application form and checklist (until the HOA provides a blank copy, the packet's form pages with every
-filled value removed). It has about 40 fence rules.
+filled value removed). It follows the one-check-per-rule convention ([rules.md](rules.md#rule-shape)) and has about 45
+fence rules.
 
 Application variants start from a **complete, compliant baseline**: the redacted packet with a listed Trex color,
-vertical boards in a K style, a stated 72-inch height, both owners' signatures, a signed checklist, neighbor approval letters that
-state everything 5.6.1(i) requires, and a matching gate. Each variant then changes one thing, so every branch of the
+vertical boards in a K style, a stated 72-inch height, both owners' signatures, a signed checklist that answers "Yes" to before photos,
+neighbor approval letters that state everything 5.6.1(i) requires, and a gate that matches the fence. Each variant then changes one thing, so every branch of the
 decision policy is reached:
 
 | Variant | Expected recommendation |
