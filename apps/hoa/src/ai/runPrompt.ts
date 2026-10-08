@@ -116,11 +116,29 @@ export function outputSchema<T>(schema: z.ZodType<T>) {
 
 const respondTool = "respond"
 
+/** The answer from a tool call, or from a JSON reply when the model answered in text instead. */
+export function answerOf(result: { toolCalls: readonly { toolName: string; input: unknown }[]; text: string }) {
+  const call = result.toolCalls.find((item) => item.toolName === respondTool)
+  if (call) {
+    return call.input
+  }
+  const json = /\{[\s\S]*\}/.exec(result.text)?.[0]
+  if (!json) {
+    return undefined
+  }
+  try {
+    return JSON.parse(json)
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * Runs a Langfuse-managed prompt and returns JSON validated against `schema`. The model answers by calling a `respond`
  * tool rather than through structured output: providers compile a structured-output schema into a grammar, and the
  * rule schemas are larger than they accept. Tool input isn't grammar-constrained, so Zod validates it, and an invalid
- * answer throws so the Workflow step retries.
+ * answer throws so the Workflow step retries. The tool isn't forced: Claude Opus 5.5 refuses a forced tool choice, so
+ * the only tool is offered and a JSON text reply is accepted too.
  */
 export async function runObjectPrompt<T>(
   options: PromptRunOptions & { schema: z.ZodType<T> }
@@ -130,10 +148,12 @@ export async function runObjectPrompt<T>(
     generate: async (request) => {
       const result = await generateText({
         ...request,
-        tools: { [respondTool]: tool({ description: "Return your answer.", inputSchema }) },
-        toolChoice: { type: "tool", toolName: respondTool }
+        tools: {
+          [respondTool]: tool({ description: "Call this once with your complete answer.", inputSchema })
+        },
+        toolChoice: "auto"
       })
-      const parsed = options.schema.safeParse(result.toolCalls.find((call) => call.toolName === respondTool)?.input)
+      const parsed = options.schema.safeParse(answerOf(result))
       if (!parsed.success) {
         throw new Error(`No object generated: the answer didn't match the schema. ${parsed.error.message}`)
       }
