@@ -16,6 +16,7 @@ export const runModelCheck = createServerFn({ method: "POST" }).handler(async ()
       createModel: ai.createModel,
       defaultModelId: ai.modelId,
       prompt: prompts.modelCheck,
+      variables: {},
       traceName: "model-check",
       environment: ai.environment
     })
