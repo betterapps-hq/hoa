@@ -1,38 +1,64 @@
-import { createFileRoute } from "@tanstack/react-router"
-import { ShieldCheckIcon } from "lucide-react"
-import { Notice } from "@/components/Notice"
-import { Button } from "@/components/ui/button"
-import { useRole } from "@/features/role/RoleProvider"
-import { extractRules, getRulebook, publishRulebook } from "@/features/rulebook/rulebook.functions"
+import { createFileRoute, useRouter } from "@tanstack/react-router"
+import { getJobStatus, listDocuments } from "@/features/documents/documents.functions"
+import {
+  approveReadyRules,
+  getRulebookView,
+  publishRulebook,
+  resolveIssue,
+  reviewRule,
+  saveRule,
+  startRulebookBuild
+} from "@/features/rulebook/rulebook.functions"
 import { RulebookPage } from "@/features/rulebook/RulebookPage/RulebookPage"
 
 export const Route = createFileRoute("/rules")({
   staticData: { title: "Rulebook" },
-  head: () => ({ meta: [{ title: "Rulebook | HOA design review" }] }),
-  loader: () => getRulebook(),
+  loader: async () => {
+    const [draft, published, documents] = await Promise.all([
+      getRulebookView({ data: { which: "draft" } }),
+      getRulebookView({ data: { which: "published" } }),
+      listDocuments()
+    ])
+    return { draft, published, documents }
+  },
   component: RulesRoute
 })
 
 function RulesRoute() {
-  const rulebook = Route.useLoaderData()
-  const { role, setRole } = useRole()
+  const { draft, published, documents } = Route.useLoaderData()
+  const router = useRouter()
+  const refresh = () => void router.invalidate()
   return (
-    <div className="px-4 lg:px-6">
-      {role.id === "administrator" ? (
-        <RulebookPage
-          rulebook={rulebook}
-          onExtract={(formData) => extractRules({ data: formData })}
-          onPublish={(input) => publishRulebook({ data: input })}
-        />
-      ) : (
-        <div className="max-w-2xl space-y-4">
-          <Notice tone="info">Only HOA administrators can manage the rulebook.</Notice>
-          <Button variant="outline" onClick={() => setRole("administrator")}>
-            <ShieldCheckIcon />
-            Switch to administrator
-          </Button>
-        </div>
-      )}
-    </div>
+    <RulebookPage
+      draft={draft}
+      published={published}
+      documents={documents}
+      loadJob={(jobId) => getJobStatus({ data: { jobId } })}
+      onBuild={async (documentIds) => {
+        await startRulebookBuild({ data: { documentIds } })
+      }}
+      onApproveReady={async () => {
+        const { count } = await approveReadyRules()
+        return count
+      }}
+      onPublish={async (rulebookId) => {
+        await publishRulebook({ data: { rulebookId } })
+      }}
+      onChanged={refresh}
+      actions={{
+        review: async (ruleId, status) => {
+          await reviewRule({ data: { ruleId, status, note: null } })
+          refresh()
+        },
+        save: async (ruleId, changes) => {
+          await saveRule({ data: { ruleId, changes } })
+          refresh()
+        },
+        resolveIssue: async (ruleId, issueIndex, note) => {
+          await resolveIssue({ data: { ruleId, issueIndex, note } })
+          refresh()
+        }
+      }}
+    />
   )
 }

@@ -10,26 +10,6 @@ export type PromptDefinition = {
   fallback: string
 }
 
-const ruleExtraction = `You turn a homeowners association's governing documents into a structured rulebook that its Design Review Committee (DRC) uses to review homeowners' architectural applications.
-
-HOA: {{hoaName}}
-Project types to extract rules for: {{projectTypes}}
-Attached documents, in order: {{documentList}}
-
-Read every attached document completely, including scanned pages, drawings, tables and exhibits. Extract every rule that a DRC reviewer would check when reviewing an application for the listed project types. That includes:
-- what the project itself must satisfy: allowed materials, manufacturers, styles and colors; height and size limits; placement and setbacks; prohibitions;
-- what the application must include: required documents, drawings, photos, neighbor approvals, signatures;
-- process rules that affect the decision: approval authority, variances, deadlines, conditions.
-
-For each rule:
-- title: a short name, such as "Composite fence colors".
-- requirement: the complete requirement in plain language, keeping every number, unit, list of allowed values and exception exactly as written. Keep values tied to their qualifiers, for example which colors apply to which manufacturer. Don't generalize or add requirements the documents don't state.
-- kind: allowed-values, numeric-limit, placement, required-document, prohibition or process.
-- projectTypes: the listed project types the rule applies to.
-- source: the document's name as listed above, the section number or heading, the printed page number when visible (otherwise the PDF page number, or null), and a short verbatim quote of at most 25 words that supports the rule.
-
-Make each rule atomic: split a section that sets several independent limits into separate rules. Skip general boilerplate that never affects a decision. Don't extract rules for project types that weren't listed.`
-
 const applicationReview = `You review a homeowner's architectural application for the Design Review Committee (DRC) of {{hoaName}}, and recommend a decision. The DRC makes the final decision; write so a committee member can verify every finding.
 
 Project type: {{projectType}}
@@ -62,6 +42,5 @@ export const prompts = {
     fallback:
       "You are the assistant for a homeowners association's Design Review Committee. Reply with one short sentence confirming you're ready to review architectural applications."
   },
-  ruleExtraction: { name: "hoa-rule-extraction", fallback: ruleExtraction },
   applicationReview: { name: "hoa-application-review", fallback: applicationReview }
 } satisfies Record<string, PromptDefinition>

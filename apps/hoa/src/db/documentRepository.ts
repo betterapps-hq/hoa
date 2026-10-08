@@ -105,15 +105,20 @@ function toSection(row: typeof sections.$inferSelect): Section {
   }
 }
 
-/** Sections are written once per document version; a second build finds them and writes nothing. */
+/**
+ * Sections are written once per document version; a second build finds them and writes nothing. One statement per row,
+ * in a batch: D1 allows 100 bound parameters per statement, so a multi-row insert of a long document fails.
+ */
 export async function saveSections(db: Database, hoaId: string, items: readonly Omit<Section, "routing">[]) {
-  if (items.length === 0) {
-    return
+  const [first, ...rest] = items.map((section) =>
+    db
+      .insert(sections)
+      .values({ ...section, hoaId, routing: null })
+      .onConflictDoNothing()
+  )
+  if (first) {
+    await db.batch([first, ...rest])
   }
-  await db
-    .insert(sections)
-    .values(items.map((section) => ({ ...section, hoaId, routing: null })))
-    .onConflictDoNothing()
 }
 
 export async function listSections(db: Database, hoaId: string, documentId: string): Promise<Section[]> {

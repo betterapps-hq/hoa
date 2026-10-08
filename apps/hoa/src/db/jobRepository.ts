@@ -49,6 +49,18 @@ export async function getLatestJob(db: Database, hoaId: string, subjectId: strin
   return row ? jobSchema.parse(row) : null
 }
 
+/** The HOA's latest job of a kind, so the rulebook page can show why the last build failed. */
+export async function getLatestJobOfKind(db: Database, hoaId: string, kind: Job["kind"]): Promise<Job | null> {
+  const row = await db
+    .select()
+    .from(jobs)
+    .where(and(eq(jobs.hoaId, hoaId), eq(jobs.kind, kind)))
+    .orderBy(desc(jobs.createdAt))
+    .limit(1)
+    .get()
+  return row ? jobSchema.parse(row) : null
+}
+
 /** Every job for a subject, newest first: the retention sweep deletes their outputs and traces. */
 export async function listJobs(db: Database, hoaId: string, subjectId: string): Promise<Job[]> {
   const rows = await db

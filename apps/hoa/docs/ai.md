@@ -11,6 +11,10 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
 - Create models with [`createChatModel`](../src/ai/openrouter.server.ts). OpenRouter is the only provider. Every model
   denies data collection (`provider.data_collection: "deny"`), so requests never reach providers that may store or train
   on prompts. The model id comes from `OPENROUTER_MODEL` unless a feature needs a specific model.
+- `runObjectPrompt` has the model answer by calling a `respond` tool, not through structured output: providers compile a
+  structured-output schema into a grammar, and the rule schemas are larger than they accept. Zod's `oneOf` unions are
+  sent as `anyOf` (Anthropic models on Vertex and Bedrock refuse `oneOf`), and the answer is validated with Zod. An
+  invalid answer throws, so the Workflow step retries.
 - Unit tests inject `MockLanguageModelV4` from `ai/test`. Tests never call a paid model.
 
 ## Prompts

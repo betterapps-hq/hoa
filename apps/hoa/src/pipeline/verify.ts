@@ -164,3 +164,28 @@ export function checkRuleAgainstCatalog(rule: CheckedRule): Omit<RuleIssue, "res
   }
   return issues
 }
+
+/** Issues for citations whose quote wasn't found or touches words the scan read with low confidence. */
+export function citationIssues(citations: readonly { pageIndex: number; match: CitationMatch }[]): RuleIssue[] {
+  return citations.flatMap((citation): RuleIssue[] => {
+    if (citation.match.status === "not-found") {
+      return [
+        {
+          code: "citation-not-found",
+          message: `The quote wasn't found on page ${citation.pageIndex}.`,
+          resolution: null
+        }
+      ]
+    }
+    if (citation.match.touchesLowConfidence) {
+      return [
+        {
+          code: "low-confidence",
+          message: `The quote on page ${citation.pageIndex} includes words the scan read with low confidence.`,
+          resolution: null
+        }
+      ]
+    }
+    return []
+  })
+}

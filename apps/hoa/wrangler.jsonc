@@ -29,7 +29,10 @@
     }
   ],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-files" }],
-  "workflows": [{ "name": "hoa-document-ingest", "binding": "DOCUMENT_INGEST", "class_name": "DocumentIngest" }],
+  "workflows": [
+    { "name": "hoa-document-ingest", "binding": "DOCUMENT_INGEST", "class_name": "DocumentIngest" },
+    { "name": "hoa-rulebook-build", "binding": "RULEBOOK_BUILD", "class_name": "RulebookBuild" }
+  ],
   // Pull request previews. Secrets come from `wrangler preview base-config secret put`.
   "previews": {
     "vars": {
@@ -53,6 +56,12 @@
         "name": "hoa-preview-document-ingest",
         "binding": "DOCUMENT_INGEST",
         "class_name": "DocumentIngest",
+        "script_name": "hoa-preview"
+      },
+      {
+        "name": "hoa-preview-rulebook-build",
+        "binding": "RULEBOOK_BUILD",
+        "class_name": "RulebookBuild",
         "script_name": "hoa-preview"
       }
     ]
@@ -80,7 +89,8 @@
       ],
       "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-preview" }],
       "workflows": [
-        { "name": "hoa-preview-document-ingest", "binding": "DOCUMENT_INGEST", "class_name": "DocumentIngest" }
+        { "name": "hoa-preview-document-ingest", "binding": "DOCUMENT_INGEST", "class_name": "DocumentIngest" },
+        { "name": "hoa-preview-rulebook-build", "binding": "RULEBOOK_BUILD", "class_name": "RulebookBuild" }
       ]
     },
     // Local development, selected by vite.config.ts. D1 is simulated on disk; R2 is the real hoa-dev bucket, because
@@ -102,7 +112,10 @@
         }
       ],
       "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-dev", "remote": true }],
-      "workflows": [{ "name": "hoa-dev-document-ingest", "binding": "DOCUMENT_INGEST", "class_name": "DocumentIngest" }]
+      "workflows": [
+        { "name": "hoa-dev-document-ingest", "binding": "DOCUMENT_INGEST", "class_name": "DocumentIngest" },
+        { "name": "hoa-dev-rulebook-build", "binding": "RULEBOOK_BUILD", "class_name": "RulebookBuild" }
+      ]
     }
   }
 }

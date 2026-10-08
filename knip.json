@@ -8,7 +8,8 @@
     "apps/hoa": {
       "entry": ["src/routes/**/*.tsx"],
       "ignoreIssues": {
-        "src/components/ui/**": ["exports", "files"]
+        "src/components/ui/**": ["exports", "files"],
+        "src/lib/utils.ts": ["files"]
       },
       "ignoreDependencies": ["@repo/oxlint-config", "cloudflare"]
     }
