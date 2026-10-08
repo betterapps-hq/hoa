@@ -2,6 +2,9 @@
 export const roleIds = ["homeowner", "administrator"] as const
 export type RoleId = (typeof roleIds)[number]
 
+/** The demo role switcher's cookie. */
+export const roleCookie = "hoa-role"
+
 export type NavItem = { title: string; to: "/" | "/documents" | "/rules" | "/submit" }
 
 export type Role = {

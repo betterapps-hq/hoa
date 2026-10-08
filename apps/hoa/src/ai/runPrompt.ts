@@ -1,6 +1,6 @@
 import { propagateAttributes, startActiveObservation, type LangfuseSpan } from "@langfuse/tracing"
 import { isSpanContextValid } from "@opentelemetry/api"
-import { generateText, Output, type LanguageModel, type ModelMessage, type ProviderMetadata } from "ai"
+import { generateText, jsonSchema, tool, type LanguageModel, type ModelMessage, type ProviderMetadata } from "ai"
 import { z } from "zod"
 import type { PromptLoader } from "./promptLoader"
 import type { PromptDefinition } from "./prompts"
@@ -89,14 +89,56 @@ export async function runTextPrompt(options: PromptRunOptions): Promise<TextProm
   return { ...metrics, text: value }
 }
 
-/** Runs a Langfuse-managed prompt and returns JSON validated against `schema`. */
+function replaceOneOf(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(replaceOneOf)
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key === "oneOf" ? "anyOf" : key, replaceOneOf(item)])
+    )
+  }
+  return value
+}
+
+/**
+ * The JSON schema the model answers with. Zod writes discriminated unions as `oneOf`, which Anthropic's models on Vertex
+ * and Bedrock refuse; `anyOf` accepts the same objects because each branch has a distinct literal discriminator.
+ */
+export function outputSchema<T>(schema: z.ZodType<T>) {
+  const json = replaceOneOf(z.toJSONSchema(schema, { target: "draft-7", io: "input", reused: "inline" }))
+  return jsonSchema<T>(z.record(z.string(), z.unknown()).parse(json), {
+    validate: (value) => {
+      const result = schema.safeParse(value)
+      return result.success ? { success: true, value: result.data } : { success: false, error: result.error }
+    }
+  })
+}
+
+const respondTool = "respond"
+
+/**
+ * Runs a Langfuse-managed prompt and returns JSON validated against `schema`. The model answers by calling a `respond`
+ * tool rather than through structured output: providers compile a structured-output schema into a grammar, and the
+ * rule schemas are larger than they accept. Tool input isn't grammar-constrained, so Zod validates it, and an invalid
+ * answer throws so the Workflow step retries.
+ */
 export async function runObjectPrompt<T>(
   options: PromptRunOptions & { schema: z.ZodType<T> }
 ): Promise<ObjectPromptResult<T>> {
+  const inputSchema = outputSchema(options.schema)
   const { value, ...metrics } = await runTraced(options, {
     generate: async (request) => {
-      const result = await generateText({ ...request, output: Output.object({ schema: options.schema }) })
-      return { value: result.output, usage: result.usage, providerMetadata: result.providerMetadata }
+      const result = await generateText({
+        ...request,
+        tools: { [respondTool]: tool({ description: "Return your answer.", inputSchema }) },
+        toolChoice: { type: "tool", toolName: respondTool }
+      })
+      const parsed = options.schema.safeParse(result.toolCalls.find((call) => call.toolName === respondTool)?.input)
+      if (!parsed.success) {
+        throw new Error(`No object generated: the answer didn't match the schema. ${parsed.error.message}`)
+      }
+      return { value: parsed.data, usage: result.usage, providerMetadata: result.providerMetadata }
     },
     decode: (value) => options.schema.parse(value)
   })

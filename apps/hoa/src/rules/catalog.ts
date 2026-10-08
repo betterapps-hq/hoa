@@ -2,6 +2,8 @@
  * The global project-type catalog (docs/design/rules.md). Attributes and enum values are append-only: published
  * rulebooks store the catalog version they were built with, and nothing they reference may be renamed or removed.
  */
+export const catalogVersion = 1
+
 export const componentKinds = ["segment", "gate"] as const
 export type ComponentKind = (typeof componentKinds)[number]
 

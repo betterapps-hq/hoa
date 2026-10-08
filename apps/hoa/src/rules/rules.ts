@@ -13,16 +13,6 @@ export const ruleKinds = [
   "prohibition",
   "process"
 ] as const
-export type RuleKind = (typeof ruleKinds)[number]
-
-export const ruleKindLabels: Record<RuleKind, string> = {
-  "allowed-values": "Allowed values",
-  "numeric-limit": "Numeric limit",
-  placement: "Placement",
-  "required-document": "Required document",
-  prohibition: "Prohibition",
-  process: "Process"
-}
 
 export const ruleSourceSchema = z.object({
   document: z.string().min(1, "Enter the source document."),
@@ -42,8 +32,6 @@ export const extractedRuleSchema = z.object({
 
 export const ruleSchema = extractedRuleSchema.extend({ id: z.string().min(1) })
 export type Rule = z.infer<typeof ruleSchema>
-
-export const extractionOutputSchema = z.object({ rules: z.array(extractedRuleSchema) })
 
 export const rulebookSchema = z.object({
   hoaName: z.string().min(1),

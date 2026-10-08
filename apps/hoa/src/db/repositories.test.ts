@@ -30,7 +30,7 @@ import {
   setSectionRouting,
   updateGoverningDocument
 } from "./documentRepository"
-import { getJob, getLatestJob, insertJob, listJobs, newJob, updateJob } from "./jobRepository"
+import { getJob, getLatestJob, getLatestJobOfKind, insertJob, listJobs, newJob, updateJob } from "./jobRepository"
 import {
   failRulebook,
   getRule,
@@ -42,7 +42,8 @@ import {
   listRules,
   publishRulebook,
   saveDraft,
-  updateRule
+  updateRule,
+  updateRules
 } from "./rulebookRepository"
 
 const hoaId = "demo-hoa"
@@ -85,28 +86,41 @@ describe("repositories", () => {
     expect(await listGoverningDocuments(db, hoaId)).toHaveLength(2)
   })
 
+  const section = {
+    id: "doc:0",
+    documentId: "doc",
+    ordinal: 0,
+    number: "5.4.2",
+    heading: "5.4.2 Composite Fence Colors",
+    kind: "body" as const,
+    parentId: null,
+    pageStart: 17,
+    pageEnd: 17,
+    startOffset: 0,
+    endOffset: 100,
+    references: ["doc:1"]
+  }
   it("writes sections once and keeps their latest routing", async () => {
     const { db } = database
-    const section = {
-      id: "doc:0",
-      documentId: "doc",
-      ordinal: 0,
-      number: "5.4.2",
-      heading: "5.4.2 Composite Fence Colors",
-      kind: "body" as const,
-      parentId: null,
-      pageStart: 17,
-      pageEnd: 17,
-      startOffset: 0,
-      endOffset: 100,
-      references: ["doc:1"]
-    }
     await saveSections(db, hoaId, [section])
     await saveSections(db, hoaId, [{ ...section, heading: "Changed" }])
     await setSectionRouting(db, hoaId, "doc:0", { projectTypes: ["fence"], topics: ["color"], isRelevant: true })
     expect(await listSections(db, hoaId, "doc")).toEqual([
       { ...section, routing: { projectTypes: ["fence"], topics: ["color"], isRelevant: true } }
     ])
+  })
+
+  it("saves more sections than fit in one statement's bound parameters", async () => {
+    const { db } = database
+    const many = Array.from({ length: 30 }, (_, ordinal) => ({
+      ...section,
+      id: `long:${ordinal}`,
+      documentId: "long",
+      ordinal
+    }))
+    await saveSections(db, hoaId, many)
+    await saveSections(db, hoaId, [])
+    expect(await listSections(db, hoaId, "long")).toHaveLength(30)
   })
 
   it("records jobs and finds the latest one for a subject", async () => {
@@ -124,6 +138,8 @@ describe("repositories", () => {
     expect((await getLatestJob(db, hoaId, "doc"))?.id).toBe(newer.id)
     expect(await listJobs(db, hoaId, "doc")).toHaveLength(2)
     expect(await getLatestJob(db, hoaId, "nothing")).toBeNull()
+    expect((await getLatestJobOfKind(db, hoaId, "document-ingest"))?.id).toBe(newer.id)
+    expect(await getLatestJobOfKind(db, hoaId, "application-review")).toBeNull()
   })
 
   it("saves a draft over the old one, publishes it as the next version, and allows one draft at a time", async () => {
@@ -177,6 +193,9 @@ describe("repositories", () => {
     await insertRule(db, hoaId, rule)
     await updateRule(db, hoaId, { ...rule, statement: "Edited" })
     expect((await getRule(db, hoaId, "r1"))?.statement).toBe("Edited")
+    await updateRules(db, hoaId, [{ ...rule, statement: "Batched" }])
+    await updateRules(db, hoaId, [])
+    expect((await getRule(db, hoaId, "r1"))?.statement).toBe("Batched")
     expect(await getRulesById(db, hoaId, ["r1", "missing"])).toHaveLength(1)
     expect(await getRulesById(db, hoaId, [])).toEqual([])
   })

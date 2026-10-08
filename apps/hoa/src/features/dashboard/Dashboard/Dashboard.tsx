@@ -7,22 +7,25 @@ import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } 
 import { ModelCheck } from "@/features/modelCheck/ModelCheck/ModelCheck"
 import type { ModelCheckResult } from "@/features/modelCheck/modelCheckResult"
 import type { RoleId } from "@/features/role/roles"
-import { projectTypes, rulesForProject, type Rulebook } from "@/rules/rules"
+import type { DashboardSummary } from "@/features/rulebook/rulebook.functions"
+import { projectTypes } from "@/rules/catalog"
 
 export type DashboardProps = {
   roleId: RoleId
-  rulebook: Rulebook | null
+  summary: DashboardSummary
   onModelCheck: () => Promise<ModelCheckResult>
 }
 
 type Stat = { label: string; value: string; badge: ReactNode; footer: string; detail: string }
 
-function statsFor(role: RoleId, rulebook: Rulebook | null): Stat[] {
-  const isPublished = rulebook !== null
+const projectTypeLabels = Object.values(projectTypes).map((type) => type.label)
+
+function statsFor(role: RoleId, summary: DashboardSummary): Stat[] {
+  const isPublished = summary.publishedVersion !== null
   const status = isPublished ? (
     <Badge variant="outline">
       <CircleCheckIcon className="text-green-600 dark:text-green-400" />
-      Published
+      Version {summary.publishedVersion}
     </Badge>
   ) : (
     <Badge variant="outline">
@@ -30,81 +33,79 @@ function statsFor(role: RoleId, rulebook: Rulebook | null): Stat[] {
       Not published
     </Badge>
   )
-  const publishedOn = rulebook
-    ? new Date(rulebook.publishedAt).toLocaleDateString("en-US", { dateStyle: "medium" })
+  const publishedOn = summary.publishedAt
+    ? new Date(summary.publishedAt).toLocaleDateString("en-US", { dateStyle: "medium" })
     : undefined
-  const fenceRules = rulebook ? rulesForProject(rulebook, "fence").length : 0
 
   if (role === "administrator") {
     return [
       {
         label: "Published rules",
-        value: String(rulebook?.rules.length ?? 0),
+        value: String(summary.ruleCount),
         badge: status,
         footer: publishedOn ? `Published ${publishedOn}` : "No rulebook yet",
         detail: "Rules every application is checked against"
       },
       {
         label: "Governing documents",
-        value: String(rulebook?.documents.length ?? 0),
-        badge: <Badge variant="outline">PDF</Badge>,
-        footer: rulebook?.documents.join(", ") || "Upload the CC&Rs and guidelines",
+        value: String(summary.documentTitles.length),
+        badge: <Badge variant="outline">Ready</Badge>,
+        footer: summary.documentTitles.join(", ") || "Upload the CC&Rs and guidelines",
         detail: "Source of every rule citation"
       },
       {
-        label: "Fence rules",
-        value: String(fenceRules),
-        badge: <Badge variant="outline">Fence</Badge>,
-        footer: "Checked on every fence application",
-        detail: "Materials, height, placement and documents"
+        label: "Project types",
+        value: String(projectTypeLabels.length),
+        badge: <Badge variant="outline">Enabled</Badge>,
+        footer: projectTypeLabels.join(", "),
+        detail: "More types follow as rules are extracted"
       },
       {
-        label: "Project types",
-        value: String(projectTypes.length),
-        badge: <Badge variant="outline">Enabled</Badge>,
-        footer: projectTypes.map((type) => type.label).join(", "),
-        detail: "More types follow as rules are extracted"
+        label: "Review time",
+        value: "Minutes",
+        badge: <Badge variant="outline">AI review</Badge>,
+        footer: "Homeowners see results before submitting",
+        detail: "The committee decides from the same review"
       }
     ]
   }
   return [
     {
       label: "Community",
-      value: rulebook?.hoaName ?? "Not set up",
+      value: summary.hoaName,
       badge: status,
       footer: isPublished ? "Rules are ready for review" : "Waiting for the HOA to publish its rules",
       detail: "Your homeowners association"
     },
     {
       label: "Rules checked",
-      value: String(fenceRules),
+      value: String(summary.ruleCount),
       badge: <Badge variant="outline">Fence</Badge>,
-      footer: "Every fence rule, with citations",
+      footer: "Every rule, with citations",
       detail: "From the CC&Rs and design guidelines"
     },
     {
       label: "Project types",
-      value: String(projectTypes.length),
+      value: String(projectTypeLabels.length),
       badge: <Badge variant="outline">Available</Badge>,
-      footer: projectTypes.map((type) => type.label).join(", "),
-      detail: "Choose one when you submit"
+      footer: projectTypeLabels.join(", "),
+      detail: "Choose one when you apply"
     },
     {
       label: "Review time",
-      value: "About 1 minute",
+      value: "Minutes",
       badge: <Badge variant="outline">AI review</Badge>,
-      footer: "The committee makes the final decision",
-      detail: "You get a recommendation and feedback"
+      footer: "Fix problems before you submit",
+      detail: "The committee makes the final decision"
     }
   ]
 }
-
 /** Role-specific dashboard: summary cards in shadcn's section-cards style, then the next step. */
-export function Dashboard({ roleId, rulebook, onModelCheck }: DashboardProps) {
+export function Dashboard({ roleId, summary, onModelCheck }: DashboardProps) {
   return (
     <>
       <div className="grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
-        {statsFor(roleId, rulebook).map((stat) => (
+        {statsFor(roleId, summary).map((stat) => (
           <Card key={stat.label} className="@container/card">
             <CardHeader>
               <CardDescription>{stat.label}</CardDescription>

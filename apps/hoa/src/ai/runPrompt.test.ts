@@ -4,10 +4,11 @@ import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base"
 import { MockLanguageModelV4 } from "ai/test"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
+import { candidateRuleSchema } from "@/rules/rule"
 import { createPromptLoader } from "./promptLoader"
 import type { PromptLoader } from "./promptLoader"
 import { prompts } from "./prompts"
-import { runObjectPrompt, runTextPrompt } from "./runPrompt"
+import { outputSchema, runObjectPrompt, runTextPrompt } from "./runPrompt"
 import { registerTracerProvider } from "./telemetry.server"
 
 function createModel(
@@ -24,6 +25,21 @@ function createModel(
       },
       warnings: [],
       ...(providerMetadata ? { providerMetadata } : {})
+    }
+  })
+}
+
+/** A model that answers an object prompt by calling the respond tool. */
+function objectModel(input: unknown) {
+  return new MockLanguageModelV4({
+    doGenerate: {
+      content: [{ type: "tool-call", toolCallId: "call-1", toolName: "respond", input: JSON.stringify(input) }],
+      finishReason: { unified: "tool-calls", raw: "tool_use" },
+      usage: {
+        inputTokens: { total: 42, noCache: 42, cacheRead: 0, cacheWrite: 0 },
+        outputTokens: { total: 5, text: 5, reasoning: 0 }
+      },
+      warnings: []
     }
   })
 }
@@ -152,7 +168,7 @@ describe("runTextPrompt", () => {
 
 describe("runObjectPrompt", () => {
   it("sends attachments after the prompt and returns JSON validated against the schema", async () => {
-    const model = createModel(undefined, JSON.stringify({ recommendation: "request-information", missing: ["Height"] }))
+    const model = objectModel({ recommendation: "request-information", missing: ["Height"] })
     const pdf = new Uint8Array([37, 80, 68, 70])
 
     const result = await runObjectPrompt({
@@ -170,6 +186,7 @@ describe("runObjectPrompt", () => {
     })
 
     expect(result.object).toEqual({ recommendation: "request-information", missing: ["Height"] })
+    expect(model.doGenerateCalls[0]?.toolChoice).toEqual({ type: "tool", toolName: "respond" })
     expect(model.doGenerateCalls[0]?.prompt).toMatchObject([
       {
         role: "user",
@@ -186,7 +203,7 @@ describe("runObjectPrompt", () => {
     await expect(
       runObjectPrompt({
         loadPrompt: langfusePrompt,
-        createModel: () => createModel(undefined, JSON.stringify({ recommendation: 5 })),
+        createModel: () => objectModel({ recommendation: 5 }),
         defaultModelId: "test-model",
         prompt: prompts.applicationReview,
         schema: z.object({ recommendation: z.string() }),
@@ -233,7 +250,7 @@ describe("content cache", () => {
         stored.set(key, value)
       }
     }
-    const model = createModel(undefined, JSON.stringify({ recommendation: "approve" }))
+    const model = objectModel({ recommendation: "approve" })
     const run = (applicant: string) =>
       runObjectPrompt({
         loadPrompt: langfusePrompt,
@@ -257,5 +274,16 @@ describe("content cache", () => {
     expect(third.isCached).toBe(false)
     expect(model.doGenerateCalls).toHaveLength(2)
     expect(stored.size).toBe(2)
+  })
+})
+
+describe("outputSchema", () => {
+  it("writes unions as anyOf, which every provider accepts, and still validates with Zod", async () => {
+    const schema = outputSchema(z.object({ rules: z.array(candidateRuleSchema) }))
+    const json = JSON.stringify(await schema.jsonSchema)
+    expect(json).not.toContain("oneOf")
+    expect(json).toContain("anyOf")
+    expect(await schema.validate?.({ rules: [] })).toEqual({ success: true, value: { rules: [] } })
+    expect((await schema.validate?.({ rules: [{}] }))?.success).toBe(false)
   })
 })

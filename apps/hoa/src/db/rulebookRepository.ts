@@ -59,6 +59,19 @@ export async function updateRule(db: Database, hoaId: string, rule: Rule) {
     .where(and(eq(rules.hoaId, hoaId), eq(rules.id, rule.id)))
 }
 
+/** Saves several rules in one batch, such as a bulk approval. */
+export async function updateRules(db: Database, hoaId: string, items: readonly Rule[]) {
+  const [first, ...rest] = items.map((rule) =>
+    db
+      .update(rules)
+      .set({ rule: ruleSchema.parse(rule) })
+      .where(and(eq(rules.hoaId, hoaId), eq(rules.id, rule.id)))
+  )
+  if (first) {
+    await db.batch([first, ...rest])
+  }
+}
+
 export async function insertRule(db: Database, hoaId: string, rule: Rule) {
   await db.insert(rules).values({ id: rule.id, hoaId, rulebookId: rule.rulebookId, ruleKey: rule.ruleKey, rule })
 }

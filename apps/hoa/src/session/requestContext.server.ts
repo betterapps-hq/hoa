@@ -1,10 +1,8 @@
 import { getCookie, getRequestHeader } from "@tanstack/react-start/server"
 import { getDb } from "@/db/client.server"
 import { getDefaultHoa } from "@/db/hoaRepository"
-import { isRoleId, roles, type RoleId } from "@/features/role/roles"
+import { isRoleId, roleCookie, roles, type RoleId } from "@/features/role/roles"
 import type { Hoa } from "@/hoa/hoa"
-
-export const roleCookie = "hoa-role"
 
 export type RequestUser = { id: string; name: string; email: string }
 

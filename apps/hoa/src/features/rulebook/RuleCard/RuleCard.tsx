@@ -1,186 +1,363 @@
-import { CheckIcon, Trash2Icon, XIcon } from "lucide-react"
-import { useId } from "react"
-import { Controller, useFormContext, useWatch } from "react-hook-form"
+import { useForm } from "@tanstack/react-form"
+import { AlertTriangleIcon, CheckIcon, CircleCheckIcon, CircleXIcon, PencilIcon, XIcon } from "lucide-react"
+import { useState } from "react"
+import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { cn } from "@/lib/utils"
-import { projectTypes, ruleKindLabels, ruleKinds } from "@/rules/rules"
-import { decisions, type Decision, type EditorValues } from "../RulebookEditor/RulebookEditor.utils"
+import type { Rule } from "@/rules/rule"
+import {
+  approvalBlocker,
+  describeCheck,
+  describeConditions,
+  ruleEditSchema,
+  type RuleChanges
+} from "../rulebookEditing"
 
-export type RuleCardProps = {
-  index: number
-  documents: string[]
-  onRemove: () => void
+export type RuleCardActions = {
+  review: (ruleId: string, status: Rule["review"]["status"]) => Promise<void>
+  save: (ruleId: string, changes: RuleChanges) => Promise<void>
+  resolveIssue: (ruleId: string, issueIndex: number, note: string) => Promise<void>
 }
 
-const decisionStyles: Record<Decision, string> = {
-  pending: "",
-  approved: "",
-  rejected: "opacity-60"
+const obligationLabels: Record<Rule["obligation"], string> = {
+  required: "Required",
+  prohibited: "Prohibited",
+  permitted: "Permitted",
+  recommended: "Recommended"
 }
 
-function isDecision(value: unknown): value is Decision {
-  return decisions.some((decision) => decision === value)
+const reviewLabels: Record<Rule["review"]["status"], string> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected"
 }
 
-/** One extracted rule: editable fields, its source citation and the approve or reject decision. */
-export function RuleCard({ index, documents, onRemove }: RuleCardProps) {
-  const id = useId()
-  const {
-    register,
-    control,
-    formState: { errors }
-  } = useFormContext<EditorValues>()
-  const decision = useWatch({ control, name: `rules.${index}.decision` })
-  const title = useWatch({ control, name: `rules.${index}.title` })
-  const ruleErrors = errors.rules?.[index]
-  const field = (name: string) => `${id}-${name}`
+const matchLabels: Record<Rule["citations"][number]["match"]["status"], string> = {
+  exact: "Quote found",
+  fuzzy: "Quote found, with scan differences",
+  "not-found": "Quote not found"
+}
+
+async function attempt(action: () => Promise<void>) {
+  try {
+    await action()
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : "That didn't work.")
+  }
+}
+
+function RuleEditor({
+  rule,
+  onSave,
+  onCancel
+}: {
+  rule: Rule
+  onSave: (changes: RuleChanges) => Promise<void>
+  onCancel: () => void
+}) {
+  const form = useForm({
+    defaultValues: {
+      title: rule.title,
+      statement: rule.statement,
+      obligation: rule.obligation,
+      discretion: rule.discretion,
+      isCurable: rule.isCurable,
+      quotes: rule.citations.map((citation) => citation.quote)
+    },
+    validators: { onSubmit: ruleEditSchema },
+    onSubmit: async ({ value }) => {
+      await onSave(value)
+    }
+  })
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        void form.handleSubmit()
+      }}
+    >
+      <FieldGroup>
+        <form.Field name="title">
+          {(field) => (
+            <Field data-invalid={field.state.meta.errors.length > 0}>
+              <FieldLabel htmlFor={`${rule.id}-title`}>Title</FieldLabel>
+              <Input
+                id={`${rule.id}-title`}
+                value={field.state.value}
+                onChange={(event) => field.handleChange(event.target.value)}
+              />
+              <FieldError errors={field.state.meta.errors} />
+            </Field>
+          )}
+        </form.Field>
+        <form.Field name="statement">
+          {(field) => (
+            <Field data-invalid={field.state.meta.errors.length > 0}>
+              <FieldLabel htmlFor={`${rule.id}-statement`}>Rule</FieldLabel>
+              <Textarea
+                id={`${rule.id}-statement`}
+                value={field.state.value}
+                onChange={(event) => field.handleChange(event.target.value)}
+              />
+              <FieldError errors={field.state.meta.errors} />
+            </Field>
+          )}
+        </form.Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <form.Field name="obligation">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor={`${rule.id}-obligation`}>Obligation</FieldLabel>
+                <NativeSelect
+                  id={`${rule.id}-obligation`}
+                  value={field.state.value}
+                  onChange={(event) => {
+                    const value = (["required", "prohibited", "permitted", "recommended"] as const).find(
+                      (item) => item === event.target.value
+                    )
+                    if (value) {
+                      field.handleChange(value)
+                    }
+                  }}
+                >
+                  {Object.entries(obligationLabels).map(([value, label]) => (
+                    <NativeSelectOption key={value} value={value}>
+                      {label}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </Field>
+            )}
+          </form.Field>
+          <form.Field name="discretion">
+            {(field) => (
+              <Field>
+                <FieldLabel htmlFor={`${rule.id}-discretion`}>Who decides</FieldLabel>
+                <NativeSelect
+                  id={`${rule.id}-discretion`}
+                  value={field.state.value}
+                  onChange={(event) =>
+                    field.handleChange(event.target.value === "committee" ? "committee" : "objective")
+                  }
+                >
+                  <NativeSelectOption value="objective">Checked by the rules</NativeSelectOption>
+                  <NativeSelectOption value="committee">The committee</NativeSelectOption>
+                </NativeSelect>
+              </Field>
+            )}
+          </form.Field>
+        </div>
+        <form.Field name="isCurable">
+          {(field) => (
+            <Field orientation="horizontal">
+              <Checkbox
+                id={`${rule.id}-curable`}
+                checked={field.state.value}
+                onCheckedChange={(checked) => field.handleChange(checked === true)}
+              />
+              <FieldLabel htmlFor={`${rule.id}-curable`}>
+                The homeowner can fix a failure by changing a detail
+              </FieldLabel>
+            </Field>
+          )}
+        </form.Field>
+        <form.Field name="quotes" mode="array">
+          {(field) =>
+            field.state.value.map((_, index) => (
+              <form.Field key={rule.citations[index]?.pageIndex ?? index} name={`quotes[${index}]`}>
+                {(quote) => (
+                  <Field>
+                    <FieldLabel htmlFor={`${rule.id}-quote-${index}`}>
+                      Quote from {rule.citations[index]?.section}, page{" "}
+                      {rule.citations[index]?.pageLabel ?? rule.citations[index]?.pageIndex}
+                    </FieldLabel>
+                    <Textarea
+                      id={`${rule.id}-quote-${index}`}
+                      value={quote.state.value}
+                      onChange={(event) => quote.handleChange(event.target.value)}
+                    />
+                  </Field>
+                )}
+              </form.Field>
+            ))
+          }
+        </form.Field>
+        <form.Subscribe selector={(state) => state.isSubmitting}>
+          {(isSubmitting) => (
+            <Field orientation="horizontal">
+              <Button type="submit" disabled={isSubmitting}>
+                Save
+              </Button>
+              <Button type="button" variant="outline" onClick={onCancel}>
+                Cancel
+              </Button>
+            </Field>
+          )}
+        </form.Subscribe>
+      </FieldGroup>
+    </form>
+  )
+}
+
+export type RuleCardProps = { rule: Rule; actions?: RuleCardActions }
+
+/** One rule with its check, conditions, citations and issues. Without actions it's read-only. */
+export function RuleCard({ rule, actions }: RuleCardProps) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [resolving, setResolving] = useState<{ index: number; note: string } | null>(null)
+  const conditions = describeConditions(rule.appliesWhen)
+  const blocker = approvalBlocker(rule)
 
   return (
-    <Card className={cn("transition-opacity", decisionStyles[decision])}>
-      <CardContent>
-        <FieldSet>
-          <FieldLegend>{title || `Rule ${index + 1}`}</FieldLegend>
-          <FieldGroup>
-            <div className="grid gap-4 sm:grid-cols-[1fr_14rem]">
-              <Field data-invalid={Boolean(ruleErrors?.title)}>
-                <FieldLabel htmlFor={field("title")}>Title</FieldLabel>
-                <Input
-                  id={field("title")}
-                  aria-invalid={Boolean(ruleErrors?.title)}
-                  {...register(`rules.${index}.title`)}
-                />
-                <FieldError errors={[ruleErrors?.title]} />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor={field("kind")}>Kind</FieldLabel>
-                <NativeSelect id={field("kind")} className="w-full" {...register(`rules.${index}.kind`)}>
-                  {ruleKinds.map((kind) => (
-                    <NativeSelectOption key={kind} value={kind}>
-                      {ruleKindLabels[kind]}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </Field>
-            </div>
-
-            <Field data-invalid={Boolean(ruleErrors?.requirement)}>
-              <FieldLabel htmlFor={field("requirement")}>Requirement</FieldLabel>
-              <Textarea
-                id={field("requirement")}
-                rows={3}
-                aria-invalid={Boolean(ruleErrors?.requirement)}
-                {...register(`rules.${index}.requirement`)}
-              />
-              <FieldError errors={[ruleErrors?.requirement]} />
-            </Field>
-
-            <Controller
-              control={control}
-              name={`rules.${index}.projectTypes`}
-              render={({ field: { value, onChange } }) => (
-                <FieldSet>
-                  <FieldLegend variant="label">Applies to</FieldLegend>
-                  <div className="flex flex-wrap gap-4">
-                    {projectTypes.map((type) => (
-                      <Field key={type.id} orientation="horizontal" className="w-auto">
-                        <Checkbox
-                          id={field(`type-${type.id}`)}
-                          checked={value.includes(type.id)}
-                          onCheckedChange={(isChecked) =>
-                            onChange(isChecked ? [...value, type.id] : value.filter((existing) => existing !== type.id))
-                          }
-                        />
-                        <FieldLabel htmlFor={field(`type-${type.id}`)} className="font-normal">
-                          {type.label}
-                        </FieldLabel>
-                      </Field>
-                    ))}
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>{rule.title}</CardTitle>
+        <CardDescription>{rule.statement}</CardDescription>
+        <CardAction className="flex flex-wrap justify-end gap-1">
+          {rule.change === "new" || rule.change === "changed" ? (
+            <Badge variant="secondary">{rule.change === "new" ? "New" : "Changed"}</Badge>
+          ) : null}
+          <Badge variant="outline">{obligationLabels[rule.obligation]}</Badge>
+          {rule.discretion === "committee" ? <Badge variant="outline">Committee decides</Badge> : null}
+          {actions ? (
+            <Badge variant={rule.review.status === "rejected" ? "destructive" : "outline"}>
+              {rule.review.status === "approved" ? (
+                <CircleCheckIcon className="text-green-600 dark:text-green-400" />
+              ) : null}
+              {rule.review.status === "rejected" ? <CircleXIcon /> : null}
+              {reviewLabels[rule.review.status]}
+            </Badge>
+          ) : null}
+        </CardAction>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3 text-sm">
+        {isEditing && actions ? (
+          <RuleEditor
+            rule={rule}
+            onCancel={() => setIsEditing(false)}
+            onSave={(changes) =>
+              attempt(async () => {
+                await actions.save(rule.id, changes)
+                setIsEditing(false)
+              })
+            }
+          />
+        ) : (
+          <>
+            <dl className="grid gap-1 sm:grid-cols-[8rem_1fr]">
+              <dt className="text-muted-foreground">Check</dt>
+              <dd>{describeCheck(rule.check)}</dd>
+              {conditions ? (
+                <>
+                  <dt className="text-muted-foreground">Applies when</dt>
+                  <dd>{conditions}</dd>
+                </>
+              ) : null}
+              {rule.exceptions.length > 0 ? (
+                <>
+                  <dt className="text-muted-foreground">Exceptions</dt>
+                  <dd>{rule.exceptions.join("; ")}</dd>
+                </>
+              ) : null}
+            </dl>
+            <ul className="flex flex-col gap-2">
+              {rule.citations.map((citation) => (
+                <li
+                  key={`${citation.documentId}:${citation.pageIndex}:${citation.quote}`}
+                  className="rounded-lg border p-2"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-muted-foreground">
+                    <span>
+                      {citation.section}, page {citation.pageLabel ?? citation.pageIndex}
+                    </span>
+                    <Badge variant={citation.match.status === "not-found" ? "destructive" : "outline"}>
+                      {matchLabels[citation.match.status]}
+                    </Badge>
                   </div>
-                  <FieldError errors={[ruleErrors?.projectTypes]} />
-                </FieldSet>
-              )}
-            />
-
-            <div className="grid gap-4 sm:grid-cols-[1fr_10rem_6rem]">
-              <Field>
-                <FieldLabel htmlFor={field("document")}>Source document</FieldLabel>
-                <NativeSelect id={field("document")} className="w-full" {...register(`rules.${index}.source.document`)}>
-                  {documents.map((document) => (
-                    <NativeSelectOption key={document} value={document}>
-                      {document}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </Field>
-              <Field data-invalid={Boolean(ruleErrors?.source?.section)}>
-                <FieldLabel htmlFor={field("section")}>Section</FieldLabel>
-                <Input
-                  id={field("section")}
-                  aria-invalid={Boolean(ruleErrors?.source?.section)}
-                  {...register(`rules.${index}.source.section`)}
-                />
-                <FieldError errors={[ruleErrors?.source?.section]} />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor={field("page")}>Page</FieldLabel>
-                <Input
-                  id={field("page")}
-                  inputMode="numeric"
-                  {...register(`rules.${index}.source.page`, {
-                    setValueAs: (value: unknown) =>
-                      value === "" || value === null || value === undefined ? null : Number(value)
-                  })}
-                />
-              </Field>
-            </div>
-
-            <Field>
-              <FieldLabel htmlFor={field("quote")}>Supporting quote</FieldLabel>
-              <Textarea id={field("quote")} rows={2} {...register(`rules.${index}.source.quote`)} />
-            </Field>
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Controller
-                control={control}
-                name={`rules.${index}.decision`}
-                render={({ field: { value, onChange } }) => (
-                  <ToggleGroup
-                    aria-label="Decision"
-                    variant="outline"
-                    value={[value]}
-                    onValueChange={(next) => {
-                      const selected = next.at(-1)
-                      if (isDecision(selected)) {
-                        onChange(selected)
+                  <blockquote className="mt-1 border-l-2 pl-2 italic">{citation.quote}</blockquote>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {rule.issues.length > 0 ? (
+          <ul className="flex flex-col gap-2">
+            {rule.issues.map((issue, index) => (
+              <li key={`${issue.code}:${issue.message}`} className="flex flex-col gap-2 rounded-lg bg-muted p-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  <span className="flex-1">
+                    {issue.message}
+                    {issue.resolution ? (
+                      <span className="text-muted-foreground"> Resolved: {issue.resolution.note}</span>
+                    ) : null}
+                  </span>
+                  {actions && !issue.resolution && resolving?.index !== index ? (
+                    <Button size="sm" variant="outline" onClick={() => setResolving({ index, note: "" })}>
+                      Resolve
+                    </Button>
+                  ) : null}
+                </div>
+                {actions && resolving?.index === index ? (
+                  <div className="flex gap-2">
+                    <Input
+                      aria-label="Why this is resolved"
+                      placeholder="Why this is resolved"
+                      value={resolving.note}
+                      onChange={(event) => setResolving({ index, note: event.target.value })}
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!resolving.note.trim()}
+                      onClick={() =>
+                        attempt(async () => {
+                          await actions.resolveIssue(rule.id, index, resolving.note.trim())
+                          setResolving(null)
+                        })
                       }
-                    }}
-                  >
-                    <ToggleGroupItem value="approved">
-                      <CheckIcon />
-                      Approve
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="rejected">
-                      <XIcon />
-                      Reject
-                    </ToggleGroupItem>
-                  </ToggleGroup>
-                )}
-              />
-              <Button variant="ghost" onClick={onRemove}>
-                <Trash2Icon />
-                Delete rule
-              </Button>
-            </div>
-          </FieldGroup>
-        </FieldSet>
+                    >
+                      Save
+                    </Button>
+                  </div>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </CardContent>
+      {actions && !isEditing ? (
+        <CardFooter className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            disabled={blocker !== null || rule.review.status === "approved"}
+            title={blocker ?? undefined}
+            onClick={() => attempt(() => actions.review(rule.id, "approved"))}
+          >
+            <CheckIcon />
+            Approve
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={rule.review.status === "rejected"}
+            onClick={() => attempt(() => actions.review(rule.id, "rejected"))}
+          >
+            <XIcon />
+            Reject
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
+            <PencilIcon />
+            Edit
+          </Button>
+          {blocker ? <span className="text-xs text-muted-foreground">{blocker}</span> : null}
+        </CardFooter>
+      ) : null}
     </Card>
   )
 }
