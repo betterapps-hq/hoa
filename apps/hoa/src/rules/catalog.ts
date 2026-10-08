@@ -301,3 +301,38 @@ export const projectTypes: Record<ProjectTypeId, ProjectType> = { fence }
 export function getAttribute(projectType: ProjectTypeId, key: string): Attribute | undefined {
   return projectTypes[projectType].attributes.find((attribute) => attribute.key === key)
 }
+
+/** What each attribute scope is called in the editor. */
+export const scopeLabels: Record<AttributeScope, string> = {
+  project: "Project",
+  segment: "Fence run",
+  gate: "Gate"
+}
+
+/** An attribute by its key, from whichever project type defines it. */
+export function findAttribute(key: string): Attribute | undefined {
+  for (const projectType of Object.values(projectTypes)) {
+    const attribute = projectType.attributes.find((item) => item.key === key)
+    if (attribute) {
+      return attribute
+    }
+  }
+  return undefined
+}
+
+/** An attribute as people read it, "Fence run: Color"; an unknown key is shown as itself. */
+export function attributeLabel(key: string) {
+  const attribute = findAttribute(key)
+  return attribute ? `${scopeLabels[attribute.scope]}: ${attribute.label}` : key
+}
+
+/** A required document's name. */
+export function documentLabel(id: DocumentRequirementId) {
+  for (const projectType of Object.values(projectTypes)) {
+    const document = projectType.documents.find((item) => item.id === id)
+    if (document) {
+      return document.label
+    }
+  }
+  return id
+}

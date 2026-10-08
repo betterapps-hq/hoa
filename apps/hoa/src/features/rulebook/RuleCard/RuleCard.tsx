@@ -41,13 +41,13 @@ import {
 import type { Rule } from "@/rules/rule"
 import {
   approvalBlocker,
-  describeCheck,
-  describeConditions,
   issueSeverity,
   ruleEditSchema,
   type IssueSeverity,
   type RuleChanges
 } from "../rulebookEditing"
+import { CheckEditor, ConditionsEditor } from "../RuleSchema/CheckEditor"
+import { CheckSummary, ConditionsSummary } from "../RuleSchema/RuleSchema"
 
 export type RuleCardActions = {
   review: (ruleId: string, status: Rule["review"]["status"]) => Promise<void>
@@ -93,13 +93,16 @@ const editFormId = (rule: Pick<Rule, "id">) => `rule-edit-${rule.id}`
 
 /** The rule's editable fields. Save and Cancel are in the panel's pinned footer, linked by the form's id. */
 function RuleEditor({ rule, onSave }: { rule: Rule; onSave: (changes: RuleChanges) => Promise<void> }) {
+  const projectType = rule.projectTypes[0] ?? "fence"
   const form = useForm({
     defaultValues: {
       title: rule.title,
       statement: rule.statement,
       obligation: rule.obligation,
       discretion: rule.discretion,
-      isCurable: rule.isCurable
+      isCurable: rule.isCurable,
+      check: rule.check,
+      appliesWhen: rule.appliesWhen
     },
     validators: { onSubmit: ruleEditSchema },
     onSubmit: async ({ value }) => {
@@ -219,13 +222,44 @@ function RuleEditor({ rule, onSave }: { rule: Rule; onSave: (changes: RuleChange
             </Field>
           )}
         </form.Field>
+        <form.Field name="check">
+          {(field) => (
+            <CheckEditor
+              id={`${rule.id}-check`}
+              value={field.state.value}
+              projectType={projectType}
+              onChange={field.handleChange}
+            />
+          )}
+        </form.Field>
+        <form.Field name="appliesWhen">
+          {(field) => (
+            <ConditionsEditor
+              id={`${rule.id}-conditions`}
+              value={field.state.value}
+              projectType={projectType}
+              ruleId={rule.id}
+              onChange={field.handleChange}
+            />
+          )}
+        </form.Field>
+        <form.Subscribe
+          selector={(state) => state.fieldMeta.check?.errors.length || state.fieldMeta.appliesWhen?.errors.length}
+        >
+          {(hasErrors) =>
+            hasErrors ? (
+              <p className="text-sm text-destructive" role="alert">
+                The check or a condition is incomplete. Choose a detail and fill in every value.
+              </p>
+            ) : null
+          }
+        </form.Subscribe>
       </FieldGroup>
     </form>
   )
 }
 
-/** What the viewer is open for: reading a citation, adding one, or replacing citation 
-eplaceIndex. */
+/** What the viewer is open for: reading a citation, adding one, or replacing the citation at replaceIndex. */
 type ViewerState = { documentId: string; pageIndex: number; isCiting: boolean; replaceIndex?: number }
 
 function viewerTitle(viewer: ViewerState | null) {
@@ -406,7 +440,6 @@ export function RuleCard({ rule, actions, source }: RuleCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [resolving, setResolving] = useState<{ index: number; note: string } | null>(null)
-  const conditions = describeConditions(rule.appliesWhen)
   const blocker = approvalBlocker(rule)
 
   return (
@@ -452,11 +485,15 @@ export function RuleCard({ rule, actions, source }: RuleCardProps) {
                 <dt className="text-muted-foreground">Who decides</dt>
                 <dd>{rule.discretion === "committee" ? "The committee" : "Checked by the rules"}</dd>
                 <dt className="text-muted-foreground">Check</dt>
-                <dd>{describeCheck(rule.check)}</dd>
-                {conditions ? (
+                <dd>
+                  <CheckSummary check={rule.check} />
+                </dd>
+                {rule.appliesWhen.length > 0 ? (
                   <>
                     <dt className="text-muted-foreground">Applies when</dt>
-                    <dd>{conditions}</dd>
+                    <dd>
+                      <ConditionsSummary conditions={rule.appliesWhen} />
+                    </dd>
                   </>
                 ) : null}
                 {rule.exceptions.length > 0 ? (
