@@ -36,8 +36,12 @@ Section text (page markers like <<page 17>> show where pages start):
 Return the project types this section states requirements for, the topics of those requirements, and whether the section is relevant at all. A section is relevant when it states something an architectural reviewer would check for an application of one of these project types: allowed materials, colors, styles, sizes, placement, required documents or approvals, or process rules about approvals and variances. Assessments, voting, insurance, enforcement and general definitions are not relevant unless they directly govern such an application.`
 }
 
+// Rule generation runs once per build and decides the rulebook's quality, so it gets the strongest model.
+const ruleModel = { model: "anthropic/claude-opus-5.5" }
+
 const sectionRuleExtraction: PromptDefinition = {
   name: "hoa-section-rule-extraction",
+  config: ruleModel,
   fallback: `You turn one section of a homeowners association's governing documents into structured rules that software checks architectural applications against. The rules are data; code evaluates them, so they must be exact.
 
 Document kind: {{documentKind}}
@@ -74,6 +78,7 @@ Extract every requirement in this section that applies to the catalog's project 
 
 const ruleConsolidation: PromptDefinition = {
   name: "hoa-rule-consolidation",
+  config: ruleModel,
   fallback: `You review candidate rules extracted section by section from a homeowners association's governing documents for one project type, and find how they relate.
 
 Project type: {{projectType}}
@@ -183,11 +188,11 @@ Return "met" only when the evidence clearly shows the rule is satisfied, "not-me
 
 const reviewWriter: PromptDefinition = {
   name: "hoa-review-writer",
-  fallback: `You write the results of an automated architectural review for a homeowners association: an assessment for the Design Review Committee and feedback for the homeowner. The findings and recommendation are already decided; you only explain them.
+  fallback: `You phrase the results of an automated architectural review for a homeowners association. Code has already decided the findings, the recommendation and the action items; you only word them.
 
 Recommendation: {{recommendation}}
 
-Findings, with their rules, citations and evidence:
+Findings, with their rules and sections:
 {{findings}}
 
 Facts read from the application:
@@ -196,15 +201,18 @@ Facts read from the application:
 Action items to phrase, by id:
 {{actionItems}}
 
-Process rules the homeowner should know about:
+Process rules:
 {{informationalRules}}
 
-Write:
-- assessment: for the committee, a short summary of the recommendation and why, then what they must decide themselves.
-- feedback: for the homeowner, plain and specific: what to change, what to provide, and anything the committee will decide. Cite rules by section. Be polite and direct.
-- items: one entry per action item id, rewriting its text as a clear instruction to the homeowner (or, for committee decisions, a clear question for the committee).
+Return:
+- assessment: for the committee, at most three sentences: the recommendation and the main reasons for it.
+- feedback: for the homeowner, at most three sentences: the outcome and the next step, such as making the changes and providing the information listed, then running the review again.
+- items: exactly one entry for every action item id. Each is one sentence of at most 25 words that says exactly what to change or provide, naming the required value when the rule lists one, and ends with the section in parentheses. Cover every component in one sentence instead of repeating it per component. For committee items, ask one yes-or-no question.
 
-Never add a finding, requirement or condition that isn't in the input, and never contradict the recommendation.`
+Rules:
+- The page lists the items under the assessment and feedback, so never list or repeat them there.
+- Never add a requirement, request, condition or suggestion that isn't an action item.
+- No greetings, thanks, hedging or filler.`
 }
 
 export const pipelinePrompts = {

@@ -8,6 +8,8 @@ export type PromptDefinition = {
   name: string
   /** Text prompt using Langfuse `{{variable}}` syntax. */
   fallback: string
+  /** The config a prompt is first created with in Langfuse (`pnpm prompts:push`); Langfuse owns it after that. */
+  config?: { model?: string }
 }
 
 export const prompts = {

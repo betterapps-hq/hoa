@@ -104,6 +104,56 @@ export async function saveDraft(
   await db.batch([clear, ...deletes, ...inserts, promote])
 }
 
+/**
+ * Starts editing a published rulebook: a draft copy with new rule ids, keeping each rule's key, approval and edits.
+ * The partial unique index refuses it while another draft exists.
+ */
+export async function copyRulebookAsDraft(
+  db: Database,
+  hoaId: string,
+  input: { source: Rulebook; sourceRules: readonly Rule[]; draftId: string; jobId: string; now: string }
+) {
+  const draft: Rulebook = {
+    ...input.source,
+    id: input.draftId,
+    version: null,
+    status: "draft",
+    error: null,
+    jobId: input.jobId,
+    createdAt: input.now,
+    publishedBy: null,
+    publishedAt: null
+  }
+  const copies = input.sourceRules.map((rule): Rule => ({
+    ...rule,
+    id: crypto.randomUUID(),
+    rulebookId: draft.id,
+    change: "unchanged"
+  }))
+  await db.batch([
+    db.insert(rulebooks).values(draft),
+    ...copies.map((rule) =>
+      db.insert(rules).values({ id: rule.id, hoaId, rulebookId: draft.id, ruleKey: rule.ruleKey, rule })
+    )
+  ])
+  return draft
+}
+
+/** Removes a rule from a draft. */
+export async function deleteRule(db: Database, hoaId: string, id: string) {
+  await db.delete(rules).where(and(eq(rules.hoaId, hoaId), eq(rules.id, id)))
+}
+
+/** Throws away a draft and its rules; the published rulebook is untouched. */
+export async function discardDraft(db: Database, hoaId: string, rulebookId: string) {
+  await db.batch([
+    db.delete(rules).where(and(eq(rules.hoaId, hoaId), eq(rules.rulebookId, rulebookId))),
+    db
+      .delete(rulebooks)
+      .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId), eq(rulebooks.status, "draft")))
+  ])
+}
+
 export async function failRulebook(db: Database, hoaId: string, id: string, error: Rulebook["error"]) {
   await db
     .update(rulebooks)

@@ -1,7 +1,27 @@
 import { useForm } from "@tanstack/react-form"
-import { AlertTriangleIcon, CheckIcon, CircleCheckIcon, CircleXIcon, PencilIcon, XIcon } from "lucide-react"
+import {
+  AlertTriangleIcon,
+  CheckIcon,
+  CircleCheckIcon,
+  CircleXIcon,
+  InfoIcon,
+  PencilIcon,
+  Trash2Icon,
+  XIcon
+} from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,7 +35,9 @@ import {
   approvalBlocker,
   describeCheck,
   describeConditions,
+  issueSeverity,
   ruleEditSchema,
+  type IssueSeverity,
   type RuleChanges
 } from "../rulebookEditing"
 
@@ -23,6 +45,7 @@ export type RuleCardActions = {
   review: (ruleId: string, status: Rule["review"]["status"]) => Promise<void>
   save: (ruleId: string, changes: RuleChanges) => Promise<void>
   resolveIssue: (ruleId: string, issueIndex: number, note: string) => Promise<void>
+  remove: (ruleId: string) => Promise<void>
 }
 
 const obligationLabels: Record<Rule["obligation"], string> = {
@@ -205,6 +228,23 @@ function RuleEditor({
   )
 }
 
+const issueIconClass = "mt-0.5 size-4 shrink-0"
+
+function IssueIcon({ severity }: { severity: IssueSeverity | "resolved" }) {
+  switch (severity) {
+    case "resolved":
+      return <CheckIcon className={`${issueIconClass} text-muted-foreground`} aria-label="Resolved" />
+    case "note":
+      return <InfoIcon className={`${issueIconClass} text-muted-foreground`} aria-label="Note" />
+    case "blocking":
+      return <AlertTriangleIcon className={`${issueIconClass} text-destructive`} aria-label="Must be resolved" />
+    case "warning":
+      return (
+        <AlertTriangleIcon className={`${issueIconClass} text-amber-600 dark:text-amber-400`} aria-label="Warning" />
+      )
+  }
+}
+
 export type RuleCardProps = { rule: Rule; actions?: RuleCardActions }
 
 /** One rule with its check, conditions, citations and issues. Without actions it's read-only. */
@@ -286,48 +326,56 @@ export function RuleCard({ rule, actions }: RuleCardProps) {
             </ul>
           </>
         )}
-        {rule.issues.length > 0 ? (
+        {actions && rule.issues.length > 0 ? (
           <ul className="flex flex-col gap-2">
-            {rule.issues.map((issue, index) => (
-              <li key={`${issue.code}:${issue.message}`} className="flex flex-col gap-2 rounded-lg bg-muted p-2">
-                <div className="flex items-start gap-2">
-                  <AlertTriangleIcon className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                  <span className="flex-1">
-                    {issue.message}
-                    {issue.resolution ? (
-                      <span className="text-muted-foreground"> Resolved: {issue.resolution.note}</span>
-                    ) : null}
-                  </span>
-                  {actions && !issue.resolution && resolving?.index !== index ? (
-                    <Button size="sm" variant="outline" onClick={() => setResolving({ index, note: "" })}>
-                      Resolve
-                    </Button>
-                  ) : null}
-                </div>
-                {actions && resolving?.index === index ? (
-                  <div className="flex gap-2">
-                    <Input
-                      aria-label="Why this is resolved"
-                      placeholder="Why this is resolved"
-                      value={resolving.note}
-                      onChange={(event) => setResolving({ index, note: event.target.value })}
-                    />
-                    <Button
-                      size="sm"
-                      disabled={!resolving.note.trim()}
-                      onClick={() =>
-                        attempt(async () => {
-                          await actions.resolveIssue(rule.id, index, resolving.note.trim())
-                          setResolving(null)
-                        })
-                      }
+            {rule.issues.map((issue, index) => {
+              const severity = issueSeverity(issue)
+              return (
+                <li
+                  key={`${issue.code}:${issue.message}`}
+                  className={
+                    issue.resolution ? "flex flex-col gap-2 p-1" : "flex flex-col gap-2 rounded-lg bg-muted p-2"
+                  }
+                >
+                  <div className="flex items-start gap-2">
+                    <IssueIcon severity={issue.resolution ? "resolved" : severity} />
+                    <span
+                      className={issue.resolution || severity === "note" ? "flex-1 text-muted-foreground" : "flex-1"}
                     >
-                      Save
-                    </Button>
+                      {issue.message}
+                      {issue.resolution ? <> Resolved: {issue.resolution.note}</> : null}
+                    </span>
+                    {!issue.resolution && resolving?.index !== index ? (
+                      <Button size="sm" variant="outline" onClick={() => setResolving({ index, note: "" })}>
+                        Resolve
+                      </Button>
+                    ) : null}
                   </div>
-                ) : null}
-              </li>
-            ))}
+                  {resolving?.index === index ? (
+                    <div className="flex gap-2">
+                      <Input
+                        aria-label="Why this is resolved"
+                        placeholder="Why this is resolved"
+                        value={resolving.note}
+                        onChange={(event) => setResolving({ index, note: event.target.value })}
+                      />
+                      <Button
+                        size="sm"
+                        disabled={!resolving.note.trim()}
+                        onClick={() =>
+                          attempt(async () => {
+                            await actions.resolveIssue(rule.id, index, resolving.note.trim())
+                            setResolving(null)
+                          })
+                        }
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  ) : null}
+                </li>
+              )
+            })}
           </ul>
         ) : null}
       </CardContent>
@@ -355,6 +403,26 @@ export function RuleCard({ rule, actions }: RuleCardProps) {
             <PencilIcon />
             Edit
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger render={<Button size="sm" variant="ghost" />}>
+              <Trash2Icon />
+              Delete
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this rule?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  “{rule.title}” is removed from the draft. Reviews keep using the published version until you publish.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep it</AlertDialogCancel>
+                <AlertDialogAction variant="destructive" onClick={() => void attempt(() => actions.remove(rule.id))}>
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           {blocker ? <span className="text-xs text-muted-foreground">{blocker}</span> : null}
         </CardFooter>
       ) : null}

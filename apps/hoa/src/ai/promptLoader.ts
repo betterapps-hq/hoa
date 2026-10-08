@@ -37,7 +37,7 @@ function fallbackTemplate(prompt: PromptDefinition): PromptTemplate {
   return {
     name: prompt.name,
     version: "fallback",
-    config: {},
+    config: prompt.config ?? {},
     compile: (variables) => compileMustache(prompt.fallback, variables)
   }
 }
