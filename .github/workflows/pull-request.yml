@@ -42,5 +42,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PREVIEW_URL: ${{ steps.preview.outputs.url }}
         run: |
-          body="**Preview:** ${PREVIEW_URL:-see the Deploy a preview job log} (commit ${GITHUB_SHA::7})"
+          if [ -n "$PREVIEW_URL" ]; then body="**Preview:** $PREVIEW_URL (commit ${GITHUB_SHA::7})"; else body="**Preview:** deployed for commit ${GITHUB_SHA::7}, but Cloudflare returned no URL. Check the Deploy a preview job log."; fi
           gh pr comment "${{ github.event.pull_request.number }}" --body "$body" --edit-last --create-if-none
