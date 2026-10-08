@@ -279,14 +279,14 @@ Phase 1 removes `mammoth` (Layout reads Word text). Azure is called with `fetch`
 `crypto.randomUUID()`. [docs/tech-stack.md](../../../../docs/tech-stack.md) lists these.
 ## CI/CD
 
-Hosted on GitHub as a private repository, `AndrewCraswell/hoa`. Everything runs in GitHub Actions
-(`.github/workflows/ci.yml`), so a deploy only happens after `pnpm verify` passes.
+Hosted on GitHub as a private repository, `AndrewCraswell/hoa`. Everything runs in GitHub Actions, and a deploy only
+happens after `pnpm verify` passes. Both pipelines call the same verification (`verify.yml`).
 
-| Trigger | Jobs |
-| --- | --- |
-| Pull request | `verify`, then `preview`: builds the app, runs `wrangler preview --name pr-<number>` and comments the preview URL on the pull request, updating the comment on every push |
-| Merge to `main` | `verify`, then `deploy`: builds the app and runs `wrangler deploy` |
-| Pull request closed | `preview-cleanup.yml` deletes the pull request's preview |
+| Workflow | Trigger | Jobs |
+| --- | --- | --- |
+| `pull-request.yml` | Pull request opened or pushed | `verify`, then `preview`: builds the app, runs `wrangler preview --name pr-<number>` and comments the preview URL on the pull request, updating the comment on every push. A new push cancels the previous run. |
+| `deploy.yml` | Merge to `main` | `verify`, then `deploy`: builds the app and runs `wrangler deploy`. Deploys run one at a time in merge order and are never cancelled. |
+| `preview-cleanup.yml` | Pull request closed | Deletes the pull request's preview |
 
 - **Credentials.** The jobs read the repository secret `CLOUDFLARE_API_TOKEN` and the variable `CLOUDFLARE_ACCOUNT_ID`.
   Until the variable is set, the Cloudflare jobs are skipped and only `verify` runs.
