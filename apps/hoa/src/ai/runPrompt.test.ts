@@ -7,7 +7,7 @@ import { z } from "zod"
 import { candidateRuleSchema } from "@/rules/rule"
 import type { PromptLoader } from "./promptLoader"
 import { prompts } from "./prompts"
-import { outputSchema, runObjectPrompt, runTextPrompt } from "./runPrompt"
+import { answerOf, outputSchema, runObjectPrompt, runTextPrompt } from "./runPrompt"
 import { registerTracerProvider } from "./telemetry.server"
 
 function createModel(
@@ -185,7 +185,7 @@ describe("runObjectPrompt", () => {
     })
 
     expect(result.object).toEqual({ recommendation: "request-information", missing: ["Height"] })
-    expect(model.doGenerateCalls[0]?.toolChoice).toEqual({ type: "tool", toolName: "respond" })
+    expect(model.doGenerateCalls[0]?.toolChoice).toEqual({ type: "auto" })
     expect(model.doGenerateCalls[0]?.prompt).toMatchObject([
       {
         role: "user",
@@ -284,5 +284,14 @@ describe("outputSchema", () => {
     expect(json).toContain("anyOf")
     expect(await schema.validate?.({ rules: [] })).toEqual({ success: true, value: { rules: [] } })
     expect((await schema.validate?.({ rules: [{}] }))?.success).toBe(false)
+  })
+})
+
+describe("answerOf", () => {
+  it("takes the respond tool's input, or JSON the model wrote as text", () => {
+    expect(answerOf({ toolCalls: [{ toolName: "respond", input: { a: 1 } }], text: "" })).toEqual({ a: 1 })
+    expect(answerOf({ toolCalls: [], text: 'Here it is:\n```json\n{"a": 2}\n```' })).toEqual({ a: 2 })
+    expect(answerOf({ toolCalls: [], text: "{not json}" })).toBeUndefined()
+    expect(answerOf({ toolCalls: [{ toolName: "other", input: {} }], text: "No answer." })).toBeUndefined()
   })
 })

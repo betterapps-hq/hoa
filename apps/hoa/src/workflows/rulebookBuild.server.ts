@@ -209,6 +209,15 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
           failures.push({ stage: "extract", itemId: relevant[index]?.id ?? "", message: errorText(result.reason) })
         }
       })
+      // A draft missing a section would silently drop that section's rules and report them as removed, so a section
+      // that can't be extracted after retries fails the build and leaves the current draft as it is.
+      const extractFailures = failures.filter((failure) => failure.stage === "extract")
+      const [firstFailure] = extractFailures
+      if (firstFailure) {
+        throw new NonRetryableError(
+          `${extractFailures.length} of ${relevant.length} sections couldn't be extracted, so the draft wasn't replaced. ${firstFailure.message}`
+        )
+      }
       const extractedSections = relevant.filter((_, index) => extracted[index]?.status === "fulfilled")
 
       // Verify: match every citation against its page, and check every rule against the catalog.
