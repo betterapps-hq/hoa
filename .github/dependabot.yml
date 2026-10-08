@@ -12,6 +12,9 @@ updates:
           - minor
           - patch
   - package-ecosystem: github-actions
-    directory: /
+    # The shared setup action isn't under .github/workflows, so it's listed too.
+    directories:
+      - /
+      - /.github/actions/setup
     schedule:
       interval: weekly

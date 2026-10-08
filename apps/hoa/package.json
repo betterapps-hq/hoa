@@ -22,7 +22,7 @@
     "auth:langfuse": "node --env-file=.env -e \"const { LANGFUSE_PUBLIC_KEY: publicKey, LANGFUSE_SECRET_KEY: secretKey } = process.env; if (!publicKey || !secretKey) throw new Error('LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are required'); console.log(Buffer.from(`${publicKey}:${secretKey}`).toString('base64'))\""
   },
   "engines": {
-    "node": ">=24.0.0",
+    "node": ">=26.0.0",
     "pnpm": ">=12.0.0 <13.0.0"
   },
   "dependencies": {
@@ -46,8 +46,8 @@
     "lucide-react": "^1.52.0",
     "mammoth": "^1.13.0",
     "next-themes": "^0.4.6",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "react-error-boundary": "^6.1.2",
     "react-hook-form": "^7.89.0",
     "shadcn": "^4.21.3",
@@ -63,21 +63,21 @@
     "@rolldown/plugin-babel": "^0.2.4",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "catalog:",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^5.0.3",
     "babel-plugin-react-compiler": "^1.0.0",
     "happy-dom": "^20.10.6",
     "oxlint": "^1.72.0",
     "tailwindcss": "^4.3.3",
     "typescript": "catalog:",
     "vite": "^8.1.5",
-    "vitest": "^4.1.10",
+    "vitest": "^5.0.3",
     "wrangler": "4.148.0"
   }
 }

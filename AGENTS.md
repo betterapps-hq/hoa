@@ -8,7 +8,7 @@ Quick reference:
 - **Lint:** `oxlint` (not eslint) · **Format:** `oxfmt` (not prettier)
 - **Type-check:** TypeScript 7 RC native compiler via `pnpm check:types`
 - **Test:** Vitest via `pnpm test` · **Build:** Vite (TanStack Start) via `pnpm build`
-- **Package manager:** pnpm `>=12` on Node `>=24` · **Tasks:** Turborepo
+- **Package manager:** pnpm `>=12` on Node `>=26` · **Tasks:** Turborepo
 - **Git hooks:** lefthook (pre-commit: `oxlint --fix` + `oxfmt`; pre-push: `check:types`). Don't use `--no-verify`.
 - **AI:** Vercel AI SDK through OpenRouter. Every prompt lives in Langfuse prompt management and every model call is
   traced to Langfuse. See [apps/hoa/docs/ai.md](apps/hoa/docs/ai.md).

@@ -73,8 +73,8 @@ export const extractRules = createServerFn({ method: "POST" })
     }
   })
 
-export const getRulebook = createServerFn({ method: "GET" }).handler(
-  async (): Promise<Rulebook | null> => createRulebookStore().load()
+export const getRulebook = createServerFn({ method: "GET" }).handler(async (): Promise<Rulebook | null> =>
+  createRulebookStore().load()
 )
 
 const publishInput = z.object({
