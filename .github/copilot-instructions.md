@@ -10,7 +10,7 @@ setup and the [docs index](../docs/README.md) for conventions.
 - **Type-check:** `tsc` from a pinned native TypeScript — keep the version aligned across packages.
 - **Test:** Vitest (happy-dom unit tests) · **Web framework:** TanStack Start on Vite, running on Cloudflare Workers.
 - **AI:** Vercel AI SDK (`ai`) with the OpenRouter provider; prompts, traces, cost, latency and evaluations in Langfuse.
-- **Package manager:** pnpm (`>=12`) on Node `>=24`, enforced via root `engines` + `engine-strict`.
+- **Package manager:** pnpm (`>=12`) on Node `>=26`, enforced via root `engines` + `engine-strict`.
 - **Task runner:** Turborepo.
 
 ## Build / verify loop
