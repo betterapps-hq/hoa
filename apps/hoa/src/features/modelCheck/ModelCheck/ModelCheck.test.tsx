@@ -16,7 +16,8 @@ const succeeded: ModelCheckResult = {
   outputTokens: 9,
   costUsd: 0.00253,
   latencyMs: 1834,
-  traceId: "0af7651916cd43dd8448eb211c80319c"
+  traceId: "0af7651916cd43dd8448eb211c80319c",
+  isCached: false
 }
 
 async function runCheck(result: ModelCheckResult | (() => Promise<ModelCheckResult>)) {
@@ -38,7 +39,7 @@ describe("ModelCheck", () => {
   })
 
   it("flags a fallback prompt and missing Langfuse tracing", async () => {
-    await runCheck({ ...succeeded, promptVersion: null, traceId: undefined, isLangfuseConfigured: false })
+    await runCheck({ ...succeeded, promptVersion: "fallback", traceId: undefined, isLangfuseConfigured: false })
 
     expect(await screen.findByText("hoa-model-check (local fallback, not linked to Langfuse)")).toBeInTheDocument()
     expect(screen.getByText("Langfuse isn't configured")).toBeInTheDocument()

@@ -2,11 +2,12 @@ import { LangfuseSpanProcessor } from "@langfuse/otel"
 import { context, trace } from "@opentelemetry/api"
 import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base"
 import { MockLanguageModelV4 } from "ai/test"
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { createPromptLoader } from "./promptLoader"
+import type { PromptLoader } from "./promptLoader"
 import { prompts } from "./prompts"
-import { runObjectPrompt, runTextPrompt, type PromptLoader } from "./runPrompt"
+import { runObjectPrompt, runTextPrompt } from "./runPrompt"
 import { registerTracerProvider } from "./telemetry.server"
 
 function createModel(
@@ -30,7 +31,7 @@ function createModel(
 const langfusePrompt: PromptLoader = async (prompt) => ({
   name: prompt.name,
   version: 3,
-  isFallback: false,
+  config: {},
   compile: (variables) => `Managed prompt for ${variables?.applicant ?? "nobody"}`
 })
 
@@ -45,7 +46,8 @@ describe("runTextPrompt", () => {
 
     const result = await runTextPrompt({
       loadPrompt: langfusePrompt,
-      model,
+      createModel: () => model,
+      defaultModelId: "test-model",
       prompt: prompts.modelCheck,
       variables: { applicant: "Lot 12" },
       traceName: "model-check",
@@ -72,7 +74,8 @@ describe("runTextPrompt", () => {
 
     const result = await runTextPrompt({
       loadPrompt: createPromptLoader(undefined, "production"),
-      model,
+      createModel: () => model,
+      defaultModelId: "test-model",
       prompt: prompts.modelCheck,
       traceName: "model-check",
       environment: "test",
@@ -81,7 +84,7 @@ describe("runTextPrompt", () => {
 
     expect(model.doGenerateCalls[0]?.providerOptions).toEqual({ openrouter: { session_id: "session-1" } })
     expect(result.traceId).toBeUndefined()
-    expect(result.promptVersion).toBeNull()
+    expect(result.promptVersion).toBe("fallback")
     expect(result.costUsd).toBeUndefined()
   })
 
@@ -116,7 +119,8 @@ describe("runTextPrompt", () => {
 
     const result = await runTextPrompt({
       loadPrompt: langfusePrompt,
-      model,
+      createModel: () => model,
+      defaultModelId: "test-model",
       prompt: prompts.modelCheck,
       traceName: "model-check",
       environment: "test",
@@ -153,7 +157,8 @@ describe("runObjectPrompt", () => {
 
     const result = await runObjectPrompt({
       loadPrompt: langfusePrompt,
-      model,
+      createModel: () => model,
+      defaultModelId: "test-model",
       prompt: prompts.applicationReview,
       schema: z.object({ recommendation: z.string(), missing: z.array(z.string()) }),
       attachments: [
@@ -181,12 +186,76 @@ describe("runObjectPrompt", () => {
     await expect(
       runObjectPrompt({
         loadPrompt: langfusePrompt,
-        model: createModel(undefined, JSON.stringify({ recommendation: 5 })),
+        createModel: () => createModel(undefined, JSON.stringify({ recommendation: 5 })),
+        defaultModelId: "test-model",
         prompt: prompts.applicationReview,
         schema: z.object({ recommendation: z.string() }),
         traceName: "application-review",
         environment: "test"
       })
     ).rejects.toThrow("No object generated")
+  })
+})
+
+describe("model and version selection", () => {
+  it("uses the prompt version's model when it names one, and loads a pinned version", async () => {
+    const model = createModel()
+    const createModelFor = vi.fn<(modelId: string) => typeof model>(() => model)
+    const loadPrompt = vi.fn<PromptLoader>(async (prompt) => ({
+      name: prompt.name,
+      version: 9,
+      config: { model: "anthropic/claude-sonnet-5.5" },
+      compile: () => "Pinned"
+    }))
+
+    const result = await runTextPrompt({
+      loadPrompt,
+      createModel: createModelFor,
+      defaultModelId: "test-model",
+      prompt: prompts.modelCheck,
+      promptVersion: 9,
+      traceName: "model-check",
+      environment: "test"
+    })
+
+    expect(loadPrompt).toHaveBeenCalledWith(prompts.modelCheck, { version: 9 })
+    expect(createModelFor).toHaveBeenCalledWith("anthropic/claude-sonnet-5.5")
+    expect(result).toMatchObject({ modelId: "anthropic/claude-sonnet-5.5", promptVersion: 9 })
+  })
+})
+
+describe("content cache", () => {
+  it("answers a repeated call from the cache and misses when the input changes", async () => {
+    const stored = new Map<string, unknown>()
+    const cache = {
+      get: async (key: string) => stored.get(key),
+      put: async (key: string, value: unknown) => {
+        stored.set(key, value)
+      }
+    }
+    const model = createModel(undefined, JSON.stringify({ recommendation: "approve" }))
+    const run = (applicant: string) =>
+      runObjectPrompt({
+        loadPrompt: langfusePrompt,
+        createModel: () => model,
+        defaultModelId: "test-model",
+        prompt: prompts.applicationReview,
+        schema: z.object({ recommendation: z.string() }),
+        variables: { applicant },
+        attachments: [{ type: "text", text: "Packet" }],
+        traceName: "application-review",
+        environment: "test",
+        cache
+      })
+
+    const first = await run("Lot 12")
+    const second = await run("Lot 12")
+    const third = await run("Lot 13")
+
+    expect(first).toMatchObject({ isCached: false, object: { recommendation: "approve" } })
+    expect(second).toMatchObject({ isCached: true, costUsd: 0, object: { recommendation: "approve" } })
+    expect(third.isCached).toBe(false)
+    expect(model.doGenerateCalls).toHaveLength(2)
+    expect(stored.size).toBe(2)
   })
 })

@@ -57,18 +57,18 @@ When a feature needs a production evaluator:
    name, on new observations. Don't create trace-level evaluators: Langfuse v4 stops running them on November 16, 2026.
 3. Map the evaluator's variables to the root observation's input and output, which is the feature's span.
 
-## Planned with the pipeline
+## Versions, models and caching
 
-The [design](design/README.md) changes these as phase 1 lands; update this page in the same changes:
-
-- **Prompts by version.** `PromptLoader` takes `{ label }` or `{ version }` and returns the prompt's `config`, parsed
-  with Zod (`{ model?: string }`). Workflow jobs resolve each label to a version once, in `resolve-prompts`, and steps
-  load by version. Prompt versions are typed `number | "fallback"`; fallback text is fine locally, but hosted jobs fail
-  (retryably) rather than run on it.
-- **Model per prompt.** `runPrompt` receives a model factory and a default model id, picks the model after loading the
-  prompt (its `config.model`, else `OPENROUTER_MODEL` or `OPENROUTER_SMALL_MODEL`), and reports the `modelId` it used.
-- **Flushing in Workflows.** Workflow steps await the telemetry flush at the end of each step, as server functions do
-  before returning.
+- **Prompts by version.** The [prompt loader](../src/ai/promptLoader.ts) loads by label (`LANGFUSE_PROMPT_LABEL`) or
+  by a pinned version, and returns the version's `config`. Workflow jobs pin every prompt they use once, with
+  `resolvePromptVersions`, and pass `promptVersion` to each call. A version is `"fallback"` when the text came from
+  `prompts.ts`.
+- **Model per prompt.** `runTextPrompt` and `runObjectPrompt` take a model factory and a default model id, and build
+  the model after loading the prompt: the version's `config.model` when it names one, else the default
+  (`OPENROUTER_MODEL`, or `OPENROUTER_SMALL_MODEL` for routing, structure and classification). Results report the
+  `modelId` used.
+- **Content cache.** Pass a `cache` to reuse results: the key covers the trace name, model, compiled prompt and
+  attachments, so only a real change triggers a new model call. Cached results report `isCached` and cost 0.
 
 Not planned for the demo: recording summaries instead of content for application stages, and Broadcast's privacy
 mode. Both are needed before real HOAs onboard ([design/documents.md](design/documents.md#privacy-and-retention)).

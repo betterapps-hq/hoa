@@ -13,12 +13,13 @@ export const runModelCheck = createServerFn({ method: "POST" }).handler(async ()
   try {
     const result = await runTextPrompt({
       loadPrompt: ai.loadPrompt,
-      model: ai.model,
+      createModel: ai.createModel,
+      defaultModelId: ai.modelId,
       prompt: prompts.modelCheck,
       traceName: "model-check",
       environment: ai.environment
     })
-    return { status: "succeeded", modelId: ai.modelId, isLangfuseConfigured: ai.isLangfuseConfigured, ...result }
+    return { status: "succeeded", isLangfuseConfigured: ai.isLangfuseConfigured, ...result }
   } catch (error) {
     console.error("Model check failed", error)
     return { status: "failed", message: errorMessage(error, "The model check failed.") }

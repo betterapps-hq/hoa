@@ -62,7 +62,7 @@ export function ModelCheck({ onRun }: ModelCheckProps) {
                   <dt>Prompt</dt>
                   <dd>
                     {result.promptName}{" "}
-                    {result.promptVersion === null
+                    {result.promptVersion === "fallback"
                       ? "(local fallback, not linked to Langfuse)"
                       : `version ${result.promptVersion}`}
                   </dd>
