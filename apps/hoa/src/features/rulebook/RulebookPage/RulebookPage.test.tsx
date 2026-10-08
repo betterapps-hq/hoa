@@ -136,15 +136,17 @@ describe("RulebookPage", () => {
     expect(props.onChanged).toHaveBeenCalled()
   })
 
-  it("lists the draft with blockers and removed rules, starting with what needs attention", () => {
-    setup()
+  it("lists the draft with blockers and removed rules, starting with what needs attention", async () => {
+    const { user } = setup()
     expect(screen.getByText("2 pending")).toBeInTheDocument()
     expect(screen.getByText("2 rules are still pending.")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled()
-    expect(screen.getByText(/No vinyl/)).toBeInTheDocument()
+    expect(screen.getByText("1 published rule isn’t in this draft")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Needs attention (2)" })).toHaveAttribute("aria-pressed", "true")
     expect(screen.getByText("Showing 2 of 2 rules")).toBeInTheDocument()
     expect(screen.getAllByText("Open issues:")).toHaveLength(2)
+    await user.click(screen.getByRole("button", { name: "Show which" }))
+    expect(screen.getByText("No vinyl")).toBeInTheDocument()
   })
 
   it("filters by text, topic and status", async () => {
