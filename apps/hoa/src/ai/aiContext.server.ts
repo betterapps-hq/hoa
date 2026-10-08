@@ -5,11 +5,12 @@ import { createPromptLoader } from "./promptLoader"
 import { startTelemetry } from "./telemetry.server"
 
 /**
- * Everything a server function needs to run a prompt: the model, the Langfuse prompt loader and tracing. Returns the
- * missing settings instead when OpenRouter isn't configured.
+ * Everything a server function or Workflow step needs to run a prompt: a model factory with the main and small model
+ * ids, the Langfuse prompt loader and tracing. Returns the missing settings instead when OpenRouter isn't configured.
  */
 export function createAiContext() {
-  if (!env.OPENROUTER_API_KEY) {
+  const apiKey = env.OPENROUTER_API_KEY
+  if (!apiKey) {
     return { isConfigured: false as const, missing: ["OPENROUTER_API_KEY"] }
   }
   const langfuseSettings =
@@ -24,11 +25,14 @@ export function createAiContext() {
   return {
     isConfigured: true as const,
     isLangfuseConfigured: Boolean(langfuse),
+    createModel: (modelId: string) => createChatModel(apiKey, modelId),
+    /** The main model, used when a prompt version doesn't name one. */
     modelId: env.OPENROUTER_MODEL,
-    model: createChatModel(env.OPENROUTER_API_KEY, env.OPENROUTER_MODEL),
+    /** The cheaper model for routing, structure and classification. */
+    smallModelId: env.OPENROUTER_SMALL_MODEL ?? env.OPENROUTER_MODEL,
     loadPrompt: createPromptLoader(langfuse?.prompt, env.LANGFUSE_PROMPT_LABEL),
     environment: env.LANGFUSE_TRACING_ENVIRONMENT,
-    /** Sends buffered spans to Langfuse; call before a server function returns. */
+    /** Sends buffered spans to Langfuse; call before a server function returns or a Workflow step ends. */
     flush: async () => {
       await telemetry?.forceFlush()
     }

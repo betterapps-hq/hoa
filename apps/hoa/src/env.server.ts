@@ -6,6 +6,8 @@ export const env = createEnv({
   server: {
     OPENROUTER_API_KEY: z.string().min(1).optional(),
     OPENROUTER_MODEL: z.string().min(1).default("anthropic/claude-haiku-5.5"),
+    // Routing, structure and classification. Defaults to OPENROUTER_MODEL.
+    OPENROUTER_SMALL_MODEL: z.string().min(1).optional(),
     LANGFUSE_PUBLIC_KEY: z.string().min(1).optional(),
     LANGFUSE_SECRET_KEY: z.string().min(1).optional(),
     LANGFUSE_BASE_URL: z.url().default("https://us.cloud.langfuse.com"),

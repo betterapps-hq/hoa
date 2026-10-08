@@ -53,7 +53,8 @@ export const reviewProject = createServerFn({ method: "POST" })
     try {
       const result = await runObjectPrompt({
         loadPrompt: ai.loadPrompt,
-        model: ai.model,
+        createModel: ai.createModel,
+        defaultModelId: ai.modelId,
         prompt: prompts.applicationReview,
         schema: reviewSchema,
         variables: {
