@@ -1,5 +1,8 @@
 # Rule model
 
+> **Being replaced.** [rule-engine.md](rule-engine.md) proposes a general rule record that isn't tied to one project
+> type's catalog. This page describes the phase 1 model that's built today.
+
 A rule is one checkable requirement from an HOA's governing documents, stored as data. Every HOA uses the same rule
 shape, the same project-type catalog and the same prompts; only the rule data differs. That's what lets the product
 onboard new HOAs without HOA-specific prompts.

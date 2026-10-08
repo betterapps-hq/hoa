@@ -9,7 +9,8 @@ applications against it. It's written for a product that many HOAs onboard to, s
 
 | Page | What it covers |
 | --- | --- |
-| [rules.md](rules.md) | The rule model: project-type catalog, components, typed checks, citations, rule keys, versioning |
+| [rule-engine.md](rule-engine.md) | **Proposal**: the canonical rule record every feature reads, anchored citations, per-rule lifecycle, vocabulary as data |
+| [rules.md](rules.md) | The phase 1 rule model: project-type catalog, components, typed checks, citations, rule keys, versioning |
 | [documents.md](documents.md) | What lives where, the records and D1 tables, storage layout, uploads, access, privacy and retention |
 | [ocr.md](ocr.md) | Turning every uploaded file into stored page records with Azure Document Intelligence Layout |
 | [extraction.md](extraction.md) | The rulebook build pipeline, from page records to a published rulebook |
