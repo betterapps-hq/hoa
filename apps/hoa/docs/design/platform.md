@@ -90,15 +90,14 @@ Two separate mechanisms:
 1. **Within one instance**, Workflows checkpoint completed steps by name, so a retried or resumed instance skips them.
 2. **Across instances**, model steps check a content cache in R2 before calling the model. The key is the SHA-256 of
    the stage, the model id, the fully compiled prompt text and the hashes of any attachments, so a change to a prompt
-   (including fallback text in `prompts.ts`), the model or the input misses the cache, and nothing else does.
+   version, the model or the input misses the cache, and nothing else does.
    Governing-document stages use `hoas/{hoaId}/cache/{stage}/{key}.json`. Application stages use
    `hoas/{hoaId}/applications/{applicationId}/cache/{stage}/{key}.json`, so the retention sweep removes them with the
    application.
 
 The first step of every workflow, `resolve-prompts`, resolves each prompt label to a version and stores the versions on
-the job; later steps load prompts by those versions. When Langfuse has no prompt, the fallback text in `prompts.ts` is
-used and recorded as version `"fallback"`. That's expected in phase 1; in the preview and demo environments a fallback
-fails the job with a retryable error instead, so hosted runs always use managed prompts. Per-job outputs are written to
+the job; later steps load prompts by those versions. Prompts exist only in Langfuse: a prompt it can't serve fails the
+step with a retryable error. Per-job outputs are written to
 `hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json`.
 
 ## Errors and retries

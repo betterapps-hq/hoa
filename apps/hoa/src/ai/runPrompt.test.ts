@@ -5,7 +5,6 @@ import { MockLanguageModelV4 } from "ai/test"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { candidateRuleSchema } from "@/rules/rule"
-import { createPromptLoader } from "./promptLoader"
 import type { PromptLoader } from "./promptLoader"
 import { prompts } from "./prompts"
 import { outputSchema, runObjectPrompt, runTextPrompt } from "./runPrompt"
@@ -89,7 +88,7 @@ describe("runTextPrompt", () => {
     const model = createModel()
 
     const result = await runTextPrompt({
-      loadPrompt: createPromptLoader(undefined, "production"),
+      loadPrompt: langfusePrompt,
       createModel: () => model,
       defaultModelId: "test-model",
       prompt: prompts.modelCheck,
@@ -100,7 +99,7 @@ describe("runTextPrompt", () => {
 
     expect(model.doGenerateCalls[0]?.providerOptions).toEqual({ openrouter: { session_id: "session-1" } })
     expect(result.traceId).toBeUndefined()
-    expect(result.promptVersion).toBe("fallback")
+    expect(result.promptVersion).toBe(3)
     expect(result.costUsd).toBeUndefined()
   })
 

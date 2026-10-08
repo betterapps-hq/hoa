@@ -179,7 +179,7 @@ function verified(
       sectionId: "guidelines-v1:3",
       model: "m",
       promptName: "p",
-      promptVersion: "fallback"
+      promptVersion: 1
     }
   }
 }

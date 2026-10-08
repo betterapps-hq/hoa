@@ -227,7 +227,7 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         const outputSchema = z.object({
           rules: z.array(candidateRuleSchema),
           model: z.string(),
-          promptVersion: z.union([z.number(), z.literal("fallback")])
+          promptVersion: z.number().int()
         })
         const verified: VerifiedCandidate[] = []
         for (const section of extractedSections) {
@@ -290,10 +290,7 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
             sectionId: item.sectionId,
             model: z.object({ model: z.string() }).catch({ model: "" }).parse(item.provenance).model,
             promptName: pipelinePrompts.sectionRuleExtraction.name,
-            promptVersion: z
-              .object({ promptVersion: z.union([z.number(), z.literal("fallback")]) })
-              .catch({ promptVersion: "fallback" })
-              .parse(item.provenance).promptVersion
+            promptVersion: z.object({ promptVersion: z.number().int() }).parse(item.provenance).promptVersion
           }
         }))
         const proposal =

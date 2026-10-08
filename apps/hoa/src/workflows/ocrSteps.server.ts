@@ -36,7 +36,7 @@ export const visualDescriptionSchema = z.object({
 export const storedVisualSchema = visualDescriptionSchema.extend({
   figureId: z.string(),
   pageIndex: z.number().int(),
-  promptVersion: z.union([z.number().int(), z.literal("fallback")])
+  promptVersion: z.number().int()
 })
 export type StoredVisual = z.infer<typeof storedVisualSchema>
 
@@ -71,7 +71,7 @@ export type OcrDependencies = {
     environment: string
     flush: () => Promise<void>
   }
-  promptVersions: Record<string, number | "fallback">
+  promptVersions: Record<string, number>
   sessionId: string
   /** Records the current stage on the job, as a step. */
   progress: (stage: string, done: number, total: number) => Promise<void>

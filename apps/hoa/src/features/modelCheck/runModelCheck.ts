@@ -19,7 +19,7 @@ export const runModelCheck = createServerFn({ method: "POST" }).handler(async ()
       traceName: "model-check",
       environment: ai.environment
     })
-    return { status: "succeeded", isLangfuseConfigured: ai.isLangfuseConfigured, ...result }
+    return { status: "succeeded", ...result }
   } catch (error) {
     console.error("Model check failed", error)
     return { status: "failed", message: errorMessage(error, "The model check failed.") }

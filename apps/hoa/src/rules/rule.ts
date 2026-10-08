@@ -6,7 +6,8 @@ import { componentKinds, documentRequirementIds, projectTypeIds } from "./catalo
 
 export const errorInfoSchema = z.object({ stage: z.string(), message: z.string(), isRetryable: z.boolean() })
 
-export const promptVersionSchema = z.union([z.number().int(), z.literal("fallback")])
+/** The Langfuse prompt version a model call used. */
+export const promptVersionSchema = z.number().int()
 
 export const ruleTopics = [
   "material",

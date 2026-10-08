@@ -29,7 +29,7 @@ export type PromptRunOptions = {
   defaultModelId: string
   prompt: PromptDefinition
   /** A version the job pinned in resolve-prompts; without it, the prompt is loaded by the default label. */
-  promptVersion?: number | "fallback"
+  promptVersion?: number
   variables?: Record<string, string>
   attachments?: PromptAttachment[]
   /** Name of the Langfuse trace and of the app span that OpenRouter nests its generation under. */
@@ -41,8 +41,7 @@ export type PromptRunOptions = {
 
 export type PromptRunMetrics = {
   promptName: string
-  /** "fallback" when the text came from prompts.ts instead of a Langfuse prompt version. */
-  promptVersion: number | "fallback"
+  promptVersion: number
   modelId: string
   inputTokens: number | undefined
   outputTokens: number | undefined
