@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, isNotNull, lte } from "drizzle-orm"
+import { z } from "zod"
 import {
   applicationFileSchema,
   applicationSchema,
@@ -6,7 +7,7 @@ import {
   type ApplicationFile,
   type ApplicationStatus
 } from "@/applications/application"
-import type { Recommendation } from "@/review/reviewModel"
+import { recommendations, type Recommendation } from "@/review/reviewModel"
 import type { ApplicationFileKind } from "@/rules/catalog"
 import type { Database } from "./database"
 import { applicationFiles, applicationPages, applications, reviews } from "./schema"
@@ -238,10 +239,15 @@ export async function saveReviewSummary(db: Database, summary: ReviewSummary) {
   await db.insert(reviews).values(summary).onConflictDoNothing()
 }
 
-export async function listReviewSummaries(db: Database, hoaId: string, applicationId: string) {
-  return db
+export async function listReviewSummaries(
+  db: Database,
+  hoaId: string,
+  applicationId: string
+): Promise<ReviewSummary[]> {
+  const rows = await db
     .select()
     .from(reviews)
     .where(and(eq(reviews.hoaId, hoaId), eq(reviews.applicationId, applicationId)))
     .orderBy(desc(reviews.createdAt))
+  return rows.map((row) => ({ ...row, recommendation: z.enum(recommendations).parse(row.recommendation) }))
 }

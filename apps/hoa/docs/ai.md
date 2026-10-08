@@ -44,8 +44,8 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
 - Each span records the prompt name and version as metadata, and its output records latency and cost.
 - Read traces through the v2 observations API (`/api/public/v2/observations?traceId=...`). The legacy trace endpoints
   return `410 Gone`.
-- **Trace names.** Name each trace after its feature or pipeline stage: today `model-check`, and the prototype's `rule-extraction`
-  and `application-review`; the pipeline's stage trace names are listed in each design page's "Prompts and models" table.
+- **Trace names.** Name each trace after its feature or pipeline stage: `model-check`, and the pipeline's
+  stage trace names listed in each design page's "Prompts and models" table.
   A Workflow's calls use the job id as the session ID, so one build or review reads as one Langfuse session.
   Evaluators and dashboards filter on these names.
 

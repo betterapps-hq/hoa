@@ -43,7 +43,7 @@ describe("Dashboard", () => {
 
     expect(screen.getByText("Sample Ridge HOA")).toBeInTheDocument()
     expect(screen.getByText("Rules are ready for review")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: /Submit a project/ })).toHaveAttribute("href", "/submit")
+    expect(screen.getByRole("link", { name: /Start an application/ })).toHaveAttribute("href", "/applications")
     expect(screen.queryByRole("heading", { name: "Model check" })).not.toBeInTheDocument()
   })
 

@@ -133,8 +133,8 @@ export function Dashboard({ roleId, summary, onModelCheck }: DashboardProps) {
                 committee meets.
               </CardDescription>
               <CardAction>
-                <Button render={<Link to="/submit" />} nativeButton={false}>
-                  Submit a project
+                <Button render={<Link to="/applications" />} nativeButton={false}>
+                  Start an application
                   <ArrowRightIcon />
                 </Button>
               </CardAction>
