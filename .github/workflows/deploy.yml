@@ -30,4 +30,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: pnpm --filter hoa build
+      # Migrations run before the new code, so they must stay backward compatible.
+      - run: pnpm --filter hoa run db:migrate:demo
+      - run: pnpm --filter hoa run db:seed:demo
       - run: pnpm --filter hoa run deploy:demo

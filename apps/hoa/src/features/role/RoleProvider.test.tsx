@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { afterEach, describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import { RoleProvider, useRole } from "./RoleProvider"
-import { isRoleId } from "./roles"
+import { isRoleId, type RoleId } from "./roles"
 
 function CurrentRole() {
   const { role, setRole } = useRole()
@@ -19,38 +19,18 @@ function CurrentRole() {
 }
 
 describe("RoleProvider", () => {
-  afterEach(() => {
-    localStorage.clear()
-  })
-
-  it("starts as a homeowner, switches roles and remembers the choice", async () => {
-    const { unmount } = render(
-      <RoleProvider>
+  it("starts with the session's role, switches immediately and saves the choice", async () => {
+    const onRoleChange = vi.fn<(role: RoleId) => Promise<void>>().mockResolvedValue(undefined)
+    render(
+      <RoleProvider roleId="homeowner" onRoleChange={onRoleChange}>
         <CurrentRole />
       </RoleProvider>
     )
-    expect(screen.getByText("Homeowner: Dashboard, Submit a project")).toBeInTheDocument()
+    expect(screen.getByText(/^Homeowner:/)).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole("button", { name: "Switch" }))
-    expect(screen.getByText("Administrator: Dashboard, Rulebook, Review an application")).toBeInTheDocument()
-    unmount()
-
-    render(
-      <RoleProvider>
-        <CurrentRole />
-      </RoleProvider>
-    )
-    expect(await screen.findByText(/^Administrator/)).toBeInTheDocument()
-  })
-
-  it("ignores an unknown stored role", async () => {
-    localStorage.setItem("hoa-demo-role", "superuser")
-    render(
-      <RoleProvider>
-        <CurrentRole />
-      </RoleProvider>
-    )
-    expect(await screen.findByText(/^Homeowner/)).toBeInTheDocument()
+    expect(screen.getByText(/^Administrator:/)).toBeInTheDocument()
+    expect(onRoleChange).toHaveBeenCalledWith("administrator")
   })
 
   it("requires the provider", () => {

@@ -27,7 +27,7 @@ D1 tables, defined with Drizzle in `src/db/schema.ts` with migrations in `apps/h
 | `sections` | Section of a document version | Written once per version; `id` is `{documentId}:{ordinal}`. Metadata and latest routing only; text is in R2 |
 | `jobs` | Workflow instance | `id` is the Workflow instance id; progress and errors |
 | `rulebooks` | Rulebook | `UNIQUE(hoa_id, version)`; partial unique indexes allow one `building` and one `draft` per HOA |
-| `rules` | Rule in a rulebook | Scalar columns, plus JSON columns for `appliesWhen`, `check`, `exceptions`, `citations`, `issues`, `provenance`. `UNIQUE(rulebook_id, rule_key)` |
+| `rules` | Rule in a rulebook | `rule_key` and `rulebook_id` columns for lookups and the `UNIQUE(rulebook_id, rule_key)` constraint; the whole `Rule` in `rule_json` |
 | `applications` | Application | |
 | `application_files` | Uploaded or derived file | |
 | `application_pages` | Page of an application file | `(file_id, page_index)` and the page's `kind` from classification |

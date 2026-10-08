@@ -41,7 +41,6 @@ The tools we reach for **first**. Prefer them before introducing an alternative 
 - ✅ **Vitest** — test runner · **happy-dom** — DOM environment · **@vitest/coverage-v8** — coverage.
 - ✅ **@testing-library/react**, **user-event**, **jest-dom** — component testing.
 - ◻️ **@playwright/test** — end-to-end browser tests.
-- ◻️ **@cloudflare/vitest-plugin** — tests that need real D1 and R2 bindings, in their own Vitest project.
 - ◻️ **msw** — API mocking.
 - ◻️ **Storybook** + **@storybook/react-vite** — component workshop, with **@storybook/addon-vitest** and
   **@storybook/addon-a11y**.
@@ -57,7 +56,7 @@ The tools we reach for **first**. Prefer them before introducing an alternative 
 - ✅ **@tanstack/react-router** — type-safe, file-based routing through TanStack Start.
 - ◻️ **@mantine/hooks** — React hooks catalog.
 - ◻️ **date-fns** — date utilities.
-- ◻️ **react-hook-form** + **@hookform/resolvers** — forms with Zod-backed validation.
+- ◻️ **@tanstack/react-form** — forms, validated with Zod schemas and built from shadcn's `Field` components.
 - ◻️ **@tanstack/react-hotkeys** — keyboard shortcuts (or `useHotkeys` from `@mantine/hooks`).
 
 ## UI & components
@@ -85,7 +84,8 @@ Built on the **unified** (remark + rehype) ecosystem — the standard for parsin
 ## Database & data layer
 
 - ◻️ **drizzle-orm** + **drizzle-zod** + **drizzle-kit** — SQL ORM, zod schema bridge, and migrations.
-- ◻️ **Cloudflare D1** — the database (SQLite), through **drizzle-orm** and **drizzle-kit** migrations.
+- ✅ **Cloudflare D1** — the database (SQLite), through **drizzle-orm** and **drizzle-kit** migrations. Repository tests
+  run against a local D1 from Wrangler's `getPlatformProxy`.
 
 ## Authentication
 

@@ -254,25 +254,24 @@ migrations/      D1 migrations
 - Stage logic and the page builder are pure and unit-tested with co-located tests, the page builder against trimmed
   Layout responses from the governing documents (never application data). The decision engine's tests include the
   arborless gate, the arbor without lattice, and a conflicting fact.
-- Unit tests and Workers tests are separate Vitest projects. `test:coverage` runs the unit project with v8 coverage, as
-  today. Repositories and migrations run in a Workers project using `@cloudflare/vitest-plugin`, which provides real
-  D1 and R2 bindings; a new `test:workers` script (no coverage, because the Workers integration supports only
-  Istanbul) joins `verify` and Turbo.
+- Repository tests run in the normal Vitest run, with v8 coverage: `src/tests/testDatabase.ts` starts an in-memory D1
+  through Wrangler's `getPlatformProxy` and applies every migration, so the real SQL, unique and partial indexes
+  included, is exercised. (Cloudflare's Vitest plugin still requires Vitest 4.)
 - `src/server.ts` and `src/workflows/**` are added to the coverage exclusions, alongside `*.server.ts`.
 - `wrangler` is an `apps/hoa` dev dependency. `cloudflare:workers` resolves to a stub in unit tests
   (`vitest.config.ts`), and knip ignores it as a dependency.
 
 ## Dependencies
 
-Already added: `wrangler` and `@cloudflare/vite-plugin` (dev), `@opentelemetry/sdk-trace-base` and
-`@opentelemetry/context-async-hooks`; `@opentelemetry/sdk-trace-node` is removed. Phase 1 adds:
+Already added: `wrangler`, `@cloudflare/vite-plugin` and `drizzle-kit` (dev), `drizzle-orm`,
+`@opentelemetry/sdk-trace-base` and `@opentelemetry/context-async-hooks`; `@opentelemetry/sdk-trace-node` is removed.
+Phase 1 adds:
 
 | Package | For |
 | --- | --- |
-| `@cloudflare/vitest-plugin` (dev) | Workers tests |
-| `drizzle-orm`, `drizzle-kit` (dev) | D1 schema, queries and migrations |
 | `aws4fetch` | Presigned R2 URLs |
 | `@tanstack/react-query` | Polling jobs |
+| `@tanstack/react-form` | Forms, replacing react-hook-form |
 | `fflate` | Reading pictures out of Word files |
 
 Phase 1 removes `mammoth` (Layout reads Word text). Azure is called with `fetch`, and ids come from

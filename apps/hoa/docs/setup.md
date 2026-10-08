@@ -62,24 +62,33 @@ OpenRouter.
 
 ## 5. Run
 
+Sign in to Cloudflare once (step 6), then prepare the local database:
+
+```sh
+pnpm --filter hoa db:migrate:local
+pnpm --filter hoa db:seed:local
+```
+
 ```sh
 pnpm --filter hoa dev
 ```
 
-The server runs inside workerd, Cloudflare's runtime, through its Vite plugin, with R2 simulated on disk under
-`apps/hoa/.wrangler`. Open <http://localhost:3000>, switch to the **Administrator** role and select **Run model check**.
-It reports the response, prompt version, latency, tokens, cost and Langfuse trace ID, which confirms each connection.
+The server runs inside workerd, Cloudflare's runtime, through its Vite plugin, using `wrangler.jsonc`'s `dev`
+environment: D1 is simulated on disk under `apps/hoa/.wrangler`, and R2 is the real `hoa-dev` bucket. Open
+<http://localhost:3000>, switch to the **Administrator** role and select **Run model check**. It reports the response,
+prompt version, latency, tokens, cost and Langfuse trace ID, which confirms each connection.
 
-After changing `wrangler.jsonc`, regenerate the binding types with `pnpm --filter hoa cf-typegen` and commit
+After changing `src/db/schema.ts`, run `pnpm --filter hoa db:generate` and commit the new migration. After changing
+`wrangler.jsonc`, regenerate the binding types with `pnpm --filter hoa cf-typegen` and commit
 `worker-configuration.d.ts`.
-
 ## 6. Cloudflare and deployment
 
 One-time setup for the demo and pull request previews ([design/platform.md](design/platform.md#cicd)):
 
 1. Sign in from the app folder (`cd apps/hoa`, then `pnpm exec wrangler login`). Through `pnpm --filter`, Wrangler's
    login starts twice and fails on its callback port.
-2. Create the R2 buckets: `wrangler r2 bucket create hoa-files` and `wrangler r2 bucket create hoa-preview`.
+2. Create the R2 buckets `hoa-files`, `hoa-preview` and `hoa-dev` (`wrangler r2 bucket create <name>`), and the D1
+   databases `hoa`, `hoa-preview` and `hoa-dev` (`wrangler d1 create <name>`); their ids go in `wrangler.jsonc`.
 3. Set the demo's secrets with `wrangler secret put <name>`, and the previews' with
    `wrangler preview base-config secret put <name>`: `OPENROUTER_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`
    and `AZURE_DOCUMENT_INTELLIGENCE_KEY`.
@@ -90,6 +99,4 @@ One-time setup for the demo and pull request previews ([design/platform.md](desi
    `CLOUDFLARE_ACCOUNT_ID` (`gh variable set CLOUDFLARE_ACCOUNT_ID`). Setting the variable turns on the deploy and
    preview jobs.
 
-Later in phase 1, D1 and presigned uploads add: the `hoa-dev` bucket, CORS rules allowing `PUT` from each environment's
-origins, an R2 API token per bucket, the D1 databases `hoa` and `hoa-preview` with their ids in `wrangler.jsonc`, and
-`db:migrate:local` and `db:seed:local` scripts.
+The deploy and pull request pipelines apply migrations and the seed before deploying.
