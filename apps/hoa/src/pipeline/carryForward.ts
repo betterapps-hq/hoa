@@ -10,11 +10,13 @@ export type CarriedForward = { rules: Rule[]; removed: RemovedRule[] }
  * - the same extracted content: the previous rule as it was, edits and approval included;
  * - different content: the new rule, pending, marked changed;
  * - no match: new. Hand-added rules come forward, pending only when a document they cite was replaced.
+ * Removed rules are the published rules the new draft no longer has: rules only in an unpublished draft were never in
+ * force, so dropping them isn't a removal.
  */
 export function carryForward(
   extracted: readonly Rule[],
   previous: readonly Rule[],
-  context: { rulebookId: string; sourceDocumentIds: readonly string[] }
+  context: { rulebookId: string; sourceDocumentIds: readonly string[]; published: readonly Rule[] }
 ): CarriedForward {
   const previousByKey = new Map(previous.map((rule) => [rule.ruleKey, rule]))
   const extractedKeys = new Set(extracted.map((rule) => rule.ruleKey))
@@ -46,8 +48,9 @@ export function carryForward(
       }
     })
 
-  const removed = previous
-    .filter((rule) => rule.provenance.source === "extraction" && !extractedKeys.has(rule.ruleKey))
+  const keptKeys = new Set([...rules, ...handAdded].map((rule) => rule.ruleKey))
+  const removed = context.published
+    .filter((rule) => rule.review.status === "approved" && !keptKeys.has(rule.ruleKey))
     .map(({ ruleKey, title, citations }) => ({ ruleKey, title, citations }))
 
   return { rules: [...rules, ...handAdded], removed }

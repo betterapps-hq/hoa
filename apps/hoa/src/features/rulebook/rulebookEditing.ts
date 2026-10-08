@@ -2,7 +2,8 @@ import { z } from "zod"
 import type { Job } from "@/jobs/job"
 import type { Page } from "@/ocr/page"
 import { checkRuleAgainstCatalog, citationIssues, matchQuote } from "@/pipeline/verify"
-import { checkSchema, ruleSchema, type Rule } from "@/rules/rule"
+import { attributeLabel, documentLabel } from "@/rules/catalog"
+import { checkSchema, conditionSchema, ruleSchema, type Rule } from "@/rules/rule"
 
 // The rulebook editor's rules (docs/design/extraction.md, "8. Review" and "9. Publish"), as pure functions.
 
@@ -12,7 +13,8 @@ export const ruleChangesSchema = z.object({
   obligation: ruleSchema.shape.obligation.optional(),
   discretion: ruleSchema.shape.discretion.optional(),
   isCurable: z.boolean().optional(),
-  check: checkSchema.optional()
+  check: checkSchema.optional(),
+  appliesWhen: z.array(conditionSchema).optional()
 })
 export type RuleChanges = z.infer<typeof ruleChangesSchema>
 
@@ -22,7 +24,9 @@ export const ruleEditSchema = z.object({
   statement: z.string().trim().min(1, "Enter the rule."),
   obligation: ruleSchema.shape.obligation,
   discretion: ruleSchema.shape.discretion,
-  isCurable: z.boolean()
+  isCurable: z.boolean(),
+  check: checkSchema,
+  appliesWhen: z.array(conditionSchema)
 })
 
 /** Issues that only the build produces; editing a rule keeps them. */
@@ -215,27 +219,27 @@ export function describeCheck(check: Rule["check"]): string {
   const list = (values: readonly { value: string }[]) => values.map((value) => value.value).join(", ")
   switch (check.type) {
     case "allowed-values":
-      return `${check.attribute} is one of ${list(check.values)}${check.otherwise === "committee" ? "; others go to the committee" : ""}`
+      return `${attributeLabel(check.attribute)} is one of ${list(check.values)}${check.otherwise === "committee" ? "; others go to the committee" : ""}`
     case "allowed-values-by":
-      return `${check.attribute} depends on ${check.keyAttribute}: ${check.table.map((row) => `${row.key.value} to ${list(row.values)}`).join("; ")}`
+      return `${attributeLabel(check.attribute)} depends on ${attributeLabel(check.keyAttribute)}: ${check.table.map((row) => `${row.key.value} to ${list(row.values)}`).join("; ")}`
     case "prohibited-values":
-      return `${check.attribute} isn't ${list(check.values)}`
+      return `${attributeLabel(check.attribute)} isn't ${list(check.values)}`
     case "range": {
-      const subject = check.attributes.join(" + ")
+      const subject = check.attributes.map(attributeLabel).join(" plus ")
       if (check.min !== null && check.max !== null) {
         return `${subject} between ${check.min} and ${check.max}`
       }
       if (check.min === null && check.max === null) {
-        return `${subject}: no limit given`
+        return `${subject} has no limit given`
       }
       return check.min !== null ? `${subject} at least ${check.min}` : `${subject} at most ${check.max}`
     }
     case "matches":
-      return `${check.attribute} matches ${check.otherAttribute}`
+      return `${attributeLabel(check.attribute)} matches ${attributeLabel(check.otherAttribute)}`
     case "required-fact":
-      return `${check.attribute} is given`
+      return `${attributeLabel(check.attribute)} is given`
     case "required-document":
-      return `Includes the ${check.document.replace(/-/g, " ")}${check.mustState.length > 0 ? `, stating ${check.mustState.join("; ")}` : ""}`
+      return `Includes the ${documentLabel(check.document).toLowerCase()}${check.mustState.length > 0 ? `, stating ${check.mustState.join("; ")}` : ""}`
     case "qualitative":
       return check.criterion
     case "informational":
@@ -256,11 +260,11 @@ export function describeConditions(conditions: Rule["appliesWhen"]): string | nu
       const value = Array.isArray(condition.value) ? condition.value.join(" or ") : String(condition.value)
       switch (condition.operator) {
         case "exists":
-          return `${condition.attribute} is given`
+          return `${attributeLabel(condition.attribute)} is given`
         case "not-in":
-          return `${condition.attribute} isn't ${value}`
+          return `${attributeLabel(condition.attribute)} isn't ${value}`
         default:
-          return `${condition.attribute} is ${value}`
+          return `${attributeLabel(condition.attribute)} is ${value}`
       }
     })
     .join(", and ")

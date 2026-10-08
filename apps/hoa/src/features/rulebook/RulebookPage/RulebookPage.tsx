@@ -1,6 +1,7 @@
 import { PencilIcon, ScrollTextIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -236,10 +237,24 @@ export function RulebookPage({
               </Card>
               {draft.removed.length > 0 ? (
                 <Alert>
-                  <AlertTitle>No longer in the documents</AlertTitle>
+                  <AlertTitle>
+                    {draft.removed.length} published {draft.removed.length === 1 ? "rule isn’t" : "rules aren’t"} in
+                    this draft
+                  </AlertTitle>
                   <AlertDescription>
-                    These rules were in the previous version but weren’t extracted this time:{" "}
-                    {draft.removed.map((rule) => rule.title).join(", ")}.
+                    {draft.removed.length === 1 ? "It’s" : "They’re"} removed when you publish.
+                    <Accordion className="w-full">
+                      <AccordionItem value="removed">
+                        <AccordionTrigger>Show which</AccordionTrigger>
+                        <AccordionContent>
+                          <ul className="list-disc pl-5">
+                            {draft.removed.map((rule) => (
+                              <li key={rule.ruleKey}>{rule.title}</li>
+                            ))}
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </AlertDescription>
                 </Alert>
               ) : null}

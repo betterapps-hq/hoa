@@ -178,15 +178,19 @@ describe("publishBlockers", () => {
 describe("describeCheck and describeConditions", () => {
   it("summarize every check type in plain language", () => {
     expect(describeCheck(byId("manufacturers").check)).toBe(
-      "segment.manufacturer is one of Trex, Frame It All, Neoline; others go to the committee"
+      "Fence run: Manufacturer is one of Trex, Frame It All, Neoline; others go to the committee"
     )
     expect(describeCheck(byId("composite-colors").check)).toContain("Trex to Winchester Grey, Saddle")
-    expect(describeCheck(byId("no-vinyl").check)).toBe("segment.material isn't vinyl")
-    expect(describeCheck(byId("metal-height").check)).toBe("segment.height between 48 and 72")
-    expect(describeCheck(byId("min-height").check)).toBe("segment.height at least 40")
-    expect(describeCheck(byId("max-height").check)).toBe("segment.height at most 72")
-    expect(describeCheck(byId("posts").check)).toBe("segment.postColor matches segment.color")
-    expect(describeCheck({ type: "required-fact", attribute: "segment.height" })).toBe("segment.height is given")
+    expect(describeCheck(byId("no-vinyl").check)).toBe("Fence run: Material isn't vinyl")
+    expect(describeCheck(byId("metal-height").check)).toBe(
+      "Fence run: Height without lattice or arbor between 48 and 72"
+    )
+    expect(describeCheck(byId("min-height").check)).toBe("Fence run: Height without lattice or arbor at least 40")
+    expect(describeCheck(byId("max-height").check)).toBe("Fence run: Height without lattice or arbor at most 72")
+    expect(describeCheck(byId("posts").check)).toBe("Fence run: Post color matches Fence run: Color")
+    expect(describeCheck({ type: "required-fact", attribute: "segment.height" })).toBe(
+      "Fence run: Height without lattice or arbor is given"
+    )
     expect(describeCheck(byId("neighbor-approval").check)).toBe(
       "Includes the neighbor approval, stating approves the placement and height of the fence and the materials"
     )
@@ -199,7 +203,7 @@ describe("describeCheck and describeConditions", () => {
   it("summarize conditions", () => {
     expect(describeConditions([])).toBeNull()
     expect(describeConditions(byId("max-height").appliesWhen)).toBe(
-      "segment.material is wood or composite, and segment.location is side or rear or return"
+      "Fence run: Material is wood or composite, and Fence run: Location is side or rear or return"
     )
     expect(
       describeConditions([
@@ -207,7 +211,7 @@ describe("describeCheck and describeConditions", () => {
         { type: "fact", attribute: "segment.material", operator: "not-in", value: ["vinyl"] },
         { type: "text", id: "c", description: "Visible from the street" }
       ])
-    ).toBe("segment.style is given, and segment.material isn't vinyl, and Visible from the street")
+    ).toBe("Fence run: Style is given, and Fence run: Material isn't vinyl, and Visible from the street")
   })
 })
 
@@ -270,7 +274,7 @@ describe("issueSeverity and needsAttention", () => {
       needsAttention({ ...approved, issues: [issue("sanity")], review: { ...approved.review, status: "rejected" } })
     ).toBe(false)
     expect(describeCheck({ type: "range", attributes: ["segment.length"], min: null, max: null })).toBe(
-      "segment.length: no limit given"
+      "Fence run: Length has no limit given"
     )
   })
 })

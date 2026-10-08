@@ -337,11 +337,14 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         const rules =
           (await getJson(bucket, jobOutputKey(hoaId, jobId, "consolidate", "rules"), z.array(ruleSchema))) ?? []
         const previousDraft = await getRulebookByStatus(db, hoaId, "draft")
-        const previous = previousDraft ?? (await getRulebookByStatus(db, hoaId, "published"))
-        const previousRules = previous ? await listRules(db, hoaId, previous.id) : []
+        const published = await getRulebookByStatus(db, hoaId, "published")
+        const publishedRules = published ? await listRules(db, hoaId, published.id) : []
+        // Approvals and edits carry forward from the draft being replaced, or from the published rules when there's none.
+        const previousRules = previousDraft ? await listRules(db, hoaId, previousDraft.id) : publishedRules
         const carried = carryForward(rules, previousRules, {
           rulebookId,
-          sourceDocumentIds: documents.map((document) => document.id)
+          sourceDocumentIds: documents.map((document) => document.id),
+          published: publishedRules
         })
         await putJson(bucket, jobOutputKey(hoaId, jobId, "save-draft", "removed"), carried.removed)
         await saveDraft(db, hoaId, { rulebookId, previousDraftId: previousDraft?.id ?? null, rules: carried.rules })

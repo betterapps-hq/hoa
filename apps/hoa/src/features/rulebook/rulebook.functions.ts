@@ -102,11 +102,18 @@ export const getRulebookView = createServerFn({ method: "GET" })
     const latestBuild = await getLatestJobOfKind(db, hoaId, "rulebook-build")
     const rulebook = await getRulebookByStatus(db, hoaId, data.which)
     const rules = rulebook ? await listRules(db, hoaId, rulebook.id) : []
-    const removed =
-      rulebook && data.which === "draft"
+    // Removed rules are published rules the draft no longer has; the list the build saved is narrowed to the rules
+    // still published, so it's empty when nothing is.
+    const published = data.which === "draft" ? await getRulebookByStatus(db, hoaId, "published") : null
+    const publishedKeys = new Set(
+      published ? (await listRules(db, hoaId, published.id)).map((rule) => rule.ruleKey) : []
+    )
+    const saved =
+      rulebook && published
         ? ((await getJson(getBucket(), jobOutputKey(hoaId, rulebook.jobId, "save-draft", "removed"), removedSchema)) ??
           [])
         : []
+    const removed = saved.filter((rule) => publishedKeys.has(rule.ruleKey))
     return {
       rulebook,
       rules: rules.toSorted((a, b) => a.topic.localeCompare(b.topic) || a.title.localeCompare(b.title)),
