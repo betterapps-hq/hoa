@@ -4,6 +4,7 @@ import { z } from "zod"
 import { createAiContext } from "@/ai/aiContext.server"
 import { pipelinePrompts } from "@/ai/pipelinePrompts"
 import { resolvePromptVersions } from "@/ai/promptLoader"
+import type { PromptVariables } from "@/ai/prompts"
 import { runObjectPrompt } from "@/ai/runPrompt"
 import { createDatabase } from "@/db/database"
 import { getGoverningDocument, listSections, saveSections, setSectionRouting } from "@/db/documentRepository"
@@ -85,11 +86,11 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         await updateJob(db, hoaId, jobId, { promptVersions: versions, now: now() })
         return versions
       })
-      const run = <T>(
-        prompt: (typeof prompts)[number],
+      const run = <T, Prompt extends (typeof prompts)[number]>(
+        prompt: Prompt,
         options: {
           schema: z.ZodType<T>
-          variables: Record<string, string>
+          variables: PromptVariables<Prompt>
           small?: boolean
           traceName: string
           cacheStage: string
@@ -209,6 +210,15 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
           failures.push({ stage: "extract", itemId: relevant[index]?.id ?? "", message: errorText(result.reason) })
         }
       })
+      // A draft missing a section would silently drop that section's rules and report them as removed, so a section
+      // that can't be extracted after retries fails the build and leaves the current draft as it is.
+      const extractFailures = failures.filter((failure) => failure.stage === "extract")
+      const [firstFailure] = extractFailures
+      if (firstFailure) {
+        throw new NonRetryableError(
+          `${extractFailures.length} of ${relevant.length} sections couldn't be extracted, so the draft wasn't replaced. ${firstFailure.message}`
+        )
+      }
       const extractedSections = relevant.filter((_, index) => extracted[index]?.status === "fulfilled")
 
       // Verify: match every citation against its page, and check every rule against the catalog.
@@ -327,11 +337,14 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         const rules =
           (await getJson(bucket, jobOutputKey(hoaId, jobId, "consolidate", "rules"), z.array(ruleSchema))) ?? []
         const previousDraft = await getRulebookByStatus(db, hoaId, "draft")
-        const previous = previousDraft ?? (await getRulebookByStatus(db, hoaId, "published"))
-        const previousRules = previous ? await listRules(db, hoaId, previous.id) : []
+        const published = await getRulebookByStatus(db, hoaId, "published")
+        const publishedRules = published ? await listRules(db, hoaId, published.id) : []
+        // Approvals and edits carry forward from the draft being replaced, or from the published rules when there's none.
+        const previousRules = previousDraft ? await listRules(db, hoaId, previousDraft.id) : publishedRules
         const carried = carryForward(rules, previousRules, {
           rulebookId,
-          sourceDocumentIds: documents.map((document) => document.id)
+          sourceDocumentIds: documents.map((document) => document.id),
+          published: publishedRules
         })
         await putJson(bucket, jobOutputKey(hoaId, jobId, "save-draft", "removed"), carried.removed)
         await saveDraft(db, hoaId, { rulebookId, previousDraftId: previousDraft?.id ?? null, rules: carried.rules })

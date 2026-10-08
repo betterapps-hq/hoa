@@ -16,7 +16,7 @@ import {
   updateRule,
   updateRules
 } from "@/db/rulebookRepository"
-import { pageSchema, type Page } from "@/ocr/page"
+import { pageSchema } from "@/ocr/page"
 import type { RemovedRule } from "@/pipeline/carryForward"
 import { catalogVersion } from "@/rules/catalog"
 import { ruleSchema, rulebookSchema, type Rule } from "@/rules/rule"
@@ -25,11 +25,15 @@ import { governingKeys, jobOutputKey } from "@/storage/keys"
 import { getJson } from "@/storage/objects"
 import { getBucket } from "@/storage/storage.server"
 import {
+  addCitation,
   applyRuleChanges,
   approvalBlocker,
+  citationFromSelection,
   describeBuildProblem,
   publishBlockers,
   readyToApprove,
+  removeCitation,
+  replaceCitation,
   ruleChangesSchema
 } from "./rulebookEditing"
 
@@ -98,11 +102,18 @@ export const getRulebookView = createServerFn({ method: "GET" })
     const latestBuild = await getLatestJobOfKind(db, hoaId, "rulebook-build")
     const rulebook = await getRulebookByStatus(db, hoaId, data.which)
     const rules = rulebook ? await listRules(db, hoaId, rulebook.id) : []
-    const removed =
-      rulebook && data.which === "draft"
+    // Removed rules are published rules the draft no longer has; the list the build saved is narrowed to the rules
+    // still published, so it's empty when nothing is.
+    const published = data.which === "draft" ? await getRulebookByStatus(db, hoaId, "published") : null
+    const publishedKeys = new Set(
+      published ? (await listRules(db, hoaId, published.id)).map((rule) => rule.ruleKey) : []
+    )
+    const saved =
+      rulebook && published
         ? ((await getJson(getBucket(), jobOutputKey(hoaId, rulebook.jobId, "save-draft", "removed"), removedSchema)) ??
           [])
         : []
+    const removed = saved.filter((rule) => publishedKeys.has(rule.ruleKey))
     return {
       rulebook,
       rules: rules.toSorted((a, b) => a.topic.localeCompare(b.topic) || a.title.localeCompare(b.title)),
@@ -113,18 +124,6 @@ export const getRulebookView = createServerFn({ method: "GET" })
       blockers: data.which === "draft" ? publishBlockers(rules) : []
     }
   })
-
-async function loadCitedPages(hoaId: string, rule: Rule) {
-  const bucket = getBucket()
-  const pages = new Map<string, Page>()
-  for (const citation of rule.citations) {
-    const page = await getJson(bucket, governingKeys(hoaId, citation.documentId).page(citation.pageIndex), pageSchema)
-    if (page) {
-      pages.set(`${citation.documentId}:${citation.pageIndex}`, page)
-    }
-  }
-  return pages
-}
 
 async function loadDraftRule(hoaId: string, ruleId: string) {
   const db = getDb()
@@ -142,9 +141,83 @@ export const saveRule = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const context = await requireAdministrator()
     const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
-    const edited = applyRuleChanges(rule, data.changes, await loadCitedPages(context.hoa.id, rule))
+    if (rule.citations.length === 0) {
+      throw new Error("Add the passage this rule comes from before saving.")
+    }
+    const edited = applyRuleChanges(rule, data.changes)
     await updateRule(db, context.hoa.id, edited)
     return edited
+  })
+
+/**
+ * Adds a citation picked in the document viewer. The client sends only the document, page and character range; the
+ * quote is copied from the stored page, so it's always the document's own words.
+ */
+export const addRuleCitation = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    z
+      .object({
+        ruleId: z.string(),
+        documentId: z.string(),
+        pageIndex: z.number().int().positive(),
+        start: z.number().int().nonnegative(),
+        end: z.number().int().positive()
+      })
+      .parse(data)
+  )
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
+    const document = await getGoverningDocument(db, context.hoa.id, data.documentId)
+    const page = document
+      ? await getJson(getBucket(), governingKeys(context.hoa.id, document.id).page(data.pageIndex), pageSchema)
+      : null
+    if (!document || !page) {
+      throw new Error("That page isn't available.")
+    }
+    const cited = addCitation(rule, citationFromSelection(page, data, document.title))
+    await updateRule(db, context.hoa.id, cited)
+    return cited
+  })
+
+/** Replaces one of a rule's citations with a passage picked in the document viewer, copied from the stored page. */
+export const replaceRuleCitation = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    z
+      .object({
+        ruleId: z.string(),
+        index: z.number().int().nonnegative(),
+        documentId: z.string(),
+        pageIndex: z.number().int().positive(),
+        start: z.number().int().nonnegative(),
+        end: z.number().int().positive()
+      })
+      .parse(data)
+  )
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
+    const document = await getGoverningDocument(db, context.hoa.id, data.documentId)
+    const page = document
+      ? await getJson(getBucket(), governingKeys(context.hoa.id, document.id).page(data.pageIndex), pageSchema)
+      : null
+    if (!document || !page) {
+      throw new Error("That page isn't available.")
+    }
+    const updated = replaceCitation(rule, data.index, citationFromSelection(page, data, document.title))
+    await updateRule(db, context.hoa.id, updated)
+    return updated
+  })
+
+/** Removes one of a rule's citations; a rule without any can't be saved or approved until one is added. */
+export const removeRuleCitation = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ ruleId: z.string(), index: z.number().int().nonnegative() }).parse(data))
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
+    const updated = removeCitation(rule, data.index)
+    await updateRule(db, context.hoa.id, updated)
+    return updated
   })
 
 /** Approves or rejects a rule. A rule whose quote isn't found can't be approved. */

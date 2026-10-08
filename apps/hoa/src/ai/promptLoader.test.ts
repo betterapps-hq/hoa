@@ -1,12 +1,19 @@
 import { describe, expect, it, vi } from "vitest"
-import { createPromptLoader, resolvePromptVersions, type LangfusePromptManager } from "./promptLoader"
+import {
+  contractProblem,
+  createPromptLoader,
+  promptVariables,
+  resolvePromptVersions,
+  type LangfusePromptManager
+} from "./promptLoader"
 
-const prompt = { name: "hoa-greeting" } as const
+const prompt = { name: "hoa-greeting", variables: ["name"] } as const
 
 function langfuse(overrides: Partial<Awaited<ReturnType<LangfusePromptManager["get"]>>> = {}) {
   const get = vi.fn<LangfusePromptManager["get"]>(async (name) => ({
     name,
     version: 4,
+    prompt: "Hi {{name}}",
     config: { model: "anthropic/claude-opus-5.5" },
     compile: (variables) => `Hi ${variables?.name ?? ""}`,
     ...overrides
@@ -17,9 +24,9 @@ function langfuse(overrides: Partial<Awaited<ReturnType<LangfusePromptManager["g
 describe("createPromptLoader", () => {
   it("fetches the prompt from Langfuse by label, with its config", async () => {
     const manager = langfuse()
-    const template = await createPromptLoader(manager, "staging")(prompt)
+    const template = await createPromptLoader(manager, "development")(prompt)
 
-    expect(manager.get).toHaveBeenCalledWith("hoa-greeting", { label: "staging", type: "text" })
+    expect(manager.get).toHaveBeenCalledWith("hoa-greeting", { label: "development", type: "text" })
     expect(template).toMatchObject({ name: "hoa-greeting", version: 4, config: { model: "anthropic/claude-opus-5.5" } })
     expect(template.compile({ name: "Sam" })).toBe("Hi Sam")
   })
@@ -43,12 +50,28 @@ describe("createPromptLoader", () => {
     await expect(load(prompt)).rejects.toThrow('Langfuse couldn\'t serve the prompt hoa-greeting (label "production").')
     await expect(load(prompt, { version: 3 })).rejects.toThrow("hoa-greeting (version 3)")
   })
+
+  it("refuses a version whose variables don't match the code", async () => {
+    const load = createPromptLoader(langfuse({ prompt: "Hi {{fullName}}" }), "production")
+    await expect(load(prompt)).rejects.toThrow(
+      "Langfuse prompt hoa-greeting version 4 doesn't match the code: it uses {{fullName}}, which the code doesn't fill in; it doesn't use {{name}}."
+    )
+  })
+})
+
+describe("prompt contract", () => {
+  it("reads a prompt's variables and compares them with the code's", () => {
+    expect(promptVariables("{{a}} and {{ b }} and {{a}}")).toEqual(["a", "b"])
+    expect(contractProblem({ name: "x", variables: ["a", "b"] }, "{{ b }} {{a}}")).toBeNull()
+    expect(contractProblem({ name: "x", variables: ["a"] }, "Nothing here")).toBe("doesn't use {{a}}")
+    expect(contractProblem({ name: "x", variables: [] }, "{{a}}")).toBe("uses {{a}}, which the code doesn't fill in")
+  })
 })
 
 describe("resolvePromptVersions", () => {
   it("pins the labeled version of each prompt", async () => {
     const load = createPromptLoader(langfuse(), "production")
-    expect(await resolvePromptVersions(load, [prompt, { name: "hoa-other" }])).toEqual({
+    expect(await resolvePromptVersions(load, [prompt, { name: "hoa-other", variables: ["name"] }])).toEqual({
       "hoa-greeting": 4,
       "hoa-other": 4
     })

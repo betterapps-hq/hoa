@@ -273,7 +273,7 @@ describe("carryForward", () => {
       { ...fenceRules.find((rule) => rule.id === "min-height")!, id: "new-3" }
     ]
 
-    const { rules, removed } = carryForward(extracted, previous, context)
+    const { rules, removed } = carryForward(extracted, previous, { ...context, published: previous })
     const [keptHeight, changedColors, newRule, carriedHandAdded] = rules
     expect(keptHeight).toMatchObject({
       id: "new-1",
@@ -290,5 +290,8 @@ describe("carryForward", () => {
       review: { status: "pending" }
     })
     expect(removed).toEqual([{ ruleKey: vinyl.ruleKey, title: vinyl.title, citations: vinyl.citations }])
+
+    // Rules only in an unpublished draft were never in force, so a new build dropping them removes nothing.
+    expect(carryForward(extracted, previous, { ...context, published: [] }).removed).toEqual([])
   })
 })

@@ -23,6 +23,13 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
   edited there, never in code. Code names each prompt in [`prompts.ts`](../src/ai/prompts.ts) or
   [`pipelinePrompts.ts`](../src/ai/pipelinePrompts.ts) and documents the variables it fills in. The app fetches the
   version with the `LANGFUSE_PROMPT_LABEL` label (`production` by default).
+- **Prompt environments are Langfuse labels.** Local development serves `development`, pull request previews serve
+  `preview`, and the demo serves `production` (`LANGFUSE_PROMPT_LABEL` in `wrangler.jsonc` and `.env`). Change a prompt
+  by saving a new version with the `development` label, try it locally, then move the `preview` and `production` labels
+  to it. Rolling back is moving a label back.
+- **The code's variables are a contract.** Each registry entry lists the `{{variables}}` the code fills in, and the
+  loader refuses a version that uses a variable the code doesn't fill in or leaves one out. A Workflow fails at
+  `resolve-prompts`, before any model call, with the prompt, version and mismatch.
 - Langfuse is required: without its keys the AI context reports them missing, and a prompt Langfuse can't serve fails
   the call with the prompt's name and label. There's no local copy to fall back to.
 - To add a prompt, create it in Langfuse as a **text** prompt using `{{variable}}` placeholders, label the version to

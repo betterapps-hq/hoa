@@ -1,6 +1,7 @@
 import { PencilIcon, ScrollTextIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -21,6 +22,7 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { GoverningDocument } from "@/documents/governingDocument"
+import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import type { RulebookView } from "../rulebook.functions"
@@ -41,6 +43,8 @@ export type RulebookPageProps = {
   onEditPublished: () => Promise<void>
   onDiscardDraft: () => Promise<void>
   actions: RuleCardActions
+  /** The documents citations come from. */
+  source: CitationSource
   onChanged: () => void
 }
 
@@ -68,6 +72,7 @@ export function RulebookPage({
   onEditPublished,
   onDiscardDraft,
   actions,
+  source,
   onChanged
 }: RulebookPageProps) {
   const ready = documents.filter((document) => document.status === "ready")
@@ -232,14 +237,28 @@ export function RulebookPage({
               </Card>
               {draft.removed.length > 0 ? (
                 <Alert>
-                  <AlertTitle>No longer in the documents</AlertTitle>
+                  <AlertTitle>
+                    {draft.removed.length} published {draft.removed.length === 1 ? "rule isn’t" : "rules aren’t"} in
+                    this draft
+                  </AlertTitle>
                   <AlertDescription>
-                    These rules were in the previous version but weren’t extracted this time:{" "}
-                    {draft.removed.map((rule) => rule.title).join(", ")}.
+                    {draft.removed.length === 1 ? "It’s" : "They’re"} removed when you publish.
+                    <Accordion className="w-full">
+                      <AccordionItem value="removed">
+                        <AccordionTrigger>Show which</AccordionTrigger>
+                        <AccordionContent>
+                          <ul className="list-disc pl-5">
+                            {draft.removed.map((rule) => (
+                              <li key={rule.ruleKey}>{rule.title}</li>
+                            ))}
+                          </ul>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </AlertDescription>
                 </Alert>
               ) : null}
-              <RuleTable rules={draft.rules} actions={actions} />
+              <RuleTable rules={draft.rules} actions={actions} source={source} />
             </>
           ) : (
             <Empty>
@@ -293,7 +312,7 @@ export function RulebookPage({
                   </CardAction>
                 </CardHeader>
               </Card>
-              <RuleTable rules={publishedRules} />
+              <RuleTable rules={publishedRules} source={source} />
             </>
           ) : (
             <Empty>
