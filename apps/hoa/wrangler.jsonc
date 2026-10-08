@@ -1,0 +1,32 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "hoa",
+  "main": "@tanstack/react-start/server-entry",
+  "compatibility_date": "2026-10-01",
+  // AsyncLocalStorage carries the tracing context; process.env carries settings and secrets.
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  // Production: the demo. Secrets (OPENROUTER_API_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY,
+  // AZURE_DOCUMENT_INTELLIGENCE_KEY) are set with `wrangler secret put`. Locally, apps/hoa/.env overrides these.
+  "vars": {
+    "OPENROUTER_MODEL": "anthropic/claude-haiku-5.5",
+    "LANGFUSE_BASE_URL": "https://us.cloud.langfuse.com",
+    "LANGFUSE_PROMPT_LABEL": "production",
+    "LANGFUSE_TRACING_ENVIRONMENT": "production",
+    "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "https://hoa-document-intelligence.cognitiveservices.azure.com/"
+  },
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-files" }],
+  // Pull request previews don't inherit anything above. Secrets come from
+  // `wrangler preview base-config secret put`.
+  "previews": {
+    "vars": {
+      "OPENROUTER_MODEL": "anthropic/claude-haiku-5.5",
+      "LANGFUSE_BASE_URL": "https://us.cloud.langfuse.com",
+      "LANGFUSE_PROMPT_LABEL": "production",
+      "LANGFUSE_TRACING_ENVIRONMENT": "preview",
+      "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "https://hoa-document-intelligence.cognitiveservices.azure.com/"
+    },
+    "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-preview" }]
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "hoa-dev",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "hoa", "dev"],
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "hoa-check-types",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "hoa", "check:types"],
+      "isBackground": false
+    },
+    {
+      "label": "hoa-lint",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "hoa", "lint"],
+      "isBackground": false
+    },
+    {
+      "label": "hoa-test",
+      "type": "shell",
+      "command": "pnpm",
+      "args": ["--filter", "hoa", "test"],
+      "isBackground": false
+    }
+  ]
+}

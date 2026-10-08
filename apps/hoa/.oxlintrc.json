@@ -1,0 +1,10 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../packages/oxlint-config/base.json"],
+  "ignorePatterns": [
+    "src/routeTree.gen.ts",
+    "src/components/ui/**",
+    "src/hooks/use-mobile.ts",
+    "worker-configuration.d.ts"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "ignore": ["beachball.config.js"],
+  "tags": ["-vendored"],
+  "workspaces": {
+    ".": {},
+    "apps/hoa": {
+      "entry": ["src/routes/**/*.tsx"],
+      "ignoreIssues": {
+        "src/components/ui/**": ["exports", "files"]
+      },
+      "ignoreDependencies": ["@repo/oxlint-config", "cloudflare"]
+    }
+  }
+}

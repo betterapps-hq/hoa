@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "langfuse": {
+      "type": "http",
+      "url": "https://us.cloud.langfuse.com/api/public/mcp",
+      "headers": {
+        "Authorization": "Basic ${LANGFUSE_MCP_BASIC_AUTH}"
+      }
+    },
+    "openrouter": {
+      "type": "http",
+      "url": "https://mcp.openrouter.ai/mcp"
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["shadcn@latest", "mcp"]
+    }
+  }
+}

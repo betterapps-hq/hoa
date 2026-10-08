@@ -1,0 +1,41 @@
+{
+  "servers": {
+    // "context7": {
+    //   "type": "http",
+    //   "url": "https://mcp.context7.com/mcp"
+    // },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/"
+    },
+    "langfuse": {
+      "type": "http",
+      "url": "https://us.cloud.langfuse.com/api/public/mcp",
+      "headers": {
+        "Authorization": "Basic ${input:langfuse-basic-auth}"
+      }
+    },
+    "openrouter": {
+      "type": "http",
+      "url": "https://mcp.openrouter.ai/mcp"
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["shadcn@latest", "mcp"]
+    }
+    // "microsoft/playwright-mcp": {
+    //   "type": "stdio",
+    //   "command": "npx",
+    //   "args": ["@playwright/mcp@latest"]
+    // }
+  },
+  "inputs": [
+    // Run `pnpm --filter hoa auth:langfuse`, then paste the output without `Basic `. See docs/mcp-servers.md.
+    {
+      "id": "langfuse-basic-auth",
+      "type": "promptString",
+      "description": "Base64-encoded Langfuse public key and secret key",
+      "password": true
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+.DS_Store
+node_modules
+.turbo
+*.log
+dist
+dist-ssr
+.output
+.nitro
+.tanstack
+coverage
+*.local
+.cache
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+
+# Submissions from real homeowners. Personal data, never committed.
+.fixtures/
+# Local app data, such as the published rulebook.
+.data/
+# Wrangler's local state: simulated R2, D1 and Workflows.
+.wrangler/
+.dev.vars*
+
+# Claude Code personal settings, and per-machine junctions into .agents/skills.
+/.claude/settings.local.json
+/.claude/launch.json
+/.claude/skills/
