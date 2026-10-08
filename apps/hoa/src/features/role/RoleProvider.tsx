@@ -1,6 +1,5 @@
-import { useLocalStorage } from "@mantine/hooks"
-import { createContext, use, type ReactNode } from "react"
-import { isRoleId, roles, type Role, type RoleId } from "./roles"
+import { createContext, use, useState, type ReactNode } from "react"
+import { roles, type Role, type RoleId } from "./roles"
 
 type RoleContextValue = { role: Role; setRole: (role: RoleId) => void }
 
@@ -8,18 +7,20 @@ const RoleContext = createContext<RoleContextValue | null>(null)
 
 export type RoleProviderProps = {
   children: ReactNode
-  initialRole?: RoleId
+  /** The role from the server's session. */
+  roleId: RoleId
+  /** Persists a new role; the app saves it in a cookie and reloads the route data. */
+  onRoleChange: (role: RoleId) => void | Promise<void>
 }
 
-/** Holds the demo role, remembered in this browser. */
-export function RoleProvider({ children, initialRole = "homeowner" }: RoleProviderProps) {
-  const [roleId, setRoleId] = useLocalStorage<RoleId>({
-    key: "hoa-demo-role",
-    defaultValue: initialRole,
-    deserialize: (value) => (isRoleId(value) ? value : initialRole),
-    serialize: (value) => value
-  })
-  return <RoleContext value={{ role: roles[roleId], setRole: setRoleId }}>{children}</RoleContext>
+/** Holds the demo role. It switches immediately and is saved by `onRoleChange`. */
+export function RoleProvider({ children, roleId, onRoleChange }: RoleProviderProps) {
+  const [current, setCurrent] = useState(roleId)
+  const setRole = (next: RoleId) => {
+    setCurrent(next)
+    void onRoleChange(next)
+  }
+  return <RoleContext value={{ role: roles[current], setRole }}>{children}</RoleContext>
 }
 
 export function useRole() {

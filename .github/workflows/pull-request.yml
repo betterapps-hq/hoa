@@ -31,6 +31,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: pnpm --filter hoa build
+      # Every preview shares the preview database, so migrations must stay backward compatible.
+      - run: pnpm --filter hoa run db:migrate:preview
+      - run: pnpm --filter hoa run db:seed:preview
       - name: Deploy the preview
         id: preview
         run: |

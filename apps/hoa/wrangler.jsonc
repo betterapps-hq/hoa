@@ -9,8 +9,10 @@
   // Gives each pull request's Worker Preview a workers.dev URL. Takes effect after a production deploy.
   "preview_urls": true,
   "observability": { "enabled": true },
+  // Nothing at the top level reaches `previews` or an `env` block: each repeats every var and binding it needs.
+  //
   // Production: the demo. Secrets (OPENROUTER_API_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY,
-  // AZURE_DOCUMENT_INTELLIGENCE_KEY) are set with `wrangler secret put`. Locally, apps/hoa/.env overrides these.
+  // AZURE_DOCUMENT_INTELLIGENCE_KEY) are set with `wrangler secret put`.
   "vars": {
     "OPENROUTER_MODEL": "anthropic/claude-haiku-5.5",
     "LANGFUSE_BASE_URL": "https://us.cloud.langfuse.com",
@@ -18,9 +20,16 @@
     "LANGFUSE_TRACING_ENVIRONMENT": "production",
     "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "https://hoa-document-intelligence.cognitiveservices.azure.com/"
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hoa",
+      "database_id": "5c684f75-b8b9-4745-8512-f1ea3ef1c4d4",
+      "migrations_dir": "migrations"
+    }
+  ],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-files" }],
-  // Pull request previews don't inherit anything above. Secrets come from
-  // `wrangler preview base-config secret put`.
+  // Pull request previews. Secrets come from `wrangler preview base-config secret put`.
   "previews": {
     "vars": {
       "OPENROUTER_MODEL": "anthropic/claude-haiku-5.5",
@@ -29,6 +38,58 @@
       "LANGFUSE_TRACING_ENVIRONMENT": "preview",
       "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "https://hoa-document-intelligence.cognitiveservices.azure.com/"
     },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "hoa-preview",
+        "database_id": "1904519a-d44e-4534-8611-906c8a70a1a3",
+        "migrations_dir": "migrations"
+      }
+    ],
     "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-preview" }]
+  },
+  "env": {
+    // A second Worker, hoa-preview, that will host the Workflows previews bind to (Workflows can't run inside a
+    // preview). Also the target for preview database migrations.
+    "preview-workflows": {
+      "name": "hoa-preview",
+      "workers_dev": false,
+      "vars": {
+        "OPENROUTER_MODEL": "anthropic/claude-haiku-5.5",
+        "LANGFUSE_BASE_URL": "https://us.cloud.langfuse.com",
+        "LANGFUSE_PROMPT_LABEL": "production",
+        "LANGFUSE_TRACING_ENVIRONMENT": "preview",
+        "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "https://hoa-document-intelligence.cognitiveservices.azure.com/"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "hoa-preview",
+          "database_id": "1904519a-d44e-4534-8611-906c8a70a1a3",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-preview" }]
+    },
+    // Local development, selected by vite.config.ts. D1 is simulated on disk; R2 is the real hoa-dev bucket, because
+    // presigned browser uploads and Azure's urlSource need a real S3 endpoint. Settings and secrets come from .env.
+    "dev": {
+      "vars": {
+        "OPENROUTER_MODEL": "anthropic/claude-haiku-5.5",
+        "LANGFUSE_BASE_URL": "https://us.cloud.langfuse.com",
+        "LANGFUSE_PROMPT_LABEL": "production",
+        "LANGFUSE_TRACING_ENVIRONMENT": "development",
+        "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "https://hoa-document-intelligence.cognitiveservices.azure.com/"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "hoa-dev",
+          "database_id": "ae24cb48-fe54-4dfb-8a6c-8223443bb114",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-dev", "remote": true }]
+    }
   }
 }

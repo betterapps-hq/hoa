@@ -35,7 +35,9 @@ Conventions for authoring React components in this monorepo. Hooks have their ow
   Start) — prefer the router's `<Link>` (it validates `to` and preloads on intent).
 - **Read/write URL state with the route's `validateSearch`** schema rather than hand-parsing `location.search`.
 - **Server work goes through TanStack Start server functions** (`createServerFn`) with a Zod input validator.
-- **Forms use [React Hook Form](https://react-hook-form.com)** with Zod through `@hookform/resolvers/zod`.
+- **Forms use [TanStack Form](https://tanstack.com/form)** with a Zod schema as the form's validator, rendered with
+  shadcn's `Field` components (`Field`, `FieldLabel`, `FieldDescription`, `FieldError`). The prototype's
+  react-hook-form screens move over as they're rebuilt.
 
 For component file layout (`{ComponentName}.tsx` / `.hooks.ts` / `.utils.ts` / `.test.tsx`), see
 [conventions.md](conventions.md#files--component-layout).

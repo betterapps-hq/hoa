@@ -5,20 +5,27 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite"
 import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
-export default defineConfig({
-  server: {
-    port: Number(process.env.PORT || 3000)
-  },
-  resolve: {
-    tsconfigPaths: true
-  },
-  // The server runs in workerd, Cloudflare's runtime, in development as in production. TanStack Start must run before
-  // the React plugin so it can transform server functions first.
-  plugins: [
-    cloudflare({ viteEnvironment: { name: "ssr" } }),
-    tailwindcss(),
-    tanstackStart(),
-    viteReact(),
-    babel({ presets: [reactCompilerPreset({ target: "19" })] })
-  ]
+export default defineConfig(({ command }) => {
+  // The dev server uses wrangler.jsonc's `dev` environment. Set here rather than in a pnpm script, because a
+  // `CLOUDFLARE_ENV=dev` prefix doesn't work in Windows' shell.
+  if (command === "serve") {
+    process.env.CLOUDFLARE_ENV ??= "dev"
+  }
+  return {
+    server: {
+      port: Number(process.env.PORT || 3000)
+    },
+    resolve: {
+      tsconfigPaths: true
+    },
+    // The server runs in workerd, Cloudflare's runtime, in development as in production. TanStack Start must run
+    // before the React plugin so it can transform server functions first.
+    plugins: [
+      cloudflare({ viteEnvironment: { name: "ssr" } }),
+      tailwindcss(),
+      tanstackStart(),
+      viteReact(),
+      babel({ presets: [reactCompilerPreset({ target: "19" })] })
+    ]
+  }
 })

@@ -115,5 +115,5 @@ const user = User.parse(await res.json()) // throws on mismatch
 const result = User.safeParse(input) // { success, data | error }
 ```
 
-The same zod schemas power form validation (`react-hook-form` with `@hookform/resolvers/zod`) and API/env parsing
+The same zod schemas power form validation (TanStack Form with Zod schemas as validators) and API/env parsing
 (`@t3-oss/env-core`).

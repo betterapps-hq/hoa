@@ -1,4 +1,4 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router"
+import { createRootRoute, HeadContent, Outlet, Scripts, useRouter } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary"
 import { AppSidebar } from "@/components/app-sidebar"
@@ -8,6 +8,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { RoleProvider } from "@/features/role/RoleProvider"
+import { getSession, setDemoRole } from "@/session/session.functions"
 import appCss from "../styles.css?url"
 
 export const Route = createRootRoute({
@@ -19,6 +20,7 @@ export const Route = createRootRoute({
     ],
     links: [{ rel: "stylesheet", href: appCss }]
   }),
+  loader: () => getSession(),
   shellComponent: RootDocument,
   component: RootLayout
 })
@@ -49,8 +51,16 @@ const layoutStyle: Record<string, string> = {
 
 /** The shadcn dashboard-01 layout: inset sidebar, site header and a container-query content column. */
 function RootLayout() {
+  const session = Route.useLoaderData()
+  const router = useRouter()
   return (
-    <RoleProvider>
+    <RoleProvider
+      roleId={session.roleId}
+      onRoleChange={async (roleId) => {
+        await setDemoRole({ data: { roleId } })
+        await router.invalidate()
+      }}
+    >
       <TooltipProvider>
         <SidebarProvider style={layoutStyle}>
           <AppSidebar variant="inset" />
