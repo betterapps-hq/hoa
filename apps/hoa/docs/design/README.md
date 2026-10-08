@@ -46,10 +46,10 @@ acceptable.
 
 ```text
  HOA administrator                                    Homeowner
-   │ uploads governing documents                        │ submits an application packet
+   │ uploads governing documents                        │ uploads an application packet, runs the review
    ▼                                                    ▼
  DocumentIngest workflow                              ApplicationReview workflow
-   hash ─> ocr ─> pages ─> figures                      resolve-prompts ─> ocr ─> visuals ─> classify
+   resolve-prompts ─> ocr ─> visuals                    resolve-prompts ─> ocr ─> visuals ─> classify
    │ documents ready                                    ─> facts ─> documents ─> evaluate ─> decide
    ▼                                                    ─> write ─> save-review
  RulebookBuild workflow                                   ▲
@@ -58,6 +58,9 @@ acceptable.
    │ administrator reviews, then publishRulebook          │
    ▼                                                      │
  published rulebook ──────────────────────────────────────┘
+                                                        │ homeowner sees the review, fixes or submits anyway
+                                                        ▼
+                                                      committee decides, from the same review
 
  R2: files, OCR output, page records, section text, reviews
  D1: HOAs, document records, sections, jobs, rulebooks, rules, applications
@@ -73,7 +76,10 @@ acceptable.
 | Unit of extraction and citation | Document section | Whole document (can't cite, too long); single page (sections span pages) |
 | Recommendation | Code: a decision policy over findings | The model decides (not reproducible) |
 | When every unmet rule is curable | Approve with conditions by default, as CC&R 4.3(b) allows; a per-HOA setting | Reject (makes homeowners resubmit for a color change) |
-| Application retention | 365 days after the committee's decision by default; a per-HOA setting | Keeping packets indefinitely |
+| When the review runs | As soon as the homeowner uploads, before submitting; they can fix and re-run, or submit anyway | Only after submission (the homeowner learns about problems weeks later) |
+| Application retention | 365 days after the committee's decision, 30 days for drafts never submitted; per-HOA settings | Keeping packets indefinitely |
+| Homeowner privacy | Not applied in the demo: model inputs and outputs reach Langfuse in full | Summaries only and Broadcast privacy mode (needed before real HOAs onboard) |
+| Images | JPEG and PNG only | Converting HEIF, TIFF and BMP (the model can't read them) |
 | Long jobs | Cloudflare Workflows; publishing is a server function | One long request (canceled on disconnect); Queues (no checkpoints); waiting for approval inside a workflow (times out) |
 | Storage | R2 for files and page text, one shared D1 database for metadata | A database per HOA (bindings are fixed at deploy time) |
 | Hosting | Cloudflare Workers, one demo environment plus isolated pull request previews | Vercel and Neon |
@@ -89,32 +95,32 @@ through the pipeline.
 | `src/review/review.ts` | `Recommendation` kept; `Fact`, `DocumentStatus`, `Finding` (with `needs-committee` and `not-applicable`) and `Review` schemas | [review.md](review.md) |
 | `src/rules/rulebookStore.server.ts`, `.data/rulebook.json` | D1 and R2 repositories in `src/db` and `src/storage` | [documents.md](documents.md) |
 | `rulebook.functions.ts`: `extractRules`, `getRulebook`, `publishRulebook` | `createUpload`, `completeUpload`, `startRulebookBuild`, `getRulebook`, `saveRule`, `reviewRule`, `publishRulebook` | [platform.md](platform.md#server-functions) |
-| `review.functions.ts`: `reviewProject` | `createApplication`, `createUpload`, `submitApplication`, `getApplication`, `recordDecision` | [platform.md](platform.md#server-functions) |
-| `src/documents/uploads.ts` | Layout's types only (no WebP or GIF), new limits | [documents.md](documents.md#uploads) |
+| `review.functions.ts`: `reviewProject` | `createApplication`, `createUpload`, `runReview`, `submitApplication`, `listApplications`, `getApplication`, `recordDecision` | [platform.md](platform.md#server-functions) |
+| `src/documents/uploads.ts` | PDF, DOCX, JPEG and PNG only, new limits | [documents.md](documents.md#uploads) |
 | `src/documents/toAttachments.server.ts` and `mammoth` | Removed: Layout reads Word text, and the app extracts Word images | [ocr.md](ocr.md#word-files) |
 | `src/ai/prompts.ts`: `hoa-rule-extraction`, `hoa-application-review` | Removed; one prompt per stage. `hoa-model-check` stays | [extraction.md](extraction.md#prompts-and-models), [review.md](review.md#prompts-and-models) |
-| `src/ai/telemetry.server.ts` (`NodeTracerProvider`) | `BasicTracerProvider` plus an `AsyncLocalStorage` context manager | [platform.md](platform.md#tracing-on-workers) |
-| `src/ai/runPrompt.ts`, `aiContext.server.ts`, `openrouter.server.ts` | Prompts by version, `recordContent`, a small model, the prompt's `config.model`, data collection denied | [ai.md](../ai.md) |
+| `src/env.server.ts` | Keeps t3-env validation for vars and secrets, adds the phase 1 settings; bindings come only from `cloudflare:workers` | [platform.md](platform.md#app-wiring) |
+| `src/ai/runPrompt.ts`, `promptLoader.ts`, `aiContext.server.ts` | Prompts by version, the prompt's `config.model`, a small model | [ai.md](../ai.md) |
 | `RulebookPage`, `RulebookEditor`, `RuleCard`, `PublishedRulebook` | Upload with job progress; an editor over D1 rules where `RuleCard` edits each check type with its own fields and shows issues and citations with page text | [extraction.md](extraction.md#8-review) |
-| `SubmitProjectPage`, `ReviewResult` | Application form with direct uploads and job progress; `ReviewResult` renders a `Review`: per-component findings, action items, committee decisions, cost and a Langfuse session link | [review.md](review.md#the-review-record) |
+| `SubmitProjectPage`, `ReviewResult` | An application page with direct uploads, job progress, the review, **Run review again** and **Submit**; a committee queue; `ReviewResult` renders a `Review`: per-component findings, action items, committee decisions, cost and a Langfuse session link | [review.md](review.md#the-review-record) |
 | `RoleProvider` (`localStorage`) | A cookie read by `getRequestContext()` | [documents.md](documents.md#phase-1-assumptions) |
-| `ModelCheck`, the dashboard and layout | Unchanged | |
+| `Dashboard`, the sidebar navigation | Reworked around the new records: the dashboard reads the published rulebook through `getRulebook` and application counts through `listApplications`; administrators get a committee queue | [platform.md](platform.md#server-functions) |
+| `ModelCheck` | Unchanged | |
 
 ## Build phases
 
 1. **Pipeline, locally.**
-   1. Move the app onto Cloudflare's Vite plugin, and prove Langfuse tracing on workerd before anything else
+   1. Done: the app runs on Cloudflare's Vite plugin in workerd, and Langfuse tracing is proven there
       ([platform.md](platform.md#tracing-on-workers)).
-   2. D1 schema and migrations, R2 storage with the remote `hoa-dev` bucket, presigned uploads, request context.
-   3. DocumentIngest with Layout; measure memory on the full CC&Rs.
-   4. RulebookBuild and the rulebook editor; ApplicationReview and the review screens.
+   2. D1 schema and migrations, the `dev` environment with the remote `hoa-dev` bucket, presigned uploads, request
+      context.
+   3. DocumentIngest with Layout, including 50-page ranges; measure memory on the full CC&Rs.
+   4. RulebookBuild and the rulebook editor; ApplicationReview, the application page and the committee queue.
 2. **Run and tune.** Run the full flow on the sample HOA and the redacted sample application. Build the gold datasets,
    create the prompts in Langfuse, and tune until extraction recall, citation validity and the sample review match the
    expected results.
-3. **Repository and CI/CD.** Create the private GitHub repository and push, including the existing CI workflow
-   (`ci.yml`). Put Cloudflare Access in front of the demo and preview hostnames, then add Workers Builds deploys on
-   merge to `main` and pull request previews.
-4. **Host.** Deploy the demo, seed it, and build its first rulebook.
-
+3. **Host.** Done: the private repository, CI on every push, deploys on merge to `main` and a preview per pull request,
+   all in GitHub Actions ([platform.md](platform.md#cicd)). Remaining: the first deploy, then Cloudflare Access if the
+   demo should be private, the preview Workflows Worker once Workflows exist, and seeding the demo's first rulebook.
 Later: real sign-in in place of the demo role switcher, more project types, multiple HOAs in the UI, and rulebook diffs
 when governing documents change.

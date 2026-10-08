@@ -6,6 +6,8 @@
   // AsyncLocalStorage carries the tracing context; process.env carries settings and secrets.
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  // Gives each pull request's Worker Preview a workers.dev URL. Takes effect after a production deploy.
+  "preview_urls": true,
   "observability": { "enabled": true },
   // Production: the demo. Secrets (OPENROUTER_API_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY,
   // AZURE_DOCUMENT_INTELLIGENCE_KEY) are set with `wrangler secret put`. Locally, apps/hoa/.env overrides these.

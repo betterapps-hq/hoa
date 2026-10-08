@@ -24,14 +24,15 @@ The tools we reach for **first**. Prefer them before introducing an alternative 
 ## Backend / full-stack
 
 - ✅ **@tanstack/react-start** — full-stack React (SSR, server functions) on Vite.
-- ◻️ **nitro** — deployment adapter for TanStack Start (Vercel, Node and other presets) when the app is first deployed.
+- ✅ **Cloudflare Workers** — hosting, through **@cloudflare/vite-plugin** (the dev server runs in workerd) and **wrangler**
+  (deploys, previews, bindings and `wrangler types`).
 
 ## AI
 
 - ✅ **ai** (Vercel AI SDK) — model calls, structured output and streaming.
 - ✅ **@openrouter/ai-sdk-provider** — the only model provider; reaches OpenAI and other models through OpenRouter.
 - ✅ **Langfuse** — prompt management (`@langfuse/client`), app tracing (`@langfuse/otel` and `@langfuse/tracing` on
-  `@opentelemetry/sdk-trace-node`), datasets, experiments and evaluators. Model generations, with billed cost, arrive
+  `@opentelemetry/sdk-trace-base` with `@opentelemetry/context-async-hooks`), datasets, experiments and evaluators. Model generations, with billed cost, arrive
   through **OpenRouter Broadcast**, not the AI SDK's Langfuse integration.
 - ◻️ **@ai-sdk/react** — `useChat` / `useObject` hooks for streaming AI UI.
 
@@ -40,6 +41,7 @@ The tools we reach for **first**. Prefer them before introducing an alternative 
 - ✅ **Vitest** — test runner · **happy-dom** — DOM environment · **@vitest/coverage-v8** — coverage.
 - ✅ **@testing-library/react**, **user-event**, **jest-dom** — component testing.
 - ◻️ **@playwright/test** — end-to-end browser tests.
+- ◻️ **@cloudflare/vitest-plugin** — tests that need real D1 and R2 bindings, in their own Vitest project.
 - ◻️ **msw** — API mocking.
 - ◻️ **Storybook** + **@storybook/react-vite** — component workshop, with **@storybook/addon-vitest** and
   **@storybook/addon-a11y**.
@@ -83,7 +85,7 @@ Built on the **unified** (remark + rehype) ecosystem — the standard for parsin
 ## Database & data layer
 
 - ◻️ **drizzle-orm** + **drizzle-zod** + **drizzle-kit** — SQL ORM, zod schema bridge, and migrations.
-- ◻️ **@neondatabase/serverless** — serverless Postgres driver.
+- ◻️ **Cloudflare D1** — the database (SQLite), through **drizzle-orm** and **drizzle-kit** migrations.
 
 ## Authentication
 
@@ -92,7 +94,8 @@ Built on the **unified** (remark + rehype) ecosystem — the standard for parsin
 ## File uploads
 
 - ◻️ **react-dropzone** — drag-and-drop / file-picker hook; pairs with any upload target.
-- ◻️ **@vercel/blob** — blob storage for uploaded submissions when deployed on Vercel.
+- ✅ **Cloudflare R2** — file storage. ◻️ **aws4fetch** signs presigned upload and download URLs.
+- ◻️ **fflate** — reading pictures out of Word files.
 
 ## Observability
 
@@ -100,8 +103,8 @@ Built on the **unified** (remark + rehype) ecosystem — the standard for parsin
 
 ## Background jobs & events
 
-- ◻️ **@trigger.dev/sdk** — durable background tasks, scheduled/cron jobs, and event/webhook handlers (long-running work
-  off the request path).
+- ◻️ **Cloudflare Workflows** — durable multi-step jobs (OCR, rulebook builds, reviews), and **Cron Triggers** for
+  scheduled work.
 
 ## Notifications
 
