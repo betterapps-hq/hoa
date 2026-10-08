@@ -32,7 +32,8 @@ jobs:
   deploy:
     name: Deploy the demo
     needs: verify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Skipped until the Cloudflare account is connected (see apps/hoa/docs/setup.md).
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CLOUDFLARE_ACCOUNT_ID != ''
     runs-on: ubuntu-latest
     environment:
       name: demo
@@ -53,7 +54,7 @@ jobs:
   preview:
     name: Deploy a preview
     needs: verify
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && vars.CLOUDFLARE_ACCOUNT_ID != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
