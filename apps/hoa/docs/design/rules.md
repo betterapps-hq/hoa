@@ -164,7 +164,7 @@ type RuleIssue = {
   resolution: { note: string; resolvedBy: string; resolvedAt: string } | null // set when an administrator dismisses it
 }
 
-type PromptVersion = number | "fallback" // "fallback" when the text came from prompts.ts, not Langfuse
+type PromptVersion = number // the Langfuse prompt version
 
 type Provenance =
   | { source: "extraction"; jobId: string; sectionId: string; model: string; promptName: string; promptVersion: PromptVersion }

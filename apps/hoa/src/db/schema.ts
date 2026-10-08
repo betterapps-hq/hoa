@@ -74,7 +74,7 @@ export const jobs = sqliteTable(
     stage: text("stage"),
     done: integer("done").notNull(),
     total: integer("total").notNull(),
-    promptVersions: json<Record<string, number | "fallback">>("prompt_versions_json").notNull(),
+    promptVersions: json<Record<string, number>>("prompt_versions_json").notNull(),
     failures: json<unknown[]>("failures_json").notNull(),
     error: json<unknown>("error_json"),
     createdAt: timestamp("created_at"),

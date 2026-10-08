@@ -8,7 +8,6 @@ import { formatCost, formatTokens } from "./ModelCheck.utils"
 const succeeded: ModelCheckResult = {
   status: "succeeded",
   modelId: "anthropic/claude-haiku-5.5",
-  isLangfuseConfigured: true,
   text: "Ready to review architectural applications.",
   promptName: "hoa-model-check",
   promptVersion: 2,
@@ -38,11 +37,10 @@ describe("ModelCheck", () => {
     expect(screen.getByText("0af7651916cd43dd8448eb211c80319c")).toBeInTheDocument()
   })
 
-  it("flags a fallback prompt and missing Langfuse tracing", async () => {
-    await runCheck({ ...succeeded, promptVersion: "fallback", traceId: undefined, isLangfuseConfigured: false })
+  it("says when no trace was recorded", async () => {
+    await runCheck({ ...succeeded, traceId: undefined })
 
-    expect(await screen.findByText("hoa-model-check (local fallback, not linked to Langfuse)")).toBeInTheDocument()
-    expect(screen.getByText("Langfuse isn't configured")).toBeInTheDocument()
+    expect(await screen.findByText("Not recorded")).toBeInTheDocument()
   })
 
   it("lists the settings to add when OpenRouter isn't configured", async () => {

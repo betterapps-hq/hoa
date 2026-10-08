@@ -61,10 +61,7 @@ export function ModelCheck({ onRun }: ModelCheckProps) {
                   <dd>{result.modelId}</dd>
                   <dt>Prompt</dt>
                   <dd>
-                    {result.promptName}{" "}
-                    {result.promptVersion === "fallback"
-                      ? "(local fallback, not linked to Langfuse)"
-                      : `version ${result.promptVersion}`}
+                    {result.promptName} version {result.promptVersion}
                   </dd>
                   <dt>Latency</dt>
                   <dd>{result.latencyMs.toLocaleString("en-US")} ms</dd>
@@ -74,7 +71,7 @@ export function ModelCheck({ onRun }: ModelCheckProps) {
                   <dd>{formatCost(result.costUsd)}</dd>
                   <dt>Langfuse trace</dt>
                   <dd className={result.traceId ? "font-mono break-all" : undefined}>
-                    {result.traceId ?? (result.isLangfuseConfigured ? "Not recorded" : "Langfuse isn't configured")}
+                    {result.traceId ?? "Not recorded"}
                   </dd>
                 </dl>
               ))

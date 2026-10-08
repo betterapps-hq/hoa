@@ -19,20 +19,16 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
 
 ## Prompts
 
-- **Every prompt lives in Langfuse prompt management, which is the source of truth.** Register each prompt in
-  [`prompts.ts`](../src/ai/prompts.ts) or [`pipelinePrompts.ts`](../src/ai/pipelinePrompts.ts) with its Langfuse name, a
-  fallback text and optionally its initial `config` (such as `model`). The app fetches the version with the
-  `LANGFUSE_PROMPT_LABEL` label (`production` by default).
-- Run `pnpm prompts:push` (in `apps/hoa`) after adding a prompt. It creates every missing prompt in Langfuse as a
-  **text** prompt with the serving label, and never touches a prompt that already has a labeled version, so edits made in
-  Langfuse stay. `pnpm prompts:push --update` publishes the code's text as a new version wherever it differs, keeping
-  the config set in Langfuse.
-- Change prompts and models in Langfuse; copy a prompt's final text back into its fallback when you change it there.
+- **Prompts exist only in Langfuse prompt management.** Their text, versions, labels and `config.model` are created and
+  edited there, never in code. Code names each prompt in [`prompts.ts`](../src/ai/prompts.ts) or
+  [`pipelinePrompts.ts`](../src/ai/pipelinePrompts.ts) and documents the variables it fills in. The app fetches the
+  version with the `LANGFUSE_PROMPT_LABEL` label (`production` by default).
+- Langfuse is required: without its keys the AI context reports them missing, and a prompt Langfuse can't serve fails
+  the call with the prompt's name and label. There's no local copy to fall back to.
+- To add a prompt, create it in Langfuse as a **text** prompt using `{{variable}}` placeholders, label the version to
+  serve, then add its name to the registry. The Langfuse MCP server or the Langfuse UI can create and edit prompts.
 - Rule extraction and consolidation run on `anthropic/claude-opus-5.5` through their prompts' `config.model`; every
-  other stage uses `OPENROUTER_MODEL` or `OPENROUTER_SMALL_MODEL`.
-- The fallback text is used only when Langfuse is unreachable or the prompt doesn't exist yet. Results from a fallback
-  aren't linked to a prompt version; the model check flags this.
-- A prompt whose contract changes (new variables or output) gets a new name, so two contracts never share a label.
+  other stage uses `OPENROUTER_MODEL` or `OPENROUTER_SMALL_MODEL`.- A prompt whose contract changes (new variables or output) gets a new name, so two contracts never share a label.
 
 ## Tracing and cost
 
@@ -71,8 +67,7 @@ When a feature needs a production evaluator:
 
 - **Prompts by version.** The [prompt loader](../src/ai/promptLoader.ts) loads by label (`LANGFUSE_PROMPT_LABEL`) or
   by a pinned version, and returns the version's `config`. Workflow jobs pin every prompt they use once, with
-  `resolvePromptVersions`, and pass `promptVersion` to each call. A version is `"fallback"` when the text came from
-  `prompts.ts`.
+  `resolvePromptVersions`, and pass `promptVersion` to each call.
 - **Model per prompt.** `runTextPrompt` and `runObjectPrompt` take a model factory and a default model id, and build
   the model after loading the prompt: the version's `config.model` when it names one, else the default
   (`OPENROUTER_MODEL`, or `OPENROUTER_SMALL_MODEL` for routing, structure and classification). Results report the
@@ -84,7 +79,7 @@ Not planned for the demo: recording summaries instead of content for application
 mode. Both are needed before real HOAs onboard ([design/documents.md](design/documents.md#privacy-and-retention)).
 ## New AI feature checklist
 
-- [ ] Prompt registered in `prompts.ts` and created in Langfuse with the serving label.
+- [ ] Prompt created in Langfuse with the serving label, and its name and variables added to `prompts.ts` or `pipelinePrompts.ts`.
 - [ ] The model is called through `runTextPrompt` or `runObjectPrompt`, with a trace name for the feature or stage.
 - [ ] A Langfuse dataset covers the stage (or the stage that consumes it), listed in design/evaluation.md.
 - [ ] Any production evaluator targets root observations with that trace name.

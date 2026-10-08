@@ -49,8 +49,8 @@ needs a human discussion**, not a silent add.
 ## AI features
 
 - **Prompts live in Langfuse.** Fetch them through the app's prompt helper: by label for a single call, and by the
-  version the job resolved for a Workflow step. Never hard-code a prompt in source except as the fallback used when
-  Langfuse is unreachable.
+  version the job resolved for a Workflow step. Never put prompt text in source: prompts are created and edited only in
+  Langfuse, and code refers to them by name.
 - **Every model call is traced.** Use the app's model helper so the call reaches Langfuse with its prompt version, token
   usage, cost and latency.
 - **Every model stage is measured.** It has a Langfuse dataset (or is measured through the stage that consumes it),

@@ -1,76 +1,56 @@
 import { describe, expect, it, vi } from "vitest"
-import { compileMustache, createPromptLoader, resolvePromptVersions, type LangfusePromptManager } from "./promptLoader"
+import { createPromptLoader, resolvePromptVersions, type LangfusePromptManager } from "./promptLoader"
 
-const prompt = { name: "hoa-greeting", fallback: "Hello {{ name }}" } as const
+const prompt = { name: "hoa-greeting" } as const
 
 function langfuse(overrides: Partial<Awaited<ReturnType<LangfusePromptManager["get"]>>> = {}) {
-  const compile = vi.fn<(variables?: Record<string, string>) => string>(() => "Hello from Langfuse")
-  const get = vi.fn<LangfusePromptManager["get"]>(async () => ({
-    name: "hoa-greeting",
-    version: 7,
-    isFallback: false,
-    config: { model: "anthropic/claude-sonnet-5.5", temperature: 0 },
-    compile,
+  const get = vi.fn<LangfusePromptManager["get"]>(async (name) => ({
+    name,
+    version: 4,
+    config: { model: "anthropic/claude-opus-5.5" },
+    compile: (variables) => `Hi ${variables?.name ?? ""}`,
     ...overrides
   }))
-  return { get, compile }
+  return { get }
 }
 
 describe("createPromptLoader", () => {
-  it("uses the local fallback when Langfuse isn't configured", async () => {
-    const template = await createPromptLoader(undefined, "production")(prompt)
+  it("fetches the prompt from Langfuse by label, with its config", async () => {
+    const manager = langfuse()
+    const template = await createPromptLoader(manager, "staging")(prompt)
 
-    expect(template).toMatchObject({ name: "hoa-greeting", version: "fallback", config: {} })
-    expect(template.compile({ name: "Avery" })).toBe("Hello Avery")
+    expect(manager.get).toHaveBeenCalledWith("hoa-greeting", { label: "staging", type: "text" })
+    expect(template).toMatchObject({ name: "hoa-greeting", version: 4, config: { model: "anthropic/claude-opus-5.5" } })
+    expect(template.compile({ name: "Sam" })).toBe("Hi Sam")
   })
 
-  it("fetches the prompt from Langfuse by label, with its config and the fallback text", async () => {
-    const { get, compile } = langfuse()
-    const template = await createPromptLoader({ get }, "staging")(prompt)
+  it("loads a pinned version, and ignores an unusable config", async () => {
+    const manager = langfuse({ config: { model: 7 } })
+    const template = await createPromptLoader(manager, "production")(prompt, { version: 7 })
 
-    expect(get).toHaveBeenCalledWith("hoa-greeting", { label: "staging", fallback: "Hello {{ name }}", type: "text" })
-    expect(template).toMatchObject({
-      name: "hoa-greeting",
-      version: 7,
-      config: { model: "anthropic/claude-sonnet-5.5" }
-    })
-    expect(template.compile({ name: "Avery" })).toBe("Hello from Langfuse")
-    expect(compile).toHaveBeenCalledWith({ name: "Avery" })
+    expect(manager.get).toHaveBeenCalledWith("hoa-greeting", { version: 7, type: "text" })
+    expect(template.config).toEqual({})
   })
 
-  it("loads a pinned version, and a pinned fallback without calling Langfuse", async () => {
-    const { get } = langfuse()
-    const load = createPromptLoader({ get }, "production")
+  it("fails with the prompt and label when Langfuse can't serve it", async () => {
+    const manager = {
+      get: vi.fn<LangfusePromptManager["get"]>(async () => {
+        throw new Error("404")
+      })
+    }
+    const load = createPromptLoader(manager, "production")
 
-    await load(prompt, { version: 7 })
-    expect(get).toHaveBeenCalledWith("hoa-greeting", { version: 7, fallback: "Hello {{ name }}", type: "text" })
-
-    get.mockClear()
-    expect((await load(prompt, { version: "fallback" })).version).toBe("fallback")
-    expect(get).not.toHaveBeenCalled()
-  })
-
-  it("reports Langfuse's own fallback as a fallback, and ignores an unusable config", async () => {
-    const fallback = await createPromptLoader(langfuse({ isFallback: true }), "production")(prompt)
-    expect(fallback.version).toBe("fallback")
-
-    const oddConfig = await createPromptLoader(langfuse({ config: { model: 42 } }), "production")(prompt)
-    expect(oddConfig.config).toEqual({})
+    await expect(load(prompt)).rejects.toThrow('Langfuse couldn\'t serve the prompt hoa-greeting (label "production").')
+    await expect(load(prompt, { version: 3 })).rejects.toThrow("hoa-greeting (version 3)")
   })
 })
 
 describe("resolvePromptVersions", () => {
-  it("pins the version each prompt's label points at", async () => {
+  it("pins the labeled version of each prompt", async () => {
     const load = createPromptLoader(langfuse(), "production")
-    expect(await resolvePromptVersions(load, [prompt])).toEqual({ "hoa-greeting": 7 })
-    expect(await resolvePromptVersions(createPromptLoader(undefined, "production"), [prompt])).toEqual({
-      "hoa-greeting": "fallback"
+    expect(await resolvePromptVersions(load, [prompt, { name: "hoa-other" }])).toEqual({
+      "hoa-greeting": 4,
+      "hoa-other": 4
     })
-  })
-})
-
-describe("compileMustache", () => {
-  it("replaces known placeholders and leaves unknown ones in place", () => {
-    expect(compileMustache("{{a}} and {{ b }} and {{c}}", { a: "1", b: "2" })).toBe("1 and 2 and {{c}}")
   })
 })
