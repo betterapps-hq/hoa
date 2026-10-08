@@ -67,18 +67,29 @@ OpenRouter.
 pnpm --filter hoa dev
 ```
 
-Open <http://localhost:3000> and select **Run model check**. It reports the response, prompt version, latency, tokens,
-cost and Langfuse trace ID, which confirms each connection.
+The server runs inside workerd, Cloudflare's runtime, through its Vite plugin, with R2 simulated on disk under
+`apps/hoa/.wrangler`. Open <http://localhost:3000>, switch to the **Administrator** role and select **Run model check**.
+It reports the response, prompt version, latency, tokens, cost and Langfuse trace ID, which confirms each connection.
 
-## Cloudflare (from phase 1)
+After changing `wrangler.jsonc`, regenerate the binding types with `pnpm --filter hoa cf-typegen` and commit
+`worker-configuration.d.ts`.
 
-One-time setup when the app moves onto Workers ([design/platform.md](design/platform.md)):
+## 6. Cloudflare and deployment
 
-1. Put the Cloudflare account on the **Workers Paid** plan.
-2. Sign in: `pnpm --filter hoa exec wrangler login`.
-3. Create the R2 buckets `hoa-dev`, `hoa-preview` and `hoa-files`. Give each a CORS rule allowing `PUT` from its
-   environment's origins (`http://localhost:3000` for `hoa-dev`), and create an R2 API token with object read and write
-   access scoped to each bucket.
-4. Create the D1 databases `hoa` and `hoa-preview`, and put their ids in `wrangler.jsonc`.
-5. Prepare the local database and types:
-   `pnpm --filter hoa db:migrate:local`, `pnpm --filter hoa db:seed:local` and `pnpm --filter hoa cf-typegen`.
+One-time setup for the demo and pull request previews ([design/platform.md](design/platform.md#cicd)):
+
+1. Sign in: `pnpm --filter hoa exec wrangler login`.
+2. Create the R2 buckets: `wrangler r2 bucket create hoa-files` and `wrangler r2 bucket create hoa-preview`.
+3. Set the demo's secrets with `wrangler secret put <name>`, and the previews' with
+   `wrangler preview base-config secret put <name>`: `OPENROUTER_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`
+   and `AZURE_DOCUMENT_INTELLIGENCE_KEY`.
+4. In the Cloudflare dashboard, turn on Cloudflare Access for the `hoa` Worker's `workers.dev` hostname and its preview
+   URLs, so only invited people can open them.
+5. Create a Cloudflare API token from the **Edit Cloudflare Workers** template. In the GitHub repository, store it as
+   the secret `CLOUDFLARE_API_TOKEN` (`gh secret set CLOUDFLARE_API_TOKEN`), and set the variable
+   `CLOUDFLARE_ACCOUNT_ID` (`gh variable set CLOUDFLARE_ACCOUNT_ID`). Setting the variable turns on the deploy and
+   preview jobs.
+
+Later in phase 1, D1 and presigned uploads add: the `hoa-dev` bucket, CORS rules allowing `PUT` from each environment's
+origins, an R2 API token per bucket, the D1 databases `hoa` and `hoa-preview` with their ids in `wrangler.jsonc`, and
+`db:migrate:local` and `db:seed:local` scripts.

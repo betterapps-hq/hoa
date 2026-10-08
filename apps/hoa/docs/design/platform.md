@@ -246,23 +246,28 @@ Neon, `@vercel/blob` and trigger.dev.
 
 ## CI/CD
 
-Hosted on GitHub as a private repository, `AndrewCraswell/hoa`.
+Hosted on GitHub as a private repository, `AndrewCraswell/hoa`. Everything runs in GitHub Actions
+(`.github/workflows/ci.yml`), so a deploy only happens after `pnpm verify` passes.
 
-| Trigger | What runs |
+| Trigger | Jobs |
 | --- | --- |
-| Pull request | GitHub Actions runs `pnpm verify` (the existing `.github/workflows/ci.yml`). Workers Builds applies migrations to the preview database, builds a **preview** and comments its URL on the pull request. |
-| Merge to `main` | Workers Builds runs `pnpm exec wrangler d1 migrations apply DB --remote && pnpm exec wrangler deploy` from `apps/hoa`. |
+| Pull request | `verify`, then `preview`: builds the app, runs `wrangler preview --name pr-<number>` and comments the preview URL on the pull request, updating the comment on every push |
+| Merge to `main` | `verify`, then `deploy`: builds the app and runs `wrangler deploy` |
+| Pull request closed | `preview-cleanup.yml` deletes the pull request's preview |
 
-- **Workers Builds** is Cloudflare's GitHub integration: it needs no API token in GitHub and caches the pnpm store. The
-  build variable `PNPM_VERSION=12.10.1` overrides its default pnpm. The app depends on workspace packages, so the build
-  command installs from the repository root.
-- **Previews are isolated from the demo's data.** The `previews` block binds a preview D1 database and the `hoa-preview`
-  bucket. Previews share those with each other, so **migrations must stay backward compatible**: a preview may run old
-  code against a newer schema.
+- **Credentials.** The jobs read the repository secret `CLOUDFLARE_API_TOKEN` and the variable `CLOUDFLARE_ACCOUNT_ID`.
+  Until the variable is set, the Cloudflare jobs are skipped and only `verify` runs.
+- **Migrations.** Once D1 arrives, `deploy` runs `wrangler d1 migrations apply DB --remote` before `wrangler deploy`,
+  and `preview` applies migrations to the preview database first.
+- **Previews are isolated from the demo's data.** The `previews` block in `wrangler.jsonc` binds the `hoa-preview` bucket
+  (and later a preview D1 database). Previews share those with each other, so **migrations must stay backward
+  compatible**: a preview may run old code against a newer schema. Worker secrets for previews are set once with
+  `wrangler preview base-config secret put`.
 - **Workflows are the exception.** A preview binds to an already deployed Workflow rather than getting its own, so a
   second Worker, `hoa-preview`, deploys preview copies of the Workflows from `main`, and previews bind to those. Workflow
   code changed in a pull request isn't exercised by that pull request's preview; it's covered by tests and checked on
   the demo after merging.
-- **Access first.** Cloudflare Access protects the demo hostname and preview URLs before previews are turned on.
-- **Fallback.** If Workers Builds proves awkward in the monorepo, GitHub Actions with `cloudflare/wrangler-action` runs
-  the same commands, using `wrangler preview` on pull requests and commenting the URL.
+- **Access first.** Cloudflare Access protects the demo's `workers.dev` hostname and preview URLs before the first
+  deploy.
+- **Why not Workers Builds.** Cloudflare's GitHub integration needs no API token, but it deploys whether or not CI
+  passes, and it's configured only in the dashboard, which is awkward for a pnpm monorepo.
