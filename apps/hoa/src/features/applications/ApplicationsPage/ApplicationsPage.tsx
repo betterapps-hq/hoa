@@ -7,19 +7,31 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import { projectTypeIds, projectTypes, type ProjectTypeId } from "@/rules/catalog"
+import { acceptFor } from "@/storage/uploadRules"
 import { recommendationLabels, statusLabels } from "../applicationDisplay"
 import type { ApplicationListItem } from "../applications.functions"
+import { uploadProblem } from "../uploadApplicationFiles"
 
 const newApplicationSchema = z.object({
   projectType: z.enum(projectTypeIds),
-  description: z.string().trim().max(4000, "Keep the description under 4,000 characters.")
+  description: z.string().trim().max(4000, "Keep the description under 4,000 characters."),
+  files: z
+    .array(z.instanceof(File))
+    .min(1, "Add your application packet.")
+    .superRefine((files, context) => {
+      const problem = uploadProblem(files)
+      if (problem) {
+        context.addIssue({ code: "custom", message: problem })
+      }
+    })
 })
 
-export type NewApplication = { projectType: ProjectTypeId; description: string | null }
+export type NewApplication = { projectType: ProjectTypeId; description: string | null; files: File[] }
 
 export type ApplicationsPageProps = {
   applications: ApplicationListItem[]
@@ -35,12 +47,16 @@ const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
 export function ApplicationsPage({ applications, isCommittee, onCreate, onOpen }: ApplicationsPageProps) {
   const [error, setError] = useState<string | null>(null)
   const form = useForm({
-    defaultValues: { projectType: "fence" as ProjectTypeId, description: "" },
+    defaultValues: { projectType: "fence" as ProjectTypeId, description: "", files: [] as File[] },
     validators: { onSubmit: newApplicationSchema },
     onSubmit: async ({ value }) => {
       setError(null)
       try {
-        await onCreate({ projectType: value.projectType, description: value.description.trim() || null })
+        await onCreate({
+          projectType: value.projectType,
+          description: value.description.trim() || null,
+          files: value.files
+        })
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : "The application couldn't be created.")
       }
@@ -54,8 +70,8 @@ export function ApplicationsPage({ applications, isCommittee, onCreate, onOpen }
           <CardHeader>
             <CardTitle>Start an application</CardTitle>
             <CardDescription>
-              Describe the project, then upload your packet. The review runs right away, so you can fix anything it
-              finds before the committee sees it.
+              Describe the project and add your packet. The review runs right away, so you can fix anything it finds
+              before the committee sees it.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -106,12 +122,32 @@ export function ApplicationsPage({ applications, isCommittee, onCreate, onOpen }
                     </Field>
                   )}
                 </form.Field>
+                <form.Field name="files">
+                  {(field) => (
+                    <Field data-invalid={field.state.meta.errors.length > 0}>
+                      <FieldLabel htmlFor={field.name}>Application packet</FieldLabel>
+                      <Input
+                        id={field.name}
+                        type="file"
+                        multiple
+                        accept={acceptFor.application}
+                        onChange={(event) => field.handleChange([...(event.target.files ?? [])])}
+                        aria-invalid={field.state.meta.errors.length > 0}
+                      />
+                      <FieldDescription>
+                        The application form, plot plan, photos and anything else you’re submitting. PDF, Word, JPEG or
+                        PNG; photos up to 5 MB each.
+                      </FieldDescription>
+                      <FieldError errors={field.state.meta.errors} />
+                    </Field>
+                  )}
+                </form.Field>
                 {error ? <p className="text-sm text-destructive">{error}</p> : null}
                 <form.Subscribe selector={(state) => state.isSubmitting}>
                   {(isSubmitting) => (
                     <Field orientation="horizontal">
                       <Button type="submit" disabled={isSubmitting}>
-                        {isSubmitting ? "Creating" : "Create application"}
+                        {isSubmitting ? "Uploading" : "Upload and review"}
                       </Button>
                     </Field>
                   )}
