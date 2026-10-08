@@ -70,6 +70,28 @@ export function readyToApprove(rules: readonly Rule[]): Rule[] {
   )
 }
 
+export type IssueSeverity = "blocking" | "warning" | "note"
+
+/**
+ * How much an issue matters to the administrator. A missing quote or an open conflict blocks approval or publishing;
+ * a scan read with low confidence is only a note to check the quote.
+ */
+export function issueSeverity(issue: Rule["issues"][number]): IssueSeverity {
+  if (issue.code === "citation-not-found" || issue.code === "conflict") {
+    return "blocking"
+  }
+  return issue.code === "low-confidence" ? "note" : "warning"
+}
+
+/** A rule the administrator still has to look at: pending, or kept with an open issue above a note. */
+export function needsAttention(rule: Rule) {
+  return (
+    rule.review.status === "pending" ||
+    (rule.review.status === "approved" &&
+      rule.issues.some((issue) => !issue.resolution && issueSeverity(issue) !== "note"))
+  )
+}
+
 /** Why a draft can't be published yet; empty when it can. */
 export function publishBlockers(rules: readonly Rule[]): string[] {
   const pending = rules.filter((rule) => rule.review.status === "pending").length
@@ -97,6 +119,9 @@ export function describeCheck(check: Rule["check"]): string {
       const subject = check.attributes.join(" + ")
       if (check.min !== null && check.max !== null) {
         return `${subject} between ${check.min} and ${check.max}`
+      }
+      if (check.min === null && check.max === null) {
+        return `${subject}: no limit given`
       }
       return check.min !== null ? `${subject} at least ${check.min}` : `${subject} at most ${check.max}`
     }

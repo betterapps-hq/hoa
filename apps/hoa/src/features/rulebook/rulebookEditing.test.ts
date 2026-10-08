@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { newJob } from "@/db/jobRepository"
 import type { Page } from "@/ocr/page"
 import { catalogForPrompt, routingOptions, truncate } from "@/pipeline/catalogPrompt"
+import type { Rule } from "@/rules/rule"
 import { fenceRules } from "@/tests/fenceRulebook"
 import {
   applyRuleChanges,
@@ -9,6 +10,8 @@ import {
   describeBuildProblem,
   describeCheck,
   describeConditions,
+  issueSeverity,
+  needsAttention,
   publishBlockers,
   readyToApprove
 } from "./rulebookEditing"
@@ -163,6 +166,33 @@ describe("describeBuildProblem", () => {
     )
     expect(describeBuildProblem({ ...job, status: "completed-with-errors", failures: [failure, failure] })).toBe(
       "2 items failed (extract): Bad schema"
+    )
+  })
+})
+
+describe("issueSeverity and needsAttention", () => {
+  const issue = (code: Rule["issues"][number]["code"], resolved = false): Rule["issues"][number] => ({
+    code,
+    message: code,
+    resolution: resolved ? { note: "ok", resolvedBy: "a", resolvedAt: "" } : null
+  })
+
+  it("ranks issues and flags rules that still need a look", () => {
+    expect(issueSeverity(issue("conflict"))).toBe("blocking")
+    expect(issueSeverity(issue("citation-not-found"))).toBe("blocking")
+    expect(issueSeverity(issue("duplicate-key"))).toBe("warning")
+    expect(issueSeverity(issue("low-confidence"))).toBe("note")
+
+    const approved = byId("posts")
+    expect(needsAttention(approved)).toBe(false)
+    expect(needsAttention({ ...approved, review: { ...approved.review, status: "pending" } })).toBe(true)
+    expect(needsAttention({ ...approved, issues: [issue("duplicate-key")] })).toBe(true)
+    expect(needsAttention({ ...approved, issues: [issue("low-confidence"), issue("conflict", true)] })).toBe(false)
+    expect(
+      needsAttention({ ...approved, issues: [issue("sanity")], review: { ...approved.review, status: "rejected" } })
+    ).toBe(false)
+    expect(describeCheck({ type: "range", attributes: ["segment.length"], min: null, max: null })).toBe(
+      "segment.length: no limit given"
     )
   })
 })

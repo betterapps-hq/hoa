@@ -5,6 +5,9 @@ import { getDb } from "@/db/client.server"
 import { getGoverningDocument, listGoverningDocuments } from "@/db/documentRepository"
 import { getLatestJobOfKind, insertJob, newJob } from "@/db/jobRepository"
 import {
+  copyRulebookAsDraft,
+  deleteRule,
+  discardDraft,
   getRule,
   getRulebookByStatus,
   insertRulebook,
@@ -187,6 +190,53 @@ export const approveReadyRules = createServerFn({ method: "POST" }).handler(asyn
   }))
   await updateRules(db, context.hoa.id, approved)
   return { count: approved.length }
+})
+
+/**
+ * Starts editing the published rulebook: a draft copy the administrator changes and publishes as the next version.
+ * The copy has no build job; its id only keeps the record's shape.
+ */
+export const editPublishedRulebook = createServerFn({ method: "POST" }).handler(async () => {
+  const context = await requireAdministrator()
+  const db = getDb()
+  const hoaId = context.hoa.id
+  if (await getRulebookByStatus(db, hoaId, "draft")) {
+    throw new Error("A draft is already open. Publish or discard it first.")
+  }
+  if (await getRulebookByStatus(db, hoaId, "building")) {
+    throw new Error("Wait for the rulebook build to finish.")
+  }
+  const published = await getRulebookByStatus(db, hoaId, "published")
+  if (!published) {
+    throw new Error("Nothing is published yet. Build the rulebook first.")
+  }
+  const draft = await copyRulebookAsDraft(db, hoaId, {
+    source: published,
+    sourceRules: await listRules(db, hoaId, published.id),
+    draftId: crypto.randomUUID(),
+    jobId: crypto.randomUUID(),
+    now: new Date().toISOString()
+  })
+  return { rulebookId: draft.id }
+})
+
+/** Removes a rule from the draft. */
+export const deleteDraftRule = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ ruleId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
+    await deleteRule(db, context.hoa.id, rule.id)
+  })
+
+/** Throws the draft away; the published rulebook stays as it is. */
+export const discardRulebookDraft = createServerFn({ method: "POST" }).handler(async () => {
+  const context = await requireAdministrator()
+  const db = getDb()
+  const draft = await getRulebookByStatus(db, context.hoa.id, "draft")
+  if (draft) {
+    await discardDraft(db, context.hoa.id, draft.id)
+  }
 })
 
 /** Dismisses an issue with a note, such as a conflict the administrator has decided. */

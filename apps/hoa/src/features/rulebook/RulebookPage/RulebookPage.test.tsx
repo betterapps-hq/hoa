@@ -79,14 +79,18 @@ const documents: GoverningDocument[] = [
   }
 ]
 
-const card = (title: string) =>
-  screen.getByText(title, { selector: "[data-slot=card-title]" }).closest<HTMLElement>("[data-slot=card]")!
+/** Opens a rule from the table in its side panel. */
+async function openRule(user: ReturnType<typeof userEvent.setup>, title: string) {
+  await user.click(screen.getByRole("button", { name: title }))
+  return screen.getByRole("dialog")
+}
 
 function setup(overrides: Partial<RulebookPageProps> = {}) {
   const actions = {
     review: vi.fn<RuleCardActions["review"]>(async () => undefined),
     save: vi.fn<(ruleId: string, changes: RuleChanges) => Promise<void>>(async () => undefined),
-    resolveIssue: vi.fn<RuleCardActions["resolveIssue"]>(async () => undefined)
+    resolveIssue: vi.fn<RuleCardActions["resolveIssue"]>(async () => undefined),
+    remove: vi.fn<RuleCardActions["remove"]>(async () => undefined)
   }
   const props: RulebookPageProps = {
     draft,
@@ -96,6 +100,8 @@ function setup(overrides: Partial<RulebookPageProps> = {}) {
     onBuild: vi.fn<(documentIds: string[]) => Promise<void>>(async () => undefined),
     onApproveReady: vi.fn<() => Promise<number>>(async () => 3),
     onPublish: vi.fn<(rulebookId: string) => Promise<void>>(async () => undefined),
+    onEditPublished: vi.fn<() => Promise<void>>(async () => undefined),
+    onDiscardDraft: vi.fn<() => Promise<void>>(async () => undefined),
     actions,
     onChanged: vi.fn<() => void>(),
     ...overrides
@@ -115,65 +121,96 @@ describe("RulebookPage", () => {
     expect(props.onChanged).toHaveBeenCalled()
   })
 
-  it("shows the draft grouped by topic, with blockers, removed rules and a disabled publish", () => {
+  it("lists the draft with blockers and removed rules, starting with what needs attention", () => {
     setup()
     expect(screen.getByText("2 pending")).toBeInTheDocument()
     expect(screen.getByText("2 rules are still pending.")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled()
     expect(screen.getByText(/No vinyl/)).toBeInTheDocument()
-    expect(
-      within(screen.getByRole("region", { name: "Colors" })).getByText("Composite colors", {
-        selector: "[data-slot=card-title]"
-      })
-    ).toBeInTheDocument()
-    expect(screen.getByText("The CC&Rs list other colors.")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Needs attention (2)" })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByText("Showing 2 of 2 rules")).toBeInTheDocument()
+    expect(screen.getAllByText("Open issues:")).toHaveLength(2)
+  })
+
+  it("filters by text, topic and status", async () => {
+    const { user } = setup()
+    await user.type(screen.getByLabelText("Search rules"), "posts")
+    expect(screen.getByText("Showing 1 of 2 rules")).toBeInTheDocument()
+    await user.clear(screen.getByLabelText("Search rules"))
+    await user.selectOptions(screen.getByLabelText("Topic"), "color")
+    expect(screen.getByRole("button", { name: "Composite colors" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Posts match" })).not.toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText("Topic"), "all")
+    await user.click(screen.getByRole("button", { name: "Approved" }))
+    expect(screen.getByText("No rules match.")).toBeInTheDocument()
   })
 
   it("approves, rejects, and won't approve a rule whose quote wasn't found", async () => {
     const { actions, user } = setup()
-    const colorCard = card("Composite colors")
-    await user.click(within(colorCard).getByRole("button", { name: "Approve" }))
+    const colors = await openRule(user, "Composite colors")
+    await user.click(within(colors).getByRole("button", { name: "Approve" }))
     expect(actions.review).toHaveBeenCalledWith("composite-colors", "approved")
-    await user.click(within(colorCard).getByRole("button", { name: "Reject" }))
+    await user.click(within(colors).getByRole("button", { name: "Reject" }))
     expect(actions.review).toHaveBeenCalledWith("composite-colors", "rejected")
-
-    const postsCard = card("Posts match")
-    expect(within(postsCard).getByRole("button", { name: "Approve" })).toBeDisabled()
+    await user.keyboard("{Escape}")
+    const posts = await openRule(user, "Posts match")
+    expect(within(posts).getByRole("button", { name: "Approve" })).toBeDisabled()
   })
 
   it("resolves an issue with a note", async () => {
     const { actions, user } = setup()
-    const colorCard = card("Composite colors")
-    await user.click(within(colorCard).getByRole("button", { name: "Resolve" }))
-    await user.type(within(colorCard).getByLabelText("Why this is resolved"), "The guidelines are newer")
-    await user.click(within(colorCard).getByRole("button", { name: "Save" }))
+    const panel = await openRule(user, "Composite colors")
+    expect(within(panel).getByText("The CC&Rs list other colors.")).toBeInTheDocument()
+    await user.click(within(panel).getByRole("button", { name: "Resolve" }))
+    await user.type(within(panel).getByLabelText("Why this is resolved"), "The guidelines are newer")
+    await user.click(within(panel).getByRole("button", { name: "Save" }))
     expect(actions.resolveIssue).toHaveBeenCalledWith("composite-colors", 0, "The guidelines are newer")
   })
 
   it("edits a rule and saves the changes", async () => {
     const { actions, user } = setup()
-    const colorCard = card("Composite colors")
-    await user.click(within(colorCard).getByRole("button", { name: "Edit" }))
-    const title = within(colorCard).getByLabelText("Title")
+    const panel = await openRule(user, "Composite colors")
+    await user.click(within(panel).getByRole("button", { name: "Edit" }))
+    const title = within(panel).getByLabelText("Title")
     await user.clear(title)
     await user.type(title, "Composite fence colors")
-    await user.selectOptions(within(colorCard).getByLabelText("Who decides"), "committee")
-    await user.click(within(colorCard).getByRole("button", { name: "Save" }))
+    await user.selectOptions(within(panel).getByLabelText("Who decides"), "committee")
+    await user.click(within(panel).getByRole("button", { name: "Save" }))
     expect(actions.save).toHaveBeenCalledWith(
       "composite-colors",
       expect.objectContaining({ title: "Composite fence colors", discretion: "committee", isCurable: true })
     )
   })
 
-  it("shows the published rulebook read-only, and an empty draft", async () => {
-    const { user } = setup({
+  it("deletes a rule after confirming", async () => {
+    const { actions, user } = setup()
+    const panel = await openRule(user, "Composite colors")
+    await user.click(within(panel).getByRole("button", { name: "Delete" }))
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }))
+    expect(actions.remove).toHaveBeenCalledWith("composite-colors")
+  })
+
+  it("discards the draft after confirming", async () => {
+    const { props, user } = setup()
+    await user.click(screen.getByRole("button", { name: "Discard draft" }))
+    await user.click(screen.getByRole("button", { name: "Discard" }))
+    expect(props.onDiscardDraft).toHaveBeenCalled()
+  })
+
+  it("shows the published rulebook read-only and starts editing it", async () => {
+    const { props, user } = setup({
       draft: { ...draft, rulebook: null, rules: [], removed: [], blockers: [], lastBuildError: "Section 5 failed." }
     })
     expect(screen.getByText("Section 5 failed.")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Edit rules" })).toBeInTheDocument()
+    const panel = await openRule(user, published.rules[0]!.title)
+    expect(within(panel).queryByRole("button", { name: "Approve" })).not.toBeInTheDocument()
+    await user.keyboard("{Escape}")
+    await user.click(screen.getByRole("button", { name: "Edit rules" }))
+    expect(props.onEditPublished).toHaveBeenCalled()
     expect(screen.getByText("No draft")).toBeInTheDocument()
-    await user.click(screen.getByRole("tab", { name: /Published/ }))
-    expect(card("Fence materials")).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Edit published rules" }))
+    expect(props.onEditPublished).toHaveBeenCalledTimes(2)
   })
 
   it("publishes when nothing blocks it", async () => {

@@ -32,6 +32,9 @@ import {
 } from "./documentRepository"
 import { getJob, getLatestJob, getLatestJobOfKind, insertJob, listJobs, newJob, updateJob } from "./jobRepository"
 import {
+  copyRulebookAsDraft,
+  deleteRule,
+  discardDraft,
   failRulebook,
   getRule,
   getRulebook,
@@ -181,6 +184,30 @@ describe("repositories", () => {
     await saveDraft(db, hoaId, { rulebookId: "third", previousDraftId: null, rules: rules("third") })
     expect(await publishRulebook(db, hoaId, { rulebookId: "third", userId: "admin", now })).toBe(2)
     expect((await getRulebook(db, hoaId, "second"))?.status).toBe("superseded")
+
+    // Editing the published rulebook copies it into a draft, which can lose a rule or be thrown away.
+    const third = (await getRulebook(db, hoaId, "third"))!
+    const copy = await copyRulebookAsDraft(db, hoaId, {
+      source: third,
+      sourceRules: await listRules(db, hoaId, "third"),
+      draftId: "edit",
+      jobId: "none",
+      now
+    })
+    expect(copy).toMatchObject({ status: "draft", version: null, publishedBy: null })
+    const copied = await listRules(db, hoaId, "edit")
+    expect(copied.map((rule) => rule.ruleKey).toSorted()).toEqual(
+      rules("third")
+        .map((rule) => rule.ruleKey)
+        .toSorted()
+    )
+    expect(copied.every((rule) => rule.change === "unchanged" && !rule.id.startsWith("third"))).toBe(true)
+    await deleteRule(db, hoaId, copied[0]!.id)
+    expect(await listRules(db, hoaId, "edit")).toHaveLength(2)
+    await discardDraft(db, hoaId, "edit")
+    expect(await getRulebook(db, hoaId, "edit")).toBeNull()
+    expect(await listRules(db, hoaId, "edit")).toEqual([])
+    expect(await listRules(db, hoaId, "third")).toHaveLength(3)
 
     await insertRulebook(db, rulebook("broken", "building"))
     await failRulebook(db, hoaId, "broken", { stage: "extract", message: "x", isRetryable: true })

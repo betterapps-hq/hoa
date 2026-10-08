@@ -19,11 +19,17 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
 
 ## Prompts
 
-- **Langfuse prompt management is the source of truth.** Register each prompt in [`prompts.ts`](../src/ai/prompts.ts)
-  with its Langfuse name and a fallback text. The app fetches the version with the `LANGFUSE_PROMPT_LABEL` label
-  (`production` by default).
-- Create the prompt in Langfuse with the same name, as a **text** prompt using `{{variable}}` placeholders, and label
-  the version to serve. The Langfuse MCP server can create and update prompts for you.
+- **Every prompt lives in Langfuse prompt management, which is the source of truth.** Register each prompt in
+  [`prompts.ts`](../src/ai/prompts.ts) or [`pipelinePrompts.ts`](../src/ai/pipelinePrompts.ts) with its Langfuse name, a
+  fallback text and optionally its initial `config` (such as `model`). The app fetches the version with the
+  `LANGFUSE_PROMPT_LABEL` label (`production` by default).
+- Run `pnpm prompts:push` (in `apps/hoa`) after adding a prompt. It creates every missing prompt in Langfuse as a
+  **text** prompt with the serving label, and never touches a prompt that already has a labeled version, so edits made in
+  Langfuse stay. `pnpm prompts:push --update` publishes the code's text as a new version wherever it differs, keeping
+  the config set in Langfuse.
+- Change prompts and models in Langfuse; copy a prompt's final text back into its fallback when you change it there.
+- Rule extraction and consolidation run on `anthropic/claude-opus-5.5` through their prompts' `config.model`; every
+  other stage uses `OPENROUTER_MODEL` or `OPENROUTER_SMALL_MODEL`.
 - The fallback text is used only when Langfuse is unreachable or the prompt doesn't exist yet. Results from a fallback
   aren't linked to a prompt version; the model check flags this.
 - A prompt whose contract changes (new variables or output) gets a new name, so two contracts never share a label.
