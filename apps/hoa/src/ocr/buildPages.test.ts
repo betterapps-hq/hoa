@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { buildPages, computeDocumentLayout } from "./buildPages"
 import guidelines from "./fixtures/guidelines-p16-17.json"
+import { layoutEngine } from "./layoutClient"
 import { layoutResultSchema, type LayoutResult } from "./layoutResult"
 import { normalizeForMatching, pageMarker, type Page } from "./page"
 
 const options = {
   documentId: "guidelines-v1",
-  engine: "azure-layout@2024-11-30",
+  engine: layoutEngine,
   optionsHash: "hash",
   figureKey: (figureId: string) => `figures/${figureId}.png`,
   sectionAtStart: "5.2.5"
