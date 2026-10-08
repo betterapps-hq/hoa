@@ -1,5 +1,6 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createRootRoute, HeadContent, Outlet, Scripts, useRouter } from "@tanstack/react-router"
-import type { ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary"
 import { AppSidebar } from "@/components/app-sidebar"
 import { SiteHeader } from "@/components/site-header"
@@ -53,33 +54,36 @@ const layoutStyle: Record<string, string> = {
 function RootLayout() {
   const session = Route.useLoaderData()
   const router = useRouter()
+  const [queryClient] = useState(() => new QueryClient())
   return (
-    <RoleProvider
-      roleId={session.roleId}
-      onRoleChange={async (roleId) => {
-        await setDemoRole({ data: { roleId } })
-        await router.invalidate()
-      }}
-    >
-      <TooltipProvider>
-        <SidebarProvider style={layoutStyle}>
-          <AppSidebar variant="inset" />
-          <SidebarInset>
-            <SiteHeader />
-            <div className="flex flex-1 flex-col">
-              <div className="@container/main flex flex-1 flex-col gap-2">
-                <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-                  <ErrorBoundary FallbackComponent={AppError}>
-                    <Outlet />
-                  </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <RoleProvider
+        roleId={session.roleId}
+        onRoleChange={async (roleId) => {
+          await setDemoRole({ data: { roleId } })
+          await router.invalidate()
+        }}
+      >
+        <TooltipProvider>
+          <SidebarProvider style={layoutStyle}>
+            <AppSidebar variant="inset" />
+            <SidebarInset>
+              <SiteHeader />
+              <div className="flex flex-1 flex-col">
+                <div className="@container/main flex flex-1 flex-col gap-2">
+                  <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+                    <ErrorBoundary FallbackComponent={AppError}>
+                      <Outlet />
+                    </ErrorBoundary>
+                  </div>
                 </div>
               </div>
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
-        <Toaster />
-      </TooltipProvider>
-    </RoleProvider>
+            </SidebarInset>
+          </SidebarProvider>
+          <Toaster />
+        </TooltipProvider>
+      </RoleProvider>
+    </QueryClientProvider>
   )
 }
 

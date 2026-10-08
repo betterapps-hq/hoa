@@ -34,3 +34,6 @@ jobs:
       - run: pnpm --filter hoa run db:migrate:demo
       - run: pnpm --filter hoa run db:seed:demo
       - run: pnpm --filter hoa run deploy:demo
+      # The second Worker that hosts the Workflows pull request previews bind to.
+      - run: CLOUDFLARE_ENV=preview-workflows pnpm --filter hoa build
+      - run: pnpm --filter hoa run deploy:demo

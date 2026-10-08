@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router"
-import { ClipboardCheckIcon, LayoutDashboardIcon, ScrollTextIcon } from "lucide-react"
+import { ClipboardCheckIcon, FilesIcon, LayoutDashboardIcon, ScrollTextIcon } from "lucide-react"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -12,6 +12,7 @@ import type { NavItem } from "@/features/role/roles"
 
 const icons: Record<NavItem["to"], typeof LayoutDashboardIcon> = {
   "/": LayoutDashboardIcon,
+  "/documents": FilesIcon,
   "/rules": ScrollTextIcon,
   "/submit": ClipboardCheckIcon
 }

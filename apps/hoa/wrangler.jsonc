@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "hoa",
-  "main": "@tanstack/react-start/server-entry",
+  "main": "src/server.ts",
   "compatibility_date": "2026-10-01",
   // AsyncLocalStorage carries the tracing context; process.env carries settings and secrets.
   "compatibility_flags": ["nodejs_compat"],
@@ -29,6 +29,7 @@
     }
   ],
   "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-files" }],
+  "workflows": [{ "name": "hoa-document-ingest", "binding": "DOCUMENT_INGEST", "class_name": "DocumentIngest" }],
   // Pull request previews. Secrets come from `wrangler preview base-config secret put`.
   "previews": {
     "vars": {
@@ -46,7 +47,15 @@
         "migrations_dir": "migrations"
       }
     ],
-    "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-preview" }]
+    "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-preview" }],
+    "workflows": [
+      {
+        "name": "hoa-preview-document-ingest",
+        "binding": "DOCUMENT_INGEST",
+        "class_name": "DocumentIngest",
+        "script_name": "hoa-preview"
+      }
+    ]
   },
   "env": {
     // A second Worker, hoa-preview, that will host the Workflows previews bind to (Workflows can't run inside a
@@ -69,7 +78,10 @@
           "migrations_dir": "migrations"
         }
       ],
-      "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-preview" }]
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-preview" }],
+      "workflows": [
+        { "name": "hoa-preview-document-ingest", "binding": "DOCUMENT_INGEST", "class_name": "DocumentIngest" }
+      ]
     },
     // Local development, selected by vite.config.ts. D1 is simulated on disk; R2 is the real hoa-dev bucket, because
     // presigned browser uploads and Azure's urlSource need a real S3 endpoint. Settings and secrets come from .env.
@@ -89,7 +101,8 @@
           "migrations_dir": "migrations"
         }
       ],
-      "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-dev", "remote": true }]
+      "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-dev", "remote": true }],
+      "workflows": [{ "name": "hoa-dev-document-ingest", "binding": "DOCUMENT_INGEST", "class_name": "DocumentIngest" }]
     }
   }
 }

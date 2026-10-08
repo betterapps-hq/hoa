@@ -255,11 +255,15 @@ Browsers upload directly to R2 with presigned `PUT` URLs, so large files never p
 
 1. The page calls `createUpload` with the file name, size and type. The server checks the type and size, creates the
    record with status `uploading`, and returns a presigned URL signed with `aws4fetch` against R2's S3 API. The URL
-   expires after 15 minutes and is bound to the content type and length.
+   expires after 15 minutes; `completeUpload` then checks the stored object's size, since the URL can't bind it.
 2. The browser `PUT`s the file. The bucket's CORS rule allows `PUT` with the `Content-Type` header from
    `http://localhost:3000`, the demo origin and the preview origin pattern.
 3. The page calls `completeUpload`. The server checks the object exists with the expected size. For a governing
    document it starts DocumentIngest; application files wait for `runReview`.
+
+**Without an R2 API token** (`R2_*` settings unset), `createUpload` returns no URL and the page uploads through a
+server function that streams the file into R2, and OCR sends Layout the file inline (`base64Source`) instead of a
+presigned URL. That works at demo sizes (the largest sample is 14 MB); with a token, uploads and OCR skip the Worker.
 
 Accepted types: PDF and DOCX for every upload, and JPEG and PNG for application files. HEIF, TIFF, BMP, WebP and GIF are
 refused with a message asking for JPEG or PNG, because the review model can't read them. Limits: 50 MB and 300 pages per governing document (OCR reads PDFs in 50-page ranges, see
