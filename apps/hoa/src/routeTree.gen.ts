@@ -12,7 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as RulesRouteImport } from './routes/rules'
-import { Route as SubmitRouteImport } from './routes/submit'
+import { Route as ApplicationsIndexRouteImport } from './routes/applications.index'
+import { Route as ApplicationsApplicationIdRouteImport } from './routes/applications.$applicationId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -29,44 +30,70 @@ const RulesRoute = RulesRouteImport.update({
   path: '/rules',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SubmitRoute = SubmitRouteImport.update({
-  id: '/submit',
-  path: '/submit',
+const ApplicationsIndexRoute = ApplicationsIndexRouteImport.update({
+  id: '/applications/',
+  path: '/applications/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApplicationsApplicationIdRoute =
+  ApplicationsApplicationIdRouteImport.update({
+    id: '/applications/$applicationId',
+    path: '/applications/$applicationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/documents': typeof DocumentsRoute
   '/rules': typeof RulesRoute
-  '/submit': typeof SubmitRoute
+  '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/applications/': typeof ApplicationsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/documents': typeof DocumentsRoute
   '/rules': typeof RulesRoute
-  '/submit': typeof SubmitRoute
+  '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/applications': typeof ApplicationsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/documents': typeof DocumentsRoute
   '/rules': typeof RulesRoute
-  '/submit': typeof SubmitRoute
+  '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/applications/': typeof ApplicationsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/documents' | '/rules' | '/submit'
+  fullPaths:
+    | '/'
+    | '/documents'
+    | '/rules'
+    | '/applications/$applicationId'
+    | '/applications/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/documents' | '/rules' | '/submit'
-  id: '__root__' | '/' | '/documents' | '/rules' | '/submit'
+  to:
+    | '/'
+    | '/documents'
+    | '/rules'
+    | '/applications/$applicationId'
+    | '/applications'
+  id:
+    | '__root__'
+    | '/'
+    | '/documents'
+    | '/rules'
+    | '/applications/$applicationId'
+    | '/applications/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DocumentsRoute: typeof DocumentsRoute
   RulesRoute: typeof RulesRoute
-  SubmitRoute: typeof SubmitRoute
+  ApplicationsApplicationIdRoute: typeof ApplicationsApplicationIdRoute
+  ApplicationsIndexRoute: typeof ApplicationsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -92,11 +119,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RulesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/submit': {
-      id: '/submit'
-      path: '/submit'
-      fullPath: '/submit'
-      preLoaderRoute: typeof SubmitRouteImport
+    '/applications/': {
+      id: '/applications/'
+      path: '/applications'
+      fullPath: '/applications/'
+      preLoaderRoute: typeof ApplicationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/applications/$applicationId': {
+      id: '/applications/$applicationId'
+      path: '/applications/$applicationId'
+      fullPath: '/applications/$applicationId'
+      preLoaderRoute: typeof ApplicationsApplicationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -106,7 +140,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DocumentsRoute: DocumentsRoute,
   RulesRoute: RulesRoute,
-  SubmitRoute: SubmitRoute,
+  ApplicationsApplicationIdRoute: ApplicationsApplicationIdRoute,
+  ApplicationsIndexRoute: ApplicationsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

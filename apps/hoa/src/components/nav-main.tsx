@@ -14,7 +14,7 @@ const icons: Record<NavItem["to"], typeof LayoutDashboardIcon> = {
   "/": LayoutDashboardIcon,
   "/documents": FilesIcon,
   "/rules": ScrollTextIcon,
-  "/submit": ClipboardCheckIcon
+  "/applications": ClipboardCheckIcon
 }
 
 export function NavMain({ items }: { items: NavItem[] }) {

@@ -106,3 +106,4 @@ export const reviewSchema = z.object({
   sessionId: z.string(),
   createdAt: z.string()
 })
+export type Review = z.infer<typeof reviewSchema>

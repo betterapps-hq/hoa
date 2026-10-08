@@ -175,7 +175,7 @@ describe("runObjectPrompt", () => {
       loadPrompt: langfusePrompt,
       createModel: () => model,
       defaultModelId: "test-model",
-      prompt: prompts.applicationReview,
+      prompt: prompts.modelCheck,
       schema: z.object({ recommendation: z.string(), missing: z.array(z.string()) }),
       attachments: [
         { type: "file", filename: "application.pdf", mediaType: "application/pdf", data: pdf },
@@ -205,7 +205,7 @@ describe("runObjectPrompt", () => {
         loadPrompt: langfusePrompt,
         createModel: () => objectModel({ recommendation: 5 }),
         defaultModelId: "test-model",
-        prompt: prompts.applicationReview,
+        prompt: prompts.modelCheck,
         schema: z.object({ recommendation: z.string() }),
         traceName: "application-review",
         environment: "test"
@@ -256,7 +256,7 @@ describe("content cache", () => {
         loadPrompt: langfusePrompt,
         createModel: () => model,
         defaultModelId: "test-model",
-        prompt: prompts.applicationReview,
+        prompt: prompts.modelCheck,
         schema: z.object({ recommendation: z.string() }),
         variables: { applicant },
         attachments: [{ type: "text", text: "Packet" }],

@@ -215,10 +215,8 @@ type Review = {
 }
 ```
 
-`Recommendation` matches the prototype's `src/review/review.ts`. The full record is stored in R2; D1's `reviews` row
-holds the recommendation, cost and session for lists. When the staged review ships, the prototype's
-`hoa-application-review` prompt and its fallback text are removed from `src/ai/prompts.ts`, and the Langfuse prompt is
-archived.
+The full record is stored in R2; D1's `reviews` row holds the recommendation, cost and session for lists. The
+prototype's `hoa-application-review` prompt is removed from `src/ai/prompts.ts`; archive it in Langfuse.
 
 ## Errors
 

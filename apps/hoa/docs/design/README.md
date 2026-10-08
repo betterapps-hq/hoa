@@ -1,7 +1,8 @@
 # Design: rulebooks and reviews
 
-> **Target design, not yet built.** The app today is the prototype described in [../ai.md](../ai.md) and
-> [../setup.md](../setup.md). Update those pages as each phase lands.
+> **Phase 1 is built**: governing documents with OCR at upload, the rulebook build and editor, and application review with the
+> committee's decision. Not yet built: the retention Cron Trigger, the review's cost and Langfuse session link in the UI, and
+> the phase 2 prompt and dataset work ([evaluation.md](evaluation.md)).
 
 The design for turning an HOA's governing documents into a reviewed, versioned rulebook, and for reviewing homeowners'
 applications against it. It's written for a product that many HOAs onboard to, so nothing in it is specific to one HOA.
@@ -86,26 +87,9 @@ acceptable.
 
 ## From the prototype
 
-The prototype's data is disposable: there's no data migration. Delete `.data/rulebook.json` and rebuild rulebooks
-through the pipeline.
-
-| Today | Becomes | Specified in |
-| --- | --- | --- |
-| `src/rules/rules.ts` (`kind`, one source per rule, flat rulebook) | Zod schemas for the catalog, `Rule`, `Check`, `Rulebook` | [rules.md](rules.md) |
-| `src/review/review.ts` | `Recommendation` kept; `Fact`, `DocumentStatus`, `Finding` (with `needs-committee` and `not-applicable`) and `Review` schemas | [review.md](review.md) |
-| `src/rules/rulebookStore.server.ts`, `.data/rulebook.json` | D1 and R2 repositories in `src/db` and `src/storage` | [documents.md](documents.md) |
-| `rulebook.functions.ts`: `extractRules`, `getRulebook`, `publishRulebook` | `createUpload`, `completeUpload`, `startRulebookBuild`, `getRulebook`, `saveRule`, `reviewRule`, `publishRulebook` | [platform.md](platform.md#server-functions) |
-| `review.functions.ts`: `reviewProject` | `createApplication`, `createUpload`, `runReview`, `submitApplication`, `listApplications`, `getApplication`, `recordDecision` | [platform.md](platform.md#server-functions) |
-| `src/documents/uploads.ts` | PDF, DOCX, JPEG and PNG only, new limits | [documents.md](documents.md#uploads) |
-| `src/documents/toAttachments.server.ts` and `mammoth` | Removed: Layout reads Word text, and the app extracts Word images | [ocr.md](ocr.md#word-files) |
-| `src/ai/prompts.ts`: `hoa-rule-extraction`, `hoa-application-review` | Removed; one prompt per stage. `hoa-model-check` stays | [extraction.md](extraction.md#prompts-and-models), [review.md](review.md#prompts-and-models) |
-| `src/env.server.ts` | Keeps t3-env validation for vars and secrets, adds the phase 1 settings; bindings come only from `cloudflare:workers` | [platform.md](platform.md#app-wiring) |
-| `src/ai/runPrompt.ts`, `promptLoader.ts`, `aiContext.server.ts` | Prompts by version, the prompt's `config.model`, a small model | [ai.md](../ai.md) |
-| `RulebookPage`, `RulebookEditor`, `RuleCard`, `PublishedRulebook` | Upload with job progress; an editor over D1 rules where `RuleCard` edits each check type with its own fields and shows issues and citations with page text | [extraction.md](extraction.md#8-review) |
-| `SubmitProjectPage`, `ReviewResult` | An application page with direct uploads, job progress, the review, **Run review again** and **Submit**; a committee queue; `ReviewResult` renders a `Review`: per-component findings, action items, committee decisions, cost and a Langfuse session link | [review.md](review.md#the-review-record) |
-| `RoleProvider` (`localStorage`) | A cookie read by `getRequestContext()` | [documents.md](documents.md#phase-1-assumptions) |
-| `Dashboard`, the sidebar navigation | Reworked around the new records: the dashboard reads the published rulebook through `getRulebook` and application counts through `listApplications`; administrators get a committee queue | [platform.md](platform.md#server-functions) |
-| `ModelCheck` | Unchanged | |
+The prototype's one-call extraction and review are gone: `rules.ts`, `review.ts`, `rulebookStore.server.ts`, `.data/rulebook.json`,
+`toAttachments.server.ts`, `mammoth`, the `hoa-rule-extraction` and `hoa-application-review` prompts, and the `/submit` page.
+Their data was disposable and isn't migrated.
 
 ## Build phases
 
