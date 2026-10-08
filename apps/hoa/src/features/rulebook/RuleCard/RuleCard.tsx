@@ -55,6 +55,7 @@ export type RuleCardActions = {
   resolveIssue: (ruleId: string, issueIndex: number, note: string) => Promise<void>
   remove: (ruleId: string) => Promise<void>
   addCitation: (ruleId: string, selection: PageSelectionInput) => Promise<void>
+  replaceCitation: (ruleId: string, index: number, selection: PageSelectionInput) => Promise<void>
   removeCitation: (ruleId: string, index: number) => Promise<void>
 }
 
@@ -223,7 +224,16 @@ function RuleEditor({ rule, onSave }: { rule: Rule; onSave: (changes: RuleChange
   )
 }
 
-type ViewerState = { documentId: string; pageIndex: number; isCiting: boolean }
+/** What the viewer is open for: reading a citation, adding one, or replacing citation 
+eplaceIndex. */
+type ViewerState = { documentId: string; pageIndex: number; isCiting: boolean; replaceIndex?: number }
+
+function viewerTitle(viewer: ViewerState | null) {
+  if (!viewer?.isCiting) {
+    return "Citation in the document"
+  }
+  return viewer.replaceIndex === undefined ? "Add a citation" : "Edit the citation"
+}
 
 /**
  * A rule's citations. Each is fixed text from a document: it can be opened in the document, removed, or replaced by
@@ -238,22 +248,34 @@ function Citations({ rule, actions, source }: Pick<RuleCardProps, "rule" | "acti
     setIsOpen(true)
   }
   const first = rule.citations[0]
-  const canRemove = actions !== undefined && rule.citations.length > 1
+  const canRemove = actions !== undefined
   return (
     <section aria-label="Citations" className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Citations</h3>
-        {actions && source && first ? (
+        {actions && source ? (
           <Button
             size="sm"
             variant="outline"
-            onClick={() => open({ documentId: first.documentId, pageIndex: first.pageIndex, isCiting: true })}
+            onClick={() =>
+              open({
+                documentId: first?.documentId ?? source.documents[0]?.id ?? "",
+                pageIndex: first?.pageIndex ?? 1,
+                isCiting: true
+              })
+            }
+            disabled={source.documents.length === 0}
           >
             <PlusIcon />
             Add citation
           </Button>
         ) : null}
       </div>
+      {rule.citations.length === 0 ? (
+        <p className="rounded-lg border border-dashed p-3 text-muted-foreground" role="alert">
+          No citation. Add the passage this rule comes from; the rule can’t be saved or approved without one.
+        </p>
+      ) : null}
       <ul className="flex flex-col gap-2">
         {rule.citations.map((citation, index) => (
           <li key={`${citation.documentId}:${citation.pageIndex}:${citation.quote}`} className="rounded-lg border p-2">
@@ -280,6 +302,24 @@ function Citations({ rule, actions, source }: Pick<RuleCardProps, "rule" | "acti
                     View in document
                   </Button>
                 ) : null}
+                {actions && source ? (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() =>
+                      open({
+                        documentId: citation.documentId,
+                        pageIndex: citation.pageIndex,
+                        isCiting: true,
+                        replaceIndex: index
+                      })
+                    }
+                    aria-label="Edit citation"
+                  >
+                    <PencilIcon />
+                    Edit
+                  </Button>
+                ) : null}
                 {canRemove ? (
                   <Button
                     size="xs"
@@ -299,7 +339,7 @@ function Citations({ rule, actions, source }: Pick<RuleCardProps, "rule" | "acti
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogContent className="sm:max-w-3xl">
             <DialogHeader>
-              <DialogTitle>{viewer?.isCiting ? "Add a citation" : "Citation in the document"}</DialogTitle>
+              <DialogTitle>{viewerTitle(viewer)}</DialogTitle>
               <DialogDescription>{rule.title}</DialogDescription>
             </DialogHeader>
             {viewer ? (
@@ -307,10 +347,16 @@ function Citations({ rule, actions, source }: Pick<RuleCardProps, "rule" | "acti
                 source={source}
                 initial={viewer}
                 highlights={rule.citations}
+                citeLabel={viewer.replaceIndex === undefined ? "Add as citation" : "Use this passage"}
                 onCite={
                   viewer.isCiting && actions
                     ? async (selection) => {
-                        if (await attempt(() => actions.addCitation(rule.id, selection))) {
+                        const replaceIndex = viewer.replaceIndex
+                        const save =
+                          replaceIndex === undefined
+                            ? () => actions.addCitation(rule.id, selection)
+                            : () => actions.replaceCitation(rule.id, replaceIndex, selection)
+                        if (await attempt(save)) {
                           setIsOpen(false)
                         }
                       }
@@ -479,7 +525,7 @@ export function RuleCard({ rule, actions, source }: RuleCardProps) {
       </div>
       {actions && isEditing ? (
         <footer className={pinnedFooter}>
-          <Button size="sm" type="submit" form={editFormId(rule)} disabled={isSaving}>
+          <Button size="sm" type="submit" form={editFormId(rule)} disabled={isSaving || rule.citations.length === 0}>
             {isSaving ? "Saving" : "Save"}
           </Button>
           <Button size="sm" variant="outline" disabled={isSaving} onClick={() => setIsEditing(false)}>

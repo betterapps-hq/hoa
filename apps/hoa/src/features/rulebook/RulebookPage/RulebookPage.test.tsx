@@ -93,6 +93,7 @@ function setup(overrides: Partial<RulebookPageProps> = {}) {
     resolveIssue: vi.fn<RuleCardActions["resolveIssue"]>(async () => undefined),
     remove: vi.fn<RuleCardActions["remove"]>(async () => undefined),
     addCitation: vi.fn<RuleCardActions["addCitation"]>(async () => undefined),
+    replaceCitation: vi.fn<RuleCardActions["replaceCitation"]>(async () => undefined),
     removeCitation: vi.fn<RuleCardActions["removeCitation"]>(async () => undefined)
   }
   const props: RulebookPageProps = {
@@ -262,5 +263,26 @@ describe("RulebookPage", () => {
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Add citation" }))
     const picker = await screen.findByRole("dialog", { name: "Add a citation" })
     expect(within(picker).getByRole("button", { name: "Add as citation" })).toBeDisabled()
+    await user.keyboard("{Escape}")
+
+    await user.click(within(screen.getByRole("dialog")).getAllByRole("button", { name: "Edit citation" })[0]!)
+    const editor = await screen.findByRole("dialog", { name: "Edit the citation" })
+    expect(within(editor).getByRole("button", { name: "Use this passage" })).toBeDisabled()
+  })
+
+  it("lets the last citation go, then asks for one before saving or approving", async () => {
+    const uncited = { ...colors, citations: [] }
+    const { actions, user } = setup({ draft: { ...draft, rules: [uncited, unverified] } })
+    const panel = await openRule(user, "Composite colors")
+    expect(within(panel).getByRole("alert")).toHaveTextContent("No citation.")
+    expect(within(panel).getByRole("button", { name: "Approve" })).toBeDisabled()
+    await user.click(within(panel).getByRole("button", { name: "Edit" }))
+    expect(within(panel).getByRole("button", { name: "Save" })).toBeDisabled()
+    await user.click(within(panel).getByRole("button", { name: "Cancel" }))
+
+    await user.keyboard("{Escape}")
+    const single = await openRule(user, "Posts match")
+    await user.click(within(single).getByRole("button", { name: "Remove" }))
+    expect(actions.removeCitation).toHaveBeenCalledWith("posts", 0)
   })
 })

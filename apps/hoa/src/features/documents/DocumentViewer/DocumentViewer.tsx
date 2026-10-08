@@ -27,13 +27,21 @@ export type DocumentViewerProps = {
   highlights?: PageHighlight[]
   /** With this, the reader can select a passage and cite it; the range, not the text, is sent. */
   onCite?: (selection: PageSelectionInput) => Promise<void>
+  /** The cite button's label, such as "Use this passage" when replacing a citation. */
+  citeLabel?: string
 }
 
 /** Shows a governing document page by page, highlights cited passages, and lets an administrator cite a selection. */
-export function DocumentViewer({ source, initial, highlights = [], onCite }: DocumentViewerProps) {
+export function DocumentViewer({
+  source,
+  initial,
+  highlights = [],
+  onCite,
+  citeLabel = "Add as citation"
+}: DocumentViewerProps) {
   const [documentId, setDocumentId] = useState(initial.documentId)
   const [pageIndex, setPageIndex] = useState(initial.pageIndex)
-  const [selection, setSelection] = useState<{ start: number; end: number; text: string } | null>(null)
+  const [selection, setSelection] = useState<{ start: number; end: number } | null>(null)
   const [isCiting, setIsCiting] = useState(false)
   const textRef = useRef<HTMLDivElement>(null)
   const document = source.documents.find((item) => item.id === documentId)
@@ -63,9 +71,14 @@ export function DocumentViewer({ source, initial, highlights = [], onCite }: Doc
     }
     const range = selectionRange(container, textSelection.getRangeAt(0))
     if (range) {
-      setSelection({ ...range, text: selectedText })
+      setSelection(range)
     }
   }, [onCite, textSelection, selectedText, page])
+  // Open at the cited passage: scroll the first highlight on the page into view once the page has rendered.
+  useEffect(() => {
+    textRef.current?.querySelector("mark")?.scrollIntoView({ block: "center" })
+  }, [page])
+
   const cite = async () => {
     if (!onCite || !selection) {
       return
@@ -161,11 +174,9 @@ export function DocumentViewer({ source, initial, highlights = [], onCite }: Doc
         <div className="flex flex-wrap items-center gap-3">
           <Button disabled={!selection || isCiting} onClick={() => void cite()}>
             <HighlighterIcon />
-            {isCiting ? "Adding" : "Add as citation"}
+            {isCiting ? "Saving" : citeLabel}
           </Button>
-          <span className="line-clamp-2 flex-1 text-sm text-muted-foreground">
-            {selection ? `“${selection.text.trim()}”` : "Nothing selected."}
-          </span>
+          {selection ? null : <span className="text-sm text-muted-foreground">Select a passage on the page.</span>}
         </div>
       ) : null}
     </div>

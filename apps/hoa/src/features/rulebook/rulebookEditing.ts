@@ -120,11 +120,32 @@ export function addCitation(rule: Rule, citation: Rule["citations"][number]): Ru
   return withCitations(rule, [...rule.citations, citation])
 }
 
-/** Removes a citation; every rule keeps at least one. The rule goes back to pending. */
-export function removeCitation(rule: Rule, index: number): Rule {
-  if (rule.citations.length <= 1) {
-    throw new Error("A rule needs at least one citation. Add the right one before removing this one.")
+/** Replaces a citation with another passage picked from a document, such as a wider one; it keeps its position. */
+export function replaceCitation(rule: Rule, index: number, citation: Rule["citations"][number]): Rule {
+  if (!rule.citations[index]) {
+    throw new Error("That citation doesn't exist.")
   }
+  const isDuplicate = rule.citations.some(
+    (item, position) =>
+      position !== index &&
+      item.documentId === citation.documentId &&
+      item.pageIndex === citation.pageIndex &&
+      item.quote === citation.quote
+  )
+  if (isDuplicate) {
+    throw new Error("The rule already cites that passage.")
+  }
+  return withCitations(
+    rule,
+    rule.citations.map((item, position) => (position === index ? citation : item))
+  )
+}
+
+/**
+ * Removes a citation, even the last one: a rule without citations can't be saved, approved or published until one is
+ * added. The rule goes back to pending.
+ */
+export function removeCitation(rule: Rule, index: number): Rule {
   if (!rule.citations[index]) {
     throw new Error("That citation doesn't exist.")
   }
@@ -135,6 +156,9 @@ export function removeCitation(rule: Rule, index: number): Rule {
 }
 /** Why a rule can't be approved yet, or null when it can. */
 export function approvalBlocker(rule: Rule): string | null {
+  if (rule.citations.length === 0) {
+    return "Add the passage this rule comes from before approving."
+  }
   const unverified = rule.issues.find((issue) => issue.code === "citation-not-found" && !issue.resolution)
   return unverified ? "Replace the citation whose quote isn't on its page before approving." : null
 }
@@ -178,8 +202,10 @@ export function publishBlockers(rules: readonly Rule[]): string[] {
     (rule) =>
       rule.review.status !== "rejected" && rule.issues.some((issue) => issue.code === "conflict" && !issue.resolution)
   ).length
+  const uncited = rules.filter((rule) => rule.review.status !== "rejected" && rule.citations.length === 0).length
   return [
     ...(pending > 0 ? [`${pending} ${pending === 1 ? "rule is" : "rules are"} still pending.`] : []),
+    ...(uncited > 0 ? [`${uncited} ${uncited === 1 ? "rule has" : "rules have"} no citation.`] : []),
     ...(conflicts > 0 ? [`${conflicts} ${conflicts === 1 ? "rule has" : "rules have"} an unresolved conflict.`] : [])
   ]
 }

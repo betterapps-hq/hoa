@@ -18,6 +18,7 @@ import {
   publishBlockers,
   readyToApprove,
   removeCitation,
+  replaceCitation,
   sectionAt
 } from "./rulebookEditing"
 
@@ -101,7 +102,7 @@ describe("citations picked from a document", () => {
     expect(plainQuote("## Title <!-- PageBreak -->\n| a | **b** |\n`c`")).toBe("Title a b c")
   })
 
-  it("adds a citation, refuses a duplicate, and removes one but never the last", () => {
+  it("adds a citation, refuses a duplicate, and removes any, including the last", () => {
     const rule = { ...byId("composite-colors"), issues: [] }
     const citation = citationFromSelection(sourcePage, { start: listStart, end: text.length }, "Guidelines")
     const cited = addCitation(rule, citation)
@@ -109,9 +110,22 @@ describe("citations picked from a document", () => {
     expect(cited.review).toMatchObject({ status: "pending", isEdited: true })
     expect(() => addCitation(cited, citation)).toThrow("already cites")
 
+    const wider = { ...citation, quote: "Fence colors are limited to the following: a) Behr" }
+    const replaced = replaceCitation(cited, cited.citations.length - 1, wider)
+    expect(replaced.citations.at(-1)).toEqual(wider)
+    expect(replaced.citations).toHaveLength(cited.citations.length)
+    expect(() => replaceCitation(cited, 0, citation)).toThrow("already cites")
+    expect(() => replaceCitation(cited, 9, citation)).toThrow("doesn't exist")
+
     const removed = removeCitation(cited, 0)
     expect(removed.citations).toEqual([citation])
-    expect(() => removeCitation(removed, 0)).toThrow("at least one citation")
+    const uncited = removeCitation(removed, 0)
+    expect(uncited.citations).toEqual([])
+    expect(approvalBlocker(uncited)).toBe("Add the passage this rule comes from before approving.")
+    expect(publishBlockers([{ ...uncited, review: { ...uncited.review, status: "approved" } }])).toEqual([
+      "1 rule has no citation."
+    ])
+    expect(publishBlockers([uncited, uncited])).toContain("2 rules have no citation.")
     expect(() => removeCitation(cited, 9)).toThrow("doesn't exist")
   })
 

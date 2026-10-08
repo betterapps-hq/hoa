@@ -11,6 +11,7 @@ import {
   getRulebookView,
   publishRulebook,
   removeRuleCitation,
+  replaceRuleCitation,
   resolveIssue,
   reviewRule,
   saveRule,
@@ -118,6 +119,10 @@ function RulesRoute() {
         },
         addCitation: async (ruleId, selection) => {
           await addRuleCitation({ data: { ruleId, ...selection } })
+          refresh()
+        },
+        replaceCitation: async (ruleId, index, selection) => {
+          await replaceRuleCitation({ data: { ruleId, index, ...selection } })
           refresh()
         },
         removeCitation: async (ruleId, index) => {

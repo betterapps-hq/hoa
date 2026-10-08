@@ -33,6 +33,7 @@ import {
   publishBlockers,
   readyToApprove,
   removeCitation,
+  replaceCitation,
   ruleChangesSchema
 } from "./rulebookEditing"
 
@@ -133,6 +134,9 @@ export const saveRule = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const context = await requireAdministrator()
     const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
+    if (rule.citations.length === 0) {
+      throw new Error("Add the passage this rule comes from before saving.")
+    }
     const edited = applyRuleChanges(rule, data.changes)
     await updateRule(db, context.hoa.id, edited)
     return edited
@@ -169,7 +173,36 @@ export const addRuleCitation = createServerFn({ method: "POST" })
     return cited
   })
 
-/** Removes one of a rule's citations; a rule keeps at least one. */
+/** Replaces one of a rule's citations with a passage picked in the document viewer, copied from the stored page. */
+export const replaceRuleCitation = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    z
+      .object({
+        ruleId: z.string(),
+        index: z.number().int().nonnegative(),
+        documentId: z.string(),
+        pageIndex: z.number().int().positive(),
+        start: z.number().int().nonnegative(),
+        end: z.number().int().positive()
+      })
+      .parse(data)
+  )
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
+    const document = await getGoverningDocument(db, context.hoa.id, data.documentId)
+    const page = document
+      ? await getJson(getBucket(), governingKeys(context.hoa.id, document.id).page(data.pageIndex), pageSchema)
+      : null
+    if (!document || !page) {
+      throw new Error("That page isn't available.")
+    }
+    const updated = replaceCitation(rule, data.index, citationFromSelection(page, data, document.title))
+    await updateRule(db, context.hoa.id, updated)
+    return updated
+  })
+
+/** Removes one of a rule's citations; a rule without any can't be saved or approved until one is added. */
 export const removeRuleCitation = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ ruleId: z.string(), index: z.number().int().nonnegative() }).parse(data))
   .handler(async ({ data }) => {

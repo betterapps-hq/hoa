@@ -150,7 +150,8 @@ export const ruleSchema = z.object({
   ...ruleContentShape,
   appliesWhen: z.array(conditionSchema),
   modifies: z.string().nullable(),
-  citations: z.array(citationSchema).min(1),
+  /** At least one before the rule can be approved; a draft rule can be left without while its citation is replaced. */
+  citations: z.array(citationSchema),
   issues: z.array(ruleIssueSchema),
   extractedHash: z.string().nullable(),
   change: z.enum(["new", "changed", "unchanged"]).nullable(),
