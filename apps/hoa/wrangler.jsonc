@@ -39,7 +39,7 @@
     "vars": {
       "OPENROUTER_MODEL": "anthropic/claude-haiku-5.5",
       "LANGFUSE_BASE_URL": "https://us.cloud.langfuse.com",
-      "LANGFUSE_PROMPT_LABEL": "production",
+      "LANGFUSE_PROMPT_LABEL": "preview",
       "LANGFUSE_TRACING_ENVIRONMENT": "preview",
       "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "https://hoa-document-intelligence.cognitiveservices.azure.com/"
     },
@@ -82,7 +82,7 @@
       "vars": {
         "OPENROUTER_MODEL": "anthropic/claude-haiku-5.5",
         "LANGFUSE_BASE_URL": "https://us.cloud.langfuse.com",
-        "LANGFUSE_PROMPT_LABEL": "production",
+        "LANGFUSE_PROMPT_LABEL": "preview",
         "LANGFUSE_TRACING_ENVIRONMENT": "preview",
         "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "https://hoa-document-intelligence.cognitiveservices.azure.com/"
       },
@@ -111,7 +111,7 @@
       "vars": {
         "OPENROUTER_MODEL": "anthropic/claude-haiku-5.5",
         "LANGFUSE_BASE_URL": "https://us.cloud.langfuse.com",
-        "LANGFUSE_PROMPT_LABEL": "production",
+        "LANGFUSE_PROMPT_LABEL": "development",
         "LANGFUSE_TRACING_ENVIRONMENT": "development",
         "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT": "https://hoa-document-intelligence.cognitiveservices.azure.com/"
       },

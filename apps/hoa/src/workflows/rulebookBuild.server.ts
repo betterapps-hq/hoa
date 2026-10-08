@@ -4,6 +4,7 @@ import { z } from "zod"
 import { createAiContext } from "@/ai/aiContext.server"
 import { pipelinePrompts } from "@/ai/pipelinePrompts"
 import { resolvePromptVersions } from "@/ai/promptLoader"
+import type { PromptVariables } from "@/ai/prompts"
 import { runObjectPrompt } from "@/ai/runPrompt"
 import { createDatabase } from "@/db/database"
 import { getGoverningDocument, listSections, saveSections, setSectionRouting } from "@/db/documentRepository"
@@ -85,11 +86,11 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         await updateJob(db, hoaId, jobId, { promptVersions: versions, now: now() })
         return versions
       })
-      const run = <T>(
-        prompt: (typeof prompts)[number],
+      const run = <T, Prompt extends (typeof prompts)[number]>(
+        prompt: Prompt,
         options: {
           schema: z.ZodType<T>
-          variables: Record<string, string>
+          variables: PromptVariables<Prompt>
           small?: boolean
           traceName: string
           cacheStage: string

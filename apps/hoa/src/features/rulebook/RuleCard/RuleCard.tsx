@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
+import { InfoTip } from "@/components/info-tip"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -136,7 +137,14 @@ function RuleEditor({
           <form.Field name="obligation">
             {(field) => (
               <Field>
-                <FieldLabel htmlFor={`${rule.id}-obligation`}>Obligation</FieldLabel>
+                <div className="flex items-center gap-1.5">
+                  <FieldLabel htmlFor={`${rule.id}-obligation`}>Obligation</FieldLabel>
+                  <InfoTip label="About obligation">
+                    How strongly the documents state the rule. Required (“shall”, “must”) and prohibited (“shall not”)
+                    rules can fail an application. Recommended (“should”) rules never fail it; they go to the committee.
+                    Permitted (“may”) rules describe what’s allowed.
+                  </InfoTip>
+                </div>
                 <NativeSelect
                   id={`${rule.id}-obligation`}
                   value={field.state.value}
@@ -161,7 +169,14 @@ function RuleEditor({
           <form.Field name="discretion">
             {(field) => (
               <Field>
-                <FieldLabel htmlFor={`${rule.id}-discretion`}>Who decides</FieldLabel>
+                <div className="flex items-center gap-1.5">
+                  <FieldLabel htmlFor={`${rule.id}-discretion`}>Who decides</FieldLabel>
+                  <InfoTip label="About who decides">
+                    Checked by the rules: the review decides from the application whether the rule is met. The
+                    committee: the documents leave it to the reviewer’s judgment (“case by case”, “at the discretion
+                    of”), so the review only flags it for the committee and it never changes the recommendation.
+                  </InfoTip>
+                </div>
                 <NativeSelect
                   id={`${rule.id}-discretion`}
                   value={field.state.value}
@@ -184,9 +199,15 @@ function RuleEditor({
                 checked={field.state.value}
                 onCheckedChange={(checked) => field.handleChange(checked === true)}
               />
-              <FieldLabel htmlFor={`${rule.id}-curable`}>
-                The homeowner can fix a failure by changing a detail
-              </FieldLabel>
+              <div className="flex items-center gap-1.5">
+                <FieldLabel htmlFor={`${rule.id}-curable`}>Fixable by changing a detail</FieldLabel>
+                <InfoTip label="About fixable rules">
+                  Check this when a homeowner who fails the rule could meet it by changing a detail of the plan, such as
+                  a color, height or material. If every rule an application fails is fixable, the review recommends
+                  approval with conditions instead of rejection. Leave it unchecked when failing rules the project out,
+                  such as a prohibited location.
+                </InfoTip>
+              </div>
             </Field>
           )}
         </form.Field>

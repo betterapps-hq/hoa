@@ -3,7 +3,7 @@ import { isSpanContextValid } from "@opentelemetry/api"
 import { generateText, jsonSchema, tool, type LanguageModel, type ModelMessage, type ProviderMetadata } from "ai"
 import { z } from "zod"
 import type { PromptLoader } from "./promptLoader"
-import type { PromptDefinition } from "./prompts"
+import type { PromptDefinition, PromptVariables } from "./prompts"
 
 /** Builds a model by id. The prompt version's `config.model` picks the id, else the stage's default. */
 export type ModelFactory = (modelId: string) => LanguageModel
@@ -22,15 +22,15 @@ export type PromptCache = {
   put: (key: string, value: unknown) => Promise<void>
 }
 
-export type PromptRunOptions = {
+export type PromptRunOptions<Prompt extends PromptDefinition = PromptDefinition> = {
   loadPrompt: PromptLoader
   createModel: ModelFactory
   /** The model when the prompt version doesn't name one: `OPENROUTER_MODEL` or `OPENROUTER_SMALL_MODEL`. */
   defaultModelId: string
-  prompt: PromptDefinition
+  prompt: Prompt
   /** A version the job pinned in resolve-prompts; without it, the prompt is loaded by the default label. */
   promptVersion?: number
-  variables?: Record<string, string>
+  variables: PromptVariables<Prompt>
   attachments?: PromptAttachment[]
   /** Name of the Langfuse trace and of the app span that OpenRouter nests its generation under. */
   traceName: string
@@ -77,7 +77,9 @@ type Generator<T> = {
 const openRouterCost = z.object({ openrouter: z.object({ usage: z.object({ cost: z.number() }) }) })
 
 /** Runs a Langfuse-managed prompt and returns the model's text. */
-export async function runTextPrompt(options: PromptRunOptions): Promise<TextPromptResult> {
+export async function runTextPrompt<Prompt extends PromptDefinition>(
+  options: PromptRunOptions<Prompt>
+): Promise<TextPromptResult> {
   const { value, ...metrics } = await runTraced(options, {
     generate: async (request) => {
       const result = await generateText(request)
@@ -140,8 +142,8 @@ export function answerOf(result: { toolCalls: readonly { toolName: string; input
  * answer throws so the Workflow step retries. The tool isn't forced: Claude Opus 5.5 refuses a forced tool choice, so
  * the only tool is offered and a JSON text reply is accepted too.
  */
-export async function runObjectPrompt<T>(
-  options: PromptRunOptions & { schema: z.ZodType<T> }
+export async function runObjectPrompt<T, Prompt extends PromptDefinition>(
+  options: PromptRunOptions<Prompt> & { schema: z.ZodType<T> }
 ): Promise<ObjectPromptResult<T>> {
   const inputSchema = outputSchema(options.schema)
   const { value, ...metrics } = await runTraced(options, {

@@ -4,7 +4,7 @@ import type { z } from "zod"
 import { createAiContext } from "@/ai/aiContext.server"
 import { pipelinePrompts } from "@/ai/pipelinePrompts"
 import { resolvePromptVersions } from "@/ai/promptLoader"
-import type { PromptDefinition } from "@/ai/prompts"
+import type { PromptDefinition, PromptVariables } from "@/ai/prompts"
 import { runObjectPrompt, type PromptAttachment } from "@/ai/runPrompt"
 import { deleteAfterFor, type ApplicationFile, type ApplicationStatus } from "@/applications/application"
 import {
@@ -226,11 +226,11 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
         await updateJob(db, hoaId, jobId, { promptVersions: versions, now: now() })
         return versions
       })
-      const run = async <T>(
-        prompt: PromptDefinition,
+      const run = async <T, Prompt extends PromptDefinition>(
+        prompt: Prompt,
         options: {
           schema: z.ZodType<T>
-          variables: Record<string, string>
+          variables: PromptVariables<Prompt>
           attachments?: PromptAttachment[]
           small?: boolean
           traceName: string

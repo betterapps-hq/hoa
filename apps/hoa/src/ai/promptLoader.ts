@@ -26,14 +26,38 @@ export type LangfusePromptManager = {
   ) => Promise<{
     name: string
     version: number
+    prompt: string
     config: unknown
     compile: (variables?: Record<string, string>) => string
   }>
 }
 
+/** The `{{variables}}` a prompt's text uses. */
+export function promptVariables(text: string) {
+  return [...new Set([...text.matchAll(/\{\{\s*([\w.-]+)\s*\}\}/g)].map((match) => match[1] ?? ""))]
+}
+
+/**
+ * Why a Langfuse prompt version doesn't fit the code's contract, or null when it does. The text must use exactly the
+ * variables the code fills in: an extra one would reach the model as a literal placeholder, and a missing one means
+ * data the code sends never reaches it.
+ */
+export function contractProblem(definition: PromptDefinition, text: string) {
+  const used = promptVariables(text)
+  const unfilled = used.filter((name) => !definition.variables.includes(name))
+  const unused = definition.variables.filter((name) => !used.includes(name))
+  const problems = [
+    ...(unfilled.length > 0
+      ? [`uses ${unfilled.map((name) => `{{${name}}}`).join(", ")}, which the code doesn't fill in`]
+      : []),
+    ...(unused.length > 0 ? [`doesn't use ${unused.map((name) => `{{${name}}}`).join(", ")}`] : [])
+  ]
+  return problems.length > 0 ? problems.join("; it ") : null
+}
+
 /**
  * Loads prompts from Langfuse, by `defaultLabel` unless a selector pins a label or version. Prompts exist only in
- * Langfuse, so a prompt Langfuse can't serve fails the call with its name and label.
+ * Langfuse, so a prompt Langfuse can't serve, or a version whose variables don't match the code, fails the call.
  */
 export function createPromptLoader(langfuse: LangfusePromptManager, defaultLabel: string): PromptLoader {
   return async (prompt, selector = { label: defaultLabel }): Promise<PromptTemplate> => {
@@ -44,6 +68,10 @@ export function createPromptLoader(langfuse: LangfusePromptManager, defaultLabel
     } catch (error) {
       const which = "version" in options ? `version ${options.version}` : `label "${options.label}"`
       throw new Error(`Langfuse couldn't serve the prompt ${prompt.name} (${which}).`, { cause: error })
+    }
+    const problem = contractProblem(prompt, loaded.prompt)
+    if (problem) {
+      throw new Error(`Langfuse prompt ${prompt.name} version ${loaded.version} doesn't match the code: it ${problem}.`)
     }
     return {
       name: loaded.name,
