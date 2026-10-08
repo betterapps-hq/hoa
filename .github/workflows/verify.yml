@@ -1,0 +1,23 @@
+name: Verify
+
+# The required verification, shared by the pull request and deploy pipelines.
+on:
+  workflow_call:
+
+jobs:
+  verify:
+    name: Required verification
+    runs-on: ubuntu-latest
+    env:
+      # Turbo Remote Cache. Set TURBO_TOKEN (secret) and TURBO_TEAM (variable) in the
+      # repository settings to share the cache across CI runs and contributors.
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # `pnpm check:change` runs `beachball check`, which diffs against
+          # origin/main, so the full git history must be available.
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - run: pnpm verify
