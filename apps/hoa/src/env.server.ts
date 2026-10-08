@@ -12,7 +12,14 @@ export const env = createEnv({
     LANGFUSE_SECRET_KEY: z.string().min(1).optional(),
     LANGFUSE_BASE_URL: z.url().default("https://us.cloud.langfuse.com"),
     LANGFUSE_PROMPT_LABEL: z.string().min(1).default("production"),
-    LANGFUSE_TRACING_ENVIRONMENT: z.string().min(1).default("development")
+    LANGFUSE_TRACING_ENVIRONMENT: z.string().min(1).default("development"),
+    AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: z.url().optional(),
+    AZURE_DOCUMENT_INTELLIGENCE_KEY: z.string().min(1).optional(),
+    // Presigned R2 URLs: an R2 API token scoped to this environment's bucket.
+    R2_ACCOUNT_ID: z.string().min(1).optional(),
+    R2_BUCKET: z.string().min(1).optional(),
+    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional()
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true

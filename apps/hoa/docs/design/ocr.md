@@ -38,7 +38,7 @@ Upload ──> R2 ──presigned GET──> Layout ──> raw response ──>
 1. **Hash.** The file is hashed by streaming it from R2 through `crypto.DigestStream`. A governing document matching
    one the HOA already has is refused as a duplicate ([documents.md](documents.md#object-layout)).
 2. **Submit.** `ocr:submit:{range}` calls Layout with a presigned `GET` URL to the file (`urlSource`), so the Worker
-   never holds the file. Requested options: `outputContentFormat=markdown`, `output=figures`, API version
+   never holds the file (without an R2 token it sends the file inline, as `base64Source`). Requested options: `outputContentFormat=markdown`, `output=figures`, API version
    `2024-11-30`, and for PDFs `pages={range}`. The step returns the operation URL. Submitting is its own step, so a
    retried poll never analyzes (and bills) a range twice.
 3. **Poll.** `ocr:poll:{range}` checks the operation and throws a retryable "not ready" error while Layout is still

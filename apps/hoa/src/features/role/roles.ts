@@ -2,7 +2,7 @@
 export const roleIds = ["homeowner", "administrator"] as const
 export type RoleId = (typeof roleIds)[number]
 
-export type NavItem = { title: string; to: "/" | "/rules" | "/submit" }
+export type NavItem = { title: string; to: "/" | "/documents" | "/rules" | "/submit" }
 
 export type Role = {
   id: RoleId
@@ -30,6 +30,7 @@ export const roles: Record<RoleId, Role> = {
     user: { name: "Sam Rivera", email: "sam@example.com", initials: "SR" },
     navigation: [
       { title: "Dashboard", to: "/" },
+      { title: "Documents", to: "/documents" },
       { title: "Rulebook", to: "/rules" },
       { title: "Review an application", to: "/submit" }
     ]

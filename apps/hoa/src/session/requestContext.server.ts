@@ -25,3 +25,12 @@ export async function getRequestContext(): Promise<RequestContext> {
     : { id: `demo-${role}`, name: demoUser.name, email: demoUser.email }
   return { hoa: await getDefaultHoa(getDb()), role, user }
 }
+
+/** Throws unless the request comes from the HOA's administrator role. */
+export async function requireAdministrator(): Promise<RequestContext> {
+  const context = await getRequestContext()
+  if (context.role !== "administrator") {
+    throw new Error("Only an administrator can do this.")
+  }
+  return context
+}
