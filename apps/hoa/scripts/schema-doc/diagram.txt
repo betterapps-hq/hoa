@@ -1,0 +1,19 @@
+    Request ──has──> Fact ──is a value of─────────────────────────────────┐               evaluation
+      │                                                                   │
+      │ is evaluated into                                                 │
+      │                                                                   │
+      │                                                                   │
+      │                                                                   │
+      ▼                                                                   ▼
+    Finding ──applies────────────────────> Rule ──is stated in─────────> Term             rules and vocabulary
+                                            │ ▲                           │
+                                            │ └── overrides ── Rule       │
+                                      cites │                             │ is defined by
+                                            │                             │
+                                            ▼                             │
+                                         Citation <───────────────────────┘
+                                            │
+                                            │ highlights
+                                            │
+                                            ▼
+                 Document ──contains──> Provision                                         sources

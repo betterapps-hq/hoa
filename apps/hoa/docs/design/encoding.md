@@ -283,10 +283,15 @@ The `/rules` route keeps its shape: a build card, a Draft tab and a Published ta
 | Prompt | Trace name | Model | Variables | Output |
 | --- | --- | --- | --- | --- |
 | `hoa-structure-repair` | `structure-repair` | `OPENROUTER_MODEL` | `documentTitle`, `pageText`, `parserOutline`, `problems` | `{ markers: { offset: number; marker: string; level: number }[] }` |
-| `hoa-term-extraction` | `term-extraction` | `anthropic/claude-opus-5.5` | `documentTitle`, `documentKind`, `definitions`, `candidates`, `coreTerms` | `{ terms: EncodedTerm[]; notes: string[] }` |
-| `hoa-provision-encoding` | `provision-encoding` | `anthropic/claude-opus-5.5` | `documentTitle`, `documentKey`, `documentKind`, `provisions`, `context`, `references`, `terms`, `coreTerms`, `requestTypes` | `EncodingDraft` |
+| `hoa-term-extraction` | `term-extraction` | `anthropic/claude-opus-5.5` | `document`, `definitions`, `candidates`, `coreTerms` | `{ terms: EncodedTerm[]; notes: string[] }` |
+| `hoa-provision-encoding` | `provision-encoding` | `anthropic/claude-opus-5.5` | `document`, `provisions`, `context`, `references`, `terms`, `coreTerms`, `requestTypes` | `EncodingDraft` |
 | `hoa-encoding-repair` | `encoding-repair` | `anthropic/claude-opus-5.5` | `draft`, `problems`, `terms`, `coreTerms` | `EncodingDraft` |
 | `hoa-rulebook-consolidation` | `rulebook-consolidation` | `anthropic/claude-opus-5.5` | `rules`, `termPairs`, `documents` | `Consolidation` |
+
+`hoa-rules-encoding-guide` holds the encoding conventions and the schema's rules in one text with no variables; the
+encoding, repair and term prompts include it by pinned version (Langfuse prompt composition), so it's written once.
+The statement link syntax is described on the output schema's `statement` field, because Langfuse would read double
+braces in prompt text as variables.
 
 The old `hoa-section-routing`, `hoa-section-rule-extraction` and `hoa-rule-consolidation` are retired with the code
 that calls them.

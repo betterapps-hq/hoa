@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { projectTypeIds } from "@/rules/catalog"
-import { errorInfoSchema, ruleTopics } from "@/rules/rule"
+import { ruleTopics } from "@/rules/rule"
+import { errorInfoSchema } from "@/shared/schemas"
 
 // Governing documents and their sections (docs/design/documents.md).
 

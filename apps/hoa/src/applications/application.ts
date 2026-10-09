@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { applicationFileKinds, projectTypeIds } from "@/rules/catalog"
-import { errorInfoSchema } from "@/rules/rule"
+import { errorInfoSchema } from "@/shared/schemas"
 
 // Applications and their files (docs/design/documents.md, "Applications").
 

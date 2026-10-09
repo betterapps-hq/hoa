@@ -1,13 +1,9 @@
 import { z } from "zod"
+import { errorInfoSchema, promptVersionSchema } from "@/shared/schemas"
 import { componentKinds, documentRequirementIds, projectTypeIds } from "./catalog"
 
 // The rule model from docs/design/rules.md. These schemas validate stored rules and, in their candidate form, the
 // extraction model's output.
-
-export const errorInfoSchema = z.object({ stage: z.string(), message: z.string(), isRetryable: z.boolean() })
-
-/** The Langfuse prompt version a model call used. */
-export const promptVersionSchema = z.number().int()
 
 export const ruleTopics = [
   "material",

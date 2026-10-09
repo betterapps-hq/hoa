@@ -1,0 +1,116 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`describeCondition > describes category criteria and settings conditions 1`] = `
+[
+  "its location is return",
+  "its boundary with exists",
+  ""owns a lot that shares a boundary with the applicant's lot"",
+  "the request's notice delivered on exists and (the request's hearing held on exists or it's not the case that the request's hearing requested on exists)",
+]
+`;
+
+exports[`describeCondition > describes quantifiers, windows and ranges 1`] = `
+[
+  "each of its pets where its species is dog meets this: its species exists",
+  "none of its pets meets this: its species is dog",
+  "the time from its start to its end overlaps sat and sun 08:00 to 10:00 each week",
+  "the time from its start to its end falls within 11-15 to 01-15 each year",
+  "the lot is more than 1 and less than 2",
+]
+`;
+
+exports[`describeRule > describes bylaws:3.2#annual-meeting 1`] = `"The board must ensure, for each compliance period, that the request's completed on is no later than 1 year after the request's scheduled on. Runs in compliance periods."`;
+
+exports[`describeRule > describes bylaws:3.4#notice 1`] = `"The board must ensure, for each meeting, that the request's notice sent on is between 60 days before the request's starts at and 10 days before the request's starts at. Runs in meetings."`;
+
+exports[`describeRule > describes bylaws:3.7#quorum 1`] = `"For each meeting to take effect: the request's votes present divided by the community's total votes is at least 1/10. Runs in meetings."`;
+
+exports[`describeRule > describes bylaws:4.1#candidate-ownership 1`] = `"For each board nomination to take effect: its owner since plus 12 months is on or before the governing date. Runs in board nominations."`;
+
+exports[`describeRule > describes decision-2026-0142:1#rear-height 1`] = `"The owner must ensure, for each fence run, that its height is at most 84 in, overriding guidelines:5.5.1(i)#max-height. Runs in applications and violations."`;
+
+exports[`describeRule > describes declaration:4.1#prior-approval 1`] = `"The owner must ensure, for each work, that it was approved by the Reviewer in writing beforehand. Runs in applications and violations."`;
+
+exports[`describeRule > describes declaration:4.3(a)#response-time 1`] = `"The Reviewer must ensure, for each application, that the request's decided on is no later than 30 days after the request's submitted on; if not, the request's decision is deemed approved. Runs in applications."`;
+
+exports[`describeRule > describes declaration:6.4#annual-due 1`] = `"The owner must ensure, for each assessment, that its paid on is no later than its due on. Runs in assessments."`;
+
+exports[`describeRule > describes declaration:6.6#late-fee 1`] = `"The organization must impose a late fee of the greater of $25 and 1/10 times its unpaid balance on the owner when declaration:6.4#annual-due isn't met, for each assessment. Runs in assessments."`;
+
+exports[`describeRule > describes declaration:7.1#landscaping 1`] = `"The owner must ensure, for each Unit, that the answer to "Is the lot's landscaping neat, trimmed and free of weeds?" is yes (judged from photo and inspection report). Runs in violations."`;
+
+exports[`describeRule > describes declaration:7.3#self-help 1`] = `"The organization may impose a self help of the request's cost of the work on the owner when declaration:7.1#landscaping isn't met, for each violation where the request's notice delivered on exists. Runs in violations."`;
+
+exports[`describeRule > describes declaration:8.4#pet-limit 1`] = `"The owner must ensure, for each Unit, that the number of its pets where its species is dog or cat is at most 3. Runs in violations."`;
+
+exports[`describeRule > describes declaration:9.2#minimum-term 1`] = `"The owner must ensure, for each lease registration, that its lease term is at least 12 months. Runs in lease registrations."`;
+
+exports[`describeRule > describes declaration:9.3#rental-cap 1`] = `"The owner must ensure, for each lease registration, that (the community's leased lots plus 1) divided by the community's number of lots is at most 1/5. Runs in lease registrations."`;
+
+exports[`describeRule > describes declaration:14.2#amendment-vote 1`] = `"For each vote where its subject is amendment to the Declaration to take effect: its votes in favor divided by the community's total votes is at least 67/100. Runs in meetings."`;
+
+exports[`describeRule > describes guidelines:1.4#existing-fences 1`] = `"Each fence run where its installed on is before 2025-11-12 and it was approved by the Reviewer is permitted to the owner, overriding every rule in guidelines adopted after its installed on. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.3.2#manufacturers 1`] = `"The owner must ensure, for each fence run where its material is composite, that its manufacturer is Trex, Frame It All or Neoline. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.3.2#other-manufacturers 1`] = `"The Reviewer decides case by case for each fence run where its material is composite and it's not the case that its manufacturer is Trex, Frame It All or Neoline, over guidelines:5.4.2(i)#colors and guidelines:5.3.2#manufacturers. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.4.2(i)#colors 1`] = `"The owner must ensure, for each fence run where its material is composite, that one of these holds: its manufacturer is Trex and its color is Winchester Grey or Saddle; or its manufacturer is Frame It All and its color is River Birch or Teak; or its manufacturer is Neoline and its color is Honey Oak or Desert Sage. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.4.2(iii)#gate-color 1`] = `"The owner must ensure, for each gate where its fence run's material is composite, that its gate color is its fence run's color. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.5.1(i)#max-height 1`] = `"The owner must ensure, for each fence run where its material is wood or composite and (it is a boundary fence or it is a return fence), that its height is at most 72 in. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.5.1(i)#max-height-all 1`] = `"The owner must ensure, for each fence run where its material is wood or composite, that its height is at most 72 in. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.5.1(ii)#fence-and-lattice 1`] = `"The owner must ensure, for each fence run, that its height plus its lattice height is at most 90 in. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.5.2#metal-height 1`] = `"The owner must ensure, for each fence run where its material is metal, that its height is at least 48 in and at most 72 in. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.5.2#variations 1`] = `"The Reviewer decides case by case for each fence run where its material is metal, over guidelines:5.5.2#metal-height. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.6.1(i)#neighbor-approval 1`] = `"The applicant must ensure, for each fence run where its boundary with is another Unit, that a neighbor approval form is provided for each one, stating approval of the fence's placement, approval of its height, approval of its materials and who maintains it, signed by the neighbor. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.6.2(i)#sight-lines 1`] = `"The owner must ensure, for each fence run where its location is front, that the answer to "Does the fence leave a driver a clear view of objects in the roadway?" is yes (judged from site plan and photo). Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:5.6.2(ii)#setback 1`] = `"The owner should ensure, for each fence run where its location is front or return, that its setback from the front corner is at least 5 ft. Runs in applications and violations."`;
+
+exports[`describeRule > describes guidelines:8.2#no-solar 1`] = `"Each solar energy device is prohibited for the owner. Runs in applications and violations."`;
+
+exports[`describeRule > describes property-code:202.010#solar 1`] = `"Each solar energy device where its mounting is roof is permitted to the owner, overriding guidelines:8.2#no-solar. Runs in applications and violations."`;
+
+exports[`describeRule > describes property-code:209.005#records-response 1`] = `"The organization must ensure, for each records request, that the request's produced on is no later than 10 business days after the request's received on. Runs in records requests."`;
+
+exports[`describeRule > describes property-code:209.006#fine-cap 1`] = `"Limits rules:12.1#fines for each violation: allows at most $500 in total. Runs in violations."`;
+
+exports[`describeRule > describes rules:3.2#commercial-overnight 1`] = `"The occupant must ensure, for each parking where its vehicle's class is commercial vehicle and its location is street, that it's not the case that the time from its start to its end overlaps 02:00 to 05:00 each day. Runs in violations."`;
+
+exports[`describeRule > describes rules:4#vehicle-storage 1`] = `"The owner must ensure, for each vehicle, that it was approved by the board or the Reviewer in writing. Runs in violations."`;
+
+exports[`describeRule > describes rules:5.1#trash-out 1`] = `"The occupant must ensure, for each time at the curb, that the time from its put out to its taken in falls within 1 day before the date at 18:00 to the date at 21:00, around each date of the community's trash pickup. Runs in violations."`;
+
+exports[`describeRule > describes rules:12.1#fines 1`] = `"The board may impose a fine of $100, then $200, plus $25 every 1 day, up to $1,000 on the owner when a rule in rules isn't met, for each violation. Runs in violations."`;
+
+exports[`every other form > describes operands, conditions and checks 1`] = `
+[
+  "its in writing isn't no",
+  "its start is after 22:00",
+  "$10 minus ($2 times 3) is at least the lesser of $1 and $2",
+  "the greatest of $1, $2 and $3 is less than the total pet.weight of its pets",
+  "the greatest pet.age of its pets where its species exists is at most the least pet.age of its pets",
+  "the governing date minus 1 year is after 2020-01-01",
+  "the time from its start to its end falls within mon each week",
+  "the time from its start to its end falls within the date to the date, around each date of its trash pickup",
+  "the table says not met when its material isn't wood; met when its height is less than 72 in; not met when anything; otherwise met",
+  "a site plan is provided",
+  "its end is no earlier than 1 day after its start",
+  "its end is at any time after its start",
+  "the answer to "Is it tidy?" is yes",
+  "The subjects of the rules it overrides where its material is composite is prohibited for the owner, overriding every rule under guidelines:5, except guidelines:5.4.2(i)#colors. Runs in applications and violations.",
+  "Each fence run where its material is composite is permitted to the owner, overriding guidelines:5.5.1(i)#max-height. Runs in applications and violations.",
+  "The Reviewer decides case by case for each fence run where its material is composite and it's not the case that its manufacturer is Trex, Frame It All or Neoline, over every rule in guidelines. Runs in applications and violations.",
+  "The organization must impose a late fee on the owner when declaration:6.4#annual-due isn't met, for each assessment. Runs in assessments.",
+  "The organization must impose a late fee in an amount it sets on the owner when declaration:6.4#annual-due isn't met, for each assessment. Runs in assessments.",
+  "Limits rules:12.1#fines for each violation: forbids them and allows at most $100 each time. Runs in violations.",
+]
+`;

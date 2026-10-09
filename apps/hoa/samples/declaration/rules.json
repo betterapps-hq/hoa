@@ -59,6 +59,14 @@
       "issuedBy": null,
       "governs": null,
       "edition": null
+    },
+    {
+      "key": "guidelines",
+      "kind": "design-guidelines",
+      "title": "Residential Design Guidelines",
+      "issuedBy": null,
+      "governs": null,
+      "edition": null
     }
   ],
   "provisions": [

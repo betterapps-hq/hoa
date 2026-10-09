@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { componentKinds, documentRequirementIds } from "@/rules/catalog"
-import { promptVersionSchema } from "@/rules/rule"
+import { promptVersionSchema } from "@/shared/schemas"
 
 // The review model from docs/design/review.md. The facts and documents schemas are also the models' output schemas.
 

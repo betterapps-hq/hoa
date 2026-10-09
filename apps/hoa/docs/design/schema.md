@@ -3,7 +3,8 @@
 > **First pass, for review.** The schema for an organization's governing documents and the rules in them: the
 > documents, the organization's terms, the rules with their checks, and how a rule is evaluated. It
 > replaces the first build's rule model, and the vocabulary and rule record in the
-> [rule engine proposal](https://github.com/AndrewCraswell/hoa/pull/31) where they differ. Nothing here is built. The
+> [rule engine proposal](https://github.com/AndrewCraswell/hoa/pull/31) where they differ. The types, validators and examples
+> are built in `src/schema/`; the pipelines aren't yet. The
 > types on this page are generated from a file that type-checks against all 57 examples in
 > [schema-examples.md](schema-examples.md), with every term and rule they reference defined.
 
@@ -977,7 +978,12 @@ type FactValue =
   | { type: "date"; value: IsoDate }
   | { type: "date-time"; value: Timestamp }
   | { type: "time"; value: TimeOfDay }
-  | { type: "schedule"; weekly: Weekday[]; annual: MonthDay[]; every: { value: number; unit: TermKey; from: IsoDate } | null }
+  | {
+      type: "schedule"
+      weekly: Weekday[]
+      annual: MonthDay[]
+      every: { value: number; unit: TermKey; from: IsoDate } | null
+    }
   | { type: "text"; value: string }
   | { type: "entity"; entity: string }
 

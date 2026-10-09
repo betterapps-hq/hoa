@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { errorInfoSchema, promptVersionSchema } from "@/rules/rule"
+import { errorInfoSchema, promptVersionSchema } from "@/shared/schemas"
 
 export const jobKinds = ["document-ingest", "rulebook-build", "application-review"] as const
 
