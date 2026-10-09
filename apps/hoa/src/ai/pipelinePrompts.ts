@@ -19,24 +19,35 @@ export const pipelinePrompts = {
   },
   encodingRepair: { name: "hoa-encoding-repair", variables: ["draft", "problems", "terms", "coreTerms"] },
   rulebookConsolidation: { name: "hoa-rulebook-consolidation", variables: ["rules", "termPairs", "documents"] },
-  // The first build's application review, until phase 6 replaces it.
-  fileClassification: {
-    name: "hoa-file-classification",
-    variables: ["fileKinds", "contextText", "visualDescriptions", "checkboxCount", "pageText"]
+  // Evaluation round 1 (implementation-plan.md): the judge comparing the build's rules with the golden encoding's.
+  encodingJudge: { name: "hoa-eval-encoding-judge", variables: ["provision", "referenceRules", "pipelineRules"] },
+  // The application review (application-review.md). The subjects and facts calls also receive the packet's images.
+  pageClassification: {
+    name: "hoa-page-classification",
+    variables: ["documentTypes", "contextText", "visualDescriptions", "pageText"]
   },
-  /** Also receives the packet's images as attachments. */
-  factExtraction: {
-    name: "hoa-fact-extraction",
-    variables: ["projectType", "catalog", "allowedValues", "textConditions", "description", "pages"]
+  subjectIdentification: {
+    name: "hoa-subject-identification",
+    variables: ["requestType", "projectKind", "description", "candidateTypes", "pages"]
   },
-  documentCheck: { name: "hoa-document-check", variables: ["requirements", "ownersOfRecord", "checkboxes", "pages"] },
-  qualitativeCheck: {
-    name: "hoa-qualitative-check",
-    variables: ["ruleStatement", "criterion", "component", "facts", "evidencePages"]
+  entityFacts: {
+    name: "hoa-entity-facts",
+    variables: ["requestType", "description", "entities", "properties", "textConditions", "pages"]
   },
-  reviewWriter: {
-    name: "hoa-review-writer",
-    variables: ["recommendation", "findings", "facts", "actionItems", "informationalRules"]
+  documentReview: { name: "hoa-document-review", variables: ["requirements", "parties", "pages"] },
+  judgmentCheck: {
+    name: "hoa-judgment-check",
+    variables: ["statement", "question", "subject", "facts", "evidencePages"]
+  },
+  reviewSummary: {
+    name: "hoa-review-summary",
+    variables: ["recommendation", "findings", "actionItems", "suggestions"]
+  },
+  // Evaluation round 2 (implementation-plan.md): the judge of the writer's faithfulness and clarity. It reads what the
+  // writer read, with the writer's phrasing of each action item, and the assessment and feedback.
+  reviewJudge: {
+    name: "hoa-eval-review-judge",
+    variables: ["recommendation", "findings", "actionItems", "suggestions", "writing"]
   }
 } as const satisfies Record<string, PromptDefinition>
 
@@ -47,4 +58,15 @@ export const rulebookBuildPrompts = [
   pipelinePrompts.provisionEncoding,
   pipelinePrompts.encodingRepair,
   pipelinePrompts.rulebookConsolidation
+] as const
+
+/** The prompts an application review pins in resolve-prompts: OCR's visual descriptions, then the review's own. */
+export const applicationReviewPrompts = [
+  pipelinePrompts.visualDescription,
+  pipelinePrompts.pageClassification,
+  pipelinePrompts.subjectIdentification,
+  pipelinePrompts.entityFacts,
+  pipelinePrompts.documentReview,
+  pipelinePrompts.judgmentCheck,
+  pipelinePrompts.reviewSummary
 ] as const

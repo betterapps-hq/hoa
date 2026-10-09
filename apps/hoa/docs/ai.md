@@ -42,8 +42,10 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
   the call with the prompt's name and label. There's no local copy to fall back to.
 - To add a prompt, create it in Langfuse as a **text** prompt using `{{variable}}` placeholders, label the version to
   serve, then add its name to the registry. The Langfuse MCP server or the Langfuse UI can create and edit prompts.
-- Rule extraction and consolidation run on `anthropic/claude-opus-5.5` through their prompts' `config.model`; every
-  other stage uses `OPENROUTER_MODEL` or `OPENROUTER_SMALL_MODEL`.- A prompt whose contract changes (new variables or output) gets a new name, so two contracts never share a label.
+- Rule extraction and consolidation run on `anthropic/claude-opus-5.5` and the review's document review on
+  `anthropic/claude-sonnet-5.5`, through their prompts' `config.model`, as do the evaluation judges; every other stage
+  uses `OPENROUTER_MODEL` or `OPENROUTER_SMALL_MODEL`.
+- A prompt whose contract changes (new variables or output) gets a new name, so two contracts never share a label.
 
 ## Tracing and cost
 

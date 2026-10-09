@@ -9,6 +9,7 @@ import {
   listDocumentRecords,
   listGoverningDocuments,
   listProvisions,
+  updateProvisions,
   saveProvisions,
   saveReferencedDocuments
 } from "./documentRepository"
@@ -98,6 +99,13 @@ describe("document records and provisions", () => {
     expect(await listProvisions(db, hoaId, [])).toEqual([])
     expect(await getProvision(db, hoaId, "by-laws:1.2")).toEqual(items[2])
     expect(await getProvision(db, hoaId, "by-laws:old")).toBeNull()
+    const reason = {
+      reason: "heading" as const,
+      note: null,
+      review: { status: "approved" as const, by: "admin", at: now, note: null }
+    }
+    await updateProvisions(db, hoaId, [{ ...items[0], noRule: reason }])
+    expect((await getProvision(db, hoaId, "by-laws:article-1"))?.noRule).toEqual(reason)
     expect((await db.select().from(provisions)).map((row) => [row.key, row.parentKey, row.ordinal])).toEqual([
       ["by-laws:article-1", null, 0],
       ["by-laws:1.1", "by-laws:article-1", 1],

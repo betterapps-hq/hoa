@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from "vitest"
 import { pipelinePrompts } from "@/ai/pipelinePrompts"
 import type { PromptCache } from "@/ai/runPrompt"
 import { uploadEdition } from "@/documents/documentStructure"
+import type { StepRunner } from "@/jobs/steps"
 import type { RuleDraft } from "@/schema/zod"
 import { cite } from "@/tests/encodingDrafts"
 import { scriptedModel, variableOf, variablesPromptLoader } from "@/tests/scriptedModel"
 import { syntheticPages } from "@/tests/syntheticDeclaration"
-import { buildRulebook, type BuildInput, type StepRunner } from "./build"
+import { buildRulebook, type BuildInput } from "./build"
 import { buildScores } from "./buildScores"
 
 const structure = {

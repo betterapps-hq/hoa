@@ -1,0 +1,295 @@
+{
+  "id": "garage-fee-not-paid",
+  "title": "Garage enclosure with the review fee not yet paid",
+  "application": {
+    "projectKind": null,
+    "description": "Convert the attached two-car garage into a family room.",
+    "submittedOn": "2026-10-01"
+  },
+  "now": "2026-10-02T12:00:00Z",
+  "packet": {
+    "files": [
+      {
+        "id": "form",
+        "fileName": "application-form.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "ARCHITECTURAL REVIEW APPLICATION\n1. Unit: Unit 14 (sample address withheld)\n2. Owner of record: the owner named on the deed (one owner)\n3. Applicant: the owner\n4. Type of project: Garage enclosure\n5. Description of the work: Convert the attached two-car garage into a family room. See the attached project description.\n6. Plans attached: floor plan, exterior elevation and site plan\n7. Review fee: $50, to be paid when the application is reviewed\n8. Work to be done by: the owner\n9. Owner signature: [signed by the owner]   Date: 09/30/2026"
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "visuals": [],
+        "images": []
+      },
+      {
+        "id": "checklist",
+        "fileName": "application-checklist.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "APPLICATION CHECKLIST\nCompleted application form: Yes\nProject description: Yes\nSite plan showing the Unit's boundaries and the work: Yes\nFloor plan and exterior elevation: Yes\nPhotos of the existing condition: Yes\nProduct information for new materials: Yes\nOwner signature: [signed by the owner]   Date: 09/30/2026"
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "visuals": [],
+        "images": []
+      },
+      {
+        "id": "description",
+        "fileName": "project-description.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "PROJECT DESCRIPTION\nWe plan to convert our attached two-car garage into a family room.\nThe garage door opening will be framed in as a wall with a double-hung window, finished in lap siding painted to match the house.\nThe interior will be insulated, drywalled and carpeted. The driveway stays as it is."
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "visuals": [],
+        "images": []
+      },
+      {
+        "id": "floor-plan",
+        "fileName": "floor-plan.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "FLOOR PLAN - GARAGE CONVERSION\nFamily room 20'-0\" x 22'-0\". New wall with window where the garage door was."
+          }
+        ],
+        "visuals": [
+          {
+            "figureId": "1.1",
+            "pageIndex": 1,
+            "description": "A floor plan of the attached garage converted to a family room, with the former garage door opening shown as a new wall with a window, dimensions 20 feet by 22 feet.",
+            "measurements": []
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "images": []
+      },
+      {
+        "id": "elevation",
+        "fileName": "front-elevation.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "FRONT ELEVATION\nLap siding to match the existing house. Window 36\" x 48\"."
+          }
+        ],
+        "visuals": [
+          {
+            "figureId": "1.1",
+            "pageIndex": 1,
+            "description": "An exterior front elevation of the house where the two-car garage door is replaced by a wall with one window, with lap siding matching the rest of the house. Neighboring homes aren't shown.",
+            "measurements": []
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "images": []
+      },
+      {
+        "id": "site-plan",
+        "fileName": "site-plan.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "SITE PLAN - UNIT 14\nLot boundary, house footprint, attached garage (to be converted), driveway."
+          }
+        ],
+        "visuals": [
+          {
+            "figureId": "1.1",
+            "pageIndex": 1,
+            "description": "A site plan of the lot showing its boundaries, the house footprint with the attached garage marked for conversion, and the driveway.",
+            "measurements": []
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "images": []
+      },
+      {
+        "id": "photo",
+        "fileName": "existing-garage.jpg",
+        "mediaType": "image/jpeg",
+        "contextText": null,
+        "pages": [
+          {
+            "text": ""
+          }
+        ],
+        "visuals": [
+          {
+            "figureId": "image",
+            "pageIndex": 1,
+            "description": "A photo of the front of a two-story house with an attached two-car garage and a white garage door, a concrete driveway in front.",
+            "measurements": []
+          }
+        ],
+        "isReadable": true,
+        "images": []
+      },
+      {
+        "id": "window",
+        "fileName": "window-product-sheet.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "PRODUCT SHEET\nDouble-hung window, 36 x 48 inches, white frame, insulated glass.\nLap siding: fiber cement, painted to match the house."
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "visuals": [],
+        "images": []
+      }
+    ]
+  },
+  "expected": {
+    "entities": [
+      {
+        "id": "work-1",
+        "type": "work",
+        "label": "Convert the garage into a family room"
+      },
+      {
+        "id": "space-1",
+        "type": "space-conversion",
+        "label": "The attached two-car garage"
+      },
+      {
+        "id": "owner-1",
+        "type": "owner",
+        "label": "The owner of record"
+      }
+    ],
+    "facts": [
+      {
+        "entity": "space-1",
+        "property": "space-conversion.space",
+        "state": "known",
+        "value": {
+          "type": "value",
+          "term": "unfinished-space.garage",
+          "text": ""
+        }
+      },
+      {
+        "entity": "work-1",
+        "property": "work.kind",
+        "state": "known",
+        "value": {
+          "type": "value",
+          "term": "work-kind.garage-enclosure",
+          "text": ""
+        }
+      },
+      {
+        "entity": "work-1",
+        "property": "work.performed-by",
+        "state": "known",
+        "value": {
+          "type": "value",
+          "term": "owner",
+          "text": ""
+        }
+      },
+      {
+        "entity": "request",
+        "property": "architectural-application.review-fee",
+        "state": "known",
+        "value": {
+          "type": "quantity",
+          "value": 50,
+          "unit": "usd"
+        }
+      },
+      {
+        "entity": "request",
+        "property": "architectural-application.review-fee-paid-on",
+        "state": "unknown",
+        "value": null
+      }
+    ],
+    "documents": [
+      {
+        "ruleKey": "guidelines:3.1.5#application-form",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "guidelines:3.1.5#owner-signatures",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "guidelines:3.1.5#project-description",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "guidelines:3.1.5#plot-plan",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "guidelines:3.1.5#product-specification",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "guidelines:3.1.5#checklist",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "declaration:4.3(b)#plans",
+        "entity": "request",
+        "present": true
+      }
+    ],
+    "findings": {
+      "use-restrictions:a(vii)#replacement-garage-plans space-1": "missing-information",
+      "use-restrictions:a(vii)#reviewer-garage-enclosure space-1": "committee",
+      "use-restrictions:a(vii)#no-conversion space-1": "not-applicable",
+      "declaration:4.1/p1#approval-required work-1": "committee",
+      "declaration:4.3(b)#plans request": "met",
+      "declaration:4.3(b)/p2#harmony work-1": "committee",
+      "declaration:4.2(d)#fee-before-review request": "missing-information",
+      "declaration:4.3(b)/p3#written-response request": "pending",
+      "guidelines:3.1.5#application-form request": "met",
+      "guidelines:3.1.5#owner-signatures request": "met",
+      "guidelines:3.1.5#project-description request": "met",
+      "guidelines:3.1.5#plot-plan request": "met",
+      "guidelines:3.1.5#product-specification request": "met",
+      "guidelines:3.1.5#checklist request": "met",
+      "guidelines:3.4.2#photos request": "met"
+    },
+    "recommendation": "request-information",
+    "actionItems": {
+      "changes": [],
+      "missingInformation": [
+        {
+          "ruleKey": "use-restrictions:a(vii)#replacement-garage-plans",
+          "entities": ["space-1"]
+        },
+        {
+          "ruleKey": "declaration:4.2(d)#fee-before-review",
+          "entities": ["request"]
+        }
+      ],
+      "committeeDecisions": [
+        {
+          "ruleKey": "declaration:4.3(b)/p2#harmony",
+          "entities": ["work-1"]
+        }
+      ]
+    }
+  }
+}

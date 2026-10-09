@@ -2,19 +2,31 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { ActionItem, Recommendation, Review } from "@/review/reviewModel"
-import { componentLabel, findingLabels, groupFindings, recommendationLabels } from "../applicationDisplay"
-import type { ReviewRule } from "../applications.functions"
+import type { ReviewRule } from "@/review/reviewRules"
+import { renderRuleMarkers } from "@/review/ruleMarkers"
+import { entityLabel, findingLabels, groupFindings, recommendationLabels } from "../applicationDisplay"
 
 const recommendationVariants: Record<Recommendation, "default" | "secondary" | "destructive" | "outline"> = {
   approve: "default",
   "approve-with-conditions": "secondary",
   "request-information": "outline",
-  reject: "destructive"
+  "refer-to-committee": "outline",
+  deny: "destructive"
 }
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" })
 
-function ItemList({ title, description, items }: { title: string; description: string; items: ActionItem[] }) {
+function ItemList({
+  title,
+  description,
+  items,
+  render
+}: {
+  title: string
+  description: string
+  items: ActionItem[]
+  render: (text: string) => string
+}) {
   if (items.length === 0) {
     return null
   }
@@ -26,7 +38,7 @@ function ItemList({ title, description, items }: { title: string; description: s
       </div>
       <ul className="list-disc pl-5 text-sm">
         {items.map((item) => (
-          <li key={item.id}>{item.text}</li>
+          <li key={item.id}>{render(item.text)}</li>
         ))}
       </ul>
     </section>
@@ -42,14 +54,18 @@ export type ReviewReportProps = {
 
 /** A review's recommendation, what to change or provide, what the committee decides, and every finding. */
 export function ReviewReport({ review, rules, audience }: ReviewReportProps) {
-  const rulesById = new Map(rules.map((rule) => [rule.id, rule]))
+  const rulesByKey = new Map(rules.map((rule) => [rule.key, rule]))
+  const titleOf = (ruleKey: string) => rulesByKey.get(ruleKey)?.title ?? ruleKey
+  // The rule references in the written text become links in the review UX; until then they read as rule titles.
+  const render = (text: string) => renderRuleMarkers(text, titleOf)
   const groups = groupFindings(review.findings)
   return (
     <Card>
       <CardHeader>
         <CardTitle>Review</CardTitle>
         <CardDescription>
-          Checked against rulebook version {review.rulebookVersion} on {dateFormat.format(new Date(review.createdAt))}
+          Checked against the published rulebook on {dateFormat.format(new Date(review.createdAt))}
+          {review.provisional ? ", before submission" : ""}
         </CardDescription>
         <CardAction>
           <Badge variant={recommendationVariants[review.recommendation]}>
@@ -58,7 +74,9 @@ export function ReviewReport({ review, rules, audience }: ReviewReportProps) {
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
-        <p className="text-sm whitespace-pre-line">{audience === "committee" ? review.assessment : review.feedback}</p>
+        <p className="text-sm whitespace-pre-line">
+          {render(audience === "committee" ? review.assessment : review.feedback)}
+        </p>
         <ItemList
           title="What to change"
           description={
@@ -67,43 +85,51 @@ export function ReviewReport({ review, rules, audience }: ReviewReportProps) {
               : "These don't meet the rules as described."
           }
           items={review.changes}
+          render={render}
         />
         <ItemList
           title="What to provide"
           description="The committee may deny an application that's missing these."
           items={review.missingInformation}
+          render={render}
         />
         <ItemList
           title="For the committee"
-          description="The committee decides these itself; they don't change the recommendation."
+          description="The committee decides these itself."
           items={review.committeeDecisions}
+          render={render}
+        />
+        <ItemList
+          title="Suggestions"
+          description="Recommendations the application doesn't follow."
+          items={review.suggestions}
+          render={render}
         />
         <section aria-label="Findings" className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold">Findings</h3>
           <Accordion>
             {groups.map((group) => (
-              <AccordionItem key={group.status} value={group.status}>
+              <AccordionItem key={group.outcome} value={group.outcome}>
                 <AccordionTrigger>
-                  {findingLabels[group.status]} ({group.findings.length})
+                  {findingLabels[group.outcome]} ({group.findings.length})
                 </AccordionTrigger>
                 <AccordionContent>
                   <ul className="flex flex-col gap-3">
                     {group.findings.map((finding) => {
-                      const rule = rulesById.get(finding.ruleId)
+                      const citation = rulesByKey.get(finding.ruleKey)?.citations[0]
                       return (
-                        <li key={finding.id} className="flex flex-col gap-0.5 text-sm">
+                        <li key={`${finding.ruleKey} ${finding.entity}`} className="flex flex-col gap-0.5 text-sm">
                           <span className="font-medium">
-                            {rule?.title ?? finding.ruleId}
+                            {titleOf(finding.ruleKey)}
                             <span className="font-normal text-muted-foreground">
                               {" "}
-                              ({componentLabel(review, finding.componentId)})
+                              ({entityLabel(review, finding.entity)})
                             </span>
                           </span>
-                          <span>{finding.explanation}</span>
-                          {rule?.citations[0] ? (
+                          <span>{finding.reason}</span>
+                          {citation ? (
                             <span className="text-muted-foreground">
-                              {rule.citations[0].section}, page{" "}
-                              {rule.citations[0].pageLabel ?? rule.citations[0].pageIndex}
+                              {citation.documentTitle} {citation.label}
                             </span>
                           ) : null}
                         </li>

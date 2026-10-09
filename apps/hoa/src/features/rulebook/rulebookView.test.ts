@@ -1,18 +1,22 @@
 import { describe, expect, it } from "vitest"
 import { newJob } from "@/db/jobRepository"
-import type { RulebookContent } from "@/db/rulebookContentRepository"
+import type { RulebookRecords } from "@/rulebook/assemble"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
-import { approvedRuleLines, describeBuildProblem, rulebookCounts, ruleLines } from "./rulebookView"
+import { describeBuildProblem, rulebookCounts } from "./rulebookView"
 
 const sample = sampleRulesFile()
 const approved = { status: "approved" as const, by: "admin", at: "", note: null }
-const content: RulebookContent = {
-  settings: sample.settings,
-  coverage: { provisions: 2, uncovered: ["declaration:21.4"] },
+const [first, second] = sample.rules
+const cited = sample.provisions.find((provision) => provision.key === first?.citations[0]?.provisionKey)
+const withReason = sample.provisions.find((provision) => provision.noRule !== null)
+const records: RulebookRecords = {
+  ...sample,
+  // One provision the first rule cites, one with a reason for having no rule, and one nothing covers.
+  provisions: [cited!, withReason!, { ...withReason!, key: "declaration:99", label: "99", noRule: null }],
   rules: [
-    { ...sample.rules[0]!, review: approved },
+    { ...first!, review: approved },
     {
-      ...sample.rules[1]!,
+      ...second!,
       issues: [{ code: "undefined-term", message: "gazebo isn't a term", related: [], resolution: null }]
     }
   ],
@@ -36,7 +40,7 @@ describe("describeBuildProblem", () => {
 
 describe("rulebook view", () => {
   it("counts the records and what still needs attention", () => {
-    expect(rulebookCounts(content)).toEqual({
+    expect(rulebookCounts(records)).toEqual({
       rules: 2,
       terms: 3,
       questions: 0,
@@ -44,12 +48,5 @@ describe("rulebook view", () => {
       withIssues: 1,
       approved: 1
     })
-  })
-
-  it("lists rules by key with their statements in words, and the approved ones for the published view", () => {
-    const lines = ruleLines(content)
-    expect(lines.map((line) => line.key)).toEqual(content.rules.map((rule) => rule.key).toSorted())
-    expect(lines.every((line) => !line.statement.includes("{{"))).toBe(true)
-    expect(approvedRuleLines(content).map((line) => line.key)).toEqual([content.rules[0]?.key])
   })
 })

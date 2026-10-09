@@ -23,14 +23,13 @@ import {
 } from "@/db/applicationRepository"
 import { getDb } from "@/db/client.server"
 import { getLatestJob, insertJob, newJob } from "@/db/jobRepository"
-import { getRulebookByStatus, listRules } from "@/db/rulebookRepository"
+import { getPublishedRulesFile, type RulesFileRef } from "@/db/rulebookContentRepository"
 import type { Job } from "@/jobs/job"
-import { hasOpenRequests } from "@/pipeline/reviewInputs"
-import { reviewSchema, type Recommendation, type Review } from "@/review/reviewModel"
-import { projectTypeIds } from "@/rules/catalog"
-import type { Rule } from "@/rules/rule"
+import { hasOpenRequests, reviewSchema, type Recommendation, type Review } from "@/review/reviewModel"
+import { projectKinds, reviewRules, type ProjectKind, type ReviewRule } from "@/review/reviewRules"
+import { readRulesFile } from "@/rulebook/assemble"
 import { getRequestContext, requireAdministrator, type RequestContext } from "@/session/requestContext.server"
-import { applicationKeys } from "@/storage/keys"
+import { applicationKeys, rulebookKeys } from "@/storage/keys"
 import { getJson } from "@/storage/objects"
 import { getBucket, getPresigner } from "@/storage/storage.server"
 import { validateUpload } from "@/storage/uploadRules"
@@ -74,7 +73,7 @@ export const createApplication = createServerFn({ method: "POST" })
   .validator((data: unknown) =>
     z
       .object({
-        projectType: z.enum(projectTypeIds),
+        projectKind: z.string().nullable(),
         description: z.string().trim().max(4000).nullable()
       })
       .parse(data)
@@ -84,7 +83,7 @@ export const createApplication = createServerFn({ method: "POST" })
     const now = new Date().toISOString()
     return createApplicationRecord(getDb(), {
       hoaId: context.hoa.id,
-      projectType: data.projectType,
+      projectKind: data.projectKind,
       description: data.description || null,
       createdBy: context.user.id,
       now,
@@ -207,7 +206,7 @@ export const runReview = createServerFn({ method: "POST" })
     if (!files.some((file) => file.parentFileId === null)) {
       throw new Error("Add at least one file first.")
     }
-    if (!(await getRulebookByStatus(db, context.hoa.id, "published"))) {
+    if (!(await getPublishedRulesFile(db, context.hoa.id))) {
       throw new Error("The HOA hasn't published its rulebook yet, so applications can't be reviewed.")
     }
     const now = new Date().toISOString()
@@ -291,7 +290,33 @@ export const recordDecision = createServerFn({ method: "POST" })
     }
   })
 
-export type ApplicationListItem = Application & { recommendation: Recommendation | null }
+export type ApplicationListItem = Application & {
+  recommendation: Recommendation | null
+  /** The project kind's label in the published rulebook; null for "Something else". */
+  projectKindLabel: string | null
+}
+
+/**
+ * A rules file the pages read labels and rule text from. A file storage can't serve (or whose hash doesn't match)
+ * is logged and left out, so the application pages still show the applications and their reviews.
+ */
+async function readRulesFileForDisplay(ref: RulesFileRef) {
+  try {
+    return await readRulesFile(getBucket(), ref)
+  } catch (error) {
+    console.error(error)
+    return null
+  }
+}
+
+/** The published rules file, or null before the HOA publishes one. */
+async function loadPublishedRulesFile(hoaId: string) {
+  const published = await getPublishedRulesFile(getDb(), hoaId)
+  return published ? readRulesFileForDisplay(published) : null
+}
+
+const kindLabel = (kinds: readonly ProjectKind[], key: string | null) =>
+  key === null ? null : (kinds.find((kind) => kind.key === key)?.label ?? key)
 
 /** A homeowner's own applications, or every application for the committee, with their latest recommendation. */
 export const listApplications = createServerFn({ method: "GET" }).handler(async (): Promise<ApplicationListItem[]> => {
@@ -302,23 +327,43 @@ export const listApplications = createServerFn({ method: "GET" }).handler(async 
     context.hoa.id,
     context.role === "administrator" ? {} : { createdBy: context.user.id }
   )
+  const published = await loadPublishedRulesFile(context.hoa.id)
+  const kinds = published ? projectKinds(published) : []
   return Promise.all(
     applications.map(async (application) => {
       const [latest] = await listReviewSummaries(db, context.hoa.id, application.id)
-      return { ...application, recommendation: latest?.recommendation ?? null }
+      return {
+        ...application,
+        recommendation: latest?.recommendation ?? null,
+        projectKindLabel: kindLabel(kinds, application.projectKind)
+      }
     })
   )
 })
 
-export type ReviewRule = Pick<Rule, "id" | "title" | "statement" | "citations">
+/** The published rulebook's project kinds, for the homeowner's picker; none until a rulebook is published. */
+export const listProjectKinds = createServerFn({ method: "GET" }).handler(async (): Promise<ProjectKind[]> => {
+  const context = await getRequestContext()
+  const published = await loadPublishedRulesFile(context.hoa.id)
+  return published ? projectKinds(published) : []
+})
+
+/** The rules file a review read, checked against the hash it recorded. */
+const reviewRulesFile = (hoaId: string, review: Review) =>
+  readRulesFileForDisplay({
+    fileKey: rulebookKeys(hoaId, review.rulebookId).file,
+    fileSha256: review.rulesFileSha256
+  })
 
 export type ApplicationView = {
   application: Application
   files: ApplicationFile[]
   /** The latest review; for the committee, the review fixed at submission. */
   review: Review | null
-  /** The rules the review's findings refer to. */
+  /** The rules the review considered, with the provisions they cite. */
   rules: ReviewRule[]
+  /** The project kind's label in the rulebook; null for "Something else". */
+  projectKindLabel: string | null
   history: Pick<ReviewSummary, "id" | "recommendation" | "createdAt">[]
   /** The latest review job, so the page can follow one in progress or show why it failed. */
   job: Job | null
@@ -342,12 +387,15 @@ export const getApplicationView = createServerFn({ method: "GET" })
       listReviewSummaries(db, context.hoa.id, application.id),
       getLatestJob(db, context.hoa.id, application.id)
     ])
-    const rules = review ? await listRules(db, context.hoa.id, review.rulebookId) : []
+    const rulesFile = review
+      ? await reviewRulesFile(context.hoa.id, review)
+      : await loadPublishedRulesFile(context.hoa.id)
     return {
       application,
       files,
       review,
-      rules: rules.map(({ id, title, statement, citations }) => ({ id, title, statement, citations })),
+      rules: review && rulesFile ? reviewRules(rulesFile, review.selected) : [],
+      projectKindLabel: kindLabel(rulesFile ? projectKinds(rulesFile) : [], application.projectKind),
       history: history.map(({ id, recommendation, createdAt }) => ({ id, recommendation, createdAt })),
       job,
       isOwner,

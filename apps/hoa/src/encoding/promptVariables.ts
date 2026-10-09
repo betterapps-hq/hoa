@@ -94,7 +94,7 @@ function headingOf(provision: Pick<Provision, "kind" | "label" | "heading">) {
 }
 
 /** A provision as the encoder reads it: its key and heading, then its text, intro and wrap-up in reading order. */
-function provisionBlock(provision: Provision) {
+export function provisionBlock(provision: Provision) {
   return [
     `[${provision.key}] ${headingOf(provision)}`,
     provision.text,

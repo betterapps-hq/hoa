@@ -55,22 +55,34 @@ evaluation date and is marked provisional, as the first build did.
 One small-model call per page with `hoa-page-classification`. The choices are the rulebook's document types (things of
 nature `document` that document checks name, such as `neighbor-approval-form` and `site-plan`) plus generic kinds
 (`application-form`, `photo`, `product-specification`, `drawing`, `other`), each with its labels and definition. The
-page's visual descriptions go in as context, as today.
+page's visual descriptions go in as context, as today. A category with no definition of its own is described by its
+criteria when they're text (a plot plan: "a drawing of the Unit showing its boundaries and where the proposed Work
+goes"); subjects and document review describe types the same way.
 
 ### 5. Subjects
 
 `hoa-subject-identification` reads the packet and names the things the application is about. Its choices are the
 **candidate types**: every thing or category that a rule in the request type applies to, plus the things those can
-reference (a gate references its fence run), each with labels, definition and its referencing properties. For the
-sample rulebook that's about ten types and 2,000 tokens.
+reference (a gate references its fence run), each with labels, definition, its kinds (the rulebook's categories of it)
+and its referencing properties. For the sample rulebook that's about ten types and 2,000 tokens.
 
 It returns entities:
 
 ```ts
 type SubjectsOutput = {
-  entities: { id: string; type: TermKey; label: string; evidence: Evidence[] }[] // "run-1", "fence-run", "Left side run"
+  entities: {
+    id: string; type: TermKey; label: string; evidence: Evidence[] // "run-1", "fence-run", "Left side run"
+    refersTo: { property: TermKey; entity: string; confidence: number }[] // a gate's fence run
+    kinds: { kind: TermKey; confidence: number }[] // a return fence
+  }[]
 }
 ```
+
+How an entity relates and what kind it is are part of naming it, so they become readings of facts: a reference is a
+reading of its property (the gate's `gate.fence-run`), and a kind whose criteria fix one of the entity's own properties
+is a reading of that value (a return fence's `fence-run.location` is `return`). A reading identification gives at or
+above the fact confidence threshold stands for its entity and property; below it, it's weighed with the facts stage's
+reading like any other.
 
 Code always adds `request` (the application), `lot` and `community`, and one `work` entity for the project when the
 model didn't name one. An entity of a type outside the candidates is dropped with a warning on the job.
@@ -114,7 +126,15 @@ property nobody asked for.
 `hoa-entity-facts` reads the packet and answers the plan. The plan is split into **entity groups** so each call stays
 small: one call for the request, lot and work, and one per entity type with items (all fence runs together, all gates
 together). For the sample fence that's three calls. Each call gets the pages, up to 20 images, the visual descriptions,
-the entities with their labels, and its slice of the plan.
+the entities with their labels (and, marked as there only to be referred to, the entities its reference properties can
+point to, so a gate's run can be named), and its slice of the plan. A value every entity of a type shares (one color for
+the whole fence) can be answered once, for `all`; code gives it to each entity that has no answer of its own.
+
+**Second reading.** A fact read with a value but below the fact confidence threshold is read again in a focused call
+(`facts:{group}:second`) that asks only for the entities and properties concerned; so is an entity the first reading
+skipped while answering others of its type (three runs answered, the fourth left out). When both readings name the
+same value, the fact stands at the more confident of the two; when they don't, the first reading stands. A skipped
+entity's second reading is its only one.
 
 The model returns, per entity and property: the state (`known`, `absent`, `conflicting`, `uncertain`), the value as
 written (`stated`, such as "6'" or "River Birch"), its reading of the value, every source as evidence (file, page,
@@ -129,16 +149,23 @@ Code turns stated values into typed `FactValue`s:
   `six (6) feet`, `72 inches`. The unit labels come from the rulebook's unit terms. A value that doesn't parse is
   `uncertain`.
 - **Choices** against the property's value terms: exact on any label, then normalized, then RapidFuzz similarity. A
-  fuzzy match is kept with the matched label and its score. No match is `{ term: null }` for an open set, and `uncertain` with an `invalid-value`
-  note for a complete one, as the schema requires.
+  fuzzy match is kept with the matched label and its score. When no label matches the words, the model's reading
+  (the allowed value it took them for) stands, as kind `reading`: labels can be phrases a packet never uses
+  ("enclosing a garage as living space"). With neither, the value is `{ term: null }` for an open set, and
+  `uncertain` with an `invalid-value` note for a complete one, as the schema requires.
+- **Parties** from the model's reading, which names a role ("contractor"), else the stated words, matched to the party
+  terms; a role no party term names stands as written (`{ term: null }`): it's known, and it isn't a party the rules
+  list, so "built by a contractor" settles that the Declarant isn't doing the work.
 - **Dates** with dateparser, in the organization's time zone and with US month-day order (`09/04/26`,
-  `September 4, 2026`, `Sept. 4`).
+  `September 4, 2026`, `Sept. 4`). Until the text-analysis service exists, a small grammar of our own
+  (`src/text/date.ts`) reads these forms.
 - **References** to entity ids.
 
 Then two checks that need no model:
 
 - **Evidence verification:** every evidence quote is matched against its page with the existing `matchQuote`. A fact
-  whose only evidence doesn't match is downgraded to `uncertain`.
+  whose only evidence doesn't match is downgraded to `uncertain`; an `absent` answer whose evidence doesn't match is
+  dropped, since "none" with nothing behind it is a guess and no answer means unknown.
 - **Conflicts:** two readings of one property for one entity that disagree become `conflicting`, with both as
   candidates.
 
@@ -149,7 +176,9 @@ Facts below the organization's fact confidence threshold become `uncertain`.
 `hoa-document-review` gets every document check among the selected rules: the document type, what it must state, who
 must sign, and whether it's per subject. It also gets the parties as facts (owners of record from the packet, the
 applicant) and the pages classified as those document types (or every page when none is). It returns, per check and
-subject: present or not, each statement confirmed, contradicted or not found (with its quote), and the signers.
+subject: present or not, each statement confirmed, contradicted, not applicable or not found (with its quote), and
+the signers. A statement is contradicted only when the packet says its opposite; `not-applicable` is for a statement the
+rule qualifies ("as applicable", "if any") when the project has nothing it covers, and holds like a confirmed one.
 
 ### 11. Judgments
 
@@ -235,8 +264,9 @@ type Review = {
   provisional: boolean // reviewed before submission
   selected: RuleKey[] // every rule considered
   documents: DocumentResult[]
-  normalizations: { entity: string; property: TermKey; stated: string; matchedLabel: string | null; kind: "exact" | "normalized" | "fuzzy" | "parsed" | "none"; score: number | null }[]
+  normalizations: { entity: string; property: TermKey; stated: string; matchedLabel: string | null; kind: "exact" | "normalized" | "fuzzy" | "reading" | "parsed" | "none"; score: number | null }[]
   judgments: { ruleKey: RuleKey; entity: string; answer: "yes" | "no" | "unclear"; confidence: number; rationale: string; evidence: Evidence[] }[]
+  conditionAnswers: { entity: string; text: string; holds: boolean | null }[] // the text conditions, as the engine read them
   findings: Finding[] // schema.md
   recommendation: "approve" | "approve-with-conditions" | "request-information" | "refer-to-committee" | "deny"
   changes: ActionItem[]; missingInformation: ActionItem[]; committeeDecisions: ActionItem[]; suggestions: ActionItem[]
@@ -302,7 +332,7 @@ marks; js-quantities and chrono-node handle neither form. The grammar's tests li
 | `hoa-page-classification` | `page-classification` | `OPENROUTER_SMALL_MODEL` | `documentTypes`, `contextText`, `visualDescriptions`, `pageText` | `{ type: string }` |
 | `hoa-subject-identification` | `subject-identification` | `OPENROUTER_MODEL` | `requestType`, `projectKind`, `description`, `candidateTypes`, `pages` | `SubjectsOutput` |
 | `hoa-entity-facts` | `entity-facts` | `OPENROUTER_MODEL` | `requestType`, `description`, `entities`, `properties`, `textConditions`, `pages` | facts and condition answers, typed by the fact schema |
-| `hoa-document-review` | `document-review` | `OPENROUTER_MODEL` | `requirements`, `parties`, `pages` | `{ documents: DocumentResult[] }` |
+| `hoa-document-review` | `document-review` | `anthropic/claude-sonnet-5.5` (the prompt's `config.model`) | `requirements`, `parties`, `pages` | `{ documents: DocumentResult[] }` |
 | `hoa-judgment-check` | `judgment-check` | `OPENROUTER_MODEL` | `statement`, `question`, `subject`, `facts`, `evidencePages` | `{ answer, confidence, rationale, evidence }` |
 | `hoa-review-summary` | `review-summary` | `OPENROUTER_MODEL` | `recommendation`, `findings`, `actionItems`, `suggestions` | `{ assessment, feedback, items: { id, text }[] }` |
 

@@ -212,7 +212,9 @@ export const applications = sqliteTable(
   {
     id: text("id").primaryKey(),
     hoaId: text("hoa_id").notNull(),
+    // The first build's project type, written as its one value until cutover drops it (implementation-plan.md, 9.6).
     projectType: text("project_type").notNull(),
+    projectKind: text("project_kind"),
     description: text("description"),
     createdBy: text("created_by").notNull(),
     createdAt: timestamp("created_at"),

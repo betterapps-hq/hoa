@@ -9,7 +9,7 @@ import {
 } from "@/documents/governingDocument"
 import type * as Rules from "@/schema/types"
 import { governingDocument, provision as provisionSchema } from "@/schema/zod"
-import { insertChunks, runBatch } from "./batching"
+import { chunk, insertChunks, runBatch } from "./batching"
 import type { Database } from "./database"
 import { governingDocuments, provisions, sections } from "./schema"
 
@@ -273,6 +273,19 @@ export async function listProvisions(
     .where(and(eq(provisions.hoaId, hoaId), inArray(provisions.documentId, [...documentIds])))
     .orderBy(asc(provisions.documentId), asc(provisions.ordinal))
   return rows.map((row) => provisionSchema.parse(row.provision))
+}
+
+/** Saves provisions' review changes, such as a no-rule reason, in batches of 100 that each land whole. */
+export async function updateProvisions(db: Database, hoaId: string, items: readonly Rules.Provision[]) {
+  const statements = items.map((item) =>
+    db
+      .update(provisions)
+      .set({ provision: provisionSchema.parse(item) })
+      .where(and(eq(provisions.hoaId, hoaId), eq(provisions.key, item.key)))
+  )
+  for (const group of chunk(statements, 100)) {
+    await runBatch(db, group)
+  }
 }
 
 export async function getProvision(db: Database, hoaId: string, key: string): Promise<Rules.Provision | null> {

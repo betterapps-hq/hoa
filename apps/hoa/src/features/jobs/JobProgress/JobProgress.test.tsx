@@ -71,4 +71,12 @@ describe("JobProgress", () => {
     expect(stageLabel("vocabulary")).toBe("Building the vocabulary")
     expect(stageLabel("unknown")).toBe("Working")
   })
+
+  it("names every application review stage", () => {
+    const stages = ["resolve-prompts", "load", "ocr", "visuals", "classify", "subjects", "select", "plan", "facts"]
+    const later = ["normalize", "documents", "judgments", "evaluate", "decide", "write", "save-review"]
+    expect([...stages, ...later].map(stageLabel)).not.toContain("Working")
+    expect(stageLabel("subjects")).toBe("Finding what the project covers")
+    expect(stageLabel("judgments")).toBe("Weighing judgment calls")
+  })
 })

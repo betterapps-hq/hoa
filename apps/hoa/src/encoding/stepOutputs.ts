@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { modelCall } from "@/jobs/steps"
 import { rulebookCoverage } from "@/rulebook/coverage"
 import {
   encodingDraft,
@@ -16,21 +17,6 @@ import { consolidationProblemCodes } from "./consolidate"
 // replay, so every output is plain JSON, checked by these schemas when it's read.
 
 const jsonPath = z.array(z.union([z.string(), z.number()]))
-
-/** One model call's cost and timing, for the build's report. */
-export const modelCall = z.object({
-  stage: z.string(),
-  itemId: z.string(),
-  promptName: z.string(),
-  promptVersion: z.number().int(),
-  modelId: z.string(),
-  inputTokens: z.number().nullable(),
-  outputTokens: z.number().nullable(),
-  costUsd: z.number().nullable(),
-  latencyMs: z.number(),
-  isCached: z.boolean()
-})
-export type ModelCall = z.infer<typeof modelCall>
 
 const structureCheck = z.object({
   outside: z.number(),

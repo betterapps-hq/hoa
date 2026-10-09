@@ -4,9 +4,10 @@ Committed sample data for development, tests and evaluation datasets. Nothing he
 details or an individual's name: application packets stay in the git-ignored repository-root `.fixtures/` folder until a
 reviewed, redacted copy is added here.
 
-| Folder                       | What it holds                                                                                                                                                          |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [declaration/](declaration/) | The sample community's recorded Declaration (CC&Rs, recorded 2001-12-04) and its Use Restrictions (Exhibit C), encoded in the [rules schema](../docs/design/schema.md) |
+| Folder                                 | What it holds                                                                                                                                                          |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [declaration/](declaration/)           | The sample community's recorded Declaration (CC&Rs, recorded 2001-12-04) and its Use Restrictions (Exhibit C), encoded in the [rules schema](../docs/design/schema.md) |
+| [garage-enclosure/](garage-enclosure/) | The synthetic garage enclosure application and its three variants, as evaluation round 2's cases (made-up text and image descriptions; no personal data)               |
 
 ## declaration/
 
@@ -25,6 +26,15 @@ removed; the signature and notary pages aren't included.
 - the gold set for the `provision-encoding` and `term-extraction` datasets, once reviewed;
 - the expected output for structure tests (provision keys, labels, intros and wrap-ups);
 - a seed rulebook, so the review pipeline can run before the rules UX is finished (`pnpm db:seed:sample`).
+
+## garage-enclosure/
+
+One folder per case (`baseline`, `replacement-plans`, `attic`, `fee-not-paid`; application-review.md, "Expected result
+for a garage enclosure"), each a `case.json` read by `pnpm eval:review`: the application (description, submission date),
+the packet as OCR would leave it (each file's page text and image descriptions, written for the purpose), and the
+expected entities, facts, documents, findings, recommendation and action items. Besides the form, description, floor
+plan and elevation the spec names, each packet carries the Design Guidelines' packet items (a signed checklist, a site
+plan, a photo and a product sheet), because evaluation's rules file includes the guidelines' packet rules.
 
 **Not here yet:** the Declaration's page text and PDF, the Residential Design Guidelines, and the sample fence
 application. Each needs a reviewed redaction first (the Declaration's cover sheet and signature pages name individuals;

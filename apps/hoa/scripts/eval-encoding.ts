@@ -1,27 +1,31 @@
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { readFileSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { parseArgs } from "node:util"
 import { createAiContext } from "../src/ai/aiContext.server.ts"
 import { rulebookBuildPrompts } from "../src/ai/pipelinePrompts.ts"
 import { resolvePromptVersions } from "../src/ai/promptLoader.ts"
-import type { PromptCache } from "../src/ai/runPrompt.ts"
 import { recordScores } from "../src/ai/scores.ts"
 import { uploadEdition } from "../src/documents/documentStructure.ts"
-import { buildRulebook, type StepRunner } from "../src/encoding/build.ts"
+import { buildRulebook } from "../src/encoding/build.ts"
 import { buildScores } from "../src/encoding/buildScores.ts"
 import { selectsUnit } from "../src/encoding/unitSelection.ts"
+import type { StepRunner } from "../src/jobs/steps.ts"
 import { pageSchema } from "../src/ocr/page.ts"
+import { splitSelectors } from "./encodingSplits.ts"
+import { encodingRuns, fileCache, fixtures, writeJson } from "./evalFiles.ts"
 import { sampleDocuments } from "./sampleDocuments.ts"
 
 // Evaluation round 1's runner (implementation-plan.md, E1.2): runs the rulebook build in process, without a Workflow,
 // on the cached page records in .fixtures/ocr/ (git-ignored: they name individuals, so nothing here prints their text),
 // with the real models, traced to Langfuse as the app traces a build (session id = run id). Writes the merged draft,
 // every step's output (the per-unit drafts are under steps/encode and steps/repair), the issues and a short report to
-// .fixtures/eval/encoding/<run id>/. Scoring against the golden encoding is E1.3. Usage, from apps/hoa:
+// .fixtures/eval/encoding/<run id>/: draft.json, issues.json, run.json (the units, calls and prompt versions the
+// scorer reads) and build.md. `pnpm eval:encoding:score <run id>` scores it against the golden encoding. Usage, from
+// apps/hoa:
 //   pnpm eval:encoding [--split dev|test|all] [--documents declaration,design-guidelines] [--units <key>,<key>]
-// The split is by provision key: dev is the Declaration's Articles 1 to 8 and the use restrictions (Exhibit C), test
-// its Articles 9 to 21. --units keeps only units holding or under the given provision keys or in the given documents.
+// The split is by provision key (encodingSplits.ts). --units keeps only units holding or under the given provision
+// keys or in the given documents.
 const { values } = parseArgs({
   options: {
     split: { type: "string", default: "dev" },
@@ -30,17 +34,7 @@ const { values } = parseArgs({
   }
 })
 
-const articles = (from: number, to: number) =>
-  Array.from({ length: to - from + 1 }, (_, index) => `declaration:article-${from + index}`)
-const splits: Record<string, string[] | null> = {
-  dev: [...articles(1, 8), "use-restrictions"],
-  test: articles(9, 21),
-  all: null
-}
-const split = splits[values.split]
-if (split === undefined) {
-  throw new Error(`--split is dev, test or all, not ${values.split}`)
-}
+const split = splitSelectors(values.split)
 const unitSelectors = values.units?.split(",").filter(Boolean) ?? null
 const documents = values.documents.split(",").map((fixture) => {
   const found = sampleDocuments.find((document) => document.fixture === fixture)
@@ -56,28 +50,9 @@ const ai = createAiContext()
 if (!ai.isConfigured) {
   throw new Error(`Missing settings: ${ai.missing.join(", ")}`)
 }
-const fixtures = join(import.meta.dirname, "../../../.fixtures")
 const runId = `${new Date().toISOString().replaceAll(":", "-").slice(0, 19)}-${values.split}`
-const out = join(fixtures, "eval/encoding", runId)
+const out = join(encodingRuns, runId)
 const fileName = (name: string) => name.replaceAll(":", "~")
-/** Writes a value as JSON and returns the text written. */
-const writeJson = (path: string, value: unknown) => {
-  mkdirSync(dirname(path), { recursive: true })
-  const text = `${JSON.stringify(value, null, 1)}\n`
-  writeFileSync(path, text)
-  return text
-}
-
-/** Model results by content, shared by runs, so a rerun pays only for what changed. */
-function fileCache(stage: string): PromptCache {
-  const path = (key: string) => join(fixtures, "eval/encoding/cache", stage, `${key}.json`)
-  return {
-    get: async (key) => (existsSync(path(key)) ? JSON.parse(readFileSync(path(key), "utf8")) : undefined),
-    put: async (key, value) => {
-      writeJson(path(key), value)
-    }
-  }
-}
 
 /** Runs a step in process, keeping its output as the Workflow would, and checking it round-trips the same way. */
 const step: StepRunner = async (name, schema, run) => {
@@ -146,6 +121,19 @@ writeJson(join(out, "draft.json"), {
   ...result.content
 })
 writeJson(join(out, "issues.json"), { failures: result.failures, ...result.issues })
+writeJson(join(out, "run.json"), {
+  runId,
+  split: values.split,
+  documents: values.documents,
+  units: values.units ?? null,
+  promptVersions,
+  report: {
+    units: result.report.units,
+    validAfterEncode: result.report.validAfterEncode,
+    problemsBefore: result.report.problemsBefore,
+    calls: result.report.calls
+  }
+})
 
 const { calls } = result.report
 const sum = (values: (number | null)[]) => values.reduce<number>((total, value) => total + (value ?? 0), 0)
@@ -177,6 +165,6 @@ const report = [
   `Failures: ${result.failures.length === 0 ? "none" : result.failures.map((failure) => `${failure.stage} ${failure.itemId}: ${failure.message}`).join("; ")}`,
   ""
 ].join("\n")
-writeFileSync(join(out, "report.md"), report)
+writeFileSync(join(out, "build.md"), report)
 console.warn(report)
 console.warn(`Written to ${out}`)

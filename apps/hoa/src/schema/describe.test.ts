@@ -231,3 +231,27 @@ describe("describeCheck", () => {
     ).toBe("it was approved by the Reviewer in writing beforehand")
   })
 })
+
+describe("linked terms", () => {
+  it("writes terms as statement links, units as labels, and keeps the article the label needs", () => {
+    const options = { linkTerms: true }
+    const height = { type: "ref" as const, path: ["fence-run.height"] }
+    expect(
+      describeCondition(
+        { type: "compare", left: height, op: "<=", right: { type: "quantity", value: 72, unit: "inch" } },
+        vocabulary,
+        options
+      )
+    ).toBe("its {{fence-run.height}} is at most 72 in")
+    expect(describeCondition({ type: "is-a", path: [], category: "return-fence" }, vocabulary, options)).toBe(
+      "it is a {{return-fence}}"
+    )
+    expect(
+      describeCheck(
+        { type: "approval", by: ["committee"], needs: "all", prior: false, written: false },
+        vocabulary,
+        options
+      )
+    ).toBe("it was approved by the {{committee}}")
+  })
+})

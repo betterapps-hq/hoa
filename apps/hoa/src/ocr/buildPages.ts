@@ -176,3 +176,24 @@ export function computeDocumentLayout(pages: readonly Page[]): DocumentLayout {
     .map(([line]) => line)
   return { labels, repeatedLines }
 }
+
+/** A Word file has no real pages: its text is stored as one page. */
+export function mergeWordPages(pages: readonly Page[]): Page {
+  const [first] = pages
+  if (!first) {
+    throw new Error("A Word file produced no text.")
+  }
+  const text = pages.map((page) => page.text).join("\n\n")
+  return {
+    ...first,
+    pageIndex: 1,
+    pageLabel: null,
+    labelSource: null,
+    text,
+    normalizedText: pages.map((page) => page.normalizedText).join(" "),
+    headings: [],
+    checkboxes: pages.flatMap((page) => page.checkboxes),
+    figures: [],
+    lowConfidenceSpans: []
+  }
+}

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 import type { ApplicationListItem } from "../applications.functions"
@@ -7,7 +7,7 @@ import { ApplicationsPage, type ApplicationsPageProps, type NewApplication } fro
 const application: ApplicationListItem = {
   id: "app-1",
   hoaId: "hoa",
-  projectType: "fence",
+  projectKind: "fence-work",
   description: "Replace the side fence",
   createdBy: "demo-homeowner",
   createdAt: "2026-10-08T10:00:00.000Z",
@@ -18,12 +18,14 @@ const application: ApplicationListItem = {
   submittedAt: "2026-10-08T11:00:00.000Z",
   decision: null,
   deleteAfter: null,
-  recommendation: "request-information"
+  recommendation: "request-information",
+  projectKindLabel: "Fence"
 }
 
 function setup(overrides: Partial<ApplicationsPageProps> = {}) {
   const props: ApplicationsPageProps = {
     applications: [application],
+    projectKinds: [{ key: "fence-work", label: "Fence" }],
     isCommittee: false,
     onCreate: vi.fn<(input: NewApplication) => Promise<void>>(async () => undefined),
     onOpen: vi.fn<(id: string) => void>(),
@@ -40,7 +42,22 @@ describe("ApplicationsPage", () => {
     await user.type(screen.getByLabelText("Project description"), "  New rear fence  ")
     await user.upload(screen.getByLabelText("Application packet"), pdf)
     await user.click(screen.getByRole("button", { name: "Upload and review" }))
-    expect(props.onCreate).toHaveBeenCalledWith({ projectType: "fence", description: "New rear fence", files: [pdf] })
+    expect(props.onCreate).toHaveBeenCalledWith({
+      projectKind: "fence-work",
+      description: "New rear fence",
+      files: [pdf]
+    })
+  })
+
+  it("offers the rulebook's project kinds and something else", async () => {
+    const { props, user } = setup()
+    await user.selectOptions(screen.getByLabelText("Project type"), "Something else")
+    await user.upload(
+      screen.getByLabelText("Application packet"),
+      new File(["%PDF"], "form.pdf", { type: "application/pdf" })
+    )
+    await user.click(screen.getByRole("button", { name: "Upload and review" }))
+    expect(props.onCreate).toHaveBeenCalledWith(expect.objectContaining({ projectKind: null }))
   })
 
   it("asks for the packet, and refuses files it can't read", async () => {
@@ -73,6 +90,7 @@ describe("ApplicationsPage", () => {
 
   it("lists applications with status and latest recommendation, and opens one", async () => {
     const { props, user } = setup()
+    expect(within(screen.getByRole("table")).getByText("Fence")).toBeInTheDocument()
     expect(screen.getByText("With the committee")).toBeInTheDocument()
     expect(screen.getByText("More information needed")).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Open" }))

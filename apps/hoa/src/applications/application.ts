@@ -1,8 +1,10 @@
 import { z } from "zod"
-import { applicationFileKinds, projectTypeIds } from "@/rules/catalog"
 import { errorInfoSchema } from "@/shared/schemas"
 
 // Applications and their files (docs/design/documents.md, "Applications").
+
+/** Every application is an architectural application (application-review.md, Load). */
+export const applicationRequestType = "architectural-application"
 
 export const applicationStatuses = [
   "draft",
@@ -32,7 +34,8 @@ export const decisionSchema = z.object({
 export const applicationSchema = z.object({
   id: z.string(),
   hoaId: z.string(),
-  projectType: z.enum(projectTypeIds),
+  /** The project kind the homeowner chose: a category of work in the rulebook; null for "Something else". */
+  projectKind: z.string().nullable(),
   description: z.string().nullable(),
   createdBy: z.string(),
   createdAt: z.string(),
@@ -58,7 +61,8 @@ export const applicationFileSchema = z.object({
   sizeBytes: z.number().int(),
   sha256: z.string().nullable(),
   pageCount: z.number().int().nullable(),
-  kind: z.enum(applicationFileKinds).nullable(),
+  /** The document type every page shares, from classification. */
+  kind: z.string().nullable(),
   status: z.enum(["uploading", "processing", "ready", "unreadable"]),
   error: errorInfoSchema.nullable(),
   createdAt: z.string()

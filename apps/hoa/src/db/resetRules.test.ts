@@ -93,7 +93,7 @@ describe("resetRulesData", { timeout: 30_000 }, () => {
     })
     const application = await createApplication(db, {
       hoaId,
-      projectType: "fence",
+      projectKind: null,
       description: null,
       createdBy: "h",
       now,

@@ -47,12 +47,15 @@ export const rulebookKeys = (hoaId: string, rulebookId: string) => {
 }
 
 /**
- * A rulebook build's step outputs (encoding.md, Storage), by step name: `encode:declaration:article-4` is
- * `encode/declaration:article-4.json`, and a step without an item, such as `merge`, is `merge/result.json`.
+ * A job's step output by step name: `encode:declaration:article-4` is `encode/declaration:article-4.json`, and a step
+ * without an item, such as `merge`, is `merge/result.json`.
  */
+export function jobStepKey(hoaId: string, jobId: string, name: string) {
+  const [stage = name, ...item] = name.split(":")
+  return jobOutputKey(hoaId, jobId, stage, item.join(":") || "result")
+}
+
+/** A rulebook build's step outputs (encoding.md, Storage). */
 export const rulebookBuildKeys = (hoaId: string, jobId: string) => ({
-  step: (name: string) => {
-    const [stage = name, ...item] = name.split(":")
-    return jobOutputKey(hoaId, jobId, stage, item.join(":") || "result")
-  }
+  step: (name: string) => jobStepKey(hoaId, jobId, name)
 })

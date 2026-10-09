@@ -21,6 +21,7 @@ Two model stages have no dataset of their own and are measured through the stage
 | `review-decision` | Facts, document statuses and a rulebook | Findings, recommendation and action items | Hand-built variants; code only, no model |
 | `review-writer` | Findings, recommendation and action items | None: scored by judges | Items from `review-decision` |
 | `rule-corrections` | An administrator's edit or rejection | The corrected rule | Production; reviewed before it's copied into `rule-extraction` |
+| `encoding-evaluation` | One split of the sample Declaration (`encoding-dev`, `encoding-test`) | The golden encoding, `samples/declaration/rules.json` | `pnpm eval:encoding:score`: one dataset run per evaluation run, a score per measure (evaluation round 1) |
 
 The gold rulebook comes from the governing documents only: guidelines Article 5 and its exhibits, CC&R Article 4, and
 the HOA's blank application form and checklist (until the HOA provides a blank copy, the packet's form pages with every
@@ -63,8 +64,8 @@ the redacted copy, with the homeowners' details replaced.
 | Document status accuracy | Status and problems equal gold | Documents |
 | Qualitative accuracy | Status equals gold | Qualitative checks |
 | Finding and recommendation accuracy | Equal gold (code) | Evaluate, decide |
-| Feedback faithfulness | Model judge: every statement is backed by a finding or action item; nothing is invented | Write |
-| Feedback clarity | Model judge: the homeowner can tell exactly what to change or provide | Write |
+| Feedback faithfulness and clarity | Model judge `hoa-eval-review-judge` (one call per review in `pnpm eval:review`): the assessment, the feedback and each action item are faithful (every statement is backed by a finding or action item; nothing is invented) and clear (the homeowner can tell exactly what to change or provide); the score is the share of parts that are both | Write |
+| Encoding against the golden | Provision keys and text, coverage and no-rule reasons, term recall, validity and repair (code); rule recall, precision and pairwise quality (judge `hoa-eval-encoding-judge`, per provision); modality and check agreement on the pairs it finds (code, the engine on generated facts) | Rulebook build ([implementation-plan.md](implementation-plan.md#evaluation-round-1-encoding-quality)) |
 
 Evaluate and decide are code, so `review-decision` also runs as ordinary unit tests; the Langfuse experiment tracks the
 pipeline end to end.

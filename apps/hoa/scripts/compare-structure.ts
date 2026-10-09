@@ -4,12 +4,12 @@ import { z } from "zod"
 import { checkStructure } from "../src/encoding/check.ts"
 import { cleanPages } from "../src/encoding/clean.ts"
 import { structureDocument } from "../src/encoding/provisions.ts"
+import { compareProvisions, splitMembership } from "../src/evaluation/encoding/provisions.ts"
 import { analyzeResultOf } from "../src/ocr/layoutClient.ts"
 import { layoutResultSchema } from "../src/ocr/layoutResult.ts"
-import { normalizeForMatching, pageSchema } from "../src/ocr/page.ts"
-import type { Provision } from "../src/schema/types.ts"
+import { pageSchema } from "../src/ocr/page.ts"
 import { rulesFile } from "../src/schema/zod.ts"
-import { ratio } from "../src/text/match.ts"
+import { splitSelectors } from "./encodingSplits.ts"
 
 // Runs structure on the sample Declaration's cached page records (git-ignored .fixtures/ocr/declaration, see
 // ocr-fixture.ts) with Exhibit C as its own document, and compares the provisions with the committed golden encoding
@@ -33,29 +33,8 @@ const documents = structureDocument(clean, {
 const check = checkStructure(clean, documents)
 const ours = documents.flatMap((document) => document.provisions)
 
-const marker =
-  /^\s*(?:(?:article|part|exhibit)\s+["“]?[a-z0-9]+["”]?:?|section\s+[\d.]+|\d+(?:[.\s-]\d+)*\.?|\([a-z0-9]+\))\s*/i
-
-/** What a provision says: its heading (unless its text repeats it), text, intro and wrap-up, without the number. */
-function content(provision: Provision) {
-  const text = normalizeForMatching(provision.text.replace(marker, ""))
-  const heading = provision.kind === "definition" ? "" : normalizeForMatching(provision.heading ?? "")
-  const body = heading && !text.startsWith(heading) ? `${heading} ${text}` : text
-  return [body, provision.intro, provision.wrapUp]
-    .map((part) => normalizeForMatching(part ?? ""))
-    .filter(Boolean)
-    .join(" ")
-}
-
 const byKey = new Map(ours.map((provision) => [provision.key, provision]))
-const goldenKeys = new Set(golden.map((provision) => provision.key))
-const matched = golden.flatMap((provision) => {
-  const found = byKey.get(provision.key)
-  return found ? [{ golden: provision, ours: found, score: ratio(content(provision), content(found)) }] : []
-})
-const missing = golden.filter((provision) => !byKey.has(provision.key)).map((provision) => provision.key)
-const extra = ours.filter((provision) => !goldenKeys.has(provision.key)).map((provision) => provision.key)
-const average = matched.reduce((sum, { score }) => sum + score, 0) / Math.max(matched.length, 1)
+const { matched, missing, extra, similarity: average } = compareProvisions(golden, ours)
 const sameHeading = matched.filter(({ golden: g, ours: o }) => (g.heading ?? "") === (o.heading ?? "")).length
 const sameIntro = matched.filter(({ golden: g, ours: o }) => (g.intro === null) === (o.intro === null)).length
 const percent = (count: number, of: number) => `${((100 * count) / Math.max(of, 1)).toFixed(1)}%`
@@ -67,15 +46,10 @@ for (const problem of check.problems) {
 }
 console.warn(`golden keys matched: ${matched.length}/${golden.length} (${percent(matched.length, golden.length)})`)
 console.warn(`average text similarity of matched provisions: ${average.toFixed(4)}`)
-// Evaluation round 1's split (implementation-plan.md): Articles 9 to 21 are the test articles, the rest dev.
-const isTest = (key: string) => /^declaration:(article-(9|1\d|2[01])\b|(9|1\d|2[01])\.)/.test(key)
-for (const [name, inSplit] of [
-  ["dev", (key: string) => !isTest(key)],
-  ["test", isTest]
-] as const) {
+for (const name of ["dev", "test"]) {
+  const inSplit = splitMembership([...golden, ...ours], splitSelectors(name) ?? [])
   const keys = golden.filter((provision) => inSplit(provision.key))
-  const found = matched.filter((item) => inSplit(item.golden.key))
-  const score = found.reduce((sum, item) => sum + item.score, 0) / Math.max(found.length, 1)
+  const { matched: found, similarity: score } = compareProvisions(keys, ours)
   console.warn(
     `  ${name}: ${found.length}/${keys.length} keys (${percent(found.length, keys.length)}), similarity ${score.toFixed(4)}`
   )

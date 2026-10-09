@@ -8,7 +8,7 @@ import {
   settings as settingsSchema,
   term as termSchema
 } from "@/schema/zod"
-import { insertChunks, runBatch } from "./batching"
+import { chunk, insertChunks, runBatch } from "./batching"
 import type { Database } from "./database"
 import { rulebookQuestions, rulebookRules, rulebooks, rulebookTerms, rules } from "./schema"
 
@@ -179,30 +179,75 @@ export async function getRulebookRule(db: Database, hoaId: string, rulebookId: s
   return row ? ruleSchema.parse(row.rule) : null
 }
 
-/** Saves one rule, added or edited, and its review. */
-export async function saveRulebookRule(db: Database, hoaId: string, rulebookId: string, rule: Rule) {
-  const row = await ruleRow(hoaId, rulebookId, ruleSchema.parse(rule))
-  const { kind, requestTypes, appliesTo, reviewStatus, contentHash } = row
-  await db
-    .insert(rulebookRules)
-    .values(row)
-    .onConflictDoUpdate({
-      target: [rulebookRules.rulebookId, rulebookRules.ruleKey],
-      set: { kind, requestTypes, appliesTo, reviewStatus, contentHash, rule: row.rule }
-    })
+/** Records an administrator changed in review, saved in one batch: rules, terms and questions by key, and the settings. */
+export type RulebookChanges = {
+  rules?: Rule[]
+  terms?: Term[]
+  questions?: Question[]
+  settings?: Settings | null
 }
 
-/** Saves one term, added or edited, and its review. */
-export async function saveRulebookTerm(db: Database, hoaId: string, rulebookId: string, term: Term) {
-  const row = await termRow(hoaId, rulebookId, termSchema.parse(term))
-  const { kind, reviewStatus, contentHash } = row
+/**
+ * Saves reviewed or edited records, adding any that are new. A change of up to 100 records lands whole; a bulk review
+ * goes in batches of 100, each landing whole.
+ */
+export async function saveRulebookChanges(db: Database, hoaId: string, rulebookId: string, changes: RulebookChanges) {
+  const [ruleRows, termRows] = await Promise.all([
+    Promise.all((changes.rules ?? []).map((rule) => ruleRow(hoaId, rulebookId, ruleSchema.parse(rule)))),
+    Promise.all((changes.terms ?? []).map((term) => termRow(hoaId, rulebookId, termSchema.parse(term))))
+  ])
+  const questionRows = (changes.questions ?? []).map((question) =>
+    questionRow(hoaId, rulebookId, questionSchema.parse(question))
+  )
+  const statements = [
+    ...ruleRows.map((row) => {
+      const { kind, requestTypes, appliesTo, reviewStatus, contentHash, rule } = row
+      return db
+        .insert(rulebookRules)
+        .values(row)
+        .onConflictDoUpdate({
+          target: [rulebookRules.rulebookId, rulebookRules.ruleKey],
+          set: { kind, requestTypes, appliesTo, reviewStatus, contentHash, rule }
+        })
+    }),
+    ...termRows.map((row) => {
+      const { kind, reviewStatus, contentHash, term } = row
+      return db
+        .insert(rulebookTerms)
+        .values(row)
+        .onConflictDoUpdate({
+          target: [rulebookTerms.rulebookId, rulebookTerms.termKey],
+          set: { kind, reviewStatus, contentHash, term }
+        })
+    }),
+    ...questionRows.map((row) =>
+      db
+        .insert(rulebookQuestions)
+        .values(row)
+        .onConflictDoUpdate({
+          target: [rulebookQuestions.rulebookId, rulebookQuestions.id],
+          set: { question: row.question, answer: row.answer }
+        })
+    ),
+    ...(changes.settings
+      ? [
+          db
+            .update(rulebooks)
+            .set({ settings: settingsSchema.parse(changes.settings) })
+            .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId)))
+        ]
+      : [])
+  ]
+  for (const group of chunk(statements, 100)) {
+    await runBatch(db, group)
+  }
+}
+
+/** Removes a rule from a draft. */
+export async function deleteRulebookRule(db: Database, hoaId: string, rulebookId: string, ruleKey: string) {
   await db
-    .insert(rulebookTerms)
-    .values(row)
-    .onConflictDoUpdate({
-      target: [rulebookTerms.rulebookId, rulebookTerms.termKey],
-      set: { kind, reviewStatus, contentHash, term: row.term }
-    })
+    .delete(rulebookRules)
+    .where(and(inRulebook(rulebookRules, hoaId, rulebookId), eq(rulebookRules.ruleKey, ruleKey)))
 }
 
 /** Records where a rulebook's rules file was written, when it's published. */

@@ -231,7 +231,7 @@ describe("repositories", () => {
     const { db } = database
     const application = await createApplication(db, {
       hoaId,
-      projectType: "fence",
+      projectKind: null,
       description: "New fence",
       createdBy: "demo-homeowner",
       now,
@@ -254,7 +254,7 @@ describe("repositories", () => {
     const { db } = database
     const application = await createApplication(db, {
       hoaId,
-      projectType: "fence",
+      projectKind: null,
       description: null,
       createdBy: "h",
       now,

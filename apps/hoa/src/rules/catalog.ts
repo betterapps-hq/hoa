@@ -295,7 +295,3 @@ const fence: ProjectType = {
 }
 
 export const projectTypes: Record<ProjectTypeId, ProjectType> = { fence }
-
-export function getAttribute(projectType: ProjectTypeId, key: string): Attribute | undefined {
-  return projectTypes[projectType].attributes.find((attribute) => attribute.key === key)
-}

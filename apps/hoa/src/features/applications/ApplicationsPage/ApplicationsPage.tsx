@@ -11,14 +11,14 @@ import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { projectTypeIds, projectTypes, type ProjectTypeId } from "@/rules/catalog"
+import type { ProjectKind } from "@/review/reviewRules"
 import { acceptFor } from "@/storage/uploadRules"
 import { recommendationLabels, statusLabels } from "../applicationDisplay"
 import type { ApplicationListItem } from "../applications.functions"
 import { uploadProblem } from "../uploadApplicationFiles"
 
 const newApplicationSchema = z.object({
-  projectType: z.enum(projectTypeIds),
+  projectKind: z.string(),
   description: z.string().trim().max(4000, "Keep the description under 4,000 characters."),
   files: z
     .array(z.instanceof(File))
@@ -31,10 +31,12 @@ const newApplicationSchema = z.object({
     })
 })
 
-export type NewApplication = { projectType: ProjectTypeId; description: string | null; files: File[] }
+export type NewApplication = { projectKind: string | null; description: string | null; files: File[] }
 
 export type ApplicationsPageProps = {
   applications: ApplicationListItem[]
+  /** The rulebook's project kinds to choose from; "Something else" is always offered. */
+  projectKinds: ProjectKind[]
   /** Committee members see every application; homeowners see their own and can start one. */
   isCommittee: boolean
   onCreate: (application: NewApplication) => Promise<void>
@@ -44,16 +46,16 @@ export type ApplicationsPageProps = {
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
 
 /** A homeowner's applications with a form to start one, or the committee's queue. */
-export function ApplicationsPage({ applications, isCommittee, onCreate, onOpen }: ApplicationsPageProps) {
+export function ApplicationsPage({ applications, projectKinds, isCommittee, onCreate, onOpen }: ApplicationsPageProps) {
   const [error, setError] = useState<string | null>(null)
   const form = useForm({
-    defaultValues: { projectType: "fence" as ProjectTypeId, description: "", files: [] as File[] },
+    defaultValues: { projectKind: projectKinds[0]?.key ?? "", description: "", files: [] as File[] },
     validators: { onSubmit: newApplicationSchema },
     onSubmit: async ({ value }) => {
       setError(null)
       try {
         await onCreate({
-          projectType: value.projectType,
+          projectKind: value.projectKind || null,
           description: value.description.trim() || null,
           files: value.files
         })
@@ -82,25 +84,21 @@ export function ApplicationsPage({ applications, isCommittee, onCreate, onOpen }
               }}
             >
               <FieldGroup>
-                <form.Field name="projectType">
+                <form.Field name="projectKind">
                   {(field) => (
                     <Field>
                       <FieldLabel htmlFor={field.name}>Project type</FieldLabel>
                       <NativeSelect
                         id={field.name}
                         value={field.state.value}
-                        onChange={(event) => {
-                          const projectType = projectTypeIds.find((item) => item === event.target.value)
-                          if (projectType) {
-                            field.handleChange(projectType)
-                          }
-                        }}
+                        onChange={(event) => field.handleChange(event.target.value)}
                       >
-                        {projectTypeIds.map((id) => (
-                          <NativeSelectOption key={id} value={id}>
-                            {projectTypes[id].label}
+                        {projectKinds.map((kind) => (
+                          <NativeSelectOption key={kind.key} value={kind.key}>
+                            {kind.label}
                           </NativeSelectOption>
                         ))}
+                        <NativeSelectOption value="">Something else</NativeSelectOption>
                       </NativeSelect>
                     </Field>
                   )}
@@ -197,7 +195,7 @@ export function ApplicationsPage({ applications, isCommittee, onCreate, onOpen }
                 {applications.map((application) => (
                   <TableRow key={application.id}>
                     <TableCell className="max-w-80">
-                      <div className="font-medium">{projectTypes[application.projectType].label}</div>
+                      <div className="font-medium">{application.projectKindLabel ?? "Something else"}</div>
                       {application.description ? (
                         <div className="truncate text-muted-foreground">{application.description}</div>
                       ) : null}

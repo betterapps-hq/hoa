@@ -32,8 +32,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
-import { hasOpenRequests } from "@/pipeline/reviewInputs"
-import { projectTypes } from "@/rules/catalog"
+import { hasOpenRequests } from "@/review/reviewModel"
 import { acceptFor } from "@/storage/uploadRules"
 import {
   fileStatusLabels,
@@ -206,7 +205,7 @@ export function ApplicationPage({ view, loadJob, actions, onChanged }: Applicati
     <div className="flex flex-col gap-4 px-4 lg:px-6">
       <Card>
         <CardHeader>
-          <CardTitle>{projectTypes[application.projectType].label} application</CardTitle>
+          <CardTitle>{view.projectKindLabel ?? "Project"} application</CardTitle>
           <CardDescription>
             Started {dateFormat.format(new Date(application.createdAt))}
             {application.submittedAt ? `, submitted ${dateFormat.format(new Date(application.submittedAt))}` : ""}

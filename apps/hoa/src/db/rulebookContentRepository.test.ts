@@ -4,13 +4,13 @@ import type { Review } from "@/schema/types"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
 import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
 import {
+  deleteRulebookRule,
   getPublishedRulesFile,
   getRulebookContent,
   getRulebookRule,
   recordRulebookFile,
   saveRulebookContent,
-  saveRulebookRule,
-  saveRulebookTerm,
+  saveRulebookChanges,
   type RulebookContent
 } from "./rulebookContentRepository"
 import { insertRulebook, publishRulebook } from "./rulebookRepository"
@@ -83,7 +83,7 @@ describe("rulebookContentRepository", { timeout: 30_000 }, () => {
     expect(row?.contentHash).toMatch(/^[0-9a-f]{64}$/)
   })
 
-  it("saves one rule or term at a time, keeping the filter columns current", async () => {
+  it("saves changed records, keeping the filter columns current, and deletes a rule", async () => {
     const { db } = database
     await insertRulebook(db, rulebook("draft", "draft"))
     await saveRulebookContent(db, hoaId, "draft", { ...content, rules: [], terms: [] })
@@ -93,15 +93,25 @@ describe("rulebookContentRepository", { timeout: 30_000 }, () => {
       throw new Error("The sample has rules and terms")
     }
 
-    await saveRulebookRule(db, hoaId, "draft", rule)
-    await saveRulebookRule(db, hoaId, "draft", { ...rule, review: approved })
-    await saveRulebookTerm(db, hoaId, "draft", term)
-    await saveRulebookTerm(db, hoaId, "draft", { ...term, review: approved })
+    const [question] = content.questions
+    await saveRulebookChanges(db, hoaId, "draft", { rules: [rule], terms: [term] })
+    await saveRulebookChanges(db, hoaId, "draft", {
+      rules: [{ ...rule, review: approved }],
+      terms: [{ ...term, review: approved }],
+      questions: question ? [{ ...question, answer: { option: 0, text: null, by: "admin", at: now } }] : [],
+      settings: { ...content.settings, review: approved }
+    })
 
     expect(await getRulebookRule(db, hoaId, "draft", rule.key)).toEqual({ ...rule, review: approved })
     expect(await getRulebookRule(db, hoaId, "draft", "declaration:0#missing")).toBeNull()
     expect((await db.select().from(rulebookRules)).map((row) => row.reviewStatus)).toEqual(["approved"])
     expect((await db.select().from(rulebookTerms)).map((row) => row.reviewStatus)).toEqual(["approved"])
+    const saved = await getRulebookContent(db, hoaId, "draft")
+    expect(saved?.settings.review).toEqual(approved)
+    expect(saved?.questions.find((item) => item.id === question?.id)?.answer?.option).toBe(0)
+
+    await deleteRulebookRule(db, hoaId, "draft", rule.key)
+    expect(await getRulebookRule(db, hoaId, "draft", rule.key)).toBeNull()
   })
 
   it("finds the published rulebook's rules file", async () => {

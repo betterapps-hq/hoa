@@ -17,8 +17,18 @@ function joinWith(items: string[], conjunction: "and" | "or") {
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 const article = (text: string) => `${/^[aeiou]/i.test(text) ? "an" : "a"} ${text}`
 
-function describer(vocabulary: Vocabulary) {
-  const label = (key: T.TermKey) => vocabulary.label(key)
+export type DescribeOptions = {
+  /** Writes each term but a unit as a statement link (`{{key}}`) instead of its label, for screens to render. */
+  linkTerms?: boolean
+}
+
+function describer(vocabulary: Vocabulary, { linkTerms = false }: DescribeOptions) {
+  const label = (key: T.TermKey, plural = false) => {
+    const kind = vocabulary.get(key)?.kind
+    return linkTerms && kind && kind !== "unit" ? `{{${key}${plural ? ":plural" : ""}}}` : vocabulary.label(key, plural)
+  }
+  // "a" or "an" goes by the label, which a link hides.
+  const aTerm = (key: T.TermKey) => `${/^[aeiou]/i.test(vocabulary.label(key)) ? "an" : "a"} ${label(key)}`
   const the = (key: T.TermKey) => `the ${label(key)}`
 
   function amount(value: number, unit: T.TermKey) {
@@ -80,7 +90,7 @@ function describer(vocabulary: Vocabulary) {
           .with("greatest-of", () => "greatest")
           .with("least-of", () => "least")
           .exhaustive()
-        const value = aggregate.value.map(label).join("'s ")
+        const value = aggregate.value.map((key) => label(key)).join("'s ")
         return `the ${word} ${value} of ${path(aggregate)}${where(aggregate.where)}`
       })
       .with({ type: "shift" }, (shift) => {
@@ -175,7 +185,7 @@ function describer(vocabulary: Vocabulary) {
           `${operand(between.left)} is ${range(operand(between.min), operand(between.max), between.includeMin, between.includeMax)}`
       )
       .with({ type: "exists" }, (exists) => `${path(exists)} exists`)
-      .with({ type: "is-a" }, (isA) => `${path(isA)} is ${article(label(isA.category))}`)
+      .with({ type: "is-a" }, (isA) => `${path(isA)} is ${aTerm(isA.category)}`)
       .with({ type: "approved" }, (approved) => `${path(approved)} was ${approval(approved)}`)
       .with({ type: P.union("every", "some", "none") }, (quantifier) => {
         const which = match(quantifier.type)
@@ -228,7 +238,7 @@ function describer(vocabulary: Vocabulary) {
         const each = document.per === "subject" ? " for each one" : ""
         const states = document.mustState.length > 0 ? `, stating ${joinWith(document.mustState, "and")}` : ""
         const signed = document.signedBy.length > 0 ? `, signed by ${parties(document.signedBy, "all")}` : ""
-        return `${article(label(document.document))} is provided${each}${states}${signed}`
+        return `${aTerm(document.document)} is provided${each}${states}${signed}`
       })
       .with({ type: "deadline" }, (deadline) => {
         const anchor = operand(deadline.anchor)
@@ -245,7 +255,12 @@ function describer(vocabulary: Vocabulary) {
       })
       .with({ type: "judgment" }, (judgment) => {
         const evidence =
-          judgment.evidence.length > 0 ? ` (judged from ${joinWith(judgment.evidence.map(label), "and")})` : ""
+          judgment.evidence.length > 0
+            ? ` (judged from ${joinWith(
+                judgment.evidence.map((key) => label(key)),
+                "and"
+              )})`
+            : ""
         return `the answer to "${judgment.question}" is yes${evidence}`
       })
       .with({ type: "approval" }, (test) => `it was ${approval(test)}`)
@@ -320,7 +335,7 @@ function describer(vocabulary: Vocabulary) {
       })
       .exhaustive()
     return `${sentence} Runs in ${joinWith(
-      value.requestTypes.map((key) => vocabulary.label(key, true)),
+      value.requestTypes.map((key) => label(key, true)),
       "and"
     )}.`
   }
@@ -328,9 +343,11 @@ function describer(vocabulary: Vocabulary) {
   return { condition, check, rule }
 }
 
-export const describeRule = (rule: RuleContent, vocabulary: Vocabulary) => describer(vocabulary).rule(rule)
+export const describeRule = (rule: RuleContent, vocabulary: Vocabulary, options: DescribeOptions = {}) =>
+  describer(vocabulary, options).rule(rule)
 
-export const describeCondition = (condition: T.Condition, vocabulary: Vocabulary) =>
-  describer(vocabulary).condition(condition)
+export const describeCondition = (condition: T.Condition, vocabulary: Vocabulary, options: DescribeOptions = {}) =>
+  describer(vocabulary, options).condition(condition)
 
-export const describeCheck = (check: T.Check, vocabulary: Vocabulary) => describer(vocabulary).check(check)
+export const describeCheck = (check: T.Check, vocabulary: Vocabulary, options: DescribeOptions = {}) =>
+  describer(vocabulary, options).check(check)

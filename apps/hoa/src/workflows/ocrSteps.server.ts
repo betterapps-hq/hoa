@@ -1,13 +1,13 @@
 import type { WorkflowStep } from "cloudflare:workers"
 import { NonRetryableError } from "cloudflare:workflows"
-import { z } from "zod"
 import { pipelinePrompts } from "@/ai/pipelinePrompts"
 import type { PromptLoader } from "@/ai/promptLoader"
 import { runObjectPrompt, type ModelFactory } from "@/ai/runPrompt"
-import { buildPages, computeDocumentLayout } from "@/ocr/buildPages"
+import { buildPages, computeDocumentLayout, mergeWordPages } from "@/ocr/buildPages"
 import { analyzeResultOf, layoutEngine, LayoutError, type LayoutClient } from "@/ocr/layoutClient"
 import { layoutResultSchema } from "@/ocr/layoutResult"
 import { pageSchema, type Page } from "@/ocr/page"
+import { visualDescriptionSchema, type StoredVisual } from "@/ocr/visualDescription"
 import { createObjectPromptCache, getJson, putJson, toHex } from "@/storage/objects"
 import type { Presigner } from "@/storage/presign"
 
@@ -27,18 +27,6 @@ export const storageStep = {
   retries: { limit: 2, delay: "1 second", backoff: "constant" },
   timeout: "1 minute"
 } as const
-
-export const visualDescriptionSchema = z.object({
-  description: z.string(),
-  measurements: z.array(z.object({ label: z.string(), value: z.string() }))
-})
-
-export const storedVisualSchema = visualDescriptionSchema.extend({
-  figureId: z.string(),
-  pageIndex: z.number().int(),
-  promptVersion: z.number().int()
-})
-export type StoredVisual = z.infer<typeof storedVisualSchema>
 
 export type OcrKeys = {
   source: string
@@ -189,26 +177,6 @@ export async function runOcr(step: WorkflowStep, dependencies: OcrDependencies, 
   await dependencies.progress("visuals", 0, file.mediaType.startsWith("image/") ? 1 : figures.length)
   const figureFailures = await describeVisuals(step, dependencies, file, figures)
   return { sha256, pageCount, figureFailures }
-}
-
-function mergeWordPages(pages: readonly Page[]): Page {
-  const [first] = pages
-  if (!first) {
-    throw new Error("A Word file produced no text.")
-  }
-  const text = pages.map((page) => page.text).join("\n\n")
-  return {
-    ...first,
-    pageIndex: 1,
-    pageLabel: null,
-    labelSource: null,
-    text,
-    normalizedText: pages.map((page) => page.normalizedText).join(" "),
-    headings: [],
-    checkboxes: pages.flatMap((page) => page.checkboxes),
-    figures: [],
-    lowConfidenceSpans: []
-  }
 }
 
 export async function loadPages(bucket: R2Bucket, keys: Pick<OcrKeys, "page">, pageCount: number): Promise<Page[]> {

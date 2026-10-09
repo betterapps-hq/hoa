@@ -16,6 +16,7 @@ import {
   structureOptionsOf,
   type DocumentStructure
 } from "@/documents/documentStructure"
+import { modelCallOf, type ModelCall, type StepRunner } from "@/jobs/steps"
 import type { Page } from "@/ocr/page"
 import type { Edition, GoverningDocument, ProvisionKey, Rule, Term } from "@/schema/types"
 import { encodingDraft, termDraft } from "@/schema/zod"
@@ -47,7 +48,6 @@ import {
   unitProblems,
   unitState,
   vocabularyOutput,
-  type ModelCall,
   type UnitState
 } from "./stepOutputs"
 import { repairStructure, structureRepairAnswer } from "./structureRepair"
@@ -68,14 +68,6 @@ export type BuildStage =
   | "repair"
   | "merge"
   | "consolidate"
-
-export type StepKind = "code" | "model"
-
-/**
- * Runs one named step and returns its output. Outputs must survive a round trip through JSON and `schema`: a Workflow
- * stores them and reads them back on replay.
- */
-export type StepRunner = <T>(name: string, schema: z.ZodType<T>, run: () => Promise<T>, kind?: StepKind) => Promise<T>
 
 /** What the build's model calls need: the prompt loader, models, versions pinned in resolve-prompts and the cache. */
 export type BuildAi = {
@@ -165,23 +157,10 @@ function draftFields(organizationId: string, effectiveFrom: (documentKey: string
   }
 }
 
-function callOf(itemId: string, metrics: PromptRunMetrics): ModelCall {
-  return {
-    stage: traceNames[metrics.promptName] ?? metrics.promptName,
-    itemId,
-    promptName: metrics.promptName,
-    promptVersion: metrics.promptVersion,
-    modelId: metrics.modelId,
-    inputTokens: metrics.inputTokens ?? null,
-    outputTokens: metrics.outputTokens ?? null,
-    costUsd: metrics.costUsd ?? null,
-    latencyMs: metrics.latencyMs,
-    isCached: metrics.isCached
-  }
-}
+const callOf = (itemId: string, metrics: PromptRunMetrics) => modelCallOf(itemId, metrics, traceNames)
 
 /** Runs `run` over `items`, at most `limit` at a time, settling each like `Promise.allSettled`. */
-async function settleEach<T, R>(items: readonly T[], limit: number, run: (item: T) => Promise<R>) {
+export async function settleEach<T, R>(items: readonly T[], limit: number, run: (item: T) => Promise<R>) {
   const results: PromiseSettledResult<R>[] = []
   let next = 0
   const worker = async () => {

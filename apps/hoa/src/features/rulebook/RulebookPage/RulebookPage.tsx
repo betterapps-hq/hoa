@@ -1,6 +1,5 @@
 import { ScrollTextIcon } from "lucide-react"
 import { useState } from "react"
-import { toast } from "sonner"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -10,40 +9,43 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { GoverningDocument } from "@/documents/governingDocument"
+import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
-import type { RulebookView } from "../rulebook.functions"
-import { approvedRuleLines, rulebookCounts, ruleLines } from "../rulebookView"
-import { RuleList } from "../RuleList/RuleList"
+import { attempt } from "../attempt"
+import { PublishedRulebook } from "../PublishedRulebook/PublishedRulebook"
+import type { RulebookSources, RulebookView } from "../rulebook.functions"
+import { recordsOf } from "../rulebookRecords"
+import { rulebookCounts } from "../rulebookView"
+import { RulebookWorkspace } from "../RulebookWorkspace/RulebookWorkspace"
+import type { RulebookActions } from "../useRulebookWorkspace"
 
 export type RulebookPageProps = {
   draft: RulebookView
   published: RulebookView
+  sources: RulebookSources
   documents: GoverningDocument[]
+  /** Loads document pages for citations. */
+  source: CitationSource
+  /** What the administrator can do to the draft. */
+  actions: RulebookActions
   loadJob: (jobId: string) => Promise<Job | null>
+  loadRulesFile: () => Promise<string>
   onBuild: (documentIds: string[]) => Promise<void>
   onPublish: (rulebookId: string) => Promise<void>
   onChanged: () => void
 }
 
-const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
-
-async function attempt(action: () => Promise<unknown>, fallback: string) {
-  try {
-    await action()
-    return true
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : fallback)
-    return false
-  }
-}
-
-/** The administrator's rulebook: build a draft from documents, see what it holds, publish it. */
+/** The administrator's rulebook: build a draft from documents, review it, publish it, and see what's published. */
 export function RulebookPage({
   draft,
   published,
+  sources,
   documents,
+  source,
+  actions,
   loadJob,
+  loadRulesFile,
   onBuild,
   onPublish,
   onChanged
@@ -52,15 +54,15 @@ export function RulebookPage({
   const [selected, setSelected] = useState<string[]>(() => ready.map((document) => document.id))
   const [isBusy, setIsBusy] = useState(false)
   const [tab, setTab] = useState(draft.rulebook || !published.rulebook ? "draft" : "published")
-  const counts = draft.content ? rulebookCounts(draft.content) : null
-  const publishedRules = published.content ? approvedRuleLines(published.content) : []
+  const records = draft.content ? recordsOf(sources, draft.content, "draft") : null
+  const counts = records ? rulebookCounts(records) : null
 
   const run = async (action: () => Promise<unknown>, fallback: string) => {
     setIsBusy(true)
-    const succeeded = await attempt(action, fallback)
+    const result = await attempt(action, fallback)
     setIsBusy(false)
     onChanged()
-    return succeeded
+    return result
   }
 
   return (
@@ -126,7 +128,7 @@ export function RulebookPage({
         </TabsList>
 
         <TabsContent value="draft" className="flex flex-col gap-4">
-          {draft.rulebook && draft.content && counts ? (
+          {draft.rulebook && records && counts ? (
             <>
               <Card size="sm">
                 <CardHeader>
@@ -134,20 +136,28 @@ export function RulebookPage({
                   <CardDescription className="flex flex-wrap gap-2">
                     <Badge variant="outline">{counts.rules} rules</Badge>
                     <Badge variant="outline">{counts.terms} terms</Badge>
+                    <Badge variant="outline">{counts.approved} approved</Badge>
                     <Badge variant="outline">{counts.questions} questions</Badge>
                     <Badge variant="outline">{counts.uncovered} uncovered provisions</Badge>
-                    <Badge variant="outline">{counts.withIssues} with problems</Badge>
+                    <Badge variant="outline">{counts.withIssues} with open issues</Badge>
                   </CardDescription>
                 </CardHeader>
-                {draft.blockers.length > 0 ? (
-                  <CardContent>
-                    <ul className="list-disc pl-5 text-sm text-muted-foreground">
-                      {draft.blockers.map((blocker) => (
-                        <li key={blocker}>{blocker}</li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                ) : null}
+                <CardContent>
+                  {draft.blockers.length > 0 ? (
+                    <div className="flex flex-col gap-1 text-sm">
+                      <p>Before it can be published:</p>
+                      <ul className="list-disc pl-5 text-muted-foreground">
+                        {draft.blockers.map((blocker) => (
+                          <li key={blocker}>{blocker}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Everything is reviewed and the rules file checks out. Publishing replaces the published version.
+                    </p>
+                  )}
+                </CardContent>
                 <CardFooter>
                   <Button
                     disabled={isBusy || draft.blockers.length > 0}
@@ -165,7 +175,7 @@ export function RulebookPage({
                   </Button>
                 </CardFooter>
               </Card>
-              <RuleList rules={ruleLines(draft.content)} showStatus />
+              <RulebookWorkspace records={records} source={source} actions={actions} />
             </>
           ) : (
             <Empty>
@@ -181,39 +191,7 @@ export function RulebookPage({
         </TabsContent>
 
         <TabsContent value="published" className="flex flex-col gap-4">
-          {published.rulebook ? (
-            <>
-              <Card size="sm">
-                <CardHeader>
-                  <CardTitle>Version {published.rulebook.version}</CardTitle>
-                  <CardDescription>
-                    {publishedRules.length} rules
-                    {published.rulebook.publishedAt
-                      ? `, published ${dateFormat.format(new Date(published.rulebook.publishedAt))}`
-                      : ""}
-                    . Applications are reviewed against this version.
-                  </CardDescription>
-                </CardHeader>
-                {published.fileSha256 ? (
-                  <CardContent>
-                    <p className="text-sm break-all text-muted-foreground">
-                      Rules file SHA-256: <span className="font-mono">{published.fileSha256}</span>
-                    </p>
-                  </CardContent>
-                ) : null}
-              </Card>
-              <RuleList rules={publishedRules} />
-            </>
-          ) : (
-            <Empty>
-              <EmptyHeader>
-                <EmptyTitle>Nothing published yet</EmptyTitle>
-                <EmptyDescription>
-                  Homeowners’ applications are checked against the published rulebook.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          )}
+          <PublishedRulebook published={published} sources={sources} source={source} loadRulesFile={loadRulesFile} />
         </TabsContent>
       </Tabs>
     </div>

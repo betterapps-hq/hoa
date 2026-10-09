@@ -3,8 +3,9 @@ import { createGoverningDocument, type BuiltDocuments } from "@/db/documentRepos
 import type { RulebookContent } from "@/db/rulebookContentRepository"
 import { insertRulebook } from "@/db/rulebookRepository"
 import { hoas } from "@/db/schema"
+import type { RulebookRecords } from "@/rulebook/assemble"
 import { buildSettings } from "@/schema/defaultSettings"
-import type { GoverningDocument, Provenance, Review, Rule, Term } from "@/schema/types"
+import type { GoverningDocument, Provenance, Provision, Review, Rule, Term } from "@/schema/types"
 import { ruleDraft } from "@/schema/zod"
 import { draftDocuments, draftProvisions, heightRule, vocabulary } from "./encodingDrafts"
 
@@ -41,6 +42,13 @@ export const builtContent: RulebookContent = {
   questions: []
 }
 
+const reviewedReason = { reason: "explanatory" as const, note: null, review: approved }
+
+/** The draft's provisions: the rule cites rules:1, and every other one has an approved reason for having no rule. */
+export const builtProvisions: Provision[] = draftProvisions.map((provision) =>
+  provision.key === "rules:1" ? provision : { ...provision, noRule: reviewedReason }
+)
+
 const byLaws: GoverningDocument = {
   key: "by-laws",
   kind: "bylaws",
@@ -48,6 +56,17 @@ const byLaws: GoverningDocument = {
   issuedBy: null,
   governs: null,
   edition: null
+}
+
+/** The draft's records as publishing reads them. */
+export const builtRecords: RulebookRecords = {
+  organization: { id: hoaId, name: "Maple Hollow" },
+  documents: [...draftDocuments, byLaws],
+  provisions: builtProvisions,
+  terms: builtContent.terms,
+  rules: builtContent.rules,
+  settings: builtContent.settings,
+  questions: []
 }
 
 /** Inserts the organization and an upload, and returns the documents a build of that upload would save. */
@@ -64,11 +83,7 @@ export async function seedUpload(db: Database): Promise<BuiltDocuments> {
     uploadedBy: "admin",
     uploadedAt: now
   })
-  const reviewed = { reason: "explanatory" as const, note: null, review: approved }
-  const provisionsOf = (key: string) =>
-    draftProvisions
-      .filter((provision) => provision.key.startsWith(`${key}:`))
-      .map((provision) => (provision.key === "rules:1" ? provision : { ...provision, noRule: reviewed }))
+  const provisionsOf = (key: string) => builtProvisions.filter((provision) => provision.key.startsWith(`${key}:`))
   return {
     uploads: [
       {

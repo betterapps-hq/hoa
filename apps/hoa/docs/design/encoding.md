@@ -1,6 +1,6 @@
 # Encoding governing documents
 
-> **Built through save-draft and publishing (phase 4); the rules UX is phase 5.** Replaces the first build's rulebook
+> **Built: the pipeline through save-draft and publishing (phase 4) and the rules UX (phase 5).** Replaces the first build's rulebook
 > pipeline and rule model. The rules it produces follow [schema.md](schema.md). The tasks that build it are in
 > [implementation-plan.md](implementation-plan.md).
 
@@ -228,8 +228,8 @@ provisions, terms, rules by kind, uncovered provisions, issues.
 
 ### 12. Review and 13. Publish
 
-The administrator works in [the rules UX](#ux). Publishing requires every record approved or rejected, no blocking
-issue and no uncovered provision. Code assembles the rules file from the approved records (schema.md, Rules file),
+The administrator works in [the rules UX](#ux). Publishing requires every record approved or rejected, every no-rule
+reason approved, no blocking issue, no uncovered provision, and approved records that make a valid rules file. Code assembles the rules file from the approved records (schema.md, Rules file),
 validates it with `rulesFile`, writes it to R2, stores its SHA-256 on the rulebook and marks the previous published
 rulebook `superseded`.
 
@@ -267,28 +267,35 @@ The `/rules` route keeps its shape: a build card, a Draft tab and a Published ta
 
 - **Build card:** documents are chosen as today. `JobProgress` has labels for the new stages (structure, analysis,
   vocabulary, planning, encoding, checking, repairing, merging, consolidating, saving). A finished build shows its
-  counts and links to the problems. Until the rest of this UX is built, the Draft and Published tabs show counts, the
-  publish blockers and a plain list of rules.
+  counts and links to the problems. The Draft tab starts with the draft's counts, what blocks publishing, and
+  Publish.
 - **Draft tab**, as tabs inside it:
   - **Rules:** `RuleTable` lists rules by domain (instead of topic), filtered by status, kind and request type. Each row
-    shows the title and the statement with term links rendered as labels.
+    shows the title and the statement with term links rendered as labels. "Approve the rules shown" approves what a
+    filter shows, skipping (and saying why) any record something blocks; the Vocabulary and Coverage tabs have the
+    same.
   - **Vocabulary:** terms with labels, kind, definition, where they're used, and review status. Approving a term is
     separate from approving rules; a rule can't be approved while a term it reads is proposed.
   - **Coverage:** every provision of every document in order, showing the rules and terms citing it, or its no-rule
-    reason, with uncovered provisions first.
-  - **Questions:** each interpretation or conflict question with its options; answering one rejects the candidate
-    rules the chosen option drops.
-  - **Settings:** the clauses (precedence, time, liability, cure, sanction preconditions), each cited.
+    reason, with uncovered provisions first. A reason an administrator gives is approved as given; the build's are
+    approved here.
+  - **Questions:** each interpretation or conflict question with its options; answering one approves the rules the
+    chosen option keeps and rejects the candidates it drops. A candidate can't be approved on its own while its
+    question is open.
+  - **Settings:** the clauses (precedence, time, liability, cure, deciders, sanction preconditions), each cited and
+    edited as JSON, and the policy; the settings are approved like a record.
 - **Every rule reference links to its citation**, through the same `RuleReference` the review uses
   ([application-review.md, UX](application-review.md#ux)): rule rows, overrides and enforced rules on a card, the
   rules a question keeps, the rules citing a provision in the coverage tab, and every issue's related rules.
 - **`RuleCard`** (in the Sheet) shows modality, bearer, subject, request types, applicability and the check, rendered
   as sentences from the schema (`describeRule`), with every term as a `TermChip` (a popover with the term's labels and
   definition, replacing `AttributeChip`). Citations open `DocumentViewer` at the provision, highlighted from its
-  anchors. Issues, approve, reject and delete work as today.
+  anchors. Issues (resolved with a note), approve, reject and delete work as today, and a preview evaluates the rule
+  with the engine against facts typed in the card.
 - **Editing:** title, statement, modality, bearer, remedy and request types in a form. Checks and conditions in a
   structured editor for the common shapes (compare, in, between, all/any, table rows, approval, document), and a JSON
-  editor with live validation for anything else. Every edit runs `validateRulebook` and shows its issues inline.
+  editor with live validation for anything else. Every edit runs `validateRulebook` and shows its issues inline; an
+  edit with problems can be saved, and they block its approval.
 - **Published tab:** the same views, read-only, with the file's hash and "Download rules file".
 
 ## Prompts and models

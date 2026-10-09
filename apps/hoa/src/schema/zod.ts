@@ -264,7 +264,7 @@ const dimension = z.enum([
   "business-time"
 ])
 
-const valueType = z.union([
+export const valueType = z.union([
   z.object({ type: z.literal("quantity"), unit: termKey }),
   z.object({ type: z.enum(["count", "boolean", "date", "date-time", "time-of-day", "schedule", "text"]) }),
   z.object({ type: z.literal("choice"), set: termKey }),
@@ -605,6 +605,101 @@ export const rulesFile = z.object({
   questions: z.array(question)
 })
 
+// ─── Evaluation: what goes in, what comes out ─────────────────────────────────────────────────────
+
+export const factValue = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("quantity"), value: z.number(), unit: termKey }),
+  z.object({ type: z.literal("number"), value: z.number() }),
+  z.object({ type: z.literal("boolean"), value: z.boolean() }),
+  z.object({ type: z.literal("value"), term: termKey.nullable(), text: z.string() }),
+  z.object({ type: z.literal("date"), value: isoDate }),
+  z.object({ type: z.literal("date-time"), value: timestamp }),
+  z.object({ type: z.literal("time"), value: timeOfDay }),
+  z.object({
+    type: z.literal("schedule"),
+    weekly: z.array(weekday),
+    annual: z.array(monthDay),
+    every: z.object({ value: z.number(), unit: termKey, from: isoDate }).nullable()
+  }),
+  z.object({ type: z.literal("text"), value: z.string() }),
+  z.object({ type: z.literal("entity"), entity: z.string() })
+])
+
+export const evidence = z.object({
+  fileId: id,
+  page: z.number().int().positive().nullable(),
+  quote: z.string().nullable(),
+  region: z.array(z.number()).nullable()
+})
+
+const factState = z.enum(["known", "absent", "conflicting", "uncertain"])
+
+export const fact = z.object({
+  entity: z.string(),
+  property: termKey,
+  state: factState,
+  value: factValue.nullable(),
+  candidates: z.array(factValue),
+  complete: z.boolean().nullable(),
+  stated: z.string().nullable(),
+  evidence: z.array(evidence),
+  confidence: z.number().min(0).max(1).nullable(),
+  provenance
+})
+
+export const evaluationRequest = z.object({
+  organizationId: id,
+  type: termKey,
+  governingDate: isoDate,
+  evaluationDate: isoDate,
+  lot: z.string().nullable(),
+  entities: z.array(z.object({ id: z.string(), type: termKey, label: z.string(), ref: z.string().nullable() })),
+  facts: z.array(fact),
+  documents: z.array(z.object({ id, type: termKey, subjects: z.array(z.string()), signedBy: z.array(z.string()) }))
+})
+
+export const outcome = z.enum([
+  "met",
+  "not-met",
+  "advisory",
+  "missing-information",
+  "committee",
+  "pending",
+  "exempt",
+  "not-applicable",
+  "available",
+  "blocked"
+])
+
+const judgmentAnswer = z.object({
+  answer: z.enum(["yes", "no", "unclear"]),
+  confidence: z.number().min(0).max(1),
+  rationale: z.string(),
+  evidence: z.array(evidence)
+})
+
+export const finding = z.object({
+  ruleKey,
+  entity: z.string(),
+  outcome,
+  remedy: z.enum(["provide-information", "provide-document", "change-detail", "redesign", "none"]).nullable(),
+  reason: z.string(),
+  inputs: z.array(
+    z.object({ entity: z.string(), property: termKey, state: z.enum([...factState.options, "unknown", "derived"]) })
+  ),
+  modifiedBy: z.array(z.object({ ruleKey, effect: z.enum(["displaced", "exempt", "decided-by", "limited"]) })),
+  judgment: judgmentAnswer.nullable(),
+  statements: z.array(
+    z.object({ statement: z.string(), confirmed: z.boolean().nullable(), quote: z.string().nullable() })
+  ),
+  effects: z.array(z.object({ target: path, value: factValue, from: isoDate })),
+  sanction: z
+    .object({ enforced: ruleKey, occurrence: z.number().int().nullable(), amount: amount.nullable() })
+    .nullable(),
+  asOf: isoDate,
+  evaluatedAt: timestamp
+})
+
 // ─── Drafts: what extraction and the editor send ──────────────────────────────────────────────────
 
 // A draft leaves out what code fills (provenance, review, issues, a label's provenance, a question's id) and may omit
@@ -750,6 +845,9 @@ agree<Same<z.infer<typeof rule>, T.Rule>>()
 agree<Same<z.infer<typeof term>, T.Term>>()
 agree<Same<z.infer<typeof provision>, T.Provision>>()
 agree<Same<z.infer<typeof settings>, T.Settings>>()
+agree<Same<z.infer<typeof fact>, T.Fact>>()
+agree<Same<z.infer<typeof evaluationRequest>, T.EvaluationRequest>>()
+agree<Same<z.infer<typeof finding>, T.Finding>>()
 agree<Same<RuleContent, RuleWithoutBookkeeping>>()
 agree<Same<TermContent, TermWithoutBookkeeping>>()
 agree<Same<QuestionContent, Omit<T.Question, "id">>>()

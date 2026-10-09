@@ -5,6 +5,7 @@ import {
   createApplication,
   createApplicationUpload,
   listApplications,
+  listProjectKinds,
   runReview,
   uploadApplicationFile
 } from "@/features/applications/applications.functions"
@@ -15,12 +16,15 @@ import { useRole } from "@/features/role/RoleProvider"
 export const Route = createFileRoute("/applications/")({
   staticData: { title: "Applications" },
   head: () => ({ meta: [{ title: "Applications | HOA design review" }] }),
-  loader: () => listApplications(),
+  loader: async () => {
+    const [applications, projectKinds] = await Promise.all([listApplications(), listProjectKinds()])
+    return { applications, projectKinds }
+  },
   component: ApplicationsRoute
 })
 
 function ApplicationsRoute() {
-  const applications = Route.useLoaderData()
+  const { applications, projectKinds } = Route.useLoaderData()
   const navigate = useNavigate()
   const { role } = useRole()
   const open = (applicationId: string) =>
@@ -28,6 +32,7 @@ function ApplicationsRoute() {
   return (
     <ApplicationsPage
       applications={applications}
+      projectKinds={projectKinds}
       isCommittee={role.id === "administrator"}
       onCreate={async ({ files, ...input }) => {
         const application = await createApplication({ data: input })

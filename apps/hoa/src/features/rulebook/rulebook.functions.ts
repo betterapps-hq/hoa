@@ -2,12 +2,20 @@ import { createServerFn } from "@tanstack/react-start"
 import { env as bindings } from "cloudflare:workers"
 import { z } from "zod"
 import { getDb } from "@/db/client.server"
-import { getGoverningDocument, listGoverningDocuments } from "@/db/documentRepository"
+import type { Database } from "@/db/database"
+import {
+  getGoverningDocument,
+  listDocumentRecords,
+  listGoverningDocuments,
+  listProvisions
+} from "@/db/documentRepository"
 import { getLatestJobOfKind, insertJob, newJob } from "@/db/jobRepository"
 import { getPublishedRulesFile, getRulebookContent, type RulebookContent } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus, insertRulebook } from "@/db/rulebookRepository"
+import { readRulesFileJson } from "@/rulebook/assemble"
 import { publishBlockers, publishDraft } from "@/rulebook/publish"
 import type { rulebookSchema } from "@/rules/rule"
+import type * as Rules from "@/schema/types"
 import { getRequestContext, requireAdministrator } from "@/session/requestContext.server"
 import { getBucket } from "@/storage/storage.server"
 import { describeBuildProblem } from "./rulebookView"
@@ -28,6 +36,41 @@ export type RulebookView = {
   /** Why the draft can't be published yet. */
   blockers: string[]
 }
+
+/** An upload with pages, which provisions' anchors point into. */
+export type SourceFile = { id: string; title: string; pageCount: number }
+
+/** The organization's governing documents and their provisions, which every rulebook's records cite. */
+export type RulebookSources = {
+  organization: { id: string; name: string }
+  documents: Rules.GoverningDocument[]
+  provisions: Rules.Provision[]
+  files: SourceFile[]
+}
+
+async function loadSources(db: Database, hoa: { id: string; name: string }): Promise<RulebookSources> {
+  const [records, uploads] = await Promise.all([listDocumentRecords(db, hoa.id), listGoverningDocuments(db, hoa.id)])
+  return {
+    organization: { id: hoa.id, name: hoa.name },
+    documents: records.map((record) => record.document),
+    provisions: await listProvisions(
+      db,
+      hoa.id,
+      records.map((record) => record.id)
+    ),
+    files: uploads.flatMap((upload) =>
+      upload.status === "ready" && upload.pageCount
+        ? [{ id: upload.id, title: upload.title, pageCount: upload.pageCount }]
+        : []
+    )
+  }
+}
+
+/** The documents and provisions the rules cite, for every rulebook view. */
+export const getRulebookSources = createServerFn({ method: "GET" }).handler(async () => {
+  const context = await getRequestContext()
+  return loadSources(getDb(), context.hoa)
+})
 
 /** Starts a rulebook build from ready documents; refused while another build runs. */
 export const startRulebookBuild = createServerFn({ method: "POST" })
@@ -81,6 +124,8 @@ export const getRulebookView = createServerFn({ method: "GET" })
     ])
     const content = rulebook ? await getRulebookContent(db, hoaId, rulebook.id) : null
     const file = data.which === "published" ? await getPublishedRulesFile(db, hoaId) : null
+    const blockers =
+      data.which === "draft" && content ? publishBlockers({ ...(await loadSources(db, context.hoa)), ...content }) : []
     return {
       rulebook,
       content,
@@ -88,7 +133,7 @@ export const getRulebookView = createServerFn({ method: "GET" })
       buildJobId: latestBuild?.id ?? null,
       isBuilding: building !== null,
       lastBuildError: describeBuildProblem(latestBuild),
-      blockers: data.which === "draft" && content ? publishBlockers(content, content.coverage) : []
+      blockers
     }
   })
 
@@ -109,6 +154,16 @@ export const publishRulebook = createServerFn({ method: "POST" })
     })
     return { version }
   })
+
+/** The published rules file exactly as written, for download. */
+export const getPublishedRulesFileJson = createServerFn({ method: "GET" }).handler(async () => {
+  const context = await getRequestContext()
+  const file = await getPublishedRulesFile(getDb(), context.hoa.id)
+  if (!file) {
+    throw new Error("Nothing is published yet.")
+  }
+  return readRulesFileJson(getBucket(), file)
+})
 
 export type DashboardSummary = {
   hoaName: string

@@ -1,5 +1,6 @@
 import type { ApplicationFile, ApplicationStatus, decisionOutcomes } from "@/applications/application"
-import type { Finding, FindingStatus, Recommendation, Review } from "@/review/reviewModel"
+import type { Recommendation, Review } from "@/review/reviewModel"
+import type { Finding, Outcome } from "@/schema/types"
 
 // Labels and groupings for the application pages.
 
@@ -16,7 +17,8 @@ export const recommendationLabels: Record<Recommendation, string> = {
   approve: "Approve",
   "approve-with-conditions": "Approve with conditions",
   "request-information": "More information needed",
-  reject: "Changes required"
+  "refer-to-committee": "Refer to the committee",
+  deny: "Deny"
 }
 
 export type DecisionOutcome = (typeof decisionOutcomes)[number]
@@ -29,12 +31,17 @@ export const outcomeLabels: Record<DecisionOutcome, string> = {
   "information-requested": "Information requested"
 }
 
-export const findingLabels: Record<FindingStatus, string> = {
+export const findingLabels: Record<Outcome, string> = {
   "not-met": "Not met",
-  unclear: "Needs information",
-  "needs-committee": "For the committee",
+  "missing-information": "Missing information",
+  committee: "For the committee",
+  advisory: "Suggestions",
+  pending: "Pending",
   met: "Met",
-  "not-applicable": "Doesn't apply"
+  exempt: "Exempt",
+  "not-applicable": "Doesn't apply",
+  available: "Available",
+  blocked: "Blocked"
 }
 
 export const fileStatusLabels: Record<ApplicationFile["status"], string> = {
@@ -44,13 +51,25 @@ export const fileStatusLabels: Record<ApplicationFile["status"], string> = {
   unreadable: "Couldn't be read"
 }
 
+const findingOrder: Outcome[] = [
+  "not-met",
+  "missing-information",
+  "committee",
+  "advisory",
+  "pending",
+  "met",
+  "exempt",
+  "not-applicable",
+  "available",
+  "blocked"
+]
+
 /** Findings grouped in the order people act on them; the groups that have findings. */
 export function groupFindings(findings: readonly Finding[]) {
-  const order: FindingStatus[] = ["not-met", "unclear", "needs-committee", "met", "not-applicable"]
-  const byStatus = Map.groupBy(findings, (finding) => finding.status)
-  return order.flatMap((status) => {
-    const group = byStatus.get(status)
-    return group ? [{ status, findings: group }] : []
+  const byOutcome = Map.groupBy(findings, (finding) => finding.outcome)
+  return findingOrder.flatMap((outcome) => {
+    const group = byOutcome.get(outcome)
+    return group ? [{ outcome, findings: group }] : []
   })
 }
 
@@ -61,10 +80,7 @@ export function packetFiles(files: readonly ApplicationFile[]) {
     .map((file) => ({ file, pictures: files.filter((child) => child.parentFileId === file.id) }))
 }
 
-/** The component a finding is about, as the review named it. */
-export function componentLabel(review: Pick<Review, "components">, componentId: string | null) {
-  if (componentId === null) {
-    return "Whole project"
-  }
-  return review.components.find((component) => component.id === componentId)?.label ?? componentId
+/** An entity the review identified, by its label. */
+export function entityLabel(review: Pick<Review, "request">, entityId: string) {
+  return review.request.entities.find((entity) => entity.id === entityId)?.label ?? entityId
 }
