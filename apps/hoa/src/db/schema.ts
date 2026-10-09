@@ -26,19 +26,43 @@ export const governingDocuments = sqliteTable(
     amends: text("amends"),
     title: text("title").notNull(),
     effectiveDate: text("effective_date"),
-    fileName: text("file_name").notNull(),
-    mediaType: text("media_type").notNull(),
-    sizeBytes: integer("size_bytes").notNull(),
+    // Null for a document with no file: one the rules name that nobody uploaded.
+    fileName: text("file_name"),
+    mediaType: text("media_type"),
+    sizeBytes: integer("size_bytes"),
     sha256: text("sha256"),
     pageCount: integer("page_count"),
     status: text("status").notNull(),
     error: json<unknown>("error_json"),
     uploadedBy: text("uploaded_by").notNull(),
-    uploadedAt: timestamp("uploaded_at")
+    uploadedAt: timestamp("uploaded_at"),
+    // The rules schema's view of the document (its GoverningDocument), once a build or the seed has keyed it.
+    key: text("key"),
+    document: json<unknown>("document_json")
   },
   (table) => [
     uniqueIndex("governing_documents_lineage_version").on(table.lineageId, table.version),
+    uniqueIndex("governing_documents_hoa_key").on(table.hoaId, table.key),
     index("governing_documents_hoa").on(table.hoaId)
+  ]
+)
+
+export const provisions = sqliteTable(
+  "provisions",
+  {
+    hoaId: text("hoa_id").notNull(),
+    documentId: text("document_id").notNull(),
+    key: text("key").notNull(),
+    label: text("label").notNull(),
+    parentKey: text("parent_key"),
+    kind: text("kind").notNull(),
+    ordinal: integer("ordinal").notNull(),
+    // The whole Provision; the columns above exist for lookups and ordering.
+    provision: json<unknown>("provision_json").notNull()
+  },
+  (table) => [
+    primaryKey({ columns: [table.hoaId, table.key] }),
+    index("provisions_document").on(table.documentId, table.ordinal)
   ]
 )
 
@@ -96,7 +120,11 @@ export const rulebooks = sqliteTable(
     jobId: text("job_id").notNull(),
     createdAt: timestamp("created_at"),
     publishedBy: text("published_by"),
-    publishedAt: text("published_at")
+    publishedAt: text("published_at"),
+    settings: json<unknown>("settings_json"),
+    fileKey: text("file_key"),
+    fileSha256: text("file_sha256"),
+    coverage: json<unknown>("coverage_json")
   },
   (table) => [
     uniqueIndex("rulebooks_hoa_version").on(table.hoaId, table.version),
@@ -121,6 +149,60 @@ export const rules = sqliteTable(
     rule: json<unknown>("rule_json").notNull()
   },
   (table) => [uniqueIndex("rules_rulebook_key").on(table.rulebookId, table.ruleKey)]
+)
+
+// A rulebook's records in the rules schema (encoding.md, Storage). Each JSON column holds the whole record; the other
+// columns exist for filtering and for carrying approvals forward.
+
+export const rulebookRules = sqliteTable(
+  "rulebook_rules",
+  {
+    hoaId: text("hoa_id").notNull(),
+    rulebookId: text("rulebook_id").notNull(),
+    ruleKey: text("rule_key").notNull(),
+    kind: text("kind").notNull(),
+    requestTypes: json<string[]>("request_types").notNull(),
+    appliesTo: text("applies_to"),
+    reviewStatus: text("review_status").notNull(),
+    contentHash: text("content_hash").notNull(),
+    rule: json<unknown>("rule_json").notNull()
+  },
+  (table) => [
+    primaryKey({ columns: [table.rulebookId, table.ruleKey] }),
+    index("rulebook_rules_hoa").on(table.hoaId, table.rulebookId)
+  ]
+)
+
+export const rulebookTerms = sqliteTable(
+  "rulebook_terms",
+  {
+    hoaId: text("hoa_id").notNull(),
+    rulebookId: text("rulebook_id").notNull(),
+    termKey: text("term_key").notNull(),
+    kind: text("kind").notNull(),
+    reviewStatus: text("review_status").notNull(),
+    contentHash: text("content_hash").notNull(),
+    term: json<unknown>("term_json").notNull()
+  },
+  (table) => [
+    primaryKey({ columns: [table.rulebookId, table.termKey] }),
+    index("rulebook_terms_hoa").on(table.hoaId, table.rulebookId)
+  ]
+)
+
+export const rulebookQuestions = sqliteTable(
+  "rulebook_questions",
+  {
+    hoaId: text("hoa_id").notNull(),
+    rulebookId: text("rulebook_id").notNull(),
+    id: text("id").notNull(),
+    question: json<unknown>("question_json").notNull(),
+    answer: json<unknown>("answer_json")
+  },
+  (table) => [
+    primaryKey({ columns: [table.rulebookId, table.id] }),
+    index("rulebook_questions_hoa").on(table.hoaId, table.rulebookId)
+  ]
 )
 
 export const applications = sqliteTable(
@@ -187,6 +269,7 @@ export const reviews = sqliteTable(
     applicationId: text("application_id").notNull(),
     jobId: text("job_id").notNull(),
     rulebookId: text("rulebook_id").notNull(),
+    rulesFileSha256: text("rules_file_sha256"),
     recommendation: text("recommendation").notNull(),
     costUsd: real("cost_usd").notNull(),
     sessionId: text("session_id").notNull(),

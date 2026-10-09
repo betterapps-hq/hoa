@@ -78,7 +78,28 @@ environment: D1 is simulated on disk under `apps/hoa/.wrangler`, and R2 is the r
 <http://localhost:3000>, switch to the **Administrator** role and select **Run model check**. It reports the response,
 prompt version, latency, tokens, cost and Langfuse trace ID, which confirms each connection.
 
-After changing `src/db/schema.ts`, run `pnpm --filter hoa db:generate` and commit the new migration. After changing
+To review applications before the rules UX exists, publish the committed sample rulebook into the local database:
+
+```sh
+pnpm --filter hoa db:seed:sample
+```
+
+It approves every record of `samples/declaration/rules.json`, publishes it as the HOA's rulebook and stores the rules
+file in Wrangler's local R2. The dev server reads R2 from the `hoa-dev` bucket, so add `--dev-bucket` to put the file
+there instead (`pnpm --filter hoa db:seed:sample --dev-bucket`).
+
+To start the rules over, empty the local rulebooks, rules, sections, provisions and reviews with their stored objects:
+
+```sh
+pnpm --filter hoa db:reset:rules
+```
+
+Uploaded documents and applications stay; applications go back to drafts. Add `--dev-bucket` to delete the objects
+from the `hoa-dev` bucket rather than Wrangler's local R2. Neither command touches the preview or demo environments.
+
+After changing `src/db/schema.ts`, run `pnpm --filter hoa db:generate` and commit the new migration. Migrations must
+stay backward compatible, since pull request previews share one database: add tables and nullable columns, and read
+the generated SQL (Drizzle Kit's table rebuilds can copy columns the old table doesn't have). After changing
 `wrangler.jsonc`, regenerate the binding types with `pnpm --filter hoa cf-typegen` and commit
 `worker-configuration.d.ts`.
 ## 6. Cloudflare and deployment

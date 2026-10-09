@@ -526,6 +526,8 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
           applicationId,
           jobId,
           rulebookId: review.rulebookId,
+          // The first build's reviews read rules from D1, not a rules file.
+          rulesFileSha256: null,
           recommendation: review.recommendation,
           costUsd,
           sessionId: jobId,

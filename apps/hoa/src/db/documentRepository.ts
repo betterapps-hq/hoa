@@ -1,4 +1,4 @@
-import { and, asc, eq, max } from "drizzle-orm"
+import { and, asc, eq, inArray, isNotNull, max } from "drizzle-orm"
 import { z } from "zod"
 import {
   governingDocumentSchema,
@@ -6,12 +6,18 @@ import {
   type GoverningDocument,
   type Section
 } from "@/documents/governingDocument"
+import type * as Rules from "@/schema/types"
+import { governingDocument, provision as provisionSchema } from "@/schema/zod"
+import { insertChunks, runBatch } from "./batching"
 import type { Database } from "./database"
-import { governingDocuments, sections } from "./schema"
+import { governingDocuments, provisions, sections } from "./schema"
 
 function toDocument(row: typeof governingDocuments.$inferSelect): GoverningDocument {
   return governingDocumentSchema.parse(row)
 }
+
+// Uploads: the rows with a file. Documents the rules name without a file are read as DocumentRecords below.
+const hasFile = isNotNull(governingDocuments.fileName)
 
 export type NewGoverningDocument = Pick<
   GoverningDocument,
@@ -58,7 +64,7 @@ export async function getGoverningDocument(db: Database, hoaId: string, id: stri
   const row = await db
     .select()
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id)))
+    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id), hasFile))
     .get()
   return row ? toDocument(row) : null
 }
@@ -67,7 +73,7 @@ export async function listGoverningDocuments(db: Database, hoaId: string) {
   const rows = await db
     .select()
     .from(governingDocuments)
-    .where(eq(governingDocuments.hoaId, hoaId))
+    .where(and(eq(governingDocuments.hoaId, hoaId), hasFile))
     .orderBy(asc(governingDocuments.uploadedAt))
   return rows.map(toDocument)
 }
@@ -136,4 +142,143 @@ export async function setSectionRouting(db: Database, hoaId: string, sectionId: 
     .update(sections)
     .set({ routing })
     .where(and(eq(sections.hoaId, hoaId), eq(sections.id, sectionId)))
+}
+
+// ─── The rules schema's documents and provisions (encoding.md, Storage) ──────────────────────────
+
+/** A governing document as the rules schema sees it, with the id of its row. */
+export type DocumentRecord = { id: string; document: Rules.GoverningDocument }
+
+/**
+ * The row for a document without a file: one the rules name that nobody uploaded (`referenced`), or one whose text
+ * came from a rules file rather than an upload (`ready`).
+ */
+export function fileLessDocumentRow(
+  hoaId: string,
+  { id, document }: DocumentRecord,
+  recordedBy: string,
+  recordedAt: string
+): typeof governingDocuments.$inferInsert {
+  return {
+    id,
+    hoaId,
+    lineageId: id,
+    version: 1,
+    kind: document.kind,
+    amends: null,
+    title: document.title,
+    effectiveDate: document.edition?.effectiveFrom ?? null,
+    fileName: null,
+    mediaType: null,
+    sizeBytes: null,
+    sha256: null,
+    pageCount: null,
+    status: document.edition ? "ready" : "referenced",
+    error: null,
+    uploadedBy: recordedBy,
+    uploadedAt: recordedAt,
+    key: document.key,
+    document
+  }
+}
+
+/** Records documents the rules name that nobody uploaded. Saving one again updates it. */
+export async function saveReferencedDocuments(
+  db: Database,
+  hoaId: string,
+  records: readonly DocumentRecord[],
+  recordedBy: string,
+  recordedAt: string
+) {
+  await runBatch(
+    db,
+    records.map((record) => {
+      const row = fileLessDocumentRow(
+        hoaId,
+        { id: record.id, document: governingDocument.parse(record.document) },
+        recordedBy,
+        recordedAt
+      )
+      const { kind, title, effectiveDate, status, key, document } = row
+      return db.insert(governingDocuments).values(row).onConflictDoUpdate({
+        target: governingDocuments.id,
+        set: { kind, title, effectiveDate, status, key, document }
+      })
+    })
+  )
+}
+
+/** The organization's documents in the rules schema, by key: the uploads a build has keyed, and the referenced. */
+export async function listDocumentRecords(db: Database, hoaId: string): Promise<DocumentRecord[]> {
+  const rows = await db
+    .select({ id: governingDocuments.id, document: governingDocuments.document })
+    .from(governingDocuments)
+    .where(and(eq(governingDocuments.hoaId, hoaId), isNotNull(governingDocuments.document)))
+    .orderBy(asc(governingDocuments.key))
+  return rows.map((row) => ({ id: row.id, document: governingDocument.parse(row.document) }))
+}
+
+/** A document's provisions as rows, in document order. A provision key starts with its document's key. */
+export function provisionRows(
+  hoaId: string,
+  documentId: string,
+  items: readonly Rules.Provision[]
+): (typeof provisions.$inferInsert)[] {
+  return items.map((provision, ordinal) => ({
+    hoaId,
+    documentId,
+    key: provision.key,
+    label: provision.label,
+    parentKey:
+      provision.parentLabel === null
+        ? null
+        : `${provision.key.slice(0, provision.key.indexOf(":"))}:${provision.parentLabel}`,
+    kind: provision.kind,
+    ordinal,
+    provision
+  }))
+}
+
+/** Replaces a document's provisions in one batch, so a retried structure step writes them once. */
+export async function saveProvisions(
+  db: Database,
+  hoaId: string,
+  documentId: string,
+  items: readonly Rules.Provision[]
+) {
+  const rows = provisionRows(
+    hoaId,
+    documentId,
+    items.map((item) => provisionSchema.parse(item))
+  )
+  await runBatch(db, [
+    db.delete(provisions).where(and(eq(provisions.hoaId, hoaId), eq(provisions.documentId, documentId))),
+    ...insertChunks(provisions, rows).map((group) => db.insert(provisions).values(group))
+  ])
+}
+
+/** The documents' provisions, each document's in order. */
+export async function listProvisions(
+  db: Database,
+  hoaId: string,
+  documentIds: readonly string[]
+): Promise<Rules.Provision[]> {
+  if (documentIds.length === 0) {
+    return []
+  }
+  const rows = await db
+    .select({ provision: provisions.provision })
+    .from(provisions)
+    .where(and(eq(provisions.hoaId, hoaId), inArray(provisions.documentId, [...documentIds])))
+    .orderBy(asc(provisions.documentId), asc(provisions.ordinal))
+  return rows.map((row) => provisionSchema.parse(row.provision))
+}
+
+export async function getProvision(db: Database, hoaId: string, key: string): Promise<Rules.Provision | null> {
+  const row = await db
+    .select({ provision: provisions.provision })
+    .from(provisions)
+    .where(and(eq(provisions.hoaId, hoaId), eq(provisions.key, key)))
+    .get()
+  return row ? provisionSchema.parse(row.provision) : null
 }

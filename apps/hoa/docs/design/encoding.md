@@ -229,12 +229,12 @@ Nothing is released, so the old rule tables and objects are dropped rather than 
 
 | Table | Holds | Key columns |
 | --- | --- | --- |
-| `governing_documents` | Uploaded documents, as today | `kind` uses the schema's `DocumentKind`; drop `lineage_id`, `version`, `amends`; add `key` (unique per organization) and `status` `referenced` for named, not uploaded |
-| `provisions` | One row per provision | `document_id`, `key` (unique per organization), `label`, `parent_key`, `kind`, `ordinal`, `provision_json` (heading, intro, text, wrap-up, num, anchors) |
-| `rulebooks` | One per build, as today | `status` building, draft, published, superseded, failed; drop `catalog_version`; add `settings_json`, `file_key`, `file_sha256`, `coverage_json` |
-| `rules` | Draft and published rule records | `rulebook_id`, `rule_key`, `kind`, `request_types` (JSON, for filtering), `applies_to`, `review_status`, `content_hash`, `rule_json` (the schema's `Rule`) |
-| `terms` | The organization's terms per rulebook | `rulebook_id`, `term_key`, `kind`, `review_status`, `content_hash`, `term_json` |
-| `questions` | Interpretation and conflict questions | `rulebook_id`, `question_json`, `answer_json` |
+| `governing_documents` | Uploaded documents, as today, and referenced ones | `key` (unique per organization) and `document_json` (the schema's `GoverningDocument`); `status` `referenced`, with no file columns, for named, not uploaded; `lineage_id`, `version`, `amends` dropped at cutover |
+| `provisions` | One row per provision | `document_id`, `key` (unique per organization), `label`, `parent_key`, `kind`, `ordinal`, `provision_json` (the schema's `Provision`) |
+| `rulebooks` | One per build, as today | `status` building, draft, published, superseded, failed; add `settings_json`, `file_key`, `file_sha256`, `coverage_json`; `catalog_version` dropped at cutover |
+| `rulebook_rules` | Draft and published rule records | `rulebook_id`, `rule_key`, `kind`, `request_types` (JSON, for filtering), `applies_to`, `review_status`, `content_hash`, `rule_json` (the schema's `Rule`) |
+| `rulebook_terms` | The organization's terms and proposed core terms per rulebook | `rulebook_id`, `term_key`, `kind`, `review_status`, `content_hash`, `term_json` |
+| `rulebook_questions` | Interpretation and conflict questions | `rulebook_id`, `id`, `question_json`, `answer_json` |
 
 The partial unique indexes (one `building`, one `draft` rulebook per organization) stay.
 

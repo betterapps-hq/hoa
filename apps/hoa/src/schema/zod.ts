@@ -585,7 +585,7 @@ const answer = z.object({
   at: timestamp
 })
 
-const question = z.object({ id, ...questionShape, answer: answer.nullable() })
+export const question = z.object({ id, ...questionShape, answer: answer.nullable() })
 
 export const rulesFile = z.object({
   organization: z.object({ id, name: z.string().min(1) }),

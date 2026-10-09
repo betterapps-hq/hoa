@@ -14,8 +14,8 @@ Two kinds of documents flow through the app, with different owners, sensitivity 
 
 | Store | Holds |
 | --- | --- |
-| **D1** (one shared database; every table except `hoas` has `hoa_id`) | HOAs, document and file records, page kinds, section metadata, jobs, rulebooks, rules, applications, review summaries |
-| **R2** (one bucket per environment) | Original files, raw OCR responses, page records, figure images and descriptions, section text, per-job stage outputs, full review records, the content caches |
+| **D1** (one shared database; every table except `hoas` has `hoa_id`) | HOAs, document and file records, provisions, page kinds, section metadata, jobs, rulebooks and their rules, terms and questions, applications, review summaries |
+| **R2** (one bucket per environment) | Original files, raw OCR responses, page records, figure images and descriptions, section text, published rules files, per-job stage outputs, full review records, the content caches |
 | **Langfuse** | Traces, prompts, datasets and scores ([evaluation.md](evaluation.md)) |
 
 D1 tables, defined with Drizzle in `src/db/schema.ts` with migrations in `apps/hoa/migrations`:
@@ -23,15 +23,23 @@ D1 tables, defined with Drizzle in `src/db/schema.ts` with migrations in `apps/h
 | Table | One row per | Notes |
 | --- | --- | --- |
 | `hoas` | HOA | `settings_json` holds `HoaSettings` |
-| `governing_documents` | Uploaded version of a document | `UNIQUE(lineage_id, version)` |
-| `sections` | Section of a document version | Written once per version; `id` is `{documentId}:{ordinal}`. Metadata and latest routing only; text is in R2 |
+| `governing_documents` | Uploaded version of a document, or a document the rules name that nobody uploaded | `UNIQUE(lineage_id, version)`. `key` is unique per HOA and `document_json` holds the rules schema's `GoverningDocument`, both set once a build or the sample seed keys the document. A referenced document (status `referenced`) has no file columns. The upload list shows only rows with a file |
+| `provisions` | Provision of a keyed document | Primary key `(hoa_id, key)`; `document_id`, `label`, `parent_key`, `kind` and `ordinal` for lookups and order; the whole `Provision` in `provision_json` |
+| `sections` | Section of a document version (first build) | Written once per version; `id` is `{documentId}:{ordinal}`. Metadata and latest routing only; text is in R2. Dropped at cutover |
 | `jobs` | Workflow instance | `id` is the Workflow instance id; progress and errors |
-| `rulebooks` | Rulebook | `UNIQUE(hoa_id, version)`; partial unique indexes allow one `building` and one `draft` per HOA |
-| `rules` | Rule in a rulebook | `rule_key` and `rulebook_id` columns for lookups and the `UNIQUE(rulebook_id, rule_key)` constraint; the whole `Rule` in `rule_json` |
+| `rulebooks` | Rulebook | `UNIQUE(hoa_id, version)`; partial unique indexes allow one `building` and one `draft` per HOA. `settings_json` and `coverage_json` once the build saves the draft; `file_key` and `file_sha256` once it's published |
+| `rulebook_rules` | Rule in a rulebook | Primary key `(rulebook_id, rule_key)`; `kind`, `request_types`, `applies_to` and `review_status` for filtering, `content_hash` for carrying approvals forward; the whole `Rule` in `rule_json` |
+| `rulebook_terms` | Organization term, or proposed core term, in a rulebook | Primary key `(rulebook_id, term_key)`; `kind`, `review_status`, `content_hash`; the whole `Term` in `term_json` |
+| `rulebook_questions` | Interpretation or conflict question | Primary key `(rulebook_id, id)`; `question_json` and `answer_json` |
+| `rules` | Rule in a first-build rulebook | `UNIQUE(rulebook_id, rule_key)`; the first build's `Rule` in `rule_json`. Dropped at cutover |
 | `applications` | Application | |
 | `application_files` | Uploaded or derived file | |
 | `application_pages` | Page of an application file | `(file_id, page_index)` and the page's `kind` from classification |
-| `reviews` | Review run | Recommendation, cost and session; the full record is in R2 |
+| `reviews` | Review run | Recommendation, cost and session, and `rules_file_sha256`, the rules file it read; the full record is in R2 |
+
+Migrations only add tables and nullable columns, because every pull request preview shares one preview database: the
+first build's tables and columns (`sections`, `rules`, `rulebooks.catalog_version`, the lineage columns) are dropped in
+one migration at cutover (implementation-plan.md, 9.6), once `main` no longer reads them.
 
 D1 has no interactive transactions. Changes that must land together (publishing a rulebook, saving a draft, starting a
 job) are one `batch()` call, which D1 runs atomically.
@@ -233,6 +241,7 @@ hoas/{hoaId}/governing/{documentId}/figures/{figureId}.png
 hoas/{hoaId}/governing/{documentId}/figures/{figureId}.json              VisualDescription
 hoas/{hoaId}/governing/{documentId}/sections/{sectionId}.md              section text with page markers
 hoas/{hoaId}/cache/{stage}/{key}.json                                    content cache for governing-document stages
+hoas/{hoaId}/rulebooks/{rulebookId}/rules.json                           published rules file, canonical JSON; its SHA-256 is on the rulebook
 hoas/{hoaId}/applications/{applicationId}/files/{fileId}/source.{ext}
 hoas/{hoaId}/applications/{applicationId}/files/{fileId}/ocr/{engine}/{pageRange}.json
 hoas/{hoaId}/applications/{applicationId}/files/{fileId}/pages/{pageIndex}.json
@@ -242,6 +251,9 @@ hoas/{hoaId}/applications/{applicationId}/cache/{stage}/{key}.json        conten
 hoas/{hoaId}/applications/{applicationId}/reviews/{reviewId}.json        full Review record
 hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json                          per-job stage outputs
 ```
+
+A rulebook build's stage outputs are `structure/{documentId}`, `analyze/{documentId}`, `encode/{unitId}`,
+`merge/draft` and `consolidate/result` (`rulebookBuildKeys` in `src/storage/keys.ts`).
 
 Duplicates are caught by hash instead of being cached:
 

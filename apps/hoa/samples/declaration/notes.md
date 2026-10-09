@@ -329,7 +329,8 @@ closest faithful form is encoded.
   the application; approved-with-conditions and approved-in-part count as approved through broader.
 - Review fees paid before review (4.2(d)) are a requirement on the application, applying when the Reviewer requires
   prepayment (architectural-application.review-fee is stated); the fee amounts, hiring reviewers and budgeting their pay
-  aren't evaluated.
+  aren't evaluated. The payment date (.review-fee-paid-on) is unknown when unstated: payment is the Association's
+  record, so a packet's silence doesn't show the fee unpaid (changed while building the engine).
 - The Declarant exemption (4.1/p4) is a permission whose selector covers every rule under Article 4 and the guidelines
   document (the guidelines bind only through 4.1/p1's "in compliance with ... this Article and the Residential Design
   Guidelines"), excepting Article 4's own exemptions so no selector selects itself; the same selector serves the 4.7

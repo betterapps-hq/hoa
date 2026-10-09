@@ -653,4 +653,27 @@ describe("aggregates, tables and documents", () => {
       issue("undefined-rule", ex.fineSchedule.key, "enforces.except.0")
     ])
   })
+
+  it("lets a document check name a category of a document thing, and nothing else", () => {
+    const plotPlan: TermDraft = {
+      key: "plot-plan",
+      kind: "category",
+      of: "site-plan",
+      criteria: { type: "text", text: "shows the lot's boundaries" },
+      labels: labels("plot plan")
+    }
+    const documentCheck = (document: string) => ({
+      type: "document" as const,
+      document,
+      per: "subject" as const,
+      mustState: [],
+      signedBy: []
+    })
+    expect(
+      issuesAfter(withTerm(plotPlan), withRule({ ...ex.neighborApproval, check: documentCheck("plot-plan") }))
+    ).toEqual([])
+    expect(issuesAfter(withRule({ ...ex.neighborApproval, check: documentCheck("gate") }))).toEqual([
+      issue("type-mismatch", ex.neighborApproval.key, "check.document")
+    ])
+  })
 })

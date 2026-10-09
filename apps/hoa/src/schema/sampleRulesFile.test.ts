@@ -1,13 +1,9 @@
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import { describe, expect, it } from "vitest"
+import { sampleRulesFile } from "@/tests/sampleRulesFile"
 import { validateRulebook } from "./validate"
-import { rulesFile } from "./zod"
 
 // The committed encoding of the sample Declaration (samples/declaration/rules.json).
-const sample = rulesFile.parse(
-  JSON.parse(readFileSync(join(import.meta.dirname, "../../samples/declaration/rules.json"), "utf8"))
-)
+const sample = sampleRulesFile()
 
 describe("the sample Declaration's rules file", () => {
   it("validates with no issues", () => {

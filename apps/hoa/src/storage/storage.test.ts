@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from "vitest"
-import { applicationKeys, extensionOf, governingKeys, hoaCacheKey, jobOutputKey, jobOutputPrefix } from "./keys"
+import {
+  applicationKeys,
+  extensionOf,
+  governingKeys,
+  hoaCacheKey,
+  jobOutputKey,
+  jobOutputPrefix,
+  rulebookBuildKeys,
+  rulebookKeys
+} from "./keys"
 import { createObjectPromptCache, getJson, putJson, toHex, type ObjectBucket } from "./objects"
 import { createPresigner } from "./presign"
 import { validateUpload } from "./uploadRules"
@@ -67,6 +76,19 @@ describe("keys", () => {
     expect(jobOutputKey("hoa", "job", "extract", "s1")).toBe("hoas/hoa/jobs/job/extract/s1.json")
     expect(jobOutputPrefix("hoa", "job")).toBe("hoas/hoa/jobs/job/")
     expect(extensionOf("README")).toBe("bin")
+  })
+
+  it("keeps a rulebook's rules file and its build's stage outputs apart", () => {
+    expect(rulebookKeys("hoa", "rb")).toEqual({
+      root: "hoas/hoa/rulebooks/rb/",
+      file: "hoas/hoa/rulebooks/rb/rules.json"
+    })
+    const build = rulebookBuildKeys("hoa", "job")
+    expect(build.structure("doc")).toBe("hoas/hoa/jobs/job/structure/doc.json")
+    expect(build.analyze("doc")).toBe("hoas/hoa/jobs/job/analyze/doc.json")
+    expect(build.encode("declaration:article-4")).toBe("hoas/hoa/jobs/job/encode/declaration:article-4.json")
+    expect(build.merge).toBe("hoas/hoa/jobs/job/merge/draft.json")
+    expect(build.consolidate).toBe("hoas/hoa/jobs/job/consolidate/result.json")
   })
 })
 

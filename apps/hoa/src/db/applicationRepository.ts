@@ -228,6 +228,8 @@ export type ReviewSummary = {
   applicationId: string
   jobId: string
   rulebookId: string
+  /** The rules file the review read, so it can be reproduced against the exact file. */
+  rulesFileSha256: string | null
   recommendation: Recommendation
   costUsd: number
   sessionId: string

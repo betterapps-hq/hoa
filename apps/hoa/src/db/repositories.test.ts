@@ -297,6 +297,7 @@ describe("repositories", () => {
       applicationId: application.id,
       jobId: "job",
       rulebookId: "rb",
+      rulesFileSha256: "a".repeat(64),
       recommendation: "request-information" as const,
       costUsd: 0.01,
       sessionId: "job",
@@ -304,7 +305,7 @@ describe("repositories", () => {
     }
     await saveReviewSummary(db, summary)
     await saveReviewSummary(db, summary)
-    expect(await listReviewSummaries(db, hoaId, application.id)).toHaveLength(1)
+    expect(await listReviewSummaries(db, hoaId, application.id)).toEqual([summary])
 
     expect(await deleteApplicationFile(db, hoaId, word.id)).toEqual([word.id, picture.id])
     expect(await listApplicationFiles(db, hoaId, application.id)).toEqual([])

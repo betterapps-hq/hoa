@@ -24,7 +24,7 @@ removed; the signature and notary pages aren't included.
 
 - the gold set for the `provision-encoding` and `term-extraction` datasets, once reviewed;
 - the expected output for structure tests (provision keys, labels, intros and wrap-ups);
-- a seed rulebook, so the review pipeline can run before the rules UX is finished.
+- a seed rulebook, so the review pipeline can run before the rules UX is finished (`pnpm db:seed:sample`).
 
 **Not here yet:** the Declaration's page text and PDF, the Residential Design Guidelines, and the sample fence
 application. Each needs a reviewed redaction first (the Declaration's cover sheet and signature pages name individuals;

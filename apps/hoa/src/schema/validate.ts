@@ -91,28 +91,9 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
     return found
   }
 
-  // A category's underlying thing: categories of categories end at a thing.
-  function thingOf(key: T.TermKey) {
-    let current = key
-    for (let depth = 0; depth < 10; depth += 1) {
-      const found = vocabulary.get(current)
-      if (found?.kind !== "category") {
-        return current
-      }
-      current = found.of
-    }
-    return current
-  }
-
+  const { thingOf, isParty } = vocabulary
   const isThingOrCategory = (t: TermContent) => t.kind === "thing" || t.kind === "category"
-  const isParty = (key: T.TermKey) => {
-    const found = vocabulary.get(thingOf(key))
-    return found?.kind === "thing" && found.nature === "party"
-  }
-  const flowOf = (requestType: T.TermKey) => {
-    const found = vocabulary.get(requestType)
-    return found?.kind === "thing" ? (found.request?.flow ?? null) : null
-  }
+  const flowOf = (requestType: T.TermKey) => vocabulary.requestOf(requestType)?.flow ?? null
   const party = (at: Site, key: T.TermKey, path: JsonPath) =>
     expectTerm(at, key, path, (t) => isParty(t.key), "a party (a thing of nature party, or a category of one)")
   const requestType = (at: Site, key: T.TermKey, path: JsonPath) =>
@@ -542,8 +523,11 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
           at,
           documentCheck.document,
           [...path, "document"],
-          (t) => t.kind === "thing" && t.nature === "document",
-          "a document thing"
+          (t) => {
+            const thing = vocabulary.get(thingOf(t.key))
+            return thing?.kind === "thing" && thing.nature === "document"
+          },
+          "a document thing, or a category of one"
         )
         documentCheck.signedBy.forEach((key, i) => party(at, key, [...path, "signedBy", i]))
       })

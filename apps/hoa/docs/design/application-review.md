@@ -255,15 +255,26 @@ to compare rules by meaning.
 
 | Module | Does |
 | --- | --- |
-| `vocabulary` | Indexes core and organization terms; resolves categories, broader values, units and `perBase` conversion |
+| `decimal` | Exact decimals and fractions as reduced bigint ratios; rounding half up |
+| `vocabulary` | Builds on `src/schema/vocabulary.ts`: properties, categories, broader values, parties, units and `perBase` conversion |
+| `values` | Three-valued logic; ranges for unknown quantities, counts and dates, and arithmetic over them |
+| `calendar` | Days, months, business days and holidays, local time, schedules |
+| `context` | The request's entities and facts indexed, the calendar, and the pipeline's answers |
 | `paths` | Resolves a path from a root through properties and references to facts; unknown, absent, many-valued |
-| `values` | Three-valued logic; ranges for unknown quantities, counts and dates; exact decimal and fraction arithmetic |
-| `conditions` | Every `Condition` type, including `during`, quantifiers, `approved` and `text` (answered by facts) |
-| `checks` | `test`, `table`, `document`, `deadline`, `judgment`, `approval` |
+| `operands` | Constants, references, arithmetic, aggregates and date shifts |
+| `conditions` | Every `Condition` type, including `during`, quantifiers, `approved` and `text` (answered by the pipeline) |
+| `derived` | Derived properties: the first derivation whose `when` holds |
+| `checks` | `test`, `table`, `document`, `judgment`, `approval` |
+| `deadlines` | `deadline` checks: windows, roll-forward, pending, `onMiss` effects |
+| `applicability` | Which rules a request considers and whether one applies to a subject |
 | `overrides` | Selector resolution, precedence, displaced, exempt and decided-by |
 | `evaluate` | Rules × subjects to findings, with remedies |
 | `sanctions` | Cure periods, preconditions, liability, amounts, limits (not needed for applications; built with violations) |
 | `decide` | Findings to recommendation and action items |
+
+`evaluate({ rulesFile, request, answers, evaluatedAt })` gives the findings, where `answers` holds the document reviews
+(each statement per rule and subject), the judgments and the text conditions' answers; `decide(findings, rulesFile,
+requestType)` gives the recommendation and the action items grouped by rule.
 
 Decimal arithmetic uses exact decimals (scaled bigints), never floats, so 72 inches and 6 feet are equal.
 
@@ -386,21 +397,21 @@ them too.
 
 | Rule | Outcome |
 | --- | --- |
-| 5.3 materials, 5.3 no vinyl, 5.3.2 listed manufacturers | `met` on every run |
+| 5.3 materials, 5.3.2 listed manufacturers | `met` on every run |
 | 5.4.2(i) composite colors by manufacturer | `not-met` on every run: River Birch is a Frame It All color, not a Trex one |
 | 5.2.1, 5.2.5 no horizontal boards | `not-met` on every run |
 | 5.9.1 gate boards coordinate with the fence | `not-met`: vertical gate, horizontal fence |
 | 5.4.2(iii) gate material matches | `met` |
-| 5.4.2(iii) gate color matches | `committee`: gate color not stated, and the rule leaves it to the committee |
-| 5.2.2 K style | `advisory` if not followed; `committee` while the style isn't stated, through the guidelines' case-by-case clause |
-| 5.4.2(iv) posts match | `committee`: post color not stated |
+| 5.4.2(iii) gate color matches | `missing-information`: gate color not stated |
+| 5.2.2 K style | `missing-information` while the style isn't stated; another style goes to the committee through the guidelines' case-by-case clause |
+| 5.4.2(iv) posts match | `missing-information`: post color not stated |
 | 5.5.1(i) maximum and minimum height | `missing-information` on every run: height is required |
 | 5.6.1(i) neighbor approval | `missing-information` on both side runs; `not-applicable` on the rear and return runs |
-| 5.6.2(ii) front setback | `committee` on the return run: setback not stated, and a recommendation the committee may vary |
-| 5.9.2 gate height without an arbor | `committee`: gate height not stated |
+| 5.6.2(ii) front setback | `missing-information` on the return run: setback not stated; `not-applicable` on the others |
+| 5.9.2 gate height without an arbor | `missing-information`: gate height not stated |
 | Owner signatures, checklist | `missing-information` |
 | Application form, project description, plot plan, photos, product specification | `met` |
-| 5.3 open metal, 5.4.1 wood finish, 5.5.1(ii) and (iii) lattice and arbor, 5.5.2, 5.6.2(i), 5.7.1, 5.9.2 with an arbor, 5.9.5 | `not-applicable` |
+| 5.3 no vinyl, 5.3 open metal, 5.4.1 wood finish, 5.5.1(ii) and (iii) lattice and arbor, 5.5.2, 5.6.2(i), 5.7.1, 5.9.2 with an arbor, 5.9.5 | `not-applicable` |
 | Declaration 4.1 prior approval of work | `committee`, shown but not counted: it's the decision the application asks for |
 | Declaration 4.3(b) plans and specifications | `met`: plot plan, photos and product specification |
 | Declaration 4.3(b) harmony with the community | `committee`: a judgment, unless the model answers it confidently from the photos |
@@ -409,10 +420,14 @@ them too.
 **Recommendation:** request information.
 
 - What to provide: the height of each run, the second owner's signature, a signed and corrected checklist,
-  neighbor approval for both side runs, and proof of the review fee unless the packet shows it.
+  neighbor approval for both side runs, proof of the review fee unless the packet shows it, and the style, post color,
+  gate color, gate height and the return run's setback.
 - What to change: a listed Trex color, vertical boards, and a gate that matches the fence.
-- For the committee: gate color, post color, the return run's setback, gate height, K style, and harmony with the
-  community.
+- For the committee: harmony with the community.
+
+A fact a rule tests that the packet doesn't state is missing information; a finding goes to the committee only through
+a discretion rule, an approval it's about to give, or a judgment the model can't make confidently. The test fixture's
+decisions behind these rows are in the [implementation log](implementation-log.md).
 
 The test fixture for this case is built from the committed sample rulebook and these facts, not from the packet, so it
 carries no personal data.
