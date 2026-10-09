@@ -1,6 +1,6 @@
 import { useForm } from "@tanstack/react-form"
-import { FileIcon, RefreshCwIcon, Trash2Icon } from "lucide-react"
-import { useState } from "react"
+import { FileIcon, Trash2Icon } from "lucide-react"
+import { useId, useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 import { decisionOutcomes } from "@/applications/application"
@@ -15,9 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Field,
   FieldDescription,
@@ -27,13 +25,13 @@ import {
   FieldLegend,
   FieldSet
 } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
-import { hasOpenRequests } from "@/review/reviewModel"
+import { hasOpenRequests, type Review } from "@/review/reviewModel"
+import { renderRuleMarkers } from "@/review/ruleMarkers"
 import { acceptFor } from "@/storage/uploadRules"
 import {
   fileStatusLabels,
@@ -44,8 +42,10 @@ import {
   type DecisionOutcome
 } from "../applicationDisplay"
 import type { ApplicationView } from "../applications.functions"
-import { createReviewContext } from "../reviewContext"
+import { createReviewContext, type ReviewAudience } from "../reviewContext"
+import { ReviewDetail } from "../ReviewDetail/ReviewDetail"
 import { ReviewReport } from "../ReviewReport/ReviewReport"
+import { countOf, suggestedDecisions } from "../ReviewVerdict/ReviewVerdict.utils"
 import { uploadProblem } from "../uploadApplicationFiles"
 
 export type ApplicationActions = {
@@ -58,6 +58,8 @@ export type ApplicationActions = {
 
 export type ApplicationPageProps = {
   view: ApplicationView
+  /** Who reads the page: the homeowner preparing the application, or the committee deciding it. */
+  audience: ReviewAudience
   loadJob: (jobId: string) => Promise<Job | null>
   actions: ApplicationActions
   onChanged: () => void
@@ -79,8 +81,14 @@ async function attempt(action: () => Promise<void>, fallback: string) {
   }
 }
 
+const isDecisionOutcome = (value: unknown): value is DecisionOutcome =>
+  decisionOutcomes.some((outcome) => outcome === value)
+
 const decisionSchema = z
-  .object({ outcome: z.enum(decisionOutcomes), note: z.string().trim().max(4000) })
+  .object({
+    outcome: z.string().refine(isDecisionOutcome, "Choose a decision."),
+    note: z.string().trim().max(4000)
+  })
   .superRefine((value, context) => {
     if (value.outcome !== "approved" && !value.note) {
       context.addIssue({
@@ -91,95 +99,259 @@ const decisionSchema = z
     }
   })
 
-function DecisionForm({ onDecide }: { onDecide: ApplicationActions["decide"] }) {
+type DecisionFormProps = {
+  /** The review: its recommendation preselects the decision, and its next steps can start the note. */
+  review: Review
+  /** A rule's title, for the review's rule markers. */
+  ruleTitle: (ruleKey: string) => string
+  onDecide: ApplicationActions["decide"]
+}
+
+/** What the homeowner has to provide and change, one line each, as a starting point for the note. */
+const reviewNote = (review: Review, ruleTitle: (ruleKey: string) => string) =>
+  [...review.missingInformation, ...review.changes]
+    .map((item) => `- ${renderRuleMarkers(item.text, ruleTitle)}`)
+    .join("\n")
+
+/** The committee's decision: preselected to follow the review, with a note to the homeowner unless approved as is. */
+function DecisionForm({ review, ruleTitle, onDecide }: DecisionFormProps) {
+  const headingId = useId()
+  const suggested = suggestedDecisions[review.recommendation]
+  const note = reviewNote(review, ruleTitle)
   const form = useForm({
-    defaultValues: { outcome: "approved" as DecisionOutcome, note: "" },
+    defaultValues: { outcome: suggested ?? "", note: "" },
     validators: { onSubmit: decisionSchema },
     onSubmit: async ({ value }) => {
-      await attempt(() => onDecide(value.outcome, value.note.trim() || null), "The decision wasn't saved.")
+      const { outcome, note } = value
+      if (isDecisionOutcome(outcome)) {
+        await attempt(() => onDecide(outcome, note.trim() || null), "The decision wasn't saved.")
+      }
     }
   })
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Committee decision</CardTitle>
-        <CardDescription>The review is a recommendation; the committee decides.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault()
-            void form.handleSubmit()
-          }}
-        >
-          <FieldGroup>
-            <form.Field name="outcome">
-              {(field) => (
-                <FieldSet>
-                  <FieldLegend variant="label">Decision</FieldLegend>
-                  <RadioGroup
-                    value={field.state.value}
-                    onValueChange={(value) => {
-                      const outcome = decisionOutcomes.find((item) => item === value)
-                      if (outcome) {
-                        field.handleChange(outcome)
-                      }
-                    }}
+    <section aria-labelledby={headingId} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h2 id={headingId} className="text-lg font-semibold">
+          Your decision
+        </h2>
+        <p className="text-sm text-muted-foreground">The review is a recommendation; the committee decides.</p>
+      </div>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          void form.handleSubmit()
+        }}
+      >
+        <FieldGroup>
+          <form.Field name="outcome">
+            {(field) => (
+              <FieldSet data-invalid={field.state.meta.errors.length > 0}>
+                <FieldLegend variant="label">Decision</FieldLegend>
+                {suggested ? <FieldDescription>Preselected to follow the review.</FieldDescription> : null}
+                <RadioGroup
+                  value={field.state.value}
+                  onValueChange={(value) => {
+                    if (isDecisionOutcome(value)) {
+                      field.handleChange(value)
+                    }
+                  }}
+                >
+                  {decisionOutcomes.map((outcome) => (
+                    <Field key={outcome} orientation="horizontal">
+                      <RadioGroupItem id={`outcome-${outcome}`} value={outcome} />
+                      <FieldLabel htmlFor={`outcome-${outcome}`} className="font-normal">
+                        {outcomeLabels[outcome]}
+                      </FieldLabel>
+                    </Field>
+                  ))}
+                </RadioGroup>
+                <FieldError errors={field.state.meta.errors} />
+              </FieldSet>
+            )}
+          </form.Field>
+          <form.Field name="note">
+            {(field) => (
+              <Field data-invalid={field.state.meta.errors.length > 0}>
+                <FieldLabel htmlFor="decision-note">Note to the homeowner</FieldLabel>
+                <Textarea
+                  id="decision-note"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  aria-invalid={field.state.meta.errors.length > 0}
+                />
+                <FieldDescription>Required unless the application is approved as submitted.</FieldDescription>
+                <FieldError errors={field.state.meta.errors} />
+                {note && !field.state.value ? (
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto self-start p-0 text-link"
+                    onClick={() => field.handleChange(note)}
                   >
-                    {decisionOutcomes.map((outcome) => (
-                      <Field key={outcome} orientation="horizontal">
-                        <RadioGroupItem id={`outcome-${outcome}`} value={outcome} />
-                        <FieldLabel htmlFor={`outcome-${outcome}`} className="font-normal">
-                          {outcomeLabels[outcome]}
-                        </FieldLabel>
-                      </Field>
-                    ))}
-                  </RadioGroup>
-                </FieldSet>
-              )}
-            </form.Field>
-            <form.Field name="note">
-              {(field) => (
-                <Field data-invalid={field.state.meta.errors.length > 0}>
-                  <FieldLabel htmlFor="decision-note">Note to the homeowner</FieldLabel>
-                  <Textarea
-                    id="decision-note"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    aria-invalid={field.state.meta.errors.length > 0}
-                  />
-                  <FieldDescription>Required unless the application is approved as submitted.</FieldDescription>
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
-            </form.Field>
-            <form.Subscribe selector={(state) => state.isSubmitting}>
-              {(isSubmitting) => (
-                <Field orientation="horizontal">
-                  <Button type="submit" disabled={isSubmitting}>
-                    Record decision
+                    Start from the review’s next steps
                   </Button>
-                </Field>
-              )}
-            </form.Subscribe>
-          </FieldGroup>
-        </form>
-      </CardContent>
-    </Card>
+                ) : null}
+              </Field>
+            )}
+          </form.Field>
+          <form.Subscribe selector={(state) => state.isSubmitting}>
+            {(isSubmitting) => (
+              <Field orientation="horizontal">
+                <Button type="submit" disabled={isSubmitting}>
+                  Record decision
+                </Button>
+              </Field>
+            )}
+          </form.Subscribe>
+        </FieldGroup>
+      </form>
+    </section>
   )
 }
 
-/** One application: its packet, the latest review, submitting, and the committee's decision. */
-export function ApplicationPage({ view, loadJob, actions, onChanged, source, loadImage }: ApplicationPageProps) {
+type AddFilesButtonProps = {
+  variant: "default" | "outline"
+  disabled: boolean
+  onAdd: (files: File[]) => void
+}
+
+/** Opens the file picker; the chosen files upload and the review runs again, unless one can't be read. */
+function AddFilesButton({ variant, disabled, onAdd }: AddFilesButtonProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [problem, setProblem] = useState<string | null>(null)
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept={acceptFor.application}
+        aria-label="Add files"
+        className="hidden"
+        onChange={(event) => {
+          const files = [...(event.target.files ?? [])]
+          event.target.value = ""
+          const found = uploadProblem(files)
+          setProblem(found)
+          if (!found && files.length > 0) {
+            onAdd(files)
+          }
+        }}
+      />
+      <Button variant={variant} disabled={disabled} onClick={() => inputRef.current?.click()}>
+        Add files
+      </Button>
+      {problem ? (
+        <p role="alert" className="basis-full text-sm text-destructive">
+          {problem}
+        </p>
+      ) : null}
+    </>
+  )
+}
+
+type PacketFileListProps = {
+  view: ApplicationView
+  isBusy: boolean
+  onRemove: (fileId: string) => void
+}
+
+/** The files the homeowner uploaded, each with what the review made of it. */
+function PacketFileList({ view, isBusy, onRemove }: PacketFileListProps) {
+  const files = packetFiles(view.files)
+  const isReviewing = view.application.status === "reviewing"
+  if (files.length === 0) {
+    return <p className="text-sm text-muted-foreground">No files yet.</p>
+  }
+  return (
+    <ul className="flex flex-col divide-y">
+      {files.map(({ file, pictures }) => (
+        <li key={file.id} className="flex items-center gap-3 py-2 text-sm">
+          <FileIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate">{file.fileName}</span>
+            <span className="text-muted-foreground">
+              {isReviewing && file.status === "processing" ? "Reading" : fileStatusLabels[file.status]}
+              {file.pageCount ? `, ${file.pageCount} ${file.pageCount === 1 ? "page" : "pages"}` : ""}
+              {pictures.length > 0 ? `, ${pictures.length} ${pictures.length === 1 ? "picture" : "pictures"}` : ""}
+              {file.error ? `: ${file.error.message}` : ""}
+            </span>
+          </div>
+          {view.canEdit ? (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={`Remove ${file.fileName}`}
+              disabled={isBusy}
+              onClick={() => onRemove(file.id)}
+            >
+              <Trash2Icon />
+            </Button>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+type HeaderProps = { view: ApplicationView }
+
+/** The application's name, where it stands, and the homeowner's own description, quietly. */
+function ApplicationHeader({ view }: HeaderProps) {
+  const { application } = view
+  const started = dateFormat.format(new Date(application.createdAt))
+  const submitted = application.submittedAt ? dateFormat.format(new Date(application.submittedAt)) : null
+  return (
+    <header className="flex flex-col gap-1">
+      <h2 className="text-xl font-semibold">{view.projectTypeLabel ?? "Project"} application</h2>
+      <p className="text-sm text-muted-foreground">
+        {statusLabels[application.status]}. Started {started}
+        {submitted ? `, submitted ${submitted}` : ""}.
+      </p>
+      {application.description ? (
+        <p className="max-w-prose text-sm whitespace-pre-line text-muted-foreground">{application.description}</p>
+      ) : null}
+    </header>
+  )
+}
+
+type StageProps = { title: string; description: string; children?: ReactNode }
+
+/** The top of the page before there's a review to show. */
+function Stage({ title, description, children }: StageProps) {
+  const headingId = useId()
+  return (
+    <section aria-labelledby={headingId} className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h2 id={headingId} className="text-2xl font-semibold tracking-tight">
+          {title}
+        </h2>
+        <p className="max-w-prose text-muted-foreground">{description}</p>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+/**
+ * One application. With a review, its recommendation leads, then the next steps and the one thing to do now; the
+ * packet, the rule matrix, the evidence and earlier reviews wait behind disclosure.
+ */
+export function ApplicationPage({
+  view,
+  audience,
+  loadJob,
+  actions,
+  onChanged,
+  source,
+  loadImage
+}: ApplicationPageProps) {
   const { application, review, job } = view
-  const [selected, setSelected] = useState<File[]>([])
-  const [fileInputKey, setFileInputKey] = useState(0)
   const [isBusy, setIsBusy] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
-  const files = packetFiles(view.files)
+  const fileCount = packetFiles(view.files).length
   const isReviewing = application.status === "reviewing"
-  const problem = uploadProblem(selected)
   const canSubmit =
     view.isOwner &&
     review !== null &&
@@ -192,143 +364,118 @@ export function ApplicationPage({ view, loadJob, actions, onChanged, source, loa
     onChanged()
     return succeeded
   }
-
-  const uploadAndReview = () =>
-    busy(async () => {
-      await actions.upload(selected)
-      setSelected([])
-      setFileInputKey((key) => key + 1)
+  const addFiles = (files: File[]) =>
+    void busy(async () => {
+      await actions.upload(files)
       await actions.runReview()
     }, "The files didn't upload.")
-
+  const runReview = () => void busy(actions.runReview, "The review didn't start.")
+  const removeFile = (fileId: string) => void busy(() => actions.removeFile(fileId), "The file wasn't removed.")
   const submit = (confirmOpenRequests: boolean) =>
     busy(async () => {
       await actions.submit(confirmOpenRequests)
       toast.success("Submitted to the committee.")
     }, "The application wasn't submitted.")
 
-  return (
-    <div className="flex flex-col gap-4 px-4 lg:px-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{view.projectKindLabel ?? "Project"} application</CardTitle>
-          <CardDescription>
-            Started {dateFormat.format(new Date(application.createdAt))}
-            {application.submittedAt ? `, submitted ${dateFormat.format(new Date(application.submittedAt))}` : ""}
-          </CardDescription>
-          <CardAction>
-            <Badge variant={application.status === "submitted" ? "default" : "outline"}>
-              {statusLabels[application.status]}
-            </Badge>
-          </CardAction>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 text-sm">
-          <p className="whitespace-pre-line">{application.description ?? "No description."}</p>
-          {application.decision ? (
-            <Alert variant={application.decision.outcome === "disapproved" ? "destructive" : "default"}>
-              <AlertTitle>Committee decision: {outcomeLabels[application.decision.outcome]}</AlertTitle>
-              {application.decision.note ? <AlertDescription>{application.decision.note}</AlertDescription> : null}
-            </Alert>
+  const failed =
+    !isReviewing && job?.status === "failed" ? (
+      <Alert variant="destructive">
+        <AlertTitle>The last review didn’t finish</AlertTitle>
+        <AlertDescription className="flex flex-col items-start gap-2">
+          {job.error?.message ?? "Run the review again."}
+          {view.canEdit && review ? (
+            <Button variant="outline" size="sm" disabled={isBusy} onClick={runReview}>
+              Run review again
+            </Button>
           ) : null}
-        </CardContent>
-      </Card>
+        </AlertDescription>
+      </Alert>
+    ) : null
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Packet</CardTitle>
-          <CardDescription>PDF, Word, JPEG or PNG. Photos up to 5 MB each.</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {files.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No files yet.</p>
+  const homeownerAction =
+    review && view.canEdit ? (
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {canSubmit && !hasOpenRequests(review) ? (
+            <>
+              <Button disabled={isBusy} onClick={() => void submit(false)}>
+                Submit to the committee
+              </Button>
+              <AddFilesButton variant="outline" disabled={isBusy} onAdd={addFiles} />
+            </>
           ) : (
-            <ul className="flex flex-col gap-2">
-              {files.map(({ file, pictures }) => (
-                <li key={file.id} className="flex items-center gap-3 rounded-lg border p-2 text-sm">
-                  <FileIcon className="size-4 shrink-0 text-muted-foreground" />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-medium">{file.fileName}</span>
-                    <span className="text-muted-foreground">
-                      {isReviewing && file.status === "processing" ? "Reading" : fileStatusLabels[file.status]}
-                      {file.pageCount ? `, ${file.pageCount} ${file.pageCount === 1 ? "page" : "pages"}` : ""}
-                      {pictures.length > 0
-                        ? `, ${pictures.length} ${pictures.length === 1 ? "picture" : "pictures"}`
-                        : ""}
-                      {file.error ? `: ${file.error.message}` : ""}
-                    </span>
-                  </div>
-                  {view.canEdit ? (
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label={`Remove ${file.fileName}`}
-                      disabled={isBusy}
-                      onClick={() => void busy(() => actions.removeFile(file.id), "The file wasn't removed.")}
-                    >
-                      <Trash2Icon />
-                    </Button>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+            <>
+              <AddFilesButton variant="default" disabled={isBusy} onAdd={addFiles} />
+              {canSubmit ? (
+                <Button variant="outline" disabled={isBusy} onClick={() => setIsConfirming(true)}>
+                  Submit anyway
+                </Button>
+              ) : null}
+            </>
           )}
-          {view.canEdit ? (
-            <Field data-invalid={problem !== null}>
-              <FieldLabel htmlFor="packet-files">Add files</FieldLabel>
-              <Input
-                key={fileInputKey}
-                id="packet-files"
-                type="file"
-                multiple
-                accept={acceptFor.application}
-                onChange={(event) => setSelected([...(event.target.files ?? [])])}
-                aria-invalid={problem !== null}
-              />
-              {problem ? <FieldError>{problem}</FieldError> : null}
-            </Field>
-          ) : null}
-        </CardContent>
+        </div>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          {hasOpenRequests(review)
+            ? "Add pages that show what’s missing, and the review runs again on the whole packet."
+            : "The committee sees this review with your packet, and decides."}
+        </p>
+      </div>
+    ) : null
+
+  const action =
+    audience === "committee" && view.canDecide && review ? (
+      <DecisionForm
+        review={review}
+        ruleTitle={(ruleKey) => view.rules.find((rule) => rule.key === ruleKey)?.title ?? ruleKey}
+        onDecide={(outcome, note) =>
+          busy(() => actions.decide(outcome, note), "The decision wasn't saved.").then(() => undefined)
+        }
+      />
+    ) : (
+      homeownerAction
+    )
+
+  const packetDetail = (
+    <ReviewDetail value="packet" title="Packet" meta={countOf(fileCount, "file", "files")}>
+      <div className="flex flex-col gap-3">
+        <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
         {view.canEdit ? (
-          <CardFooter className="flex flex-wrap gap-2">
-            <Button
-              disabled={isBusy || selected.length === 0 || problem !== null}
-              onClick={() => void uploadAndReview()}
-            >
-              {isBusy ? "Working" : "Upload and review"}
-            </Button>
-            <Button
-              variant="outline"
-              disabled={isBusy || files.length === 0}
-              onClick={() => void busy(actions.runReview, "The review didn't start.")}
-            >
-              <RefreshCwIcon />
-              {review ? "Run review again" : "Run review"}
-            </Button>
-          </CardFooter>
+          <Button variant="outline" size="sm" className="self-start" disabled={isBusy} onClick={runReview}>
+            Run review again
+          </Button>
         ) : null}
-      </Card>
+      </div>
+    </ReviewDetail>
+  )
 
-      {isReviewing && job ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Reviewing</CardTitle>
-            <CardDescription>
-              Reading the packet and checking it against the rulebook. This takes a few minutes.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <JobProgress jobId={job.id} loadJob={loadJob} onFinished={onChanged} />
-          </CardContent>
-        </Card>
-      ) : null}
-      {!isReviewing && job?.status === "failed" ? (
-        <Alert variant="destructive">
-          <AlertTitle>The last review didn’t finish</AlertTitle>
-          <AlertDescription>{job.error?.message ?? "Run the review again."}</AlertDescription>
-        </Alert>
-      ) : null}
+  const historyDetail =
+    view.history.length > 1 ? (
+      <ReviewDetail value="history" title="Earlier reviews" meta={String(view.history.length - 1)}>
+        <ul className="flex flex-col gap-1">
+          {view.history.slice(1).map((item) => (
+            <li key={item.id} className="flex flex-wrap justify-between gap-x-4">
+              <span>{recommendationLabels[item.recommendation]}</span>
+              <span className="text-muted-foreground">{dateFormat.format(new Date(item.createdAt))}</span>
+            </li>
+          ))}
+        </ul>
+      </ReviewDetail>
+    ) : null
 
-      {review ? (
+  const body = () => {
+    if (isReviewing) {
+      return (
+        <Stage
+          title="Reviewing"
+          description="Reading the packet and checking it against the rulebook. This takes a few minutes."
+        >
+          {job ? <JobProgress jobId={job.id} loadJob={loadJob} onFinished={onChanged} /> : null}
+          <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
+        </Stage>
+      )
+    }
+    if (review) {
+      return (
         <ReviewReport
           context={createReviewContext({
             review,
@@ -336,60 +483,47 @@ export function ApplicationPage({ view, loadJob, actions, onChanged, source, loa
             terms: view.terms,
             files: view.files,
             entityEvidence: view.entityEvidence,
-            audience: view.isOwner ? "homeowner" : "committee",
+            audience,
             source,
             loadImage
           })}
-        />
-      ) : null}
-
-      {canSubmit && review ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Submit to the committee</CardTitle>
-            <CardDescription>
-              The committee sees this review: {recommendationLabels[review.recommendation].toLowerCase()}.
-              {hasOpenRequests(review)
-                ? " It still asks for information. You can submit anyway, but the committee may deny an incomplete application."
-                : ""}
-            </CardDescription>
-          </CardHeader>
-          <CardFooter>
-            <Button
-              disabled={isBusy}
-              onClick={() => (hasOpenRequests(review) ? setIsConfirming(true) : void submit(false))}
-            >
-              Submit
-            </Button>
-          </CardFooter>
-        </Card>
-      ) : null}
-
-      {view.canDecide ? (
-        <DecisionForm
-          onDecide={(outcome, note) =>
-            busy(() => actions.decide(outcome, note), "The decision wasn't saved.").then(() => undefined)
+          decision={application.decision}
+          isActing={audience === "homeowner" ? canSubmit : view.canDecide}
+          action={action}
+          details={
+            <>
+              {packetDetail}
+              {historyDetail}
+            </>
           }
         />
-      ) : null}
+      )
+    }
+    return (
+      <Stage
+        title="Not reviewed yet"
+        description="Add the packet’s files. The review reads them and checks the project against the rulebook."
+      >
+        <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
+        {view.canEdit ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {fileCount > 0 ? (
+              <Button disabled={isBusy} onClick={runReview}>
+                Run review
+              </Button>
+            ) : null}
+            <AddFilesButton variant={fileCount > 0 ? "outline" : "default"} disabled={isBusy} onAdd={addFiles} />
+          </div>
+        ) : null}
+      </Stage>
+    )
+  }
 
-      {view.history.length > 1 ? (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Earlier reviews</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="text-sm">
-              {view.history.slice(1).map((item) => (
-                <li key={item.id}>
-                  {dateFormat.format(new Date(item.createdAt))}: {recommendationLabels[item.recommendation]}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      ) : null}
-
+  return (
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-4 lg:px-6">
+      <ApplicationHeader view={view} />
+      {failed}
+      {body()}
       <AlertDialog open={isConfirming} onOpenChange={setIsConfirming}>
         <AlertDialogContent>
           <AlertDialogHeader>

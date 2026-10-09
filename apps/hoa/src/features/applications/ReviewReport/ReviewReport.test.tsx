@@ -1,116 +1,199 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { describe, expect, it } from "vitest"
-import type { Review } from "@/review/reviewModel"
+import { describe, expect, it, vi } from "vitest"
+import type { Application } from "@/applications/application"
+import type { ActionItem, Review } from "@/review/reviewModel"
 import { fenceReview } from "@/tests/fenceReview"
 import { createReviewContext, type ReviewAudience } from "../reviewContext"
 import { ReviewReport } from "./ReviewReport"
 
-function setup(audience: ReviewAudience = "homeowner", change: Partial<Review> = {}) {
-  const { review, rules, terms, files } = fenceReview()
+const colors = "Composite colors by manufacturer"
+
+type Options = {
+  audience?: ReviewAudience
+  change?: (review: Review) => Review
+  decision?: Application["decision"]
+  isActing?: boolean
+}
+
+function setup({
+  audience = "homeowner",
+  change = (review) => review,
+  decision = null,
+  isActing = true
+}: Options = {}) {
+  const fence = fenceReview()
+  const review = change(fence.review)
   const context = createReviewContext({
-    review: { ...review, ...change },
-    rules,
-    terms,
-    files,
+    review,
+    rules: fence.rules,
+    terms: fence.terms,
+    files: fence.files,
     audience,
     entityEvidence: []
   })
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <ReviewReport context={context} />
+      <ReviewReport context={context} decision={decision} isActing={isActing} action={<button>Act now</button>} />
     </QueryClientProvider>
   )
   return { user: userEvent.setup(), review }
 }
 
-/** The card with this title. */
-function card(title: string) {
-  const found = screen.getByText(title, { selector: "[data-slot=card-title]" }).closest("[data-slot=card]")
-  if (!(found instanceof HTMLElement)) {
-    throw new Error(`No card titled ${title}`)
-  }
-  return within(found)
-}
+const group = (name: string) => within(screen.getByRole("region", { name }))
+
+/** A review that found nothing to change, provide or decide. */
+const clean = (review: Review): Review => ({
+  ...review,
+  recommendation: "approve",
+  provisional: false,
+  changes: [],
+  missingInformation: [],
+  committeeDecisions: [],
+  suggestions: [],
+  findings: review.findings.map((finding) => ({ ...finding, outcome: "met" }))
+})
+
+const items = (count: number, prefix: string): ActionItem[] =>
+  Array.from({ length: count }, (_, index) => ({
+    id: `${prefix}-${index}`,
+    ruleKey: "guidelines:5.2.2#k-style",
+    entities: ["run-1"],
+    text: `${prefix} item ${index + 1}`
+  }))
 
 describe("ReviewReport", () => {
-  it("gives the recommendation, and says a review before submission is provisional", () => {
+  it("leads with the recommendation in plain words, why, and when it ran", () => {
     setup()
-    expect(screen.getByText("More information needed")).toBeInTheDocument()
-    expect(screen.getByText("Provisional review")).toBeInTheDocument()
+    const verdict = screen.getByRole("region", { name: "More information needed" })
+    expect(within(verdict).getByText("Review result")).toBeInTheDocument()
+    expect(within(verdict).getByText("Your packet doesn't yet show 11 things the rules ask for.")).toBeInTheDocument()
+    expect(within(verdict).getByText(/^Provisional review from/)).toBeInTheDocument()
+    expect(within(verdict).getByRole("button", { name: "What this means" })).toBeInTheDocument()
   })
 
-  it("names every recommendation, including referral to the committee and denial", () => {
-    setup("homeowner", { recommendation: "refer-to-committee", provisional: false })
-    expect(screen.getByText("Refer to the committee")).toBeInTheDocument()
-    expect(screen.queryByText("Provisional review")).not.toBeInTheDocument()
+  it("words the recommendation for the committee", () => {
+    setup({ audience: "committee" })
+    expect(screen.getByText("The review recommends")).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Request more information" })).toBeInTheDocument()
+    expect(screen.getByText("The packet doesn't show 11 things the rules ask for.")).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Before you decide" })).toBeInTheDocument()
+    expect(screen.getByRole("region", { name: "For your judgment" })).toBeInTheDocument()
   })
 
-  it("renders the writer's rule markers as references to the rule and its citation", () => {
-    setup()
+  it("lists the next steps in the order that changes the outcome, the first few of a long group", async () => {
+    const { user } = setup()
+    expect(screen.getByRole("heading", { name: "What to do next" })).toBeInTheDocument()
+    const steps = within(screen.getByRole("region", { name: "What to do next" }))
+    const headings = steps.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)
+    expect(headings).toEqual(["Add to your packet", "Change in your plans", "Left to the committee"])
+    const provide = group("Add to your packet")
+    expect(provide.getAllByRole("listitem")).toHaveLength(5)
+    await user.click(provide.getByRole("button", { name: "Show 6 more" }))
+    expect(provide.getAllByRole("listitem")).toHaveLength(11)
+    expect(provide.getByRole("button", { name: "Show fewer" })).toHaveAttribute("aria-expanded", "true")
+    expect(group("Change in your plans").getAllByRole("listitem")).toHaveLength(3)
+    expect(screen.getByRole("button", { name: "Act now" })).toBeInTheDocument()
+  })
+
+  it("keeps an item to one line, with its rule and evidence on demand", async () => {
+    const { user } = setup()
+    const changes = group("Change in your plans")
+    const item = changes.getByRole("button", { name: /^Composite colors by manufacturer \(Left side run/ })
+    expect(changes.queryByRole("button", { name: "Guidelines 5.4.2(i)" })).not.toBeInTheDocument()
+    await user.click(item)
+    expect(item).toHaveAttribute("aria-expanded", "true")
+    expect(changes.getByRole("button", { name: "Guidelines 5.4.2(i)" })).toBeInTheDocument()
+    await user.click(changes.getByRole("button", { name: "What the review read for Right side run" }))
+    const sheet = await screen.findByRole("dialog")
+    expect(within(sheet).getByRole("heading", { name: colors })).toBeInTheDocument()
+    expect(within(sheet).getByText("Right side run")).toBeInTheDocument()
+  })
+
+  it("hides suggestions until asked, since they don't affect the recommendation", async () => {
+    const { user } = setup({
+      change: (review) => ({ ...review, suggestions: items(2, "Suggestion") })
+    })
+    const suggestions = group("Suggestions")
+    expect(suggestions.queryByRole("listitem")).not.toBeInTheDocument()
+    await user.click(suggestions.getByRole("button", { name: "Show 2 suggestions" }))
+    expect(suggestions.getAllByRole("listitem")).toHaveLength(2)
+  })
+
+  it("says plainly when there's nothing to do", () => {
+    setup({ change: clean })
+    expect(screen.getByRole("heading", { name: "Ready for approval" })).toBeInTheDocument()
+    expect(screen.getByText("Your packet meets every rule the review checked.")).toBeInTheDocument()
+    expect(screen.getByText("Nothing to change or add.")).toBeInTheDocument()
+    expect(screen.getByText(/^Reviewed /)).toBeInTheDocument()
+    expect(screen.queryByText("What this means")).not.toBeInTheDocument()
+  })
+
+  it("reads well with many items: the first few of each group", () => {
+    setup({
+      change: (review) => ({
+        ...review,
+        missingInformation: items(40, "Provide"),
+        changes: items(30, "Change"),
+        committeeDecisions: items(10, "Committee")
+      })
+    })
+    expect(screen.getAllByRole("listitem")).toHaveLength(15)
+    expect(screen.getByRole("button", { name: "Show 35 more" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Show 25 more" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Show 5 more" })).toBeInTheDocument()
+  })
+
+  it("puts changes first when the review recommends denial", () => {
+    setup({ change: (review) => ({ ...review, recommendation: "deny" }) })
+    expect(screen.getByRole("heading", { name: "Likely to be denied as planned" })).toBeInTheDocument()
+    const steps = within(screen.getByRole("region", { name: "What to do next" }))
+    expect(steps.getAllByRole("heading", { level: 3 })[0]).toHaveTextContent("Change in your plans")
+  })
+
+  it("shows the committee's decision at the top once made, with the review's findings behind disclosure", async () => {
+    const { user } = setup({
+      isActing: false,
+      decision: {
+        outcome: "approved-with-conditions",
+        note: "Use a listed color.",
+        decidedBy: "a",
+        decidedAt: "2026-10-09T12:00:00.000Z"
+      }
+    })
+    expect(screen.getByText("Committee decision")).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Approved with conditions" })).toBeInTheDocument()
+    expect(screen.getByText("Use a listed color.")).toBeInTheDocument()
+    expect(screen.getByText(/The review recommended: request more information\./)).toBeInTheDocument()
+    expect(screen.queryByRole("region", { name: "Add to your packet" })).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "What the review found" }))
+    expect(screen.getByRole("region", { name: "Add to your packet" })).toBeInTheDocument()
+  })
+
+  it("keeps the rule matrix, what it read and the written summary behind disclosure", async () => {
+    const { user } = setup()
+    expect(screen.queryByRole("table")).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: /^How each rule was checked/ }))
+    expect(screen.getByRole("table")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: /^What the review read from your packet/ }))
+    await user.click(screen.getByRole("button", { name: /^Left side run(?!:)/ }))
+    expect(screen.getByText("Written as “River Birtch”")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "The review's written summary" }))
     const feedback = screen.getByText(/Choose a listed color under/)
-    expect(within(feedback).getByText("Composite colors by manufacturer")).toBeInTheDocument()
     expect(within(feedback).getByRole("button", { name: "Guidelines 5.4.2(i)" })).toBeInTheDocument()
   })
 
-  it("shows the committee the assessment instead of the feedback", () => {
-    setup("committee")
-    expect(screen.getByText(/the committee weighs/)).toBeInTheDocument()
-    expect(screen.queryByText(/Choose a listed color under/)).not.toBeInTheDocument()
-  })
-
-  it("lists what to change and provide, naming the entities each covers, with its rule", () => {
-    const { review } = setup()
-    const changes = screen.getByRole("region", { name: "What to change" })
-    expect(within(changes).getAllByRole("listitem")).toHaveLength(review.changes.length)
-    expect(
-      within(changes).getAllByText(
-        "Left side run, Right side run, Rear run, along the permanent open space tract, Short run from the left side line to the garage's front corner"
-      )
-    ).toHaveLength(2)
-    expect(within(changes).getByRole("button", { name: "Guidelines 5.9.1" })).toBeInTheDocument()
-    const provide = screen.getByRole("region", { name: "What to provide" })
-    expect(within(provide).getAllByText("Gate on the return run", { selector: "p" }).length).toBeGreaterThan(0)
-    expect(
-      within(screen.getByRole("region", { name: "For the committee" })).getByText(
-        "Work in harmony with its surroundings",
-        { selector: "span" }
-      )
-    ).toBeInTheDocument()
-  })
-
-  it("lists suggestions when there are some", () => {
-    setup("homeowner", {
-      suggestions: [
-        { id: "suggestion-1", ruleKey: "guidelines:5.2.2#k-style", entities: ["run-1"], text: "Consider K style." }
-      ]
-    })
-    expect(
-      within(screen.getByRole("region", { name: "Suggestions" })).getByText("Consider K style.")
-    ).toBeInTheDocument()
-  })
-
-  it("groups findings by outcome with the rule, its statement, the entities, the reason and the provision", async () => {
+  it("links from a finding in the matrix back to its next step, showing it if it was hidden", async () => {
     const { user } = setup()
-    const findings = card("Findings")
-    await user.click(findings.getByRole("button", { name: "Not met (9)" }))
-    const item = findings
-      .getAllByRole("listitem")
-      .find((found) => within(found).queryByText("Composite colors by manufacturer", { selector: "span" }))
-    expect(item).toBeDefined()
-    const finding = within(item ?? document.body)
-    expect(finding.getByRole("button", { name: "Guidelines 5.4.2(i)" })).toBeInTheDocument()
-    expect(finding.getAllByRole("button", { name: "fence run" }).length).toBeGreaterThan(0)
-    expect(finding.getByText(/Left side run, Right side run/)).toBeInTheDocument()
-    expect(finding.getByRole("button", { name: /^View in document/ })).toBeInTheDocument()
-  })
-
-  it("shows what was read from the packet, per entity, with the evidence and confidence", async () => {
-    const { user } = setup()
-    await user.click(card("What we read from your packet").getByRole("button", { name: /^Left side run/ }))
-    expect(screen.getByText("“Trex fence in River Birtch”")).toBeInTheDocument()
-    expect(screen.getByText("Written as “River Birtch”")).toBeInTheDocument()
-    expect(screen.getByText("confidence 90%")).toBeInTheDocument()
+    vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(() => undefined)
+    await user.click(screen.getByRole("button", { name: /^How each rule was checked/ }))
+    await user.click(
+      screen.getByRole("button", { name: "Gates match a composite fence's color, Gate on the return run: Missing" })
+    )
+    const sheet = await screen.findByRole("dialog")
+    await user.click(within(sheet).getByRole("button", { name: /^Add to your packet: / }))
+    const item = await screen.findByRole("button", { name: /^Gates match a composite fence's color \(Gate/ })
+    await vi.waitFor(() => expect(item).toHaveFocus())
   })
 })

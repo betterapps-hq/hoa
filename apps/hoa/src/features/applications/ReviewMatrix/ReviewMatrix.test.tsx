@@ -3,19 +3,19 @@ import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { Review } from "@/review/reviewModel"
+import type { Finding } from "@/schema/types"
 import { fenceReview } from "@/tests/fenceReview"
 import { createReviewContext, type ReviewAudience } from "../reviewContext"
 import { ReviewMatrix } from "./ReviewMatrix"
 
 const colors = "Composite colors by manufacturer"
 
-const harmony = "declaration:4.3(b)/p2#harmony"
-
 function setup(audience: ReviewAudience = "homeowner", change: (review: Review) => Review = (review) => review) {
   const fence = fenceReview()
   const { rules, terms, files } = fence
   const review = change(fence.review)
   const loadImage = vi.fn<(fileId: string) => Promise<string>>(async () => "data:image/png;base64,AA==")
+  const onOpen = vi.fn<(finding: Finding) => void>()
   const context = createReviewContext({
     review,
     rules,
@@ -27,10 +27,10 @@ function setup(audience: ReviewAudience = "homeowner", change: (review: Review) 
   })
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <ReviewMatrix context={context} />
+      <ReviewMatrix context={context} onOpen={onOpen} />
     </QueryClientProvider>
   )
-  return { user: userEvent.setup(), loadImage, review }
+  return { user: userEvent.setup(), loadImage, onOpen }
 }
 
 const rowOf = (name: string) => {
@@ -77,59 +77,13 @@ describe("ReviewMatrix", () => {
     expect(rowOf("Work in harmony with its surroundings")).toBeInTheDocument()
   })
 
-  it("opens a finding with its provision, reason and every fact it read, marked by where it came from", async () => {
-    const { user } = setup()
+  it("opens a cell's finding", async () => {
+    const { user, onOpen } = setup()
     await user.click(screen.getByRole("button", { name: `${colors}, Left side run: Not met` }))
-    const sheet = await screen.findByRole("dialog")
-    expect(within(sheet).getByRole("heading", { name: colors })).toBeInTheDocument()
-    expect(within(sheet).getByRole("button", { name: /^View in document/ })).toHaveTextContent(
-      "View in document: Guidelines 5.4.2(i)"
+    expect(onOpen).toHaveBeenCalledWith(
+      expect.objectContaining({ ruleKey: "guidelines:5.4.2(i)#colors", entity: "run-1", outcome: "not-met" })
     )
-    const read = within(sheet).getByRole("region", { name: "What it read" })
-    expect(within(read).getAllByText("Matched to a listed value")).toHaveLength(1)
-    expect(within(read).getByText("“River Birtch” matched “River Birch”, 92% similar")).toBeInTheDocument()
-    expect(within(read).getByText("“Trex fence in River Birtch”")).toBeInTheDocument()
-    expect(within(read).getByText("appendix.docx, page 1")).toBeInTheDocument()
-    expect(within(read).getAllByText("Read from your packet").length).toBeGreaterThan(0)
   })
-
-  it("links the homeowner from a finding to its action item", async () => {
-    const { user, review } = setup()
-    const change = review.changes.find((found) => found.ruleKey === "guidelines:5.4.2(i)#colors")
-    const item = document.createElement("li")
-    item.id = `action-${change?.id}`
-    item.tabIndex = -1
-    document.body.appendChild(item)
-    item.scrollIntoView = vi.fn<() => void>()
-    await user.click(screen.getByRole("button", { name: `${colors}, Left side run: Not met` }))
-    const sheet = await screen.findByRole("dialog")
-    await user.click(within(sheet).getByRole("button", { name: /^What to change: / }))
-    await vi.waitFor(() => expect(item).toHaveFocus())
-    item.remove()
-  })
-
-  it("shows the committee the rules that changed a finding and the judgment's rationale", async () => {
-    const { user } = setup("committee", (review) => ({
-      ...review,
-      findings: review.findings.map((finding) =>
-        finding.ruleKey === harmony
-          ? { ...finding, modifiedBy: [{ ruleKey: "declaration:4.1/p1#approval-required", effect: "decided-by" }] }
-          : finding
-      )
-    }))
-    await user.click(
-      screen.getByRole("button", { name: "Work in harmony with its surroundings, Replace the fence: Committee" })
-    )
-    const sheet = await screen.findByRole("dialog")
-    const modifiers = within(sheet).getByRole("region", { name: "Rules that changed this finding" })
-    expect(within(modifiers).getByText("Left to the committee by")).toBeInTheDocument()
-    expect(within(modifiers).getByRole("button", { name: "Declaration 4.1, paragraph 1" })).toBeInTheDocument()
-    const judgment = within(sheet).getByRole("region", { name: "Judgment" })
-    expect(within(judgment).getByText(/not enough of the neighboring homes/)).toBeInTheDocument()
-    expect(within(judgment).getByText(/Unclear/)).toBeInTheDocument()
-    expect(within(sheet).queryByRole("button", { name: /^For the committee: / })).not.toBeInTheDocument()
-  })
-
   it("says what identified an entity, with the photo that named it", async () => {
     const { user, loadImage } = setup()
     await user.click(screen.getByRole("button", { name: "Gate on the return run: what was identified" }))

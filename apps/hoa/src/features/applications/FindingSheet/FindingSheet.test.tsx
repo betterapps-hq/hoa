@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen, within } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
-import type { Review } from "@/review/reviewModel"
+import type { ActionItem, Review } from "@/review/reviewModel"
 import type { Finding } from "@/schema/types"
 import { fenceReview } from "@/tests/fenceReview"
 import { createReviewContext, type ReviewAudience } from "../reviewContext"
@@ -12,15 +13,17 @@ const response = "declaration:4.3(b)/p3#written-response"
 const signatures = "guidelines:3.1.5#owner-signatures"
 const colors = "guidelines:5.4.2(i)#colors"
 const gateBoards = "guidelines:5.9.1#gate-boards"
+const harmony = "declaration:4.3(b)/p2#harmony"
 
 type Options = {
   audience?: ReviewAudience
+  onShowActionItem?: (item: ActionItem) => void
   changeFinding?: (finding: Finding) => Finding
   changeReview?: (review: Review) => Review
 }
 
 function setup(ruleKey: string, entity: string, options: Options = {}) {
-  const { audience = "homeowner", changeFinding = (f) => f, changeReview = (r) => r } = options
+  const { audience = "homeowner", changeFinding = (f) => f, changeReview = (r) => r, onShowActionItem } = options
   const fence = fenceReview()
   const review = changeReview(fence.review)
   const found = review.findings.find((item) => item.ruleKey === ruleKey && item.entity === entity)
@@ -39,7 +42,13 @@ function setup(ruleKey: string, entity: string, options: Options = {}) {
   })
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <FindingSheet context={context} finding={changeFinding(found)} open onOpenChange={() => undefined} />
+      <FindingSheet
+        context={context}
+        finding={changeFinding(found)}
+        open
+        onOpenChange={() => undefined}
+        onShowActionItem={onShowActionItem}
+      />
     </QueryClientProvider>
   )
   return {
@@ -140,5 +149,33 @@ describe("FindingSheet", () => {
     expect(documents.getByText("Not found")).toBeInTheDocument()
     expect(documents.getByText("Confirmed")).toBeInTheDocument()
     expect(documents.getByText("“Before photos: No”")).toBeInTheDocument()
+  })
+
+  it("links to the next step that covers the finding, worded for the reader", async () => {
+    const onShowActionItem = vi.fn<(item: ActionItem) => void>()
+    const { sheet } = setup(colors, "run-1", { onShowActionItem })
+    await userEvent.setup().click(sheet.getByRole("button", { name: /^Change in your plans: / }))
+    expect(onShowActionItem).toHaveBeenCalledWith(expect.objectContaining({ ruleKey: colors }))
+  })
+
+  it("doesn't link to a next step that isn't on the page", () => {
+    const { sheet } = setup(colors, "run-1")
+    expect(sheet.queryByRole("button", { name: /^Change in your plans: / })).not.toBeInTheDocument()
+  })
+
+  it("shows the committee the rules that changed a finding and the judgment's rationale", () => {
+    const { sheet } = setup(harmony, "work-1", {
+      audience: "committee",
+      changeFinding: (finding) => ({
+        ...finding,
+        modifiedBy: [{ ruleKey: "declaration:4.1/p1#approval-required", effect: "decided-by" }]
+      })
+    })
+    const modifiers = within(sheet.getByRole("region", { name: "Rules that changed this finding" }))
+    expect(modifiers.getByText("Left to the committee by")).toBeInTheDocument()
+    expect(modifiers.getByRole("button", { name: "Declaration 4.1, paragraph 1" })).toBeInTheDocument()
+    const judgment = within(sheet.getByRole("region", { name: "Judgment" }))
+    expect(judgment.getByText(/not enough of the neighboring homes/)).toBeInTheDocument()
+    expect(judgment.getByText(/Unclear/)).toBeInTheDocument()
   })
 })

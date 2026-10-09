@@ -1,7 +1,7 @@
 import { match } from "ts-pattern"
 import type { ApplicationFile, ApplicationStatus, decisionOutcomes } from "@/applications/application"
 import type { Recommendation } from "@/review/reviewModel"
-import type { Fact, FactValue, Finding, Outcome } from "@/schema/types"
+import type { Fact, FactValue, Outcome } from "@/schema/types"
 import type { Vocabulary } from "@/schema/vocabulary"
 import { amountText } from "../rulebook/rulebookRecords"
 
@@ -22,14 +22,6 @@ export const recommendationLabels: Record<Recommendation, string> = {
   "request-information": "More information needed",
   "refer-to-committee": "Refer to the committee",
   deny: "Deny"
-}
-
-export const recommendationVariants: Record<Recommendation, "default" | "secondary" | "destructive" | "outline"> = {
-  approve: "default",
-  "approve-with-conditions": "secondary",
-  "request-information": "outline",
-  "refer-to-committee": "secondary",
-  deny: "destructive"
 }
 
 export type DecisionOutcome = (typeof decisionOutcomes)[number]
@@ -98,15 +90,6 @@ export const attentionOutcomes: ReadonlySet<Outcome> = new Set([
   "committee",
   "advisory"
 ])
-
-/** Findings grouped in the order people act on them; the groups that have findings. */
-export function groupFindings(findings: readonly Finding[]) {
-  const byOutcome = Map.groupBy(findings, (finding) => finding.outcome)
-  return outcomeOrder.flatMap((outcome) => {
-    const group = byOutcome.get(outcome)
-    return group ? [{ outcome, findings: group }] : []
-  })
-}
 
 /** Files the homeowner uploaded, each with the pictures taken from it. */
 export function packetFiles(files: readonly ApplicationFile[]) {

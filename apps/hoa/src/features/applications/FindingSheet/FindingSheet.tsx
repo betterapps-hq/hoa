@@ -2,6 +2,7 @@ import { useRef, type ReactNode, type RefObject } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import type { ActionItem } from "@/review/reviewModel"
 import { renderRuleMarkers } from "@/review/ruleMarkers"
 import type { Finding } from "@/schema/types"
 import { CitationText } from "../../rulebook/CitationText/CitationText"
@@ -9,8 +10,9 @@ import { ProvisionReference } from "../../rulebook/ProvisionReference/ProvisionR
 import { Statement } from "../../rulebook/Statement/Statement"
 import { factStateLabels, factText, percent, sentenceCase } from "../applicationDisplay"
 import { EvidenceList } from "../EvidenceList/EvidenceList"
+import { stepTitle } from "../NextSteps/NextSteps.utils"
 import { OutcomeChip } from "../OutcomeChip/OutcomeChip"
-import { actionItemFor, actionItemId, entityLabel, type ReviewContext } from "../reviewContext"
+import { actionItemFor, entityLabel, type ReviewContext } from "../reviewContext"
 import { ReviewRuleReference } from "../ReviewRuleReference/ReviewRuleReference"
 import {
   effectLabels,
@@ -27,6 +29,8 @@ export type FindingSheetProps = {
   finding: Finding | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Closes the sheet and shows the action item that covers the finding; without it, the sheet doesn't link there. */
+  onShowActionItem?: (item: ActionItem) => void
 }
 
 type SectionProps = { title: string; children: ReactNode }
@@ -89,28 +93,20 @@ function Inputs({ context, finding }: InputsProps) {
 type FindingDetailProps = {
   context: ReviewContext
   finding: Finding
-  onClose: () => void
+  onShowActionItem?: (item: ActionItem) => void
   /** The title, which takes focus when the sheet opens. */
   titleRef: RefObject<HTMLHeadingElement | null>
 }
 
-function FindingDetail({ context, finding, onClose, titleRef }: FindingDetailProps) {
+function FindingDetail({ context, finding, onShowActionItem, titleRef }: FindingDetailProps) {
   const { review, vocabulary, audience } = context
   const rule = context.rules.get(finding.ruleKey)
   const [citation] = rule?.citations ?? []
-  const action = audience === "homeowner" ? actionItemFor(review, finding) : null
+  const action = onShowActionItem ? actionItemFor(review, finding) : null
   const documents = review.documents.filter(
     (document) => document.ruleKey === finding.ruleKey && document.entity === finding.entity
   )
-  const showActionItem = (id: string) => {
-    onClose()
-    // After the sheet gives focus back, move it to the action item.
-    requestAnimationFrame(() => {
-      const element = document.getElementById(id)
-      element?.scrollIntoView({ block: "center" })
-      element?.focus()
-    })
-  }
+
   return (
     <>
       <SheetHeader className="pr-12">
@@ -144,9 +140,10 @@ function FindingDetail({ context, finding, onClose, titleRef }: FindingDetailPro
             <Button
               variant="link"
               className="h-auto justify-start p-0 text-left whitespace-normal text-link"
-              onClick={() => showActionItem(actionItemId(action.item))}
+              onClick={() => onShowActionItem?.(action.item)}
             >
-              {action.title}: {renderRuleMarkers(action.item.text, (key) => context.rules.get(key)?.title ?? key)}
+              {stepTitle(action.key, review, audience)}:{" "}
+              {renderRuleMarkers(action.item.text, (key) => context.rules.get(key)?.title ?? key)}
             </Button>
           ) : null}
         </Section>
@@ -216,14 +213,14 @@ function FindingDetail({ context, finding, onClose, titleRef }: FindingDetailPro
 }
 
 /** One finding in full: the rule and its provision, why, every fact it read and where each came from. */
-export function FindingSheet({ context, finding, open, onOpenChange }: FindingSheetProps) {
+export function FindingSheet({ context, finding, open, onOpenChange, onShowActionItem }: FindingSheetProps) {
   // The title takes focus, so a reader hears which finding opened and no rule's preview pops up over the sheet.
   const titleRef = useRef<HTMLHeadingElement>(null)
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto data-[side=right]:sm:max-w-xl" initialFocus={titleRef}>
         {finding ? (
-          <FindingDetail context={context} finding={finding} onClose={() => onOpenChange(false)} titleRef={titleRef} />
+          <FindingDetail context={context} finding={finding} onShowActionItem={onShowActionItem} titleRef={titleRef} />
         ) : null}
       </SheetContent>
     </Sheet>

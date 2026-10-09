@@ -8,6 +8,7 @@ import type { Job } from "@/jobs/job"
 import type { Review } from "@/review/reviewModel"
 import { fenceReview } from "@/tests/fenceReview"
 import type { ApplicationView } from "../applications.functions"
+import type { ReviewAudience } from "../reviewContext"
 import { ApplicationPage, type ApplicationActions, type ApplicationPageProps } from "./ApplicationPage"
 
 vi.mock("sonner", () => ({
@@ -17,7 +18,8 @@ vi.mock("sonner", () => ({
 const application: Application = {
   id: "app-1",
   hoaId: "hoa",
-  projectKind: "fence-work",
+  projectTypeId: "fence-work",
+  answers: null,
   description: "Replace the side fence",
   createdBy: "demo-homeowner",
   createdAt: "2026-10-08T10:00:00.000Z",
@@ -71,7 +73,7 @@ const view: ApplicationView = {
   terms: fence.terms,
   entityEvidence: [],
   sourceFiles: [],
-  projectKindLabel: "Fence",
+  projectTypeLabel: "Fence",
   history: [
     { id: "r2", recommendation: "request-information", createdAt: "2026-10-08T11:00:00.000Z" },
     { id: "r1", recommendation: "deny", createdAt: "2026-10-08T10:30:00.000Z" }
@@ -82,7 +84,7 @@ const view: ApplicationView = {
   canDecide: false
 }
 
-function setup(overrides: Partial<ApplicationView> = {}) {
+function setup(overrides: Partial<ApplicationView> = {}, audience: ReviewAudience = "homeowner") {
   const actions = {
     upload: vi.fn<ApplicationActions["upload"]>(async () => undefined),
     removeFile: vi.fn<ApplicationActions["removeFile"]>(async () => undefined),
@@ -92,6 +94,7 @@ function setup(overrides: Partial<ApplicationView> = {}) {
   }
   const props: ApplicationPageProps = {
     view: { ...view, ...overrides },
+    audience,
     loadJob: vi.fn<(jobId: string) => Promise<Job | null>>(async () => null),
     actions,
     onChanged: vi.fn<() => void>()
@@ -103,73 +106,91 @@ function setup(overrides: Partial<ApplicationView> = {}) {
   return { props, actions, user: userEvent.setup() }
 }
 
+const committeeView: Partial<ApplicationView> = {
+  application: { ...application, status: "submitted", submittedAt: "2026-10-08T12:00:00.000Z" },
+  isOwner: false,
+  canEdit: false,
+  canDecide: true
+}
+
 describe("ApplicationPage", () => {
-  it("lists the packet with pictures and unreadable files, and removes a file", async () => {
+  it("leads with the recommendation and next steps, and keeps the rest behind disclosure", () => {
+    setup()
+    expect(screen.getByRole("heading", { name: "Fence application" })).toBeInTheDocument()
+    expect(screen.getByText("Reviewed. Started Oct 8, 2026.")).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "More information needed" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "What to do next" })).toBeInTheDocument()
+    expect(screen.queryByText("form.pdf")).not.toBeInTheDocument()
+    expect(screen.queryByRole("table")).not.toBeInTheDocument()
+    for (const name of [
+      /^How each rule was checked/,
+      /^What the review read from your packet/,
+      /^Packet/,
+      /^Earlier reviews/
+    ]) {
+      expect(screen.getByRole("button", { name })).toHaveAttribute("aria-expanded", "false")
+    }
+  })
+
+  it("lists the packet on demand, with pictures and unreadable files, and removes a file", async () => {
     const { actions, props, user } = setup()
+    await user.click(screen.getByRole("button", { name: /^Packet/ }))
     expect(screen.getByText("Read, 1 page, 1 picture")).toBeInTheDocument()
     expect(screen.getByText("Couldn't be read: Corrupt.")).toBeInTheDocument()
     expect(screen.queryByText("picture-1.png")).not.toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Remove form.pdf" }))
     expect(actions.removeFile).toHaveBeenCalledWith("f1")
     expect(props.onChanged).toHaveBeenCalled()
+    await user.click(screen.getByRole("button", { name: "Run review again" }))
+    expect(actions.runReview).toHaveBeenCalled()
   })
 
-  it("uploads chosen files and runs the review", async () => {
+  it("makes adding files the one primary action while information is missing, and reviews again", async () => {
     const { actions, user } = setup()
+    expect(screen.getByRole("button", { name: "Add files" })).toHaveClass("bg-primary")
     const pdf = new File(["%PDF"], "plan.pdf", { type: "application/pdf" })
     await user.upload(screen.getByLabelText("Add files"), pdf)
-    await user.click(screen.getByRole("button", { name: "Upload and review" }))
     expect(actions.upload).toHaveBeenCalledWith([pdf])
-    expect(actions.runReview).toHaveBeenCalled()
-    await user.click(screen.getByRole("button", { name: /Run review again/ }))
-    expect(actions.runReview).toHaveBeenCalledTimes(2)
+    await vi.waitFor(() => expect(actions.runReview).toHaveBeenCalled())
   })
 
   it("refuses a file type it can't read before uploading", async () => {
-    setup()
+    const { actions } = setup()
     const user = userEvent.setup({ applyAccept: false })
     await user.upload(screen.getByLabelText("Add files"), new File(["x"], "fence.heic", { type: "image/heic" }))
-    expect(screen.getByText(/Save photos as JPEG or PNG/)).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Upload and review" })).toBeDisabled()
-  })
-
-  it("shows the homeowner the review with its rule references, matrix, findings and what it read", () => {
-    setup()
-    const feedback = screen.getByText(/Choose a listed color under/)
-    expect(within(feedback).getByRole("button", { name: "Guidelines 5.4.2(i)" })).toBeInTheDocument()
-    expect(screen.getByRole("region", { name: "What to change" })).toBeInTheDocument()
-    expect(screen.getByText("Rules at a glance")).toBeInTheDocument()
-    expect(screen.getByText("Findings")).toBeInTheDocument()
-    expect(screen.getByText("What we read from your packet")).toBeInTheDocument()
-    expect(screen.getByText(/Deny/)).toBeInTheDocument()
+    expect(screen.getByRole("alert")).toHaveTextContent(/Save photos as JPEG or PNG/)
+    expect(actions.upload).not.toHaveBeenCalled()
   })
 
   it("confirms before submitting with open requests", async () => {
     const { actions, user } = setup()
-    await user.click(screen.getByRole("button", { name: "Submit" }))
-    expect(screen.getByText("Submit with open requests?")).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Submit anyway" }))
+    const dialog = await screen.findByRole("alertdialog")
+    expect(within(dialog).getByText("Submit with open requests?")).toBeInTheDocument()
+    await user.click(within(dialog).getByRole("button", { name: "Submit anyway" }))
     expect(actions.submit).toHaveBeenCalledWith(true)
   })
 
-  it("submits without asking when nothing is open", async () => {
+  it("makes submitting the primary action when nothing is open", async () => {
     const { actions, user } = setup({
       review: { ...review, recommendation: "approve-with-conditions", missingInformation: [] }
     })
-    await user.click(screen.getByRole("button", { name: "Submit" }))
+    expect(screen.getByRole("heading", { name: "Approvable with conditions" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Add files" })).not.toHaveClass("bg-primary")
+    expect(screen.getByRole("button", { name: "Submit to the committee" })).toHaveClass("bg-primary")
+    await user.click(screen.getByRole("button", { name: "Submit to the committee" }))
     expect(actions.submit).toHaveBeenCalledWith(false)
   })
 
-  it("follows a running review and explains a failed one", () => {
+  it("follows a running review", () => {
     setup({
       application: { ...application, status: "reviewing" },
       files: [file({ status: "processing", pageCount: null })],
       job: { id: "job-1" } as Job
     })
+    expect(screen.getByRole("heading", { name: "Reviewing" })).toBeInTheDocument()
     expect(screen.getByText("Reading")).toBeInTheDocument()
-    expect(
-      screen.getByText("Reading the packet and checking it against the rulebook. This takes a few minutes.")
-    ).toBeInTheDocument()
+    expect(screen.queryByRole("heading", { name: "More information needed" })).not.toBeInTheDocument()
   })
 
   it("shows why the last review failed", () => {
@@ -182,19 +203,17 @@ describe("ApplicationPage", () => {
       } as Job
     })
     expect(screen.getByText("Model unavailable.")).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Not reviewed yet" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /^Run review$/ })).toBeInTheDocument()
   })
 
-  it("lets the committee decide, requiring a note unless approved", async () => {
-    const { actions, user } = setup({
-      application: { ...application, status: "submitted" },
-      isOwner: false,
-      canEdit: false,
-      canDecide: true
-    })
-    expect(screen.getByText(/the committee weighs/)).toBeInTheDocument()
-    expect(screen.getByText("What the review read from the packet")).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Submit" })).not.toBeInTheDocument()
+  it("lets the committee decide, preselecting the decision that follows the review", async () => {
+    const { actions, user } = setup(committeeView, "committee")
+    expect(screen.getByRole("heading", { name: "Request more information" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Before you decide" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /Submit/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Add files" })).not.toBeInTheDocument()
+    expect(screen.getByRole("radio", { name: "Information requested" })).toBeChecked()
     await user.click(screen.getByRole("radio", { name: "Disapproved" }))
     await user.click(screen.getByRole("button", { name: "Record decision" }))
     expect(screen.getByText("Explain the conditions, the parts approved, or what's needed.")).toBeInTheDocument()
@@ -204,7 +223,30 @@ describe("ApplicationPage", () => {
     expect(actions.decide).toHaveBeenCalledWith("disapproved", "Horizontal boards aren't allowed.")
   })
 
-  it("shows the committee's decision", () => {
+  it("starts the committee's note from the review's next steps", async () => {
+    const { actions, user } = setup(committeeView, "committee")
+    await user.click(screen.getByRole("button", { name: "Start from the review’s next steps" }))
+    const note = screen.getByLabelText("Note to the homeowner")
+    expect(note).toHaveValue(
+      [...review.missingInformation, ...review.changes].map((item) => `- ${item.text}`).join("\n")
+    )
+    await user.click(screen.getByRole("button", { name: "Record decision" }))
+    expect(actions.decide).toHaveBeenCalledWith("information-requested", expect.stringMatching(/^- /))
+  })
+
+  it("asks the committee to choose when the review leaves it to them", async () => {
+    const { actions, user } = setup(
+      { ...committeeView, review: { ...review, recommendation: "refer-to-committee", missingInformation: [] } },
+      "committee"
+    )
+    expect(screen.getByRole("heading", { name: "Your judgment needed" })).toBeInTheDocument()
+    expect(screen.queryByRole("radio", { checked: true })).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Record decision" }))
+    expect(screen.getByText("Choose a decision.")).toBeInTheDocument()
+    expect(actions.decide).not.toHaveBeenCalled()
+  })
+
+  it("shows the committee's decision in place of the recommendation", () => {
     setup({
       application: {
         ...application,
@@ -218,8 +260,9 @@ describe("ApplicationPage", () => {
       },
       canEdit: false
     })
-    expect(screen.getByText("Committee decision: Disapproved")).toBeInTheDocument()
+    expect(screen.getByText("Committee decision")).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Disapproved" })).toBeInTheDocument()
     expect(screen.getByText("Not allowed.")).toBeInTheDocument()
-    expect(screen.queryByLabelText("Add files")).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Add files" })).not.toBeInTheDocument()
   })
 })
