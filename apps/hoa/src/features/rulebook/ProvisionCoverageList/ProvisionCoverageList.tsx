@@ -1,14 +1,14 @@
 import { SearchIcon } from "lucide-react"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { BulkApprove } from "../BulkApprove/BulkApprove"
+import { clampPage, ListPager, pageOf } from "../ListPager/ListPager"
 import { ProvisionCoverageCard } from "../ProvisionCoverageCard/ProvisionCoverageCard"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 import { filterProvisions, type CoverageFilter } from "./ProvisionCoverageList.utils"
 
-const pageSize = 50
+const pageSize = 25
 const filterChoices: { value: CoverageFilter; label: string }[] = [
   { value: "uncovered", label: "Uncovered" },
   { value: "to-review", label: "Reasons to review" },
@@ -19,18 +19,22 @@ const filterChoices: { value: CoverageFilter; label: string }[] = [
  * Every provision of every document as a list (encoding.md, UX, Coverage), searchable and filtered to the uncovered
  * ones or the reasons to review, which can be approved together; uncovered provisions first.
  */
-export function ProvisionCoverageList() {
+export function ProvisionCoverageList({ initialFilter = null }: { initialFilter?: CoverageFilter | null }) {
   const { records, coverage, actions } = useRulebookWorkspace()
   const reasonsToReview = records.provisions.filter((provision) => provision.noRule?.review.status === "proposed")
   const [filter, setFilter] = useState<CoverageFilter>(() => {
+    if (initialFilter) {
+      return initialFilter
+    }
     if (coverage.uncovered.length > 0) {
       return "uncovered"
     }
     return actions && reasonsToReview.length > 0 ? "to-review" : "all"
   })
   const [query, setQuery] = useState("")
-  const [shownCount, setShownCount] = useState(pageSize)
+  const [page, setPage] = useState(0)
   const shown = filterProvisions(records.provisions, coverage.byProvision, filter, query)
+  const current = clampPage(shown.length, page, pageSize)
 
   return (
     <div className="flex flex-col gap-3">
@@ -38,13 +42,14 @@ export function ProvisionCoverageList() {
         <div className="relative min-w-56 flex-1">
           <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
+            type="search"
             aria-label="Search provisions"
             placeholder="Search labels, headings and text"
             className="pl-8"
             value={query}
             onChange={(event) => {
               setQuery(event.target.value)
-              setShownCount(pageSize)
+              setPage(0)
             }}
           />
         </div>
@@ -58,7 +63,7 @@ export function ProvisionCoverageList() {
             const next = filterChoices.find((choice) => choice.value === value[0])
             if (next) {
               setFilter(next.value)
-              setShownCount(pageSize)
+              setPage(0)
             }
           }}
         >
@@ -80,19 +85,15 @@ export function ProvisionCoverageList() {
           {filter === "uncovered" ? "Every provision is covered." : "No provisions match."}
         </p>
       ) : (
-        <ul aria-label="Provisions" className="flex flex-col gap-2">
-          {shown.slice(0, shownCount).map((provision) => (
+        <ul aria-label="Provisions" className="flex flex-col divide-y rounded-lg border">
+          {pageOf(shown, current, pageSize).map((provision) => (
             <li key={provision.key}>
               <ProvisionCoverageCard provision={provision} />
             </li>
           ))}
         </ul>
       )}
-      {shown.length > shownCount ? (
-        <Button variant="outline" className="w-fit" onClick={() => setShownCount((count) => count + pageSize)}>
-          Show {Math.min(pageSize, shown.length - shownCount)} more
-        </Button>
-      ) : null}
+      <ListPager total={shown.length} page={current} pageSize={pageSize} onPageChange={setPage} noun="provisions" />
     </div>
   )
 }

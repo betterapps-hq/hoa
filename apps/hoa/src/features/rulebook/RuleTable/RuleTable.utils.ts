@@ -2,7 +2,8 @@ import { isBlocking } from "@/rulebook/review"
 import type * as T from "@/schema/types"
 import type { RulebookIssue } from "@/schema/validate"
 
-// Filtering the rule table (encoding.md, UX, Rules): by domain, kind, request type, review status and words.
+// Filtering the rules list (encoding.md, UX, Rules): by review status, kind, domain, request type and words, in the
+// documents' order.
 
 export type StatusFilter = T.Review["status"] | "all" | "problems"
 
@@ -37,8 +38,25 @@ export function filterRules(
             : rule.review.status === filters.status)) &&
         (!words || [rule.title, statementOf(rule), rule.key].join(" ").toLowerCase().includes(words))
     )
-    .toSorted((a, b) => a.domain.localeCompare(b.domain) || a.key.localeCompare(b.key))
+    .toSorted((a, b) => a.key.localeCompare(b.key, "en", { numeric: true }))
 }
 
 /** Every request type the rules run in. */
 export const requestTypesOf = (rules: T.Rule[]) => [...new Set(rules.flatMap((rule) => rule.requestTypes))].toSorted()
+
+export const defaultFilters = (status: StatusFilter): RuleFilters => ({
+  query: "",
+  domain: "all",
+  kind: "all",
+  requestType: "all",
+  status
+})
+
+const statusFilters: StatusFilter[] = ["proposed", "approved", "rejected", "all", "problems"]
+
+/** A status filter from a to-do link, or null when it names none. */
+export const statusFilterOf = (value: string | null) => statusFilters.find((status) => status === value) ?? null
+
+/** How many of the filters beside the words and status narrow the list. */
+export const narrowingCount = (filters: RuleFilters) =>
+  [filters.domain, filters.kind, filters.requestType].filter((value) => value !== "all").length

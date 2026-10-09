@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
-import type { CitedProvision } from "../CitationPanel/CitationPanel"
+import type { CitedProvision } from "../CitationViewer/CitationViewer"
 import { RuleReference, type ReferencedRule } from "./RuleReference"
 
 const citation = (label: string, text: string, anchors: CitedProvision["anchors"] = []): CitedProvision => ({
@@ -54,7 +54,7 @@ describe("RuleReference", () => {
     expect(await screen.findByText("Trex colors are limited to Winchester Grey.")).toBeInTheDocument()
   })
 
-  it("opens the provision on its document page, highlighted", async () => {
+  it("opens the document at the provision, highlighted, in the citation viewer", async () => {
     const loadPage = vi.fn<CitationSource["loadPage"]>(async (documentId, pageIndex) => ({
       documentId,
       title: "Guidelines",
@@ -65,22 +65,34 @@ describe("RuleReference", () => {
     }))
     const user = setup({ documents: [{ id: "file-1", title: "Guidelines", pageCount: 5 }], loadPage })
     await user.click(screen.getByRole("button", { name: "Guidelines 5.4.2(i)" }))
-    const dialog = await screen.findByRole("dialog")
-    expect(within(dialog).getByText("The following apply to fences:")).toBeInTheDocument()
+    const viewer = await screen.findByRole("dialog", { name: "Guidelines 5.4.2(i)" })
     expect(loadPage).toHaveBeenCalledWith("file-1", 3)
-    expect(await within(dialog).findByText("Page 3 of 5")).toBeInTheDocument()
-    expect(dialog.querySelector("mark")).toHaveTextContent("Trex color")
+    expect(await within(viewer).findByText("Page 3 of 5")).toBeInTheDocument()
+    expect(viewer.querySelector("mark")).toHaveTextContent("Trex color")
+    expect(within(viewer).getByRole("link", { name: /Download/ })).toHaveAttribute(
+      "href",
+      "/files/governing/file-1?download"
+    )
+    expect(within(viewer).getByRole("link", { name: /Open the original/ })).toHaveAttribute(
+      "href",
+      "/files/governing/file-1#page=3"
+    )
   })
 
-  it("says when a citation's document has no pages, and lists every citation on request", async () => {
+  it("shows the provision as stored when its document has no pages, and switches between every citation", async () => {
     const user = setup()
     await user.click(screen.getByRole("button", { name: /all 3 citations/ }))
-    const dialog = await screen.findByRole("dialog")
+    const viewer = await screen.findByRole("dialog", { name: "Guidelines 5.4.2(i)" })
+    expect(within(viewer).getByText(/pages aren’t available/)).toBeInTheDocument()
+    const picker = within(viewer).getByRole("combobox", { name: "Citation" })
     expect(
-      within(dialog)
-        .getAllByRole("heading", { level: 3 })
-        .map((heading) => heading.textContent)
-    ).toEqual(["Guidelines 5.4.2(i)", "Guidelines 5.3", "Guidelines 5.3.2"])
-    expect(within(dialog).getAllByText(/pages aren’t available/)).toHaveLength(3)
+      within(picker)
+        .getAllByRole("option")
+        .map((option) => option.textContent)
+    ).toEqual(["Guidelines 5.4.2(i) (main)", "Guidelines 5.3", "Guidelines 5.3.2"])
+    await user.selectOptions(picker, "1")
+    expect(await screen.findByRole("dialog", { name: "Guidelines 5.3" })).toHaveTextContent(
+      "Fences are wood or composite."
+    )
   })
 })

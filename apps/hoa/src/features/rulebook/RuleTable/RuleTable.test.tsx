@@ -1,59 +1,63 @@
 import { screen, within } from "@testing-library/react"
-import { describe, expect, it } from "vitest"
-import { approvedReview, renderInWorkspace, sampleRecords } from "@/tests/rulebookWorkspace"
+import { describe, expect, it, vi } from "vitest"
+import { approvedReview, renderInWorkspace, sampleRecords, sampleWithTermsApproved } from "@/tests/rulebookWorkspace"
 import { RuleTable } from "./RuleTable"
+
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn<(message: string) => void>(), success: vi.fn<(message: string) => void>() }
+}))
 
 const ageRule = "declaration:3.1(a)#age-55-occupant"
 
-function rowsShown() {
-  return screen.getAllByRole("row").slice(1)
-}
+const rulesShown = () => within(screen.getByRole("list", { name: "Rules" })).getAllByRole("listitem")
 
 describe("RuleTable", () => {
-  it("lists the draft's rules to review with their titles, citations and statements in words", () => {
+  it("lists the draft's rules to review a page at a time, with their statements in words", () => {
     renderInWorkspace(<RuleTable />)
-    expect(screen.getByText(/Showing 50 of 307 matching rules/)).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "To review", pressed: true })).toBeInTheDocument()
+    expect(screen.getByText(/307 rules, all to review/)).toBeInTheDocument()
     expect(screen.queryByText(/\{\{/)).not.toBeInTheDocument()
-    expect(rowsShown()).toHaveLength(50)
+    expect(screen.queryByText("Architectural")).not.toBeInTheDocument()
+    expect(rulesShown()).toHaveLength(25)
+    expect(screen.getByText("1 to 25 of 307")).toBeInTheDocument()
   })
 
-  it("filters by domain, kind, request type and words", async () => {
+  it("narrows by words at once, and by kind, area and request type behind Filters", async () => {
     const { user } = renderInWorkspace(<RuleTable />)
-    await user.selectOptions(screen.getByRole("combobox", { name: "Domain" }), "architectural")
+    await user.click(screen.getByRole("button", { name: "Filters" }))
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Area" }), "architectural")
     await user.selectOptions(screen.getByRole("combobox", { name: "Kind" }), "norm")
-    await user.selectOptions(screen.getByRole("combobox", { name: "Request type" }), "violation")
-    expect(rowsShown().every((row) => within(row).queryByText("Architectural") !== null)).toBe(true)
-    await user.type(screen.getByRole("textbox", { name: "Search rules" }), "55 or older")
-    expect(screen.getByText(/Showing 0 of 0/)).toBeInTheDocument()
+    await user.keyboard("{Escape}")
+    await user.type(screen.getByRole("searchbox", { name: "Search rules" }), "55 or older")
     expect(screen.getByText("No rules match.")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Clear filters" }))
+    expect(rulesShown()).toHaveLength(25)
   })
 
-  it("opens a rule from its title, and approves the rules shown after confirming", async () => {
-    const { user, openRule, actions } = renderInWorkspace(<RuleTable />)
-    await user.type(screen.getByRole("textbox", { name: "Search rules" }), "55 or older")
+  it("opens a rule from its title, reviews it in its row, and approves the rules shown after confirming", async () => {
+    const { user, openRule, actions } = renderInWorkspace(<RuleTable />, { records: sampleWithTermsApproved() })
+    await user.type(screen.getByRole("searchbox", { name: "Search rules" }), "55 or older")
     await user.click(screen.getByRole("button", { name: "Each occupied Unit has someone 55 or older" }))
     expect(openRule).toHaveBeenCalledWith(ageRule)
+    await user.click(screen.getByRole("button", { name: "Reject Each occupied Unit has someone 55 or older" }))
+    expect(actions?.review).toHaveBeenCalledWith([{ type: "rule", key: ageRule }], "rejected", null)
     await user.click(screen.getByRole("button", { name: "Approve the 1 rules shown" }))
     await user.click(await screen.findByRole("button", { name: "Approve them" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "rule", key: ageRule }], "approved", null)
   })
 
-  it("shows more rules on request and switches status", async () => {
+  it("opens with the status a to-do link asks for, and pages through", async () => {
     const records = sampleRecords()
-    const { user } = renderInWorkspace(<RuleTable />, {
+    const { user } = renderInWorkspace(<RuleTable initialStatus="approved" />, {
       records: { ...records, rules: records.rules.map((rule) => ({ ...rule, review: approvedReview })) }
     })
-    expect(screen.getByRole("button", { name: "All", pressed: true })).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Show 50 more" }))
-    expect(rowsShown()).toHaveLength(100)
-    await user.click(screen.getByRole("button", { name: "Rejected" }))
-    expect(screen.getByText("No rules match.")).toBeInTheDocument()
+    expect(screen.getAllByText("Approved")).toHaveLength(25)
+    await user.click(screen.getByRole("button", { name: "Next 25 rules" }))
+    expect(screen.getByText("26 to 50 of 307")).toBeInTheDocument()
   })
 
   it("is read-only for the published rulebook", () => {
     renderInWorkspace(<RuleTable />, { actions: null })
-    expect(screen.queryByRole("group", { name: "Review status" })).not.toBeInTheDocument()
-    expect(screen.queryByRole("columnheader", { name: "Status" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^Approve/ })).not.toBeInTheDocument()
+    expect(screen.queryByText("To review")).not.toBeInTheDocument()
   })
 })

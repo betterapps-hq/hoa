@@ -1,10 +1,9 @@
 import { useState, type ReactNode } from "react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card"
 import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
-import { CitationPanel, type CitedProvision } from "../CitationPanel/CitationPanel"
-import { citationTitle } from "../CitationPanel/CitationPanel.utils"
 import { CitationText } from "../CitationText/CitationText"
+import { CitationViewer, type CitedProvision } from "../CitationViewer/CitationViewer"
+import { citationTitle } from "../CitationViewer/CitationViewer.utils"
 
 export type ProvisionReferenceProps = {
   citation: CitedProvision
@@ -15,7 +14,7 @@ export type ProvisionReferenceProps = {
 
 /**
  * A link to a cited provision: hovering or focusing it shows the provision's text, and activating it opens the
- * provision on its document page.
+ * document at the provision, highlighted, in the citation viewer.
  */
 export function ProvisionReference({ citation, source, children }: ProvisionReferenceProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -39,15 +38,7 @@ export function ProvisionReference({ citation, source, children }: ProvisionRefe
           <CitationText citation={citation} />
         </HoverCardContent>
       </HoverCard>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{citationTitle(citation)}</DialogTitle>
-            <DialogDescription>{citation.documentTitle}</DialogDescription>
-          </DialogHeader>
-          <CitationPanel citation={citation} source={source} />
-        </DialogContent>
-      </Dialog>
+      <CitationViewer citations={[citation]} source={source} isOpen={isOpen} onOpenChange={setIsOpen} />
     </>
   )
 }

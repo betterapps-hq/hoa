@@ -1,4 +1,4 @@
-import type { CitedProvision } from "./CitationPanel"
+import type { CitedProvision } from "./CitationViewer"
 
 /** "Declaration 4.3(b): Plans and specifications" */
 export const citationTitle = (citation: Pick<CitedProvision, "label" | "heading">) =>

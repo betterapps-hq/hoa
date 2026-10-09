@@ -5,6 +5,10 @@ export type DocumentDetails = {
   kind: GoverningDocumentKind
   title: string
   effectiveDate: string | null
+  /** The document this is a new edition of: it joins that document's versions and replaces it in the rulebook. */
+  lineageId?: string | null
+  /** The document this amends: it's a document of its own that changes that one. */
+  amends?: string | null
 }
 
 export type UploadApi = {
@@ -32,9 +36,11 @@ export async function uploadDocument(api: UploadApi, file: File, details: Docume
     fileName: file.name,
     mediaType: file.type,
     sizeBytes: file.size,
-    ...details,
-    lineageId: null,
-    amends: null
+    kind: details.kind,
+    title: details.title,
+    effectiveDate: details.effectiveDate,
+    lineageId: details.lineageId ?? null,
+    amends: details.amends ?? null
   })
   if (created.uploadUrl) {
     const response = await (api.fetch ?? fetch)(created.uploadUrl, {

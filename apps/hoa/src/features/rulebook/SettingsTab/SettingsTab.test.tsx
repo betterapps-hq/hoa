@@ -29,7 +29,7 @@ describe("SettingsTab", () => {
 
   it("approves the settings and edits a clause as JSON, checked as it's typed", async () => {
     const { user, actions } = renderInWorkspace(<SettingsTab />, { records })
-    await user.click(screen.getByRole("button", { name: "Approve the settings" }))
+    await user.click(screen.getByRole("button", { name: "Approve" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "settings" }], "approved", null)
 
     await user.click(screen.getByRole("button", { name: "Edit Who decides each request" }))

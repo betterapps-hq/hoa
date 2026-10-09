@@ -5,6 +5,11 @@ import type * as T from "@/schema/types"
 
 export type CoverageFilter = "uncovered" | "to-review" | "all"
 
+const coverageFilters: CoverageFilter[] = ["uncovered", "to-review", "all"]
+
+/** A filter from a to-do link, or null when it names none. */
+export const filterOf = (value: string | null) => coverageFilters.find((filter) => filter === value) ?? null
+
 export function filterProvisions(
   provisions: T.Provision[],
   byProvision: Map<T.ProvisionKey, ProvisionCoverage>,

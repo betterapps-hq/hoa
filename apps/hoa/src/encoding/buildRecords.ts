@@ -1,13 +1,13 @@
 import type { RulebookContent } from "@/db/rulebookContentRepository"
-import { carryForward } from "@/rulebook/carryForward"
+import { carryForward, type ReviewedRulebook } from "@/rulebook/carryForward"
 import { buildSettings } from "@/schema/defaultSettings"
 import type { Issue, IssueCode, Provenance, Review, Rule, Term } from "@/schema/types"
 import { pathText } from "./promptVariables"
 import type { ConsolidateOutput, MergeOutput } from "./stepOutputs"
 
 // Save draft's records (encoding.md, Save draft): the consolidated rulebook's rules, terms and questions as proposed
-// records with their issues, the settings over the defaults, and the published rulebook's approvals carried forward to
-// records that didn't change.
+// records with their issues, the settings over the defaults, and the review of earlier rulebooks (the current draft,
+// then the published one) carried forward to records that didn't change.
 
 /** An item a build couldn't finish, recorded on the job (platform.md, Errors and retries). */
 export type BuildFailure = { stage: string; itemId: string; message: string }
@@ -39,12 +39,13 @@ function issuesByRecord(merged: MergeOutput, consolidated: ConsolidateOutput) {
   return byRecord
 }
 
-/** The draft rulebook's records, proposed, with the approvals of unchanged published records. */
+/** The draft rulebook's records, proposed, with the review of unchanged records in earlier rulebooks. */
 export async function draftContent(input: {
   merged: MergeOutput
   consolidated: ConsolidateOutput
   now: string
-  previous: { rules: readonly Rule[]; terms: readonly Term[] } | null
+  /** Earlier rulebooks, the one whose review decides first first. */
+  previous: readonly ReviewedRulebook[]
 }): Promise<RulebookContent> {
   const { rulebook } = input.consolidated
   const provenance: Provenance = { by: "extraction", at: input.now }
@@ -63,12 +64,14 @@ export async function draftContent(input: {
     review: proposed,
     issues: issuesOf(term.key)
   }))
-  const carried = await carryForward({ rules, terms }, input.previous ?? { rules: [], terms: [] })
-  return {
-    settings: buildSettings(rulebook.settings.clauses, issuesOf("settings")),
-    coverage: input.merged.coverage,
-    rules: carried.rules,
-    terms: carried.terms,
-    questions: rulebook.questions
-  }
+  const carried = await carryForward(
+    {
+      rules,
+      terms,
+      settings: buildSettings(rulebook.settings.clauses, issuesOf("settings")),
+      questions: rulebook.questions
+    },
+    input.previous
+  )
+  return { ...carried, coverage: input.merged.coverage }
 }

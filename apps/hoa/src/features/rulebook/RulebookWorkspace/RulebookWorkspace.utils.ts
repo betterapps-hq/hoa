@@ -9,14 +9,46 @@ import type { RulebookActions, RulebookSource, RulebookWorkspaceValue } from "..
 
 const noIssues = new Map<string, RulebookIssue[]>()
 
+export type WorkspaceTab = "changes" | "rules" | "terms" | "coverage" | "questions" | "settings"
+
+/**
+ * The tab shown and the filter it opens with, such as rules "to review" from a to-do item; `request` counts the
+ * requests, so asking for the same view again starts it afresh.
+ */
+export type WorkspaceView = { tab: WorkspaceTab; filter: string | null; request: number }
+
+/** The tabs a reader has: a homeowner the rules and their terms; an administrator everything there's something in. */
+export function workspaceTabs(
+  records: Pick<RulebookRecords, "questions">,
+  { audience, hasChanges }: { audience: "administrator" | "member"; hasChanges: boolean }
+): WorkspaceTab[] {
+  if (audience === "member") {
+    return ["rules", "terms"]
+  }
+  return [
+    ...(hasChanges ? (["changes"] as const) : []),
+    "rules",
+    "terms",
+    "coverage",
+    ...(records.questions.length > 0 ? (["questions"] as const) : []),
+    "settings"
+  ]
+}
+
 /** Everything the rules UX reads about a rulebook; a draft (with actions) is checked for what blocks approval. */
 export function workspaceOf(
   records: RulebookRecords,
   {
     source,
     actions,
-    openRule
-  }: { source: RulebookSource; actions: RulebookActions | null; openRule: (key: T.RuleKey) => void }
+    openRule,
+    audience = "administrator"
+  }: {
+    source: RulebookSource
+    actions: RulebookActions | null
+    openRule: (key: T.RuleKey) => void
+    audience?: RulebookWorkspaceValue["audience"]
+  }
 ): RulebookWorkspaceValue {
   const approval = actions ? approvalContext(records) : null
   return {
@@ -28,24 +60,7 @@ export function workspaceOf(
     approval,
     source,
     actions,
-    openRule
-  }
-}
-
-/** How much each tab asks of a reviewer: records to review, uncovered provisions, open questions. */
-export function workToDo(workspace: RulebookWorkspaceValue) {
-  const { records, coverage, actions } = workspace
-  const toReview = (items: { review: T.Review }[]) => items.filter((item) => item.review.status === "proposed").length
-  if (!actions) {
-    return { rules: 0, vocabulary: 0, coverage: 0, questions: 0, settings: 0 }
-  }
-  return {
-    rules: toReview(records.rules),
-    vocabulary: toReview(records.terms),
-    coverage:
-      coverage.uncovered.length +
-      records.provisions.filter((provision) => provision.noRule?.review.status === "proposed").length,
-    questions: records.questions.filter((question) => question.answer === null).length,
-    settings: records.settings.review.status === "proposed" ? 1 : 0
+    openRule,
+    audience
   }
 }

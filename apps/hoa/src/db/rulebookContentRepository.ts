@@ -1,4 +1,4 @@
-import { and, desc, eq, ne } from "drizzle-orm"
+import { and, desc, eq, inArray, ne } from "drizzle-orm"
 import { ruleContentHash, termContentHash } from "@/rulebook/carryForward"
 import { rulebookCoverage, type RulebookCoverage } from "@/rulebook/coverage"
 import type { Question, Rule, Settings, Term } from "@/schema/types"
@@ -110,6 +110,29 @@ export async function saveRulebookContent(db: Database, hoaId: string, rulebookI
 }
 
 /**
+ * The statements that delete a draft rulebook and its records, for a batch. Each acts only while the rulebook is still
+ * the draft, so a draft published or replaced in the meantime is left alone.
+ */
+function draftDeletion(db: Database, hoaId: string, rulebookId: string) {
+  const isDraft = and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId), eq(rulebooks.status, "draft"))
+  const draftIds = db.select({ id: rulebooks.id }).from(rulebooks).where(isDraft)
+  return [
+    db.delete(rulebookRules).where(and(eq(rulebookRules.hoaId, hoaId), inArray(rulebookRules.rulebookId, draftIds))),
+    db.delete(rulebookTerms).where(and(eq(rulebookTerms.hoaId, hoaId), inArray(rulebookTerms.rulebookId, draftIds))),
+    db
+      .delete(rulebookQuestions)
+      .where(and(eq(rulebookQuestions.hoaId, hoaId), inArray(rulebookQuestions.rulebookId, draftIds))),
+    db.delete(rules).where(and(eq(rules.hoaId, hoaId), inArray(rules.rulebookId, draftIds))),
+    db.delete(rulebooks).where(isDraft)
+  ] as const
+}
+
+/** Deletes a draft rulebook and its records in one batch; a rulebook that is no longer the draft is left alone. */
+export async function discardDraftRulebook(db: Database, hoaId: string, rulebookId: string) {
+  await runBatch(db, draftDeletion(db, hoaId, rulebookId))
+}
+
+/**
  * Makes a built rulebook the organization's draft, replacing the draft it had (encoding.md, Save draft): the old draft
  * and its records go in the same batch, so there's never more than one.
  */
@@ -119,13 +142,7 @@ export async function promoteToDraft(db: Database, hoaId: string, rulebookId: st
     .from(rulebooks)
     .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.status, "draft"), ne(rulebooks.id, rulebookId)))
   await runBatch(db, [
-    ...previous.flatMap(({ id }) => [
-      db.delete(rulebookRules).where(inRulebook(rulebookRules, hoaId, id)),
-      db.delete(rulebookTerms).where(inRulebook(rulebookTerms, hoaId, id)),
-      db.delete(rulebookQuestions).where(inRulebook(rulebookQuestions, hoaId, id)),
-      db.delete(rules).where(and(eq(rules.hoaId, hoaId), eq(rules.rulebookId, id))),
-      db.delete(rulebooks).where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, id)))
-    ]),
+    ...previous.flatMap(({ id }) => draftDeletion(db, hoaId, id)),
     db
       .update(rulebooks)
       .set({ status: "draft" })
@@ -180,7 +197,7 @@ export async function getRulebookRule(db: Database, hoaId: string, rulebookId: s
 }
 
 /** Records an administrator changed in review, saved in one batch: rules, terms and questions by key, and the settings. */
-export type RulebookChanges = {
+export type RecordChanges = {
   rules?: Rule[]
   terms?: Term[]
   questions?: Question[]
@@ -191,7 +208,7 @@ export type RulebookChanges = {
  * Saves reviewed or edited records, adding any that are new. A change of up to 100 records lands whole; a bulk review
  * goes in batches of 100, each landing whole.
  */
-export async function saveRulebookChanges(db: Database, hoaId: string, rulebookId: string, changes: RulebookChanges) {
+export async function saveRulebookChanges(db: Database, hoaId: string, rulebookId: string, changes: RecordChanges) {
   const [ruleRows, termRows] = await Promise.all([
     Promise.all((changes.rules ?? []).map((rule) => ruleRow(hoaId, rulebookId, ruleSchema.parse(rule)))),
     Promise.all((changes.terms ?? []).map((term) => termRow(hoaId, rulebookId, termSchema.parse(term))))
@@ -241,13 +258,6 @@ export async function saveRulebookChanges(db: Database, hoaId: string, rulebookI
   for (const group of chunk(statements, 100)) {
     await runBatch(db, group)
   }
-}
-
-/** Removes a rule from a draft. */
-export async function deleteRulebookRule(db: Database, hoaId: string, rulebookId: string, ruleKey: string) {
-  await db
-    .delete(rulebookRules)
-    .where(and(inRulebook(rulebookRules, hoaId, rulebookId), eq(rulebookRules.ruleKey, ruleKey)))
 }
 
 /** Records where a rulebook's rules file was written, when it's published. */

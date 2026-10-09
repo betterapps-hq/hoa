@@ -1,4 +1,4 @@
-import type { CitedProvision } from "../CitationPanel/CitationPanel"
+import type { CitedProvision } from "../CitationViewer/CitationViewer"
 
 export type CitationTextProps = { citation: CitedProvision }
 

@@ -4,8 +4,13 @@ import { createAiContext } from "@/ai/aiContext.server"
 import { rulebookBuildPrompts } from "@/ai/pipelinePrompts"
 import { resolvePromptVersions } from "@/ai/promptLoader"
 import { recordScores } from "@/ai/scores"
-import { createDatabase } from "@/db/database"
-import { getDocumentStructures, getGoverningDocument } from "@/db/documentRepository"
+import { createDatabase, type Database } from "@/db/database"
+import {
+  getDocumentStructures,
+  getGoverningDocument,
+  listDocumentRecords,
+  listProvisions
+} from "@/db/documentRepository"
 import { getJob, updateJob } from "@/db/jobRepository"
 import { getRulebookContent } from "@/db/rulebookContentRepository"
 import { failRulebook, getRulebook, getRulebookByStatus } from "@/db/rulebookRepository"
@@ -13,10 +18,19 @@ import { defaultDocumentStructure, uploadEdition } from "@/documents/documentStr
 import { buildRulebook } from "@/encoding/build"
 import { buildScores } from "@/encoding/buildScores"
 import type { StepRunner } from "@/jobs/steps"
+import { compareCodeUnits } from "@/rulebook/canonical"
+import type { PreviousReview } from "@/rulebook/carryForward"
 import { saveBuiltDraft } from "@/rulebook/saveDraft"
 import { governingKeys, hoaCacheKey, rulebookBuildKeys } from "@/storage/keys"
 import { createObjectPromptCache, getJson, putJson } from "@/storage/objects"
 import { loadPages, modelStep, storageStep } from "./ocrSteps.server"
+import {
+  abandonRulebookBuild,
+  newBuildIds,
+  requestRulebookBuild,
+  type BuildRequest,
+  type RulebookBuildBinding
+} from "./rulebookTrigger.server"
 
 export type RulebookBuildParams = { hoaId: string; rulebookId: string; jobId: string }
 
@@ -28,8 +42,51 @@ function errorText(error: unknown) {
 }
 
 /**
+ * Requests a rulebook build from inside a Workflow, in steps named `{name}`, `{name}:ids` and `{name}:fail`: the ids
+ * come from a step of their own, so a retried request reuses them, and a request whose workflow can't be started fails
+ * the rulebook it inserted rather than leave it building with nothing running.
+ */
+export async function requestRulebookBuildStep(
+  step: WorkflowStep,
+  name: string,
+  context: { db: Database; binding: RulebookBuildBinding; hoaId: string; unlessCurrentIs?: readonly string[] }
+): Promise<BuildRequest | null> {
+  const { db, binding, hoaId, unlessCurrentIs } = context
+  const ids = await step.do(`${name}:ids`, storageStep, async () => newBuildIds())
+  try {
+    return await step.do(name, storageStep, () =>
+      requestRulebookBuild(db, binding, hoaId, { now: new Date().toISOString(), ids, unlessCurrentIs })
+    )
+  } catch (error) {
+    await step.do(`${name}:fail`, storageStep, () =>
+      abandonRulebookBuild(db, hoaId, ids, errorText(error), new Date().toISOString())
+    )
+    return null
+  }
+}
+
+/** The review a build carries forward: the current draft's, then the published rulebook's, and the stored provisions. */
+async function loadPreviousReview(db: Database, hoaId: string): Promise<PreviousReview> {
+  const [draft, published, records] = await Promise.all([
+    getRulebookByStatus(db, hoaId, "draft"),
+    getRulebookByStatus(db, hoaId, "published"),
+    listDocumentRecords(db, hoaId)
+  ])
+  const [contents, provisions] = await Promise.all([
+    Promise.all([draft, published].map((rulebook) => (rulebook ? getRulebookContent(db, hoaId, rulebook.id) : null))),
+    listProvisions(
+      db,
+      hoaId,
+      records.map((record) => record.id)
+    )
+  ])
+  return { rulebooks: contents.flatMap((content) => (content ? [content] : [])), provisions }
+}
+
+/**
  * Builds a draft rulebook from ready governing documents (encoding.md, Stages): resolve-prompts, then the stages in
  * `buildRulebook`, each a step whose output goes to R2, then save-draft. Review and publishing are server functions.
+ * Whether it finishes or fails, a document that became ready while it ran gets a build of its own (follow-up).
  */
 export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> {
   async run(event: WorkflowEvent<RulebookBuildParams>, step: WorkflowStep) {
@@ -48,6 +105,11 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
       )
     }
 
+    const sourceDocumentIds = await step.do(
+      "load:sources",
+      storageStep,
+      async () => (await getRulebook(db, hoaId, rulebookId))?.sourceDocumentIds ?? []
+    )
     try {
       const ai = createAiContext()
       if (!ai.isConfigured) {
@@ -76,7 +138,12 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         if (sources.length === 0) {
           throw new NonRetryableError("None of the documents are ready.")
         }
-        return { sources, startedAt: now() }
+        // By document key, not upload id: a new version of one document then leaves the others' order, and so the
+        // merged vocabulary and every unit's cached context, as they were.
+        const ordered = sources.toSorted(
+          (a, b) => compareCodeUnits(a.structure.key, b.structure.key) || compareCodeUnits(a.documentId, b.documentId)
+        )
+        return { sources: ordered, startedAt: now() }
       })
 
       await progress("resolve-prompts", 0, 0)
@@ -99,7 +166,6 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         }
         return output
       }
-      const published = await getRulebookByStatus(db, hoaId, "published")
       const result = await buildRulebook({
         organizationId: hoaId,
         sources: loaded.sources.map((source) => ({
@@ -117,7 +183,7 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
           promptVersions,
           cache: (stage) => createObjectPromptCache(bucket, (hash) => hoaCacheKey(hoaId, stage, hash))
         },
-        previous: published ? await getRulebookContent(db, hoaId, published.id) : null,
+        previous: () => loadPreviousReview(db, hoaId),
         now: loaded.startedAt,
         progress
       })
@@ -163,6 +229,17 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         }
         await failRulebook(db, hoaId, rulebookId, failed)
         await updateJob(db, hoaId, jobId, { status: "failed", error: failed, now: now() })
+      })
+    }
+
+    // The rulebook is a draft or failed now, so a build can start. Compared with the documents this build read, an
+    // unchanged set starts nothing, so a failed build isn't retried in a loop.
+    if (sourceDocumentIds.length > 0) {
+      await requestRulebookBuildStep(step, "follow-up", {
+        db,
+        binding: this.env.RULEBOOK_BUILD,
+        hoaId,
+        unlessCurrentIs: sourceDocumentIds
       })
     }
   }

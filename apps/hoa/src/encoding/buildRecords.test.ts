@@ -32,7 +32,7 @@ const consolidated: ConsolidateOutput = {
 
 describe("draftContent", () => {
   it("proposes every record with the problems the build left on it, and settings over the defaults", async () => {
-    const content = await draftContent({ merged, consolidated, now, previous: null })
+    const content = await draftContent({ merged, consolidated, now, previous: [] })
     expect(content.rules[0]).toMatchObject({
       key: "rules:1#max-height",
       provenance: { by: "extraction", at: now },
@@ -48,15 +48,15 @@ describe("draftContent", () => {
     expect(content.settings.clauses.time.days).toBe("calendar-day")
   })
 
-  it("keeps the approval of a record the published rulebook has unchanged", async () => {
-    const first = await draftContent({ merged, consolidated: { ...consolidated, problems: [] }, now, previous: null })
+  it("keeps the review of a record an earlier rulebook has unchanged", async () => {
+    const first = await draftContent({ merged, consolidated: { ...consolidated, problems: [] }, now, previous: [] })
     const approved = { status: "approved" as const, by: "admin", at: now, note: null }
-    const published = { rules: first.rules.map((item) => ({ ...item, review: approved })), terms: [] }
+    const published = { ...first, rules: first.rules.map((item) => ({ ...item, review: approved })), terms: [] }
     const again = await draftContent({
       merged,
       consolidated: { ...consolidated, problems: [] },
       now,
-      previous: published
+      previous: [published]
     })
     expect(again.rules[0]?.review).toEqual(approved)
   })

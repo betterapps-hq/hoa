@@ -1,14 +1,9 @@
-import { FileTextIcon } from "lucide-react"
-import { useState, type ReactNode, type Ref } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { DocumentViewer } from "@/features/documents/DocumentViewer/DocumentViewer"
+import type { ReactNode, Ref } from "react"
 import { cn } from "@/lib/utils"
 import type { CoveragePassage, OutsidePassage } from "@/rulebook/coverage"
 import type * as T from "@/schema/types"
-import { valueText } from "../CoverageDocument/CoverageDocument.utils"
 import { coverageKindLabels, coverageKindStyles } from "../coverageKinds"
+import { valueText } from "../CoverageReader/CoverageReader.utils"
 import { NoRuleReason } from "../NoRuleReason/NoRuleReason"
 import { ProvisionReference } from "../ProvisionReference/ProvisionReference"
 import { citationLabel, citedProvision } from "../rulebookRecords"
@@ -87,9 +82,6 @@ function ProvisionCoverage({
 
   return (
     <>
-      <ProvisionReference citation={reference(provision.key)} source={source}>
-        Show it in the document
-      </ProvisionReference>
       {rules.length > 0 ? (
         <Section title={`Rules (${rules.length})`}>
           <ul className="flex flex-col gap-3">
@@ -137,7 +129,6 @@ function ProvisionCoverage({
                 <li key={question.id} className="flex flex-col gap-1">
                   <span>{question.question}</span>
                   <span className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{question.kind === "conflict" ? "Conflict" : "Interpretation"}</Badge>
                     <span className="text-muted-foreground">
                       {chosen === null ? "Unanswered" : `Answered: ${question.options[chosen]?.label ?? ""}`}
                     </span>
@@ -178,48 +169,12 @@ function ProvisionCoverage({
   )
 }
 
-/** Page text no provision holds: why it matters, and the page it's on. */
+/** Page text no provision holds, and why it matters. */
 function OutsideCoverage({ passage }: { passage: OutsidePassage }) {
-  const { source } = useRulebookWorkspace()
-  const [isOpen, setIsOpen] = useState(false)
-  const file = source.documents.find((document) => document.id === passage.fileId)
   return (
-    <>
-      <p>
-        This text is on page {passage.page}
-        {file ? ` of ${file.title}` : ""}, but the build placed it in no provision, so no rule, term or reason can cite
-        it. If it says something the rules need, the document&rsquo;s structure needs fixing before the next build.
-      </p>
-      {file ? (
-        <>
-          <Button size="sm" variant="outline" className="w-fit" onClick={() => setIsOpen(true)}>
-            <FileTextIcon />
-            Show it on the page
-          </Button>
-          <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>Text outside any provision</DialogTitle>
-                <DialogDescription>
-                  {file.title}, page {passage.page}
-                </DialogDescription>
-              </DialogHeader>
-              <DocumentViewer
-                source={source}
-                initial={{ documentId: passage.fileId, pageIndex: passage.page }}
-                highlights={[
-                  {
-                    documentId: passage.fileId,
-                    pageIndex: passage.page,
-                    quote: "",
-                    range: { start: passage.start, end: passage.end }
-                  }
-                ]}
-              />
-            </DialogContent>
-          </Dialog>
-        </>
-      ) : null}
-    </>
+    <p>
+      This text is on page {passage.page}, but the build placed it in no provision, so no rule, term or reason can cite
+      it. If it says something the rules need, the document&rsquo;s structure needs fixing before the next build.
+    </p>
   )
 }

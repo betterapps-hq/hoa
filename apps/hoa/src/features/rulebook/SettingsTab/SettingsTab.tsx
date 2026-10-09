@@ -1,8 +1,6 @@
 import { useDebouncedValue } from "@mantine/hooks"
-import { CheckIcon, RotateCcwIcon, XIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldLabel } from "@/components/ui/field"
@@ -10,13 +8,14 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { approvalBlockers } from "@/rulebook/review"
 import type * as T from "@/schema/types"
-import { attempt, reviewRecord } from "../attempt"
+import { attempt } from "../attempt"
 import { ChoiceSelect } from "../ChoiceSelect/ChoiceSelect"
 import { IssueList } from "../IssueList/IssueList"
 import { ProblemList } from "../ProblemList/ProblemList"
 import { ProvisionReference } from "../ProvisionReference/ProvisionReference"
+import { ReviewControls } from "../ReviewControls/ReviewControls"
 import { citedProvision, countOf } from "../rulebookRecords"
-import { remedyLabels, reviewLabels } from "../ruleLabels"
+import { remedyLabels } from "../ruleLabels"
 import { Statement } from "../Statement/Statement"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 import {
@@ -50,52 +49,26 @@ const remedies: T.RuleRemedy[] = ["change-detail", "redesign", "none"]
 export function SettingsTab() {
   const { records, issues, approval, actions } = useRulebookWorkspace()
   const { settings } = records
-  const [isBusy, setIsBusy] = useState(false)
   const blockers = approval ? approvalBlockers(approval, { type: "settings" }) : []
-  const review = async (status: T.Review["status"]) => {
-    if (actions) {
-      setIsBusy(true)
-      await reviewRecord(actions, { type: "settings" }, status)
-      setIsBusy(false)
-    }
-  }
   return (
     <div className="flex flex-col gap-4">
       {actions ? (
         <Card size="sm">
           <CardHeader>
-            <CardTitle>Review</CardTitle>
-            <CardDescription>The settings are published with the rules, so they’re approved like one.</CardDescription>
-            <CardAction>
-              <Badge variant="outline">{reviewLabels[settings.review.status]}</Badge>
-            </CardAction>
+            <CardTitle>Review the settings</CardTitle>
+            <CardDescription>
+              They&rsquo;re published with the rules, so they&rsquo;re approved like a rule.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <IssueList
-              issues={settings.issues}
-              found={issues.get("settings") ?? []}
-              onResolve={(index, note) => actions.resolveIssue({ type: "settings" }, index, note)}
-            />
-            <div className="flex flex-wrap gap-2">
-              {settings.review.status === "approved" ? null : (
-                <Button disabled={isBusy || blockers.length > 0} onClick={() => void review("approved")}>
-                  <CheckIcon />
-                  Approve the settings
-                </Button>
-              )}
-              {settings.review.status === "rejected" ? null : (
-                <Button variant="outline" disabled={isBusy} onClick={() => void review("rejected")}>
-                  <XIcon />
-                  Reject
-                </Button>
-              )}
-              {settings.review.status === "proposed" ? null : (
-                <Button variant="outline" disabled={isBusy} onClick={() => void review("proposed")}>
-                  <RotateCcwIcon />
-                  Back to review
-                </Button>
-              )}
-            </div>
+          <CardContent className="flex flex-col gap-4">
+            {settings.issues.length > 0 || (issues.get("settings") ?? []).length > 0 ? (
+              <IssueList
+                issues={settings.issues}
+                found={issues.get("settings") ?? []}
+                onResolve={(index, note) => actions.resolveIssue({ type: "settings" }, index, note)}
+              />
+            ) : null}
+            <ReviewControls record={{ type: "settings" }} status={settings.review.status} blockers={blockers} />
           </CardContent>
         </Card>
       ) : null}

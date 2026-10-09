@@ -27,54 +27,54 @@ type KindStyle = {
   icon: LucideIcon
   /** A bar segment or swatch. */
   fill: string
-  /** A passage of text: a tint, its edge, and stripes for the gaps. */
-  passage: string
   /** An icon in the kind's color. */
   iconColor: string
+  /** A passage highlighted on a document page: a tint, and an underline or stripes so the gaps don't rely on color. */
+  mark: string
 }
 
 export const coverageKindStyles: Record<CoverageKind, KindStyle> = {
   rule: {
     icon: ScaleIcon,
     fill: "bg-coverage-rule",
-    passage: "border-coverage-rule bg-coverage-rule/10",
-    iconColor: "text-coverage-rule"
+    iconColor: "text-coverage-rule",
+    mark: "bg-coverage-rule/15 dark:bg-coverage-rule/25"
   },
   term: {
     icon: BookOpenIcon,
     fill: "bg-coverage-term",
-    passage: "border-coverage-term bg-coverage-term/10",
-    iconColor: "text-coverage-term"
+    iconColor: "text-coverage-term",
+    mark: "bg-coverage-term/15 dark:bg-coverage-term/25"
   },
   settings: {
     icon: Settings2Icon,
     fill: "bg-coverage-settings",
-    passage: "border-coverage-settings bg-coverage-settings/10",
-    iconColor: "text-coverage-settings"
+    iconColor: "text-coverage-settings",
+    mark: "bg-coverage-settings/15 dark:bg-coverage-settings/30"
   },
   reason: {
     icon: CircleSlash2Icon,
     fill: "bg-coverage-reason",
-    passage: "border-coverage-reason bg-coverage-reason/10",
-    iconColor: "text-coverage-reason"
+    iconColor: "text-coverage-reason",
+    mark: "bg-coverage-reason/15 dark:bg-coverage-reason/25"
   },
   "to-review": {
     icon: CircleDashedIcon,
     fill: "bg-coverage-to-review",
-    passage: "border-coverage-to-review border-dashed bg-coverage-to-review/10",
-    iconColor: "text-coverage-to-review"
+    iconColor: "text-coverage-to-review",
+    mark: "bg-coverage-to-review/15 underline decoration-coverage-to-review decoration-dashed decoration-2 underline-offset-4"
   },
   outside: {
     icon: SquareDashedIcon,
     fill: "bg-coverage-outside coverage-hatch",
-    passage: "border-coverage-outside border-dashed coverage-stripes-outside",
-    iconColor: "text-muted-foreground"
+    iconColor: "text-muted-foreground",
+    mark: "bg-transparent coverage-stripes-outside underline decoration-coverage-outside decoration-dotted decoration-2 underline-offset-4"
   },
   uncovered: {
     icon: CircleAlertIcon,
     fill: "bg-coverage-uncovered coverage-hatch",
-    passage: "border-coverage-uncovered bg-coverage-uncovered/10 coverage-stripes-uncovered",
-    iconColor: "text-coverage-uncovered"
+    iconColor: "text-coverage-uncovered",
+    mark: "bg-coverage-uncovered/15 coverage-stripes-uncovered underline decoration-coverage-uncovered decoration-wavy underline-offset-4"
   }
 }
 

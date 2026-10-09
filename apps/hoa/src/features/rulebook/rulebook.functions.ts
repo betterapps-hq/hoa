@@ -3,16 +3,17 @@ import { env as bindings } from "cloudflare:workers"
 import { z } from "zod"
 import { getDb } from "@/db/client.server"
 import type { Database } from "@/db/database"
+import { listDocumentRecords, listGoverningDocuments, listProvisions } from "@/db/documentRepository"
+import { getLatestJobOfKind } from "@/db/jobRepository"
 import {
-  getGoverningDocument,
-  listDocumentRecords,
-  listGoverningDocuments,
-  listProvisions
-} from "@/db/documentRepository"
-import { getLatestJobOfKind, insertJob, newJob } from "@/db/jobRepository"
-import { getPublishedRulesFile, getRulebookContent, type RulebookContent } from "@/db/rulebookContentRepository"
-import { getRulebookByStatus, insertRulebook } from "@/db/rulebookRepository"
+  discardDraftRulebook,
+  getPublishedRulesFile,
+  getRulebookContent,
+  type RulebookContent
+} from "@/db/rulebookContentRepository"
+import { getRulebookByStatus } from "@/db/rulebookRepository"
 import { readRulesFileJson } from "@/rulebook/assemble"
+import { rulebookChanges, type RulebookChanges } from "@/rulebook/changes"
 import { textOutsideProvisions, type SourceText } from "@/rulebook/coverage"
 import { publishBlockers, publishDraft } from "@/rulebook/publish"
 import type { rulebookSchema } from "@/rules/rule"
@@ -21,6 +22,7 @@ import { getRequestContext, requireAdministrator } from "@/session/requestContex
 import { governingKeys } from "@/storage/keys"
 import { getBucket } from "@/storage/storage.server"
 import { loadPages } from "@/workflows/ocrSteps.server"
+import { abandonRulebookBuild, newBuildIds, requestRulebookBuild } from "@/workflows/rulebookTrigger.server"
 import { describeBuildProblem } from "./rulebookView"
 
 type Rulebook = z.infer<typeof rulebookSchema>
@@ -38,6 +40,8 @@ export type RulebookView = {
   lastBuildError: string | null
   /** Why the draft can't be published yet. */
   blockers: string[]
+  /** What the draft changes against the published rulebook; null for the published view and a draft with no records. */
+  changes: RulebookChanges | null
 }
 
 /** An upload with pages, which provisions' anchors point into. */
@@ -97,42 +101,46 @@ export const getSourceText = createServerFn({ method: "GET" }).handler(async ():
   )
 })
 
-/** Starts a rulebook build from ready documents; refused while another build runs. */
-export const startRulebookBuild = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z.object({ documentIds: z.array(z.string()).min(1, "Choose at least one document.") }).parse(data)
+const skippedBuild = {
+  processing: "A document is still being read. The rulebook builds when it finishes.",
+  building: "A rulebook is already being built.",
+  "no-documents": "Upload a governing document first.",
+  unchanged: "The rulebook is already built from the current documents."
+} as const
+
+/**
+ * Builds the rulebook again from the current documents (uploads build it on their own; this is "try again"). Refused
+ * while a document is being read or another build runs.
+ */
+export const startRulebookBuild = createServerFn({ method: "POST" }).handler(async () => {
+  const context = await requireAdministrator()
+  const db = getDb()
+  const hoaId = context.hoa.id
+  const ids = newBuildIds()
+  const now = new Date().toISOString()
+  const request = await requestRulebookBuild(db, bindings.RULEBOOK_BUILD, hoaId, { now, ids }).catch(
+    async (error: unknown) => {
+      await abandonRulebookBuild(db, hoaId, ids, error instanceof Error ? error.message : String(error), now)
+      throw error
+    }
   )
+  if (request.status === "skipped") {
+    throw new Error(skippedBuild[request.reason])
+  }
+  return { jobId: request.jobId, rulebookId: request.rulebookId }
+})
+
+/** Deletes the draft rulebook and its records; the published rulebook stays as it is. */
+export const discardRulebookDraft = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ rulebookId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const context = await requireAdministrator()
     const db = getDb()
-    const hoaId = context.hoa.id
-    if (await getRulebookByStatus(db, hoaId, "building")) {
-      throw new Error("A rulebook is already being built.")
+    const draft = await getRulebookByStatus(db, context.hoa.id, "draft")
+    if (draft?.id !== data.rulebookId) {
+      throw new Error("That draft is no longer current.")
     }
-    const documents = await Promise.all(data.documentIds.map((id) => getGoverningDocument(db, hoaId, id)))
-    if (documents.some((document) => document?.status !== "ready")) {
-      throw new Error("Every document must finish reading before the rulebook is built.")
-    }
-    const now = new Date().toISOString()
-    const job = newJob({ hoaId, kind: "rulebook-build", subjectId: crypto.randomUUID(), now })
-    const rulebook: Rulebook = {
-      id: job.subjectId,
-      hoaId,
-      version: null,
-      status: "building",
-      error: null,
-      // The first build's catalog; rulebooks in the rules schema have none. The column goes at cutover (9.6).
-      catalogVersion: 0,
-      sourceDocumentIds: data.documentIds,
-      jobId: job.id,
-      createdAt: now,
-      publishedBy: null,
-      publishedAt: null
-    }
-    // The partial unique index refuses a second building rulebook, so a double click can't start two builds.
-    await db.batch([insertRulebook(db, rulebook), insertJob(db, job)])
-    await bindings.RULEBOOK_BUILD.create({ id: job.id, params: { hoaId, rulebookId: rulebook.id, jobId: job.id } })
-    return { jobId: job.id, rulebookId: rulebook.id }
+    await discardDraftRulebook(db, context.hoa.id, draft.id)
   })
 
 /** The draft (administrators) or the published rulebook (everyone), with its records. */
@@ -149,8 +157,8 @@ export const getRulebookView = createServerFn({ method: "GET" })
     ])
     const content = rulebook ? await getRulebookContent(db, hoaId, rulebook.id) : null
     const file = data.which === "published" ? await getPublishedRulesFile(db, hoaId) : null
-    const blockers =
-      data.which === "draft" && content ? publishBlockers({ ...(await loadSources(db, context.hoa)), ...content }) : []
+    const review =
+      rulebook && data.which === "draft" && content ? await draftReview(db, context.hoa, rulebook, content) : null
     return {
       rulebook,
       content,
@@ -158,9 +166,31 @@ export const getRulebookView = createServerFn({ method: "GET" })
       buildJobId: latestBuild?.id ?? null,
       isBuilding: building !== null,
       lastBuildError: describeBuildProblem(latestBuild),
-      blockers
+      blockers: review?.blockers ?? [],
+      changes: review?.changes ?? null
     }
   })
+
+/** Why the draft can't be published yet, and what it changes against the published rulebook. */
+async function draftReview(
+  db: Database,
+  hoa: { id: string; name: string },
+  draft: Rulebook,
+  content: RulebookContent
+): Promise<{ blockers: string[]; changes: RulebookChanges }> {
+  const [sources, uploads, published] = await Promise.all([
+    loadSources(db, hoa),
+    listGoverningDocuments(db, hoa.id),
+    getRulebookByStatus(db, hoa.id, "published")
+  ])
+  const publishedContent = published ? await getRulebookContent(db, hoa.id, published.id) : null
+  const changes = await rulebookChanges(
+    { ...content, sourceDocumentIds: draft.sourceDocumentIds },
+    published && publishedContent ? { ...publishedContent, sourceDocumentIds: published.sourceDocumentIds } : null,
+    uploads
+  )
+  return { blockers: publishBlockers({ ...sources, ...content }), changes }
+}
 
 /** Publishes the draft: assembles the rules file, writes it to storage with its hash and supersedes the previous one. */
 export const publishRulebook = createServerFn({ method: "POST" })

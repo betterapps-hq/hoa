@@ -1,75 +1,69 @@
-import { DownloadIcon } from "lucide-react"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
-import { attempt } from "../attempt"
+import type { GoverningDocument } from "@/documents/governingDocument"
+import { GoverningDocuments } from "@/features/documents/GoverningDocuments/GoverningDocuments"
+import type { Job } from "@/jobs/job"
 import type { RulebookSources, RulebookView } from "../rulebook.functions"
 import { recordsOf } from "../rulebookRecords"
 import { RulebookWorkspace } from "../RulebookWorkspace/RulebookWorkspace"
 import type { RulebookSource } from "../useRulebookWorkspace"
-import { saveFile } from "./PublishedRulebook.utils"
 
 export type PublishedRulebookProps = {
   published: RulebookView
   sources: RulebookSources
+  /** The association's governing documents, to read or download. */
+  uploads: GoverningDocument[]
   source: RulebookSource
-  /** The published rules file's JSON, exactly as written. */
-  loadRulesFile: () => Promise<string>
+  loadJob: (jobId: string) => Promise<Job | null>
 }
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
 
-/** The published rulebook, read-only: its version, its rules file's hash and download, and the same views as a draft. */
-export function PublishedRulebook({ published, sources, source, loadRulesFile }: PublishedRulebookProps) {
-  const [isDownloading, setIsDownloading] = useState(false)
+/**
+ * The rulebook as a member sees it (encoding.md, UX, Members): the rules in force, each with the passage of the
+ * governing documents it comes from, and the documents themselves to read or download. Never a draft.
+ */
+export function PublishedRulebook({ published, sources, uploads, source, loadJob }: PublishedRulebookProps) {
   const { rulebook, content } = published
-  if (!rulebook || !content) {
-    return (
-      <Empty>
-        <EmptyHeader>
-          <EmptyTitle>Nothing published yet</EmptyTitle>
-          <EmptyDescription>Homeowners’ applications are checked against the published rulebook.</EmptyDescription>
-        </EmptyHeader>
-      </Empty>
-    )
-  }
-  const records = recordsOf(sources, content, "published")
-  const download = async () => {
-    setIsDownloading(true)
-    const json = await attempt(loadRulesFile, "The rules file couldn't be downloaded.")
-    setIsDownloading(false)
-    if (json) {
-      saveFile(`rules-version-${rulebook.version ?? "draft"}.json`, json)
-    }
-  }
+  const ready = uploads.filter((upload) => upload.status === "ready")
   return (
-    <div className="flex flex-col gap-4">
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle>Version {rulebook.version}</CardTitle>
-          <CardDescription>
-            {records.rules.length} rules
-            {rulebook.publishedAt ? `, published ${dateFormat.format(new Date(rulebook.publishedAt))}` : ""}.
-            Applications are reviewed against this version.
-          </CardDescription>
-        </CardHeader>
-        {published.fileSha256 ? (
-          <>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Rules file SHA-256</p>
-              <p className="font-mono text-sm break-all">{published.fileSha256}</p>
-            </CardContent>
-            <CardFooter>
-              <Button variant="outline" disabled={isDownloading} onClick={() => void download()}>
-                <DownloadIcon />
-                {isDownloading ? "Downloading" : "Download rules file"}
-              </Button>
-            </CardFooter>
-          </>
-        ) : null}
-      </Card>
-      <RulebookWorkspace records={records} source={source} actions={null} />
+    <div className="flex flex-col gap-10">
+      <header className="flex flex-col gap-1">
+        <h2 className="text-xl font-semibold">The rules of {sources.organization.name}</h2>
+        <p className="max-w-prose text-muted-foreground">
+          These are the rules your projects are checked against. Each one comes from the association&rsquo;s governing
+          documents: open its citation to read the passage it&rsquo;s drawn from.
+        </p>
+      </header>
+      {rulebook && content ? (
+        <section aria-labelledby="member-rules" className="flex flex-col gap-4">
+          <div className="flex flex-col gap-0.5">
+            <h2 id="member-rules" className="text-base font-semibold">
+              Rules
+            </h2>
+            {rulebook.publishedAt ? (
+              <p className="text-sm text-muted-foreground">
+                In force since {dateFormat.format(new Date(rulebook.publishedAt))}.
+              </p>
+            ) : null}
+          </div>
+          <RulebookWorkspace
+            records={recordsOf(sources, content, "published")}
+            source={source}
+            actions={null}
+            audience="member"
+          />
+        </section>
+      ) : (
+        <Empty className="border">
+          <EmptyHeader>
+            <EmptyTitle>No rules are published yet</EmptyTitle>
+            <EmptyDescription>
+              The association hasn&rsquo;t published its rulebook yet. Its governing documents are below.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
+      <GoverningDocuments uploads={ready} source={source} jobs={{}} loadJob={loadJob} onChanged={() => undefined} />
     </div>
   )
 }

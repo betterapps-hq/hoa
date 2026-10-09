@@ -1,6 +1,4 @@
 import { z } from "zod"
-import { projectTypeIds } from "@/rules/catalog"
-import { ruleTopics } from "@/rules/rule"
 import { errorInfoSchema } from "@/shared/schemas"
 
 // Governing documents and their sections (docs/design/documents.md).
@@ -38,8 +36,8 @@ export const governingDocumentSchema = z.object({
 export type GoverningDocument = z.infer<typeof governingDocumentSchema>
 
 export const sectionRoutingSchema = z.object({
-  projectTypes: z.array(z.enum(projectTypeIds)),
-  topics: z.array(z.enum(ruleTopics)),
+  projectTypes: z.array(z.string()),
+  topics: z.array(z.string()),
   isRelevant: z.boolean()
 })
 

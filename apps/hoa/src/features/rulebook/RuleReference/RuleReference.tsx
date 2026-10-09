@@ -1,9 +1,7 @@
 import { useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
-import { CitationPanel, type CitedProvision } from "../CitationPanel/CitationPanel"
-import { citationTitle } from "../CitationPanel/CitationPanel.utils"
+import { CitationViewer, type CitedProvision } from "../CitationViewer/CitationViewer"
 import { ProvisionReference } from "../ProvisionReference/ProvisionReference"
 
 /** A rule as every screen names it: its title and its citations, the main one first. */
@@ -19,7 +17,7 @@ export type RuleReferenceProps = {
 
 /**
  * A rule's title and its main citation's label (application-review.md, UX). The label shows the provision's text on
- * hover and focus and opens it on its document page; "and N more" opens every citation.
+ * hover and focus and opens the document at it; "and N more" opens the citation viewer with every citation.
  */
 export function RuleReference({ rule, source, title }: RuleReferenceProps) {
   const [isAllOpen, setIsAllOpen] = useState(false)
@@ -42,20 +40,7 @@ export function RuleReference({ rule, source, title }: RuleReferenceProps) {
           >
             and {more.length} more
           </Button>
-          <Dialog open={isAllOpen} onOpenChange={setIsAllOpen}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
-              <DialogHeader>
-                <DialogTitle>{rule.title}</DialogTitle>
-                <DialogDescription>{rule.citations.length} citations, the main one first</DialogDescription>
-              </DialogHeader>
-              {rule.citations.map((citation) => (
-                <section key={citation.provisionKey} className="flex flex-col gap-2">
-                  <h3 className="font-medium">{citationTitle(citation)}</h3>
-                  <CitationPanel citation={citation} source={source} />
-                </section>
-              ))}
-            </DialogContent>
-          </Dialog>
+          <CitationViewer citations={rule.citations} source={source} isOpen={isAllOpen} onOpenChange={setIsAllOpen} />
         </>
       ) : null}
     </span>

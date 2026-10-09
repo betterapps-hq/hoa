@@ -1,6 +1,9 @@
-import { screen, within } from "@testing-library/react"
+import { screen, waitFor, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
+import type { RulebookRecords } from "@/rulebook/assemble"
+import type { SourceText } from "@/rulebook/coverage"
 import { noPages, renderInWorkspace, sampleRecords } from "@/tests/rulebookWorkspace"
+import type { RulebookSource } from "../useRulebookWorkspace"
 import { CoverageTab } from "./CoverageTab"
 
 vi.mock("sonner", () => ({
@@ -18,41 +21,73 @@ const withUncovered = {
   rules: records.rules.filter((rule) => !rule.citations.some((citation) => citation.provisionKey === uncoveredKey))
 }
 
+// Synthetic pages: each provision of the sample sits on a page of its own, at the start of the page's text; 3.1(a)
+// is on the first page.
+const pageText = "Synthetic page text standing in for a governing document page."
+function onPages(base: RulebookRecords): RulebookRecords {
+  return {
+    ...base,
+    provisions: base.provisions.map((provision, index) => ({
+      ...provision,
+      anchors: [{ fileId: "upload", page: provision.key === uncoveredKey ? 1 : index + 2, start: 0, end: 30 }]
+    }))
+  }
+}
+function pagesSource(outside: SourceText[] = []): RulebookSource {
+  return {
+    documents: [{ id: "upload", title: "Uploaded declaration", pageCount: records.provisions.length + 1 }],
+    loadPage: async (documentId, pageIndex) => ({
+      documentId,
+      title: "Uploaded declaration",
+      pageCount: records.provisions.length + 1,
+      pageIndex,
+      pageLabel: null,
+      text: pageText
+    }),
+    loadSourceText: async () => outside
+  }
+}
 describe("CoverageTab", () => {
-  it("reports the share of the text each kind covers and marks each passage by what covers it", async () => {
-    const { user } = renderInWorkspace(<CoverageTab />, { actions: null })
-    const summary = screen.getByRole("region", { name: /of the documents’ text is covered/ })
-    expect(within(summary).getByText("60.4%")).toBeInTheDocument()
-    expect(within(summary).getByText(/^All documents: 60.4% covered; Rule 48.8%/)).toBeInTheDocument()
-    const legend = within(summary).getByRole("list", { name: "Legend" })
-    expect(within(legend).getByText("No rule, reason to review")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Document text", pressed: true })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /^Declaration of Covenants/, pressed: true })).toBeInTheDocument()
+  it("says a document whose provisions aren't on any upload's pages isn't built yet, instead of a share", () => {
+    renderInWorkspace(<CoverageTab />, { actions: null })
+    expect(screen.getByText(/coverage can’t be measured\./)).toBeInTheDocument()
+    expect(screen.getAllByText(/: not built yet\./).length).toBeGreaterThan(0)
+    expect(screen.queryByText(/0% of the text/)).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "On the pages" })).toBeDisabled()
+    expect(screen.getByRole("list", { name: "Provisions" })).toBeInTheDocument()
+  })
 
-    const passage = screen.getByRole("button", { name: "Declaration 3.1(a): Rule" })
-    expect(passage).toHaveAttribute("aria-pressed", "false")
-    expect(screen.getAllByText("55 years", { selector: "mark" }).length).toBeGreaterThan(0)
-    await user.click(passage)
-    expect(passage).toHaveAttribute("aria-pressed", "true")
+  it("shows a built document on its pages, each passage highlighted, and what covers a chosen passage", async () => {
+    const { user } = renderInWorkspace(<CoverageTab />, { records: onPages(records), source: pagesSource() })
+    expect(
+      screen.getByRole("heading", { name: /^\d+(\.\d)?% of the text of 2 documents is covered/ })
+    ).toBeInTheDocument()
+    expect(screen.getByRole("list", { name: "What the colors mean" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "On the pages", pressed: true })).toBeInTheDocument()
+
+    const page = await screen.findByRole("region", { name: /^Uploaded declaration, page \d+$/ })
+    await waitFor(() => expect(page.querySelector("mark[data-highlight]")).not.toBeNull())
+    while (!screen.queryByRole("region", { name: "On page 1" })) {
+      await user.click(screen.getByRole("button", { name: "Previous page" }))
+    }
+    const onPage = screen.getByRole("region", { name: "On page 1" })
+    await user.click(within(onPage).getByRole("button", { name: "Declaration 3.1(a): Rule" }))
     const panel = await screen.findByRole("dialog", { name: "What covers it" })
     const rules = within(panel).getByRole("region", { name: /^Rules \(\d+\)$/ })
     expect(
       within(rules).getByRole("button", { name: "Each occupied Unit has someone 55 or older" })
     ).toBeInTheDocument()
-    expect(within(rules).getAllByText(/55 years of age or older/).length).toBeGreaterThan(0)
     expect(within(panel).getByRole("region", { name: "Values its rules encode" })).toHaveTextContent("55 years")
-    expect(within(panel).getByRole("region", { name: "Provisions that refer to it" })).toBeInTheDocument()
   })
 
   it("lists the gaps, jumps to one and gives it a reason for having no rule", async () => {
-    const { user, actions } = renderInWorkspace(<CoverageTab />, { records: withUncovered })
+    const { user, actions } = renderInWorkspace(<CoverageTab />, {
+      records: onPages(withUncovered),
+      source: pagesSource()
+    })
     const gaps = screen.getByRole("region", { name: "1 gap" })
-    await user.click(within(gaps).getByRole("button", { name: /^3\.1\(a\): Uncovered/ }))
+    await user.click(within(gaps).getByRole("button", { name: "Declaration 3.1(a): Uncovered" }))
     const panel = await screen.findByRole("dialog", { name: "What covers it" })
-    // The sheet is modal, so the text behind it is hidden from the accessibility tree while it's open.
-    expect(
-      screen.getByRole("button", { name: "Declaration 3.1(a): Uncovered", pressed: true, hidden: true })
-    ).toBeInTheDocument()
     expect(within(panel).getByText(/Nothing cites this provision/)).toBeInTheDocument()
     await user.click(within(panel).getByRole("button", { name: "Give a reason for having no rule" }))
     await user.selectOptions(within(panel).getByRole("combobox", { name: "Reason" }), "explanatory")
@@ -60,44 +95,23 @@ describe("CoverageTab", () => {
     expect(actions?.setNoRule).toHaveBeenCalledWith(uncoveredKey, { reason: "explanatory", note: null })
   })
 
-  it("shows page text outside any provision where its page puts it", async () => {
-    const anchored = {
-      ...records,
-      provisions: records.provisions.map((provision) =>
-        provision.key === uncoveredKey
-          ? { ...provision, anchors: [{ fileId: "upload", page: 2, start: 0, end: 40 }] }
-          : provision
-      )
-    }
-    const source = {
-      ...noPages,
-      loadSourceText: async () => [
-        {
-          fileId: "upload",
-          skippedPages: [1],
-          outside: [{ fileId: "upload", page: 2, start: 60, end: 80, text: "A paragraph no provision holds." }]
-        }
-      ]
-    }
-    const { user } = renderInWorkspace(<CoverageTab />, { records: anchored, source })
-    const passage = await screen.findByRole("button", { name: "Page 2: Outside any provision" })
-    expect(screen.getByText(/1 passage outside any provision/)).toBeInTheDocument()
-    expect(
-      screen.getByText("Page 1 was read as front matter (a cover or contents) and not counted.")
-    ).toBeInTheDocument()
-    const row = document.getElementById("coverage-passage-outside:upload:2:60")!
-    await user.click(within(row).getByText("A paragraph no provision holds."))
-    expect(passage).toHaveAttribute("aria-pressed", "true")
+  it("shows page text outside any provision as a gap", async () => {
+    const outside = { fileId: "upload", page: 2, start: 35, end: 60, text: "Text no provision holds." }
+    const { user } = renderInWorkspace(<CoverageTab />, {
+      records: onPages(records),
+      source: pagesSource([{ fileId: "upload", skippedPages: [], outside: [outside] }])
+    })
+    const gaps = await screen.findByRole("region", { name: "1 gap" })
+    await user.click(within(gaps).getByRole("button", { name: "Page 2: Outside any provision" }))
     const panel = await screen.findByRole("dialog", { name: "What covers it" })
     expect(within(panel).getByText(/the build placed it in no provision/)).toBeInTheDocument()
   })
 
   it("lists uncovered provisions first, and gives one a reason for having no rule", async () => {
-    const { user, actions } = renderInWorkspace(<CoverageTab />, { records: withUncovered })
-    await user.click(screen.getByRole("button", { name: "Provision list" }))
+    const { user, actions } = renderInWorkspace(<CoverageTab initialFilter="uncovered" />, { records: withUncovered })
     expect(screen.getByRole("button", { name: "Uncovered", pressed: true })).toBeInTheDocument()
     const [item] = within(screen.getByRole("list", { name: "Provisions" })).getAllByRole("listitem")
-    expect(within(item!).getByText("Uncovered")).toBeInTheDocument()
+    expect(within(item!).getByText("No rule and no reason")).toBeInTheDocument()
     expect(within(item!).getByRole("button", { name: "Declaration 3.1(a)" })).toBeInTheDocument()
     await user.click(within(item!).getByRole("button", { name: "Give a reason for having no rule" }))
     await user.selectOptions(within(item!).getByRole("combobox", { name: "Reason" }), "explanatory")
@@ -110,8 +124,7 @@ describe("CoverageTab", () => {
   })
 
   it("lists reasons to review, approves one, and approves those shown", async () => {
-    const { user, actions } = renderInWorkspace(<CoverageTab />)
-    await user.click(screen.getByRole("button", { name: "Provision list" }))
+    const { user, actions } = renderInWorkspace(<CoverageTab initialFilter="to-review" />)
     expect(screen.getByRole("button", { name: "Reasons to review", pressed: true })).toBeInTheDocument()
     const [item] = within(screen.getByRole("list", { name: "Provisions" })).getAllByRole("listitem")
     expect(within(item!).getByText(/^No rule: /)).toBeInTheDocument()
@@ -127,10 +140,9 @@ describe("CoverageTab", () => {
   })
 
   it("shows the rules and terms citing a provision in the list", async () => {
-    const { user } = renderInWorkspace(<CoverageTab />, { actions: null })
-    await user.click(screen.getByRole("button", { name: "Provision list" }))
+    const { user } = renderInWorkspace(<CoverageTab />, { actions: null, source: noPages })
     expect(screen.getByRole("button", { name: "All", pressed: true })).toBeInTheDocument()
-    await user.type(screen.getByRole("textbox", { name: "Search provisions" }), "55 years of age")
+    await user.type(screen.getByRole("searchbox", { name: "Search provisions" }), "55 years of age")
     const list = screen.getByRole("list", { name: "Rules citing Declaration 3.1(a)" })
     expect(within(list).getByRole("button", { name: "Each occupied Unit has someone 55 or older" })).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /Give a reason/ })).not.toBeInTheDocument()

@@ -1,58 +1,97 @@
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
+import { Field, FieldLabel } from "@/components/ui/field"
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Spinner } from "@/components/ui/spinner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { cn } from "@/lib/utils"
-import { coverageKinds, coverageReport, coveredShare, totalOf, type CoverageTotals } from "@/rulebook/coverage"
+import {
+  coverageKinds,
+  coverageReport,
+  coveredShare,
+  totalOf,
+  type CoverageKind,
+  type CoverageTotals,
+  type DocumentCoverage
+} from "@/rulebook/coverage"
 import { CoverageBar } from "../CoverageBar/CoverageBar"
-import { CoverageDocument } from "../CoverageDocument/CoverageDocument"
 import { coverageKindLabels, coverageKindStyles, percentText } from "../coverageKinds"
+import { CoverageReader } from "../CoverageReader/CoverageReader"
+import { fileOf } from "../CoverageReader/CoverageReader.utils"
 import { ProvisionCoverageList } from "../ProvisionCoverageList/ProvisionCoverageList"
+import { filterOf } from "../ProvisionCoverageList/ProvisionCoverageList.utils"
 import { countOf } from "../rulebookRecords"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 
-const views = [
-  { value: "text", label: "Document text" },
-  { value: "list", label: "Provision list" }
-] as const
-type View = (typeof views)[number]["value"]
+export type CoverageTabProps = {
+  /** Opens the provision list with this filter, such as "uncovered" from a to-do link. */
+  initialFilter?: string | null
+}
+
+function sumTotals(items: readonly { totals: CoverageTotals }[]): CoverageTotals {
+  const sum = (kind: CoverageKind) => items.reduce((total, item) => total + item.totals[kind], 0)
+  return {
+    rule: sum("rule"),
+    term: sum("term"),
+    settings: sum("settings"),
+    reason: sum("reason"),
+    "to-review": sum("to-review"),
+    outside: sum("outside"),
+    uncovered: sum("uncovered")
+  }
+}
+
+const provisionCount = (document: DocumentCoverage) =>
+  document.articles
+    .flatMap((article) => article.passages)
+    .filter((passage) => passage.type === "provision" && passage.part === "main").length
 
 /**
- * How much of the governing documents the rulebook covers (encoding.md, UX, Coverage), like a test coverage report:
- * the share of the text each kind covers, then either the documents' text marked passage by passage, or every
- * provision as a list to search and review.
+ * How much of the governing documents the rulebook covers (encoding.md, UX, Coverage): one share for the documents
+ * the build read from their pages, a plain word for any it hasn't, then either a document's own pages with every
+ * passage highlighted by what covers it, or every provision as a list to search and review.
  */
-export function CoverageTab() {
-  const { records, coverage, vocabulary, source, actions } = useRulebookWorkspace()
-  const [view, setView] = useState<View>("text")
+export function CoverageTab({ initialFilter = null }: CoverageTabProps) {
+  const { records, coverage, vocabulary, source } = useRulebookWorkspace()
+  const listFilter = filterOf(initialFilter)
+  const [view, setView] = useState<"read" | "list">(listFilter ? "list" : "read")
   const sourceText = useQuery({
     queryKey: ["rulebook-source-text"],
     queryFn: () => source.loadSourceText(),
     staleTime: Number.POSITIVE_INFINITY
   })
   const report = coverageReport(records, coverage, vocabulary, sourceText.data ?? [])
-  const reasonsToReview = records.provisions.filter((provision) => provision.noRule?.review.status === "proposed")
-  const outsideCount = report.documents.reduce(
-    (sum, document) =>
-      sum + document.articles.flatMap((article) => article.passages).filter((item) => item.kind === "outside").length,
-    0
-  )
+  const built = report.documents.filter((document) => fileOf(document) !== null)
+  const unbuilt = report.documents.filter((document) => fileOf(document) === null)
+  const [documentKey, setDocumentKey] = useState<string | null>(null)
+  const shown = built.find((document) => document.key === documentKey) ?? built[0]
+  const totals = sumTotals(built)
 
   return (
-    <div className="flex flex-col gap-4">
-      <section aria-labelledby="coverage-summary" className="flex flex-col gap-3 rounded-lg border p-4">
-        <h3 id="coverage-summary" className="flex flex-wrap items-baseline gap-x-2">
-          <span className="text-3xl font-semibold tabular-nums">{percentText(coveredShare(report.totals))}</span>
-          <span className="text-sm text-muted-foreground">of the documents&rsquo; text is covered</span>
-        </h3>
-        <CoverageBar totals={report.totals} label="All documents" className="h-3" />
-        <CoverageLegend totals={report.totals} />
-        <p className="text-sm text-muted-foreground">
-          {totalOf(report.totals).toLocaleString("en-US")} characters in {records.provisions.length} provisions:{" "}
-          {countOf(coverage.uncovered.length, "uncovered provision", "uncovered provisions")},{" "}
-          {countOf(outsideCount, "passage", "passages")} outside any provision
-          {actions ? `, ${countOf(reasonsToReview.length, "reason", "reasons")} for having no rule to review` : ""}.
-        </p>
+    <div className="flex flex-col gap-6">
+      <section aria-labelledby="coverage-summary" className="flex flex-col gap-3">
+        {built.length > 0 ? (
+          <>
+            <h3 id="coverage-summary" className="text-base">
+              <span className="font-semibold tabular-nums">{percentText(coveredShare(totals))}</span> of the text of{" "}
+              {built.length === 1 ? (built[0]?.title ?? "the document") : `${built.length} documents`} is covered by a
+              rule, a term, a setting or a reason for having no rule.
+            </h3>
+            <CoverageBar totals={totals} label="The documents" className="h-2" />
+            <CoverageLegend totals={totals} />
+          </>
+        ) : (
+          <h3 id="coverage-summary" className="text-base">
+            No document has been read from its pages yet, so coverage can&rsquo;t be measured.
+          </h3>
+        )}
+        {unbuilt.map((document) => (
+          <p key={document.key} className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{document.title}: not built yet.</span> Its{" "}
+            {countOf(provisionCount(document), "provision isn’t", "provisions aren’t")} linked to the pages of an
+            upload, so its coverage can&rsquo;t be measured until the rulebook is built from it.
+          </p>
+        ))}
         {sourceText.isPending ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Spinner /> Reading the pages for text outside any provision
@@ -64,53 +103,70 @@ export function CoverageTab() {
           </p>
         ) : null}
       </section>
-      <ToggleGroup
-        variant="outline"
-        size="sm"
-        spacing={0}
-        aria-label="View"
-        value={[view]}
-        onValueChange={(value) => {
-          const next = views.find((choice) => choice.value === value[0])
-          if (next) {
-            setView(next.value)
-          }
-        }}
-      >
-        {views.map((choice) => (
-          <ToggleGroupItem key={choice.value} value={choice.value}>
-            {choice.label}
+
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <ToggleGroup
+          variant="outline"
+          size="sm"
+          spacing={0}
+          aria-label="View"
+          value={[view]}
+          onValueChange={(value) => setView(value[0] === "list" ? "list" : "read")}
+        >
+          <ToggleGroupItem value="read" disabled={built.length === 0}>
+            On the pages
           </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
-      {view === "text" ? <CoverageDocument report={report} /> : <ProvisionCoverageList />}
+          <ToggleGroupItem value="list">As a list</ToggleGroupItem>
+        </ToggleGroup>
+        {view === "read" && built.length > 1 && shown ? (
+          <Field className="w-full sm:w-80">
+            <FieldLabel htmlFor="coverage-document" className="sr-only">
+              Document
+            </FieldLabel>
+            <NativeSelect
+              id="coverage-document"
+              className="w-full"
+              value={shown.key}
+              onChange={(event) => setDocumentKey(event.target.value)}
+            >
+              {built.map((document) => (
+                <NativeSelectOption key={document.key} value={document.key}>
+                  {document.title} ({percentText(coveredShare(document.totals))} covered)
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+        ) : null}
+      </div>
+      {view === "read" && shown ? (
+        <CoverageReader key={shown.key} report={report} document={shown} />
+      ) : (
+        <ProvisionCoverageList initialFilter={listFilter} />
+      )}
     </div>
   )
 }
 
-/** Each kind's color, icon and share of the characters, and how encoded values are marked. */
+/** Each kind's swatch and label, so the tints on the pages read without the colors alone. */
 function CoverageLegend({ totals }: { totals: CoverageTotals }) {
   const total = totalOf(totals)
   return (
-    <ul aria-label="Legend" className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
-      {coverageKinds.map((kind) => {
-        const style = coverageKindStyles[kind]
-        const Icon = style.icon
-        return (
-          <li key={kind} className="flex items-center gap-1.5">
-            <span className={cn("size-3 shrink-0 rounded-sm", style.fill)} aria-hidden />
-            <Icon className={cn("size-3.5 shrink-0", style.iconColor)} aria-hidden />
-            <span>{coverageKindLabels[kind]}</span>
-            <span className="tabular-nums text-muted-foreground">
-              {percentText(total === 0 ? 0 : totals[kind] / total)}
-            </span>
-          </li>
-        )
-      })}
-      <li className="flex items-center gap-1.5">
-        <span className="font-semibold underline decoration-2 underline-offset-4">30 days</span>
-        <span className="text-muted-foreground">A value a rule encodes</span>
-      </li>
+    <ul aria-label="What the colors mean" className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      {coverageKinds
+        .filter((kind) => totals[kind] > 0)
+        .map((kind) => {
+          const style = coverageKindStyles[kind]
+          const Icon = style.icon
+          return (
+            <li key={kind} className="flex items-center gap-1.5">
+              <span className={cn("size-2.5 shrink-0 rounded-sm", style.fill)} aria-hidden />
+              <Icon className={cn("size-3 shrink-0", style.iconColor)} aria-hidden />
+              <span>
+                {coverageKindLabels[kind]} {percentText(total === 0 ? 0 : totals[kind] / total)}
+              </span>
+            </li>
+          )
+        })}
     </ul>
   )
 }

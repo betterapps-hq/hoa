@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge"
+import { CircleAlertIcon } from "lucide-react"
 import { isCited } from "@/rulebook/coverage"
 import type * as T from "@/schema/types"
 import { NoRuleReason } from "../NoRuleReason/NoRuleReason"
@@ -19,11 +19,16 @@ export function ProvisionCoverageCard({ provision }: ProvisionCoverageCardProps)
   const isUncovered = provision.noRule === null && !isCited(cited)
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-3 text-sm">
+    <div className="flex flex-col gap-2 px-4 py-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <ProvisionReference citation={reference} source={source} />
         {provision.heading ? <span className="font-medium">{provision.heading}</span> : null}
-        {isUncovered ? <Badge variant="destructive">Uncovered</Badge> : null}
+        {isUncovered ? (
+          <span className="flex items-center gap-1 text-coverage-uncovered">
+            <CircleAlertIcon className="size-4" aria-hidden />
+            No rule and no reason
+          </span>
+        ) : null}
       </div>
       <p className="line-clamp-3 text-muted-foreground">{provision.text}</p>
       {cited && isCited(cited) ? (

@@ -1,6 +1,5 @@
 import { CheckIcon } from "lucide-react"
 import { useState } from "react"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -49,7 +48,7 @@ export function NoRuleReason({ provision }: NoRuleReasonProps) {
       {provision.noRule ? (
         <div className="flex flex-wrap items-center gap-2">
           <span>No rule: {noRuleReasonLabels[provision.noRule.reason]}</span>
-          <Badge variant="outline">{reviewLabels[provision.noRule.review.status]}</Badge>
+          <span className="text-muted-foreground">({reviewLabels[provision.noRule.review.status].toLowerCase()})</span>
           {provision.noRule.note ? <span className="text-muted-foreground">{provision.noRule.note}</span> : null}
         </div>
       ) : null}
@@ -58,6 +57,7 @@ export function NoRuleReason({ provision }: NoRuleReasonProps) {
           {provision.noRule?.review.status === "proposed" ? (
             <Button
               size="sm"
+              variant="outline"
               disabled={isBusy}
               onClick={() => {
                 setIsBusy(true)
@@ -71,7 +71,7 @@ export function NoRuleReason({ provision }: NoRuleReasonProps) {
             </Button>
           ) : null}
           {provision.noRule || isUncovered ? (
-            <Button size="sm" variant="outline" disabled={isBusy} onClick={() => setIsEditing(true)}>
+            <Button size="sm" variant="ghost" disabled={isBusy} onClick={() => setIsEditing(true)}>
               {provision.noRule ? "Change the reason" : "Give a reason for having no rule"}
             </Button>
           ) : null}

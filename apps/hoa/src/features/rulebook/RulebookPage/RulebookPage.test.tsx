@@ -55,7 +55,14 @@ const draft: RulebookView = {
   buildJobId: null,
   isBuilding: false,
   lastBuildError: null,
-  blockers: ["884 rules and terms still need review."]
+  blockers: ["884 rules and terms still need review."],
+  changes: {
+    isFirst: false,
+    rules: { added: [records.rules[0]!.key], changed: [records.rules[1]!.key], removed: [] },
+    terms: { added: [], changed: [], removed: [] },
+    settingsChanged: false,
+    documents: { added: [{ id: "doc-1", title: "Declaration" }], removed: [] }
+  }
 }
 const published: RulebookView = {
   ...draft,
@@ -65,7 +72,8 @@ const published: RulebookView = {
     rules: content.rules.map((rule, index) => (index === 0 ? { ...rule, review: approved } : rule))
   },
   fileSha256: "ab".repeat(32),
-  blockers: []
+  blockers: [],
+  changes: null
 }
 
 const documents: GoverningDocument[] = [
@@ -95,13 +103,18 @@ function setup(overrides: Partial<RulebookPageProps> = {}) {
     draft,
     published,
     sources,
-    documents,
+    uploads: documents,
+    jobs: {},
     source: noPages,
     actions: mockActions(),
+    isReviewing: false,
+    onReviewingChange: vi.fn<(isReviewing: boolean) => void>(),
     loadJob: vi.fn<(jobId: string) => Promise<Job | null>>(async () => null),
     loadRulesFile: vi.fn<() => Promise<string>>(async () => '{"rules":[]}'),
-    onBuild: vi.fn<(documentIds: string[]) => Promise<void>>(async () => undefined),
+    onUpload: vi.fn<RulebookPageProps["onUpload"]>(async () => undefined),
+    onBuild: vi.fn<() => Promise<void>>(async () => undefined),
     onPublish: vi.fn<(rulebookId: string) => Promise<void>>(async () => undefined),
+    onDiscard: vi.fn<(rulebookId: string) => Promise<void>>(async () => undefined),
     onChanged: vi.fn<() => void>(),
     ...overrides
   }
@@ -112,51 +125,84 @@ function setup(overrides: Partial<RulebookPageProps> = {}) {
   return { props, user: userEvent.setup() }
 }
 
+const noDraft: RulebookView = { ...draft, rulebook: null, content: null, changes: null, blockers: [] }
+
 describe("RulebookPage", () => {
-  it("builds from the chosen documents", async () => {
+  it("shows the rules in force and the documents, with a ready draft as one sentence and one action", async () => {
     const { props, user } = setup()
-    await user.click(screen.getByRole("button", { name: "Build rulebook" }))
-    expect(props.onBuild).toHaveBeenCalledWith(["doc-1"])
-    expect(props.onChanged).toHaveBeenCalled()
-  })
-
-  it("shows the draft's counts and what blocks publishing, above its tabs", () => {
-    setup()
-    expect(screen.getByText("307 rules")).toBeInTheDocument()
-    expect(screen.getByText("0 uncovered provisions")).toBeInTheDocument()
-    expect(screen.getByText("884 rules and terms still need review.")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled()
-    const tabs = screen.getByRole("tablist", { name: "Rulebook" })
+    const status = screen.getByRole("region", { name: "Status" })
+    expect(within(status).getByText("A new draft of the rulebook is ready to review.")).toBeInTheDocument()
     expect(
-      within(tabs)
-        .getAllByRole("tab")
-        .map((tab) => tab.textContent)
-    ).toEqual(["Rules307 to do", "Vocabulary577 to do", "Coverage246 to do", "Questions7 to do", "Settings1 to do"])
+      within(status).getByText(/built after Declaration changed\. It adds 1 rule and changes 1 rule\./)
+    ).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Rules in force" })).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Governing documents" })).toBeInTheDocument()
+    expect(screen.queryByRole("tab", { name: "Draft" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^Approve/ })).not.toBeInTheDocument()
+    await user.click(within(status).getByRole("button", { name: "Review changes" }))
+    expect(props.onReviewingChange).toHaveBeenCalledWith(true)
   })
 
-  it("publishes when nothing blocks it", async () => {
-    const { props, user } = setup({ draft: { ...draft, blockers: [] } })
-    expect(screen.getByText(/Everything is reviewed/)).toBeInTheDocument()
+  it("reviews the draft as a focused mode: the next step, the to-do list, and what changed", async () => {
+    const { user } = setup({ isReviewing: true })
+    expect(screen.getByText("577 terms need your review before you can publish.")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Answer 7 questions" })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: "Changes", selected: true })).toBeInTheDocument()
+    expect(screen.getByRole("region", { name: /^New rules/ })).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Review terms" }))
+    expect(screen.getByRole("tab", { name: "Terms", selected: true })).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Answer 7 questions" }))
+    expect(screen.getByRole("tab", { name: "Questions", selected: true })).toBeInTheDocument()
+  })
+
+  it("discards the draft after saying what's lost", async () => {
+    const { props, user } = setup({ isReviewing: true })
+    await user.click(screen.getByRole("button", { name: "Discard draft" }))
+    const confirm = await screen.findByRole("alertdialog", { name: "Discard this draft?" })
+    expect(within(confirm).getByText(/Version 1 stays in force\./)).toBeInTheDocument()
+    await user.click(within(confirm).getByRole("button", { name: "Discard draft" }))
+    expect(props.onDiscard).toHaveBeenCalledWith("draft-1")
+  })
+
+  it("publishes, after confirming, when nothing blocks it", async () => {
+    const reviewed = {
+      ...content,
+      rules: content.rules.map((rule) => ({ ...rule, review: approved })),
+      terms: content.terms.map((term) => ({ ...term, review: approved })),
+      settings: { ...content.settings, review: approved },
+      questions: content.questions.map((question) => ({
+        ...question,
+        answer: { option: 0, text: null, by: "admin", at: "2026-10-09T00:00:00Z" }
+      }))
+    }
+    const reasonsApproved = {
+      ...sources,
+      provisions: sources.provisions.map((provision) =>
+        provision.noRule ? { ...provision, noRule: { ...provision.noRule, review: approved } } : provision
+      )
+    }
+    const { props, user } = setup({
+      isReviewing: true,
+      sources: reasonsApproved,
+      draft: { ...draft, content: reviewed, blockers: [] }
+    })
+    expect(screen.getByText(/^Everything is reviewed\./)).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Publish" }))
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Publish" }))
     expect(props.onPublish).toHaveBeenCalledWith("draft-1")
   })
 
-  it("shows the published rulebook read-only, with its file's hash and download", async () => {
+  it("offers to try a failed build again, and downloads the rules file", async () => {
     const createObjectURL = vi.fn<(blob: Blob) => string>(() => "blob:rules")
     const revokeObjectURL = vi.fn<(url: string) => void>()
     vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL }))
-    const { props, user } = setup({
-      draft: { ...draft, rulebook: null, content: null, lastBuildError: "Unit 4 failed." }
-    })
+    const { props, user } = setup({ draft: { ...noDraft, lastBuildError: "Unit 4 failed." } })
     expect(screen.getByText("Unit 4 failed.")).toBeInTheDocument()
-    expect(screen.getByText(/1 rules, published/)).toBeInTheDocument()
-    expect(screen.getByText("ab".repeat(32))).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: /Approve/ })).not.toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Download rules file" }))
+    await user.click(screen.getByRole("button", { name: "Try again" }))
+    expect(props.onBuild).toHaveBeenCalled()
+    await user.click(screen.getByRole("button", { name: "Rules file" }))
     expect(props.loadRulesFile).toHaveBeenCalled()
     expect(createObjectURL).toHaveBeenCalled()
-    await user.click(screen.getByRole("tab", { name: "Draft" }))
-    expect(screen.getByText("No draft")).toBeInTheDocument()
     vi.unstubAllGlobals()
   })
 })

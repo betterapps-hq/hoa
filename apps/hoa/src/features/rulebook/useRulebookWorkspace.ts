@@ -18,7 +18,6 @@ export type RulebookActions = {
   review: (refs: RecordRef[], status: T.Review["status"], note: string | null) => Promise<ReviewResult>
   resolveIssue: (ref: Exclude<RecordRef, { type: "provision" }>, index: number, note: string) => Promise<void>
   saveRule: (rule: RuleDraft) => Promise<RulebookIssue[]>
-  removeRule: (key: T.RuleKey) => Promise<void>
   answerQuestion: (questionId: T.Id, option: number, text: string | null) => Promise<Omit<ReviewResult, "updated">>
   setNoRule: (
     provisionKey: T.ProvisionKey,
@@ -44,6 +43,8 @@ export type RulebookWorkspaceValue = {
   actions: RulebookActions | null
   /** Opens a rule's card. */
   openRule: (key: T.RuleKey) => void
+  /** Who's reading: an administrator sees how rules are encoded; a member sees what they say and where from. */
+  audience: "administrator" | "member"
 }
 
 export const RulebookWorkspaceContext = createContext<RulebookWorkspaceValue | null>(null)

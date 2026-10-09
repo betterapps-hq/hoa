@@ -1,6 +1,5 @@
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldLabel } from "@/components/ui/field"
@@ -19,7 +18,7 @@ import { useRulebookWorkspace } from "../useRulebookWorkspace"
  * option listing the candidate rules it keeps. Answering approves the kept rules and rejects the others.
  */
 export function QuestionsTab() {
-  const { records } = useRulebookWorkspace()
+  const { records, actions } = useRulebookWorkspace()
   if (records.questions.length === 0) {
     return <p className="text-sm text-muted-foreground">The build left no questions.</p>
   }
@@ -27,7 +26,8 @@ export function QuestionsTab() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
-        {records.questions.length} questions, {open.length} unanswered.
+        Each question decides which reading of a provision the rules follow.
+        {actions && open.length > 0 ? ` ${open.length} of ${records.questions.length} to answer.` : ""}
       </p>
       {[...open, ...records.questions.filter((question) => question.answer !== null)].map((question) => (
         <QuestionCard key={question.id} question={question} />
@@ -71,13 +71,11 @@ function QuestionCard({ question }: { question: T.Question }) {
     <Card size="sm">
       <CardHeader>
         <CardTitle className="leading-snug">{question.question}</CardTitle>
-        <CardDescription className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">{question.kind === "conflict" ? "Conflict" : "Interpretation"}</Badge>
-          {question.answer ? (
-            <Badge variant="secondary">Answered</Badge>
-          ) : (
-            <Badge variant="destructive">Unanswered</Badge>
-          )}
+        <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span>
+            {question.kind === "conflict" ? "Provisions that conflict" : "A provision to interpret"}
+            {question.answer ? ", answered" : ""}
+          </span>
           {question.citations.map((citation) => (
             <ProvisionReference
               key={citation.provisionKey}
@@ -116,7 +114,7 @@ function QuestionCard({ question }: { question: T.Question }) {
                 <OptionBlock option={item}>
                   <p className="font-medium">
                     {item.label}
-                    {chosen === index ? <Badge className="ml-2">Chosen</Badge> : null}
+                    {chosen === index ? <span className="ml-2 font-normal text-muted-foreground">(chosen)</span> : null}
                   </p>
                 </OptionBlock>
               </li>
@@ -135,7 +133,11 @@ function QuestionCard({ question }: { question: T.Question }) {
         <CardFooter className="flex flex-wrap gap-2">
           {isAnswering ? (
             <>
-              <Button disabled={option === "" || isBusy} onClick={() => void answer()}>
+              <Button
+                variant={option === "" ? "outline" : "default"}
+                disabled={option === "" || isBusy}
+                onClick={() => void answer()}
+              >
                 {isBusy ? "Saving" : "Answer"}
               </Button>
               {isChanging ? (
@@ -145,7 +147,7 @@ function QuestionCard({ question }: { question: T.Question }) {
               ) : null}
             </>
           ) : (
-            <Button variant="outline" onClick={() => setIsChanging(true)}>
+            <Button variant="ghost" onClick={() => setIsChanging(true)}>
               Change the answer
             </Button>
           )}

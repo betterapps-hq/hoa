@@ -1,20 +1,27 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router"
-import { getDocumentPage, getJobStatus, listDocuments } from "@/features/documents/documents.functions"
+import {
+  completeDocumentUpload,
+  createDocumentUpload,
+  getActiveJob,
+  getDocumentPage,
+  getJobStatus,
+  listDocuments,
+  uploadDocumentFile
+} from "@/features/documents/documents.functions"
+import { uploadDocument } from "@/features/documents/uploadDocument"
 import { PublishedRulebook } from "@/features/rulebook/PublishedRulebook/PublishedRulebook"
 import {
+  discardRulebookDraft,
   getPublishedRulesFileJson,
   getRulebookSources,
   getRulebookView,
   getSourceText,
   publishRulebook,
-  startRulebookBuild,
-  type RulebookSources,
-  type RulebookView
+  startRulebookBuild
 } from "@/features/rulebook/rulebook.functions"
 import { RulebookPage } from "@/features/rulebook/RulebookPage/RulebookPage"
 import {
   answerRulebookQuestion,
-  removeRulebookRule,
   resolveRulebookIssue,
   reviewRulebookRecords,
   saveRulebookRule,
@@ -24,52 +31,61 @@ import {
 import type { RulebookActions, RulebookSource } from "@/features/rulebook/useRulebookWorkspace"
 import { getSession } from "@/session/session.functions"
 
-type Documents = Awaited<ReturnType<typeof listDocuments>>
-
-type RulesData =
-  | { isAdministrator: false; published: RulebookView; sources: RulebookSources }
-  | {
-      isAdministrator: true
-      draft: RulebookView
-      published: RulebookView
-      sources: RulebookSources
-      documents: Documents
-    }
-
+/** The rulebook and the governing documents it's built from, for everyone; administrators build, review and publish. */
 export const Route = createFileRoute("/rules")({
   staticData: { title: "Rulebook" },
-  loader: async (): Promise<RulesData> => {
+  validateSearch: (search: Record<string, unknown>): { review?: "draft" } =>
+    search.review === "draft" ? { review: "draft" } : {},
+  loader: async () => {
     const session = await getSession()
-    const [published, sources] = await Promise.all([
+    const [published, sources, uploads] = await Promise.all([
       getRulebookView({ data: { which: "published" } }),
-      getRulebookSources()
+      getRulebookSources(),
+      listDocuments()
     ])
     if (session.roleId !== "administrator") {
-      return { isAdministrator: false, published, sources }
+      return { isAdministrator: false as const, published, sources, uploads }
     }
-    const [draft, documents] = await Promise.all([getRulebookView({ data: { which: "draft" } }), listDocuments()])
-    return { isAdministrator: true, draft, published, sources, documents }
+    const [draft, jobs] = await Promise.all([
+      getRulebookView({ data: { which: "draft" } }),
+      Promise.all(
+        uploads
+          .filter((upload) => upload.status === "processing")
+          .map(async (upload) => [upload.id, (await getActiveJob({ data: { subjectId: upload.id } }))?.id] as const)
+      )
+    ])
+    return {
+      isAdministrator: true as const,
+      published,
+      sources,
+      uploads,
+      draft,
+      jobs: Object.fromEntries(jobs.flatMap(([documentId, jobId]) => (jobId ? [[documentId, jobId]] : [])))
+    }
   },
   component: RulesRoute
 })
 
 function RulesRoute() {
   const data = Route.useLoaderData()
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
   const router = useRouter()
   const source: RulebookSource = {
     documents: data.sources.files,
     loadPage: (documentId, pageIndex) => getDocumentPage({ data: { documentId, pageIndex } }),
     loadSourceText: () => getSourceText()
   }
-  const loadRulesFile = () => getPublishedRulesFileJson()
+  const loadJob = (jobId: string) => getJobStatus({ data: { jobId } })
   if (!data.isAdministrator) {
     return (
-      <div className="px-4 lg:px-6">
+      <div className="mx-auto w-full max-w-5xl px-4 pb-10 lg:px-6">
         <PublishedRulebook
           published={data.published}
           sources={data.sources}
+          uploads={data.uploads}
           source={source}
-          loadRulesFile={loadRulesFile}
+          loadJob={loadJob}
         />
       </div>
     )
@@ -87,7 +103,6 @@ function RulesRoute() {
     review: changing((refs, status, note) => reviewRulebookRecords({ data: { rulebookId, refs, status, note } })),
     resolveIssue: changing((ref, index, note) => resolveRulebookIssue({ data: { rulebookId, ref, index, note } })),
     saveRule: changing((rule) => saveRulebookRule({ data: { rulebookId, rule } })),
-    removeRule: changing((key) => removeRulebookRule({ data: { rulebookId, key } })),
     answerQuestion: changing(async (questionId, option, text) => {
       const { notApproved } = await answerRulebookQuestion({ data: { rulebookId, questionId, option, text } })
       return { skipped: notApproved }
@@ -95,23 +110,47 @@ function RulesRoute() {
     setNoRule: changing((provisionKey, noRule) => setProvisionNoRule({ data: { rulebookId, provisionKey, noRule } })),
     saveSettings: changing(({ clauses, policy }) => saveRulebookSettings({ data: { rulebookId, clauses, policy } }))
   }
+  // With nothing published, the draft is the whole rulebook, so it opens for review.
+  const isReviewing = data.draft.content !== null && (search.review === "draft" || data.published.rulebook === null)
   return (
-    <RulebookPage
-      draft={data.draft}
-      published={data.published}
-      sources={data.sources}
-      documents={data.documents}
-      source={source}
-      actions={actions}
-      loadJob={(jobId) => getJobStatus({ data: { jobId } })}
-      loadRulesFile={loadRulesFile}
-      onBuild={async (documentIds) => {
-        await startRulebookBuild({ data: { documentIds } })
-      }}
-      onPublish={async (id) => {
-        await publishRulebook({ data: { rulebookId: id } })
-      }}
-      onChanged={() => void router.invalidate()}
-    />
+    <div className="mx-auto w-full max-w-5xl px-4 pb-10 lg:px-6">
+      <RulebookPage
+        draft={data.draft}
+        published={data.published}
+        sources={data.sources}
+        uploads={data.uploads}
+        jobs={data.jobs}
+        source={source}
+        actions={actions}
+        isReviewing={isReviewing}
+        onReviewingChange={(reviewing) => {
+          void navigate({ search: reviewing ? { review: "draft" } : {} })
+          window.scrollTo({ top: 0 })
+        }}
+        loadJob={loadJob}
+        loadRulesFile={() => getPublishedRulesFileJson()}
+        onUpload={(file, details) =>
+          uploadDocument(
+            {
+              createUpload: (input) => createDocumentUpload({ data: input }),
+              uploadThroughServer: (form) => uploadDocumentFile({ data: form }),
+              completeUpload: (documentId) => completeDocumentUpload({ data: { documentId } })
+            },
+            file,
+            details
+          )
+        }
+        onBuild={async () => {
+          await startRulebookBuild()
+        }}
+        onPublish={changing(async (id: string) => {
+          await publishRulebook({ data: { rulebookId: id } })
+        })}
+        onDiscard={changing(async (id: string) => {
+          await discardRulebookDraft({ data: { rulebookId: id } })
+        })}
+        onChanged={() => void router.invalidate()}
+      />
+    </div>
   )
 }

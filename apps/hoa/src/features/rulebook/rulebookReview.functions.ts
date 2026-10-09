@@ -3,7 +3,7 @@ import { match } from "ts-pattern"
 import { z } from "zod"
 import { getDb } from "@/db/client.server"
 import { updateProvisions } from "@/db/documentRepository"
-import { deleteRulebookRule, saveRulebookChanges } from "@/db/rulebookContentRepository"
+import { saveRulebookChanges } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus } from "@/db/rulebookRepository"
 import { loadRulebookRecords, type RulebookRecords } from "@/rulebook/assemble"
 import { answerQuestion, resolveIssue, reviewIssues, reviewRecords, type RecordRef } from "@/rulebook/review"
@@ -12,7 +12,8 @@ import { rule as ruleSchema, ruleDraft, settings as settingsSchema } from "@/sch
 import { requireAdministrator } from "@/session/requestContext.server"
 
 // Reviewing the draft rulebook (encoding.md, Review): approve, reject, edit, answer questions, give provisions their
-// no-rule reasons and edit the settings. Every change is checked by the schema's Zod and by the review rules in
+// no-rule reasons and edit the settings. Nothing is deleted: rejecting a record leaves it out of the rules file, and a
+// rebuild carries the rejection forward. Every change is checked by the schema's Zod and by the review rules in
 // src/rulebook/review.ts, which the screens share.
 
 const recordRef = z.discriminatedUnion("type", [
@@ -116,14 +117,6 @@ export const saveRulebookRule = createServerFn({ method: "POST" })
     })
     await saveRulebookChanges(db, hoaId, data.rulebookId, { rules: [rule] })
     return issuesOf({ ...records, rules: records.rules.map((item) => (item.key === rule.key ? rule : item)) }, rule.key)
-  })
-
-/** Removes a rule from the draft. */
-export const removeRulebookRule = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({ ...draftInput, key: z.string() }).parse(data))
-  .handler(async ({ data }) => {
-    const { db, hoaId } = await openDraft(data.rulebookId)
-    await deleteRulebookRule(db, hoaId, data.rulebookId, data.key)
   })
 
 /** Answers a question: its chosen reading's rules are approved, the other candidates rejected. */

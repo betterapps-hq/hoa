@@ -5,7 +5,7 @@ export type RoleId = (typeof roleIds)[number]
 /** The demo role switcher's cookie. */
 export const roleCookie = "hoa-role"
 
-export type NavItem = { title: string; to: "/" | "/documents" | "/rules" | "/applications" }
+export type NavItem = { title: string; to: "/" | "/rules" | "/project-types" | "/applications" }
 
 export type Role = {
   id: RoleId
@@ -23,6 +23,7 @@ export const roles: Record<RoleId, Role> = {
     user: { name: "Jordan Avery", email: "jordan@example.com", initials: "JA" },
     navigation: [
       { title: "Dashboard", to: "/" },
+      { title: "Rulebook", to: "/rules" },
       { title: "Applications", to: "/applications" }
     ]
   },
@@ -33,8 +34,8 @@ export const roles: Record<RoleId, Role> = {
     user: { name: "Sam Rivera", email: "sam@example.com", initials: "SR" },
     navigation: [
       { title: "Dashboard", to: "/" },
-      { title: "Documents", to: "/documents" },
       { title: "Rulebook", to: "/rules" },
+      { title: "Project types", to: "/project-types" },
       { title: "Applications", to: "/applications" }
     ]
   }

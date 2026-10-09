@@ -54,6 +54,14 @@ export const createDocumentUpload = createServerFn({ method: "POST" })
     if (!validation.isValid) {
       throw new Error(validation.message)
     }
+    // A new edition joins one of this organization's documents, and an amendment amends one of them.
+    const uploads = data.lineageId || data.amends ? await listGoverningDocuments(getDb(), context.hoa.id) : []
+    if (data.lineageId && !uploads.some((upload) => upload.lineageId === data.lineageId)) {
+      throw new Error("The document this is a new edition of doesn't exist.")
+    }
+    if (data.amends && !uploads.some((upload) => upload.id === data.amends)) {
+      throw new Error("The document this amends doesn't exist.")
+    }
     const document = await createGoverningDocument(getDb(), {
       hoaId: context.hoa.id,
       kind: data.kind,

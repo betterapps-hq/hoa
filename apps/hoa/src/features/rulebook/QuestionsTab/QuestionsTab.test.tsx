@@ -16,7 +16,7 @@ const [first] = records.questions
 describe("QuestionsTab", () => {
   it("shows each question with its citations and the rules each reading keeps", () => {
     renderInWorkspace(<QuestionsTab />)
-    expect(screen.getByText("7 questions, 7 unanswered.")).toBeInTheDocument()
+    expect(screen.getByText(/7 of 7 to answer/)).toBeInTheDocument()
     const readings = screen.getAllByRole("radiogroup", { name: "Readings" })[0]!
     expect(within(readings).getByText("Only the six-month minimum term")).toBeInTheDocument()
     const kept = screen.getByRole("list", { name: "Rules kept by: Only the six-month minimum term" })
@@ -46,8 +46,8 @@ describe("QuestionsTab", () => {
       )
     }
     const { user } = renderInWorkspace(<QuestionsTab />, { records: answered })
-    expect(screen.getByText("7 questions, 6 unanswered.")).toBeInTheDocument()
-    expect(screen.getByText("Chosen")).toBeInTheDocument()
+    expect(screen.getByText(/6 of 7 to answer/)).toBeInTheDocument()
+    expect(screen.getByText("(chosen)")).toBeInTheDocument()
     expect(screen.getByText("Note: As written.")).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Change the answer" }))
     expect(screen.getAllByRole("radiogroup", { name: "Readings" })).toHaveLength(7)
