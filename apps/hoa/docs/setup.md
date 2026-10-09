@@ -75,8 +75,7 @@ pnpm --filter hoa dev
 
 The server runs inside workerd, Cloudflare's runtime, through its Vite plugin, using `wrangler.jsonc`'s `dev`
 environment: D1 is simulated on disk under `apps/hoa/.wrangler`, and R2 is the real `hoa-dev` bucket. Open
-<http://localhost:3000>, switch to the **Administrator** role and select **Run model check**. It reports the response,
-prompt version, latency, tokens, cost and Langfuse trace ID, which confirms each connection.
+<http://localhost:3000>.
 
 To review applications before the rules UX exists, publish the committed sample rulebook into the local database:
 

@@ -11,7 +11,3 @@ export type PromptDefinition<Variable extends string = string> = {
 
 /** What a call to a prompt must fill in: exactly the variables it declares, checked by the compiler. */
 export type PromptVariables<Prompt extends PromptDefinition> = Record<Prompt["variables"][number], string>
-
-export const prompts = {
-  modelCheck: { name: "hoa-model-check", variables: [] }
-} as const satisfies Record<string, PromptDefinition>

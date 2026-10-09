@@ -6,9 +6,11 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { candidateRuleSchema } from "@/rules/rule"
 import type { PromptLoader } from "./promptLoader"
-import { prompts } from "./prompts"
+import type { PromptDefinition } from "./prompts"
 import { answerOf, outputSchema, runCheckedObjectPrompt, runObjectPrompt, runTextPrompt } from "./runPrompt"
 import { registerTracerProvider } from "./telemetry.server"
+
+const prompt = { name: "hoa-sample", variables: [] } as const satisfies PromptDefinition
 
 function createModel(
   providerMetadata?: Record<string, Record<string, number | Record<string, number>>>,
@@ -66,9 +68,9 @@ describe("runTextPrompt", () => {
       loadPrompt: langfusePrompt,
       createModel: () => model,
       defaultModelId: "test-model",
-      prompt: prompts.modelCheck,
+      prompt,
       variables: { applicant: "Lot 12" },
-      traceName: "model-check",
+      traceName: "sample-stage",
       environment: "test",
       sessionId: "session-1"
     })
@@ -78,7 +80,7 @@ describe("runTextPrompt", () => {
     ])
     expect(result).toMatchObject({
       text: "Ready to review.",
-      promptName: "hoa-model-check",
+      promptName: "hoa-sample",
       promptVersion: 3,
       inputTokens: 42,
       outputTokens: 5,
@@ -94,9 +96,9 @@ describe("runTextPrompt", () => {
       loadPrompt: langfusePrompt,
       createModel: () => model,
       defaultModelId: "test-model",
-      prompt: prompts.modelCheck,
+      prompt,
       variables: {},
-      traceName: "model-check",
+      traceName: "sample-stage",
       environment: "test",
       sessionId: "session-1"
     })
@@ -140,17 +142,17 @@ describe("runTextPrompt", () => {
       loadPrompt: langfusePrompt,
       createModel: () => model,
       defaultModelId: "test-model",
-      prompt: prompts.modelCheck,
+      prompt,
       variables: {},
-      traceName: "model-check",
+      traceName: "sample-stage",
       environment: "test",
       sessionId: "session-1"
     })
     await provider.forceFlush()
 
-    const span = ended.find((entry) => entry.name === "model-check")
+    const span = ended.find((entry) => entry.name === "sample-stage")
     expect(span).toBeDefined()
-    expect(span?.attributes).toMatchObject({ "langfuse.trace.name": "model-check", "session.id": "session-1" })
+    expect(span?.attributes).toMatchObject({ "langfuse.trace.name": "sample-stage", "session.id": "session-1" })
     expect(result.traceId).toBe(span?.traceId)
     expect(model.doGenerateCalls[0]?.providerOptions).toEqual({
       openrouter: {
@@ -158,10 +160,10 @@ describe("runTextPrompt", () => {
         trace: {
           trace_id: span?.traceId,
           parent_span_id: span?.spanId,
-          trace_name: "model-check",
-          generation_name: "hoa-model-check",
+          trace_name: "sample-stage",
+          generation_name: "hoa-sample",
           environment: "test",
-          prompt_name: "hoa-model-check",
+          prompt_name: "hoa-sample",
           prompt_version: "3"
         }
       }
@@ -307,14 +309,14 @@ describe("model and version selection", () => {
       loadPrompt,
       createModel: createModelFor,
       defaultModelId: "test-model",
-      prompt: prompts.modelCheck,
+      prompt,
       variables: {},
       promptVersion: 9,
-      traceName: "model-check",
+      traceName: "sample-stage",
       environment: "test"
     })
 
-    expect(loadPrompt).toHaveBeenCalledWith(prompts.modelCheck, { version: 9 })
+    expect(loadPrompt).toHaveBeenCalledWith(prompt, { version: 9 })
     expect(createModelFor).toHaveBeenCalledWith("anthropic/claude-sonnet-5.5")
     expect(result).toMatchObject({ modelId: "anthropic/claude-sonnet-5.5", promptVersion: 9 })
   })
@@ -326,9 +328,9 @@ describe("model and version selection", () => {
         loadPrompt: async (prompt) => ({ name: prompt.name, version: 1, config, compile: () => "Reason" }),
         createModel: () => model,
         defaultModelId: "test-model",
-        prompt: prompts.modelCheck,
+        prompt,
         variables: {},
-        traceName: "model-check",
+        traceName: "sample-stage",
         environment: "test"
       })
       return model.doGenerateCalls[0]?.providerOptions?.openrouter

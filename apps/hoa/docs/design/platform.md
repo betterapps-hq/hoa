@@ -241,7 +241,7 @@ both need a real S3 endpoint; D1 and Workflows stay simulated on disk. Scripts i
 
 ## Tracing on Workers
 
-Proven on workerd (2026-10-08): the model check's `model-check` span arrived in Langfuse with its trace name, and
+Proven on workerd (2026-10-08): a prompt call's span arrived in Langfuse with its trace name, and
 OpenRouter's generation and cost nested under it. `telemetry.server.ts` uses a `BasicTracerProvider` with
 `LangfuseSpanProcessor` in immediate export mode, registered with `trace.setGlobalTracerProvider` and an
 `AsyncLocalStorageContextManager` (which needs `nodejs_compat`). Without the context manager, `propagateAttributes`

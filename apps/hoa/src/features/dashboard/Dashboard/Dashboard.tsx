@@ -4,8 +4,6 @@ import type { ReactNode } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { ModelCheck } from "@/features/modelCheck/ModelCheck/ModelCheck"
-import type { ModelCheckResult } from "@/features/modelCheck/modelCheckResult"
 import type { RoleId } from "@/features/role/roles"
 import type { DashboardSummary } from "@/features/rulebook/rulebook.functions"
 import { projectTypes } from "@/rules/catalog"
@@ -13,7 +11,6 @@ import { projectTypes } from "@/rules/catalog"
 export type DashboardProps = {
   roleId: RoleId
   summary: DashboardSummary
-  onModelCheck: () => Promise<ModelCheckResult>
 }
 
 type Stat = { label: string; value: string; badge: ReactNode; footer: string; detail: string }
@@ -100,8 +97,8 @@ function statsFor(role: RoleId, summary: DashboardSummary): Stat[] {
     }
   ]
 }
-/** Role-specific dashboard: summary cards in shadcn's section-cards style, then the next step. */
-export function Dashboard({ roleId, summary, onModelCheck }: DashboardProps) {
+/** Role-specific dashboard: summary cards in shadcn's section-cards style, then a homeowner's next step. */
+export function Dashboard({ roleId, summary }: DashboardProps) {
   return (
     <>
       <div className="grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
@@ -119,10 +116,8 @@ export function Dashboard({ roleId, summary, onModelCheck }: DashboardProps) {
           </Card>
         ))}
       </div>
-      <div className="px-4 lg:px-6">
-        {roleId === "administrator" ? (
-          <ModelCheck onRun={onModelCheck} />
-        ) : (
+      {roleId === "homeowner" ? (
+        <div className="px-4 lg:px-6">
           <Card>
             <CardHeader>
               <CardTitle>
@@ -140,8 +135,8 @@ export function Dashboard({ roleId, summary, onModelCheck }: DashboardProps) {
               </CardAction>
             </CardHeader>
           </Card>
-        )}
-      </div>
+        </div>
+      ) : null}
     </>
   )
 }
