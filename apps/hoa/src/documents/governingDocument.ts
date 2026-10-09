@@ -15,16 +15,6 @@ export const governingDocumentKinds = [
 ] as const
 export type GoverningDocumentKind = (typeof governingDocumentKinds)[number]
 
-/** Authority for resolving conflicts: lower ranks win (docs/design/rules.md, "Authority and conflicts"). */
-export const authorityRank: Record<GoverningDocumentKind, number> = {
-  declaration: 1,
-  bylaws: 2,
-  "rules-and-regulations": 3,
-  "design-guidelines": 3,
-  amendment: 3,
-  form: 4
-}
-
 export const governingDocumentSchema = z.object({
   /** One id per uploaded version; pages, sections and citations use it. */
   id: z.string(),

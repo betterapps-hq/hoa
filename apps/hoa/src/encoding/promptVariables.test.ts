@@ -54,9 +54,9 @@ describe("prompt variables", () => {
         code: "undefined-term",
         message: "rules:1#max-height: gazebo isn't a term",
         path: ["rules", 1, "appliesTo"],
-        term: "gazebo"
+        reference: "gazebo"
       },
-      { source: "zod" as const, code: "invalid_type", message: "Required", path: [], term: null }
+      { source: "zod" as const, code: "invalid_type", message: "Required", path: [], reference: null }
     ]
     expect(encodingRepairVariables(parsedDraft(firstDraft), problems, vocabulary)).toMatchSnapshot()
   })

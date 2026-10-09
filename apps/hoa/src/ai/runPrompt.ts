@@ -56,6 +56,23 @@ export type PromptRunMetrics = {
 export type TextPromptResult = PromptRunMetrics & { text: string }
 export type ObjectPromptResult<T> = PromptRunMetrics & { object: T }
 
+/**
+ * Fields code fills in after the model answers, such as a rule's effective date: they're left out of the schema the
+ * model sees, and `fill` sets them on the answer before Zod checks it.
+ */
+export type CodeFields = { names: readonly string[]; fill: (answer: unknown) => unknown }
+
+export type ObjectPromptOptions<T, Prompt extends PromptDefinition = PromptDefinition> = PromptRunOptions<Prompt> & {
+  schema: z.ZodType<T>
+  codeFields?: CodeFields
+}
+
+/** An answer checked against its schema: the parsed object, or the answer as given with Zod's issues. */
+export type CheckedAnswer<T> =
+  | { isValid: true; object: T }
+  | { isValid: false; answer: unknown; issues: z.core.$ZodIssue[] }
+export type CheckedObjectPromptResult<T> = PromptRunMetrics & CheckedAnswer<T>
+
 type GenerateRequest = {
   model: LanguageModel
   messages: ModelMessage[]
@@ -70,6 +87,8 @@ type Generated<T> = {
 
 type Generator<T> = {
   generate: (request: GenerateRequest) => Promise<Generated<T>>
+  /** What the cache stores and the span shows for a result. */
+  encode: (value: T) => unknown
   /** Validates a cached value. */
   decode: (value: unknown) => T
 }
@@ -85,33 +104,58 @@ export async function runTextPrompt<Prompt extends PromptDefinition>(
       const result = await generateText(request)
       return { value: result.text, usage: result.usage, providerMetadata: result.providerMetadata }
     },
+    encode: (text) => text,
     decode: (value) => z.string().parse(value)
   })
   return { ...metrics, text: value }
 }
 
-function replaceOneOf(value: unknown): unknown {
+/** Writes `oneOf` as `anyOf`, and drops the properties code fills in from every object and its required list. */
+function forModel(value: unknown, hidden: ReadonlySet<string>): unknown {
   if (Array.isArray(value)) {
-    return value.map(replaceOneOf)
+    return value.map((item) => forModel(item, hidden))
   }
-  if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key === "oneOf" ? "anyOf" : key, replaceOneOf(item)])
-    )
+  if (typeof value !== "object" || value === null) {
+    return value
   }
-  return value
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => {
+      if (key === "properties" && typeof item === "object" && item !== null) {
+        const shown = Object.entries(item).filter(([name]) => !hidden.has(name))
+        return [key, Object.fromEntries(shown.map(([name, property]) => [name, forModel(property, hidden)]))]
+      }
+      if (key === "required" && Array.isArray(item)) {
+        return [key, item.filter((name) => typeof name !== "string" || !hidden.has(name))]
+      }
+      return [key === "oneOf" ? "anyOf" : key, forModel(item, hidden)]
+    })
+  )
+}
+
+function checkAnswer<T>(schema: z.ZodType<T>, answer: unknown, codeFields?: CodeFields): CheckedAnswer<T> {
+  const filled = codeFields ? codeFields.fill(answer) : answer
+  const parsed = schema.safeParse(filled)
+  return parsed.success
+    ? { isValid: true, object: parsed.data }
+    : { isValid: false, answer: filled, issues: parsed.error.issues }
 }
 
 /**
  * The JSON schema the model answers with. Zod writes discriminated unions as `oneOf`, which Anthropic's models on Vertex
- * and Bedrock refuse; `anyOf` accepts the same objects because each branch has a distinct literal discriminator.
+ * and Bedrock refuse; `anyOf` accepts the same objects because each branch has a distinct literal discriminator. Fields
+ * code fills in are left out, and filled before the answer is validated.
  */
-export function outputSchema<T>(schema: z.ZodType<T>) {
-  const json = replaceOneOf(z.toJSONSchema(schema, { target: "draft-7", io: "input", reused: "inline" }))
+export function outputSchema<T>(schema: z.ZodType<T>, codeFields?: CodeFields) {
+  const json = forModel(
+    z.toJSONSchema(schema, { target: "draft-7", io: "input", reused: "inline" }),
+    new Set(codeFields?.names ?? [])
+  )
   return jsonSchema<T>(z.record(z.string(), z.unknown()).parse(json), {
     validate: (value) => {
-      const result = schema.safeParse(value)
-      return result.success ? { success: true, value: result.data } : { success: false, error: result.error }
+      const result = checkAnswer(schema, value, codeFields)
+      return result.isValid
+        ? { success: true, value: result.object }
+        : { success: false, error: new z.ZodError(result.issues) }
     }
   })
 }
@@ -143,10 +187,40 @@ export function answerOf(result: { toolCalls: readonly { toolName: string; input
  * the only tool is offered and a JSON text reply is accepted too.
  */
 export async function runObjectPrompt<T, Prompt extends PromptDefinition>(
-  options: PromptRunOptions<Prompt> & { schema: z.ZodType<T> }
+  options: ObjectPromptOptions<T, Prompt>
 ): Promise<ObjectPromptResult<T>> {
-  const inputSchema = outputSchema(options.schema)
-  const { value, ...metrics } = await runTraced(options, {
+  const { value, ...metrics } = await runObject(options, false)
+  if (!value.isValid) {
+    throw invalidAnswer(value.issues)
+  }
+  return { ...metrics, object: value.object }
+}
+
+/**
+ * Like `runObjectPrompt`, but an answer that fails Zod comes back with its issues instead of throwing, so a stage that
+ * repairs answers (encoding) sends it to repair rather than retrying the call blind. Invalid answers are cached too.
+ */
+export async function runCheckedObjectPrompt<T, Prompt extends PromptDefinition>(
+  options: ObjectPromptOptions<T, Prompt>
+): Promise<CheckedObjectPromptResult<T>> {
+  const { value, ...metrics } = await runObject(options, true)
+  return { ...metrics, ...value }
+}
+
+function invalidAnswer(issues: z.core.$ZodIssue[]) {
+  return new Error(`No object generated: the answer didn't match the schema. ${new z.ZodError(issues).message}`)
+}
+
+function runObject<T>(options: ObjectPromptOptions<T>, keepsInvalid: boolean) {
+  const inputSchema = outputSchema(options.schema, options.codeFields)
+  const check = (answer: unknown) => {
+    const checked = checkAnswer(options.schema, answer, options.codeFields)
+    if (!checked.isValid && !keepsInvalid) {
+      throw invalidAnswer(checked.issues)
+    }
+    return checked
+  }
+  return runTraced(options, {
     generate: async (request) => {
       const result = await generateText({
         ...request,
@@ -155,15 +229,11 @@ export async function runObjectPrompt<T, Prompt extends PromptDefinition>(
         },
         toolChoice: "auto"
       })
-      const parsed = options.schema.safeParse(answerOf(result))
-      if (!parsed.success) {
-        throw new Error(`No object generated: the answer didn't match the schema. ${parsed.error.message}`)
-      }
-      return { value: parsed.data, usage: result.usage, providerMetadata: result.providerMetadata }
+      return { value: check(answerOf(result)), usage: result.usage, providerMetadata: result.providerMetadata }
     },
-    decode: (value) => options.schema.parse(value)
+    encode: (checked: CheckedAnswer<T>) => (checked.isValid ? checked.object : checked.answer),
+    decode: check
   })
-  return { ...metrics, object: value }
 }
 
 /**
@@ -241,7 +311,7 @@ async function runInSpan<T>(
     const hit = await options.cache.get(cacheKey)
     if (hit !== undefined && hit !== null) {
       const value = generator.decode(hit)
-      span.update({ output: { result: value, isCached: true } })
+      span.update({ output: { result: generator.encode(value), isCached: true } })
       const usage = { inputTokens: undefined, outputTokens: undefined, costUsd: 0, latencyMs: 0 }
       return { value, promptName: template.name, promptVersion, modelId, ...usage, traceId, isCached: true }
     }
@@ -274,7 +344,7 @@ async function runInSpan<T>(
   })
   const latencyMs = Math.round(performance.now() - startedAt)
   if (options.cache && cacheKey) {
-    await options.cache.put(cacheKey, generated.value)
+    await options.cache.put(cacheKey, generator.encode(generated.value))
   }
 
   const cost = openRouterCost.safeParse(generated.providerMetadata)
@@ -290,7 +360,7 @@ async function runInSpan<T>(
     traceId,
     isCached: false
   }
-  span.update({ output: { result: generated.value, latencyMs, costUsd: run.costUsd } })
+  span.update({ output: { result: generator.encode(generated.value), latencyMs, costUsd: run.costUsd } })
   return run
 }
 

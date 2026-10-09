@@ -97,6 +97,18 @@ pnpm --filter hoa db:reset:rules
 Uploaded documents and applications stay; applications go back to drafts. Add `--dev-bucket` to delete the objects
 from the `hoa-dev` bucket rather than Wrangler's local R2. Neither command touches the preview or demo environments.
 
+Before building the rulebook from the sample documents, tell the build how they're structured (the Declaration's
+Exhibit C is the use restrictions, a document of its own):
+
+```sh
+pnpm --filter hoa db:structure:sample
+```
+
+To run the build in process on the cached page records in `.fixtures/ocr/` (evaluation round 1), with the real models
+and Langfuse tracing, run `pnpm eval:encoding` from `apps/hoa` with `--split dev|test|all`, `--documents` and
+optionally `--units` (provision or document keys). It writes the draft, every step's output, the issues and a report
+to `.fixtures/eval/encoding/<run id>/`, and caches model results in `.fixtures/eval/encoding/cache/`.
+
 After changing `src/db/schema.ts`, run `pnpm --filter hoa db:generate` and commit the new migration. Migrations must
 stay backward compatible, since pull request previews share one database: add tables and nullable columns, and read
 the generated SQL (Drizzle Kit's table rebuilds can copy columns the old table doesn't have). After changing

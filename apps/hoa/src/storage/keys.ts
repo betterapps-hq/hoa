@@ -46,11 +46,13 @@ export const rulebookKeys = (hoaId: string, rulebookId: string) => {
   return { root, file: `${root}rules.json` }
 }
 
-/** A rulebook build's stage outputs (encoding.md, Storage). */
+/**
+ * A rulebook build's step outputs (encoding.md, Storage), by step name: `encode:declaration:article-4` is
+ * `encode/declaration:article-4.json`, and a step without an item, such as `merge`, is `merge/result.json`.
+ */
 export const rulebookBuildKeys = (hoaId: string, jobId: string) => ({
-  structure: (documentId: string) => jobOutputKey(hoaId, jobId, "structure", documentId),
-  analyze: (documentId: string) => jobOutputKey(hoaId, jobId, "analyze", documentId),
-  encode: (unitId: string) => jobOutputKey(hoaId, jobId, "encode", unitId),
-  merge: jobOutputKey(hoaId, jobId, "merge", "draft"),
-  consolidate: jobOutputKey(hoaId, jobId, "consolidate", "result")
+  step: (name: string) => {
+    const [stage = name, ...item] = name.split(":")
+    return jobOutputKey(hoaId, jobId, stage, item.join(":") || "result")
+  }
 })

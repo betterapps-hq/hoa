@@ -15,6 +15,14 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
   structured-output schema into a grammar, and the rule schemas are larger than they accept. Zod's `oneOf` unions are
   sent as `anyOf` (Anthropic models on Vertex and Bedrock refuse `oneOf`), and the answer is validated with Zod. An
   invalid answer throws, so the Workflow step retries.
+- `runCheckedObjectPrompt` is the same call for stages that repair answers (the rulebook build's encode and repair):
+  an answer that fails Zod comes back with its issues instead of throwing, and is cached like a valid one.
+- `codeFields` lists fields code owns (a rule's `effectiveFrom`, a term's `organizationId`): they're left out of the
+  schema the model sees, and filled in on the answer before Zod checks it.
+- Text the model must read about the output, such as the statement link syntax, goes in the Zod schema's
+  `.describe()`, since Langfuse reads double braces in prompt text as variables.
+- `recordScores` ([scores.ts](../src/ai/scores.ts)) adds one span under a job's trace name and session with the scores
+  code computed, such as a rulebook build's (encoding.md, Quality).
 - Unit tests inject `MockLanguageModelV4` from `ai/test`. Tests never call a paid model.
 
 ## Prompts

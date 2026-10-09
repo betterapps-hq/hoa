@@ -212,23 +212,30 @@ export const provision = z.object({
 
 // ─── Vocabulary ───────────────────────────────────────────────────────────────────────────────────
 
+export const issueCode = z.enum([
+  "citation-not-found",
+  "undefined-term",
+  "avoided-label",
+  "type-mismatch",
+  "invalid-value",
+  "ambiguous-label",
+  "conflict",
+  "override-not-allowed",
+  "table-overlap",
+  "text-condition",
+  "absent-in-exception",
+  "undefined-document",
+  "unencoded-quantity",
+  "modality-cue-mismatch",
+  "duplicate-key",
+  "invalid-key",
+  "undefined-rule",
+  "invariant",
+  "coverage"
+])
+
 const issue = z.object({
-  code: z.enum([
-    "citation-not-found",
-    "undefined-term",
-    "avoided-label",
-    "type-mismatch",
-    "invalid-value",
-    "ambiguous-label",
-    "conflict",
-    "override-not-allowed",
-    "table-overlap",
-    "text-condition",
-    "absent-in-exception",
-    "undefined-document",
-    "unencoded-quantity",
-    "modality-cue-mismatch"
-  ]),
+  code: issueCode,
   message: z.string(),
   related: z.array(ruleKey),
   resolution: z.object({ note: z.string(), by: id, at: timestamp }).nullable()
@@ -640,7 +647,12 @@ const draftBase = {
   key: ruleKey,
   domain,
   title: z.string().min(1),
-  statement: z.string().min(1),
+  statement: z
+    .string()
+    .min(1)
+    .describe(
+      "Link a term by writing its key in double curly braces, such as {{fence-run}}; {{fence-run:plural}} for the plural."
+    ),
   citations: z.array(citation).min(1),
   requestTypes: z.array(termKey).min(1),
   appliesTo: d(termKey),

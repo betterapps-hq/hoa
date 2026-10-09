@@ -516,6 +516,11 @@ type IssueCode =
   | "undefined-document"
   | "unencoded-quantity"
   | "modality-cue-mismatch"
+  | "duplicate-key"
+  | "invalid-key"
+  | "undefined-rule"
+  | "invariant"
+  | "coverage"
 
 type Issue = {
   code: IssueCode

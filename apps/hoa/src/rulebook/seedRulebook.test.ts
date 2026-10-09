@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { sql } from "drizzle-orm"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { runBatch } from "@/db/batching"
+import { chunk, runBatch } from "@/db/batching"
 import type { Database } from "@/db/database"
 import { getProvision, listDocumentRecords, listGoverningDocuments } from "@/db/documentRepository"
 import { getPublishedRulesFile } from "@/db/rulebookContentRepository"
@@ -15,11 +15,15 @@ import { seedRulebook } from "./seedRulebook"
 const organization = { id: "demo-hoa", name: "Sample community" }
 const now = "2026-10-09T00:00:00.000Z"
 
-function run(db: Database, statements: readonly string[]) {
-  return runBatch(
-    db,
-    statements.map((statement) => db.run(sql.raw(statement)))
-  )
+/** Runs the seed's SQL in batches of a few hundred statements: one batch of them all can reset the local runtime's
+ * connection when other test files load it too. */
+async function run(db: Database, statements: readonly string[]) {
+  for (const group of chunk(statements, 250)) {
+    await runBatch(
+      db,
+      group.map((statement) => db.run(sql.raw(statement)))
+    )
+  }
 }
 
 describe("seedRulebook", { timeout: 60_000 }, () => {

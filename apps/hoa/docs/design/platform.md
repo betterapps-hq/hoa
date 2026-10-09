@@ -51,9 +51,10 @@ DocumentIngest(documentId)                        started by completeUpload for 
 
 RulebookBuild(rulebookId)                         started by startRulebookBuild; documents must be ready
   resolve-prompts
-  structure:{documentId} ─> route:{sectionId}
-  extract:{sectionId}                              fan-out with Promise.allSettled; failures recorded on the job
-  verify ─> consolidate:{projectType} ─> save-draft
+  structure:{documentId} ─> analyze:{documentId} ─> vocabulary:{documentId} ─> plan
+  encode:{unitId}                                  8 at a time, settled; failures recorded on the job
+  verify ─> repair:{unitId}:1 ─> verify:merged ─> repair:{unitId}:2 ─> merge ─> consolidate
+  save-draft ─> save-draft:scores ─> save-draft:finish
   ends; review and publishing are server functions
 
 ApplicationReview(applicationId)                  started by runReview

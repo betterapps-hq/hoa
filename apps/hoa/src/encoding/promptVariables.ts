@@ -1,19 +1,26 @@
+import type { pipelinePrompts } from "@/ai/pipelinePrompts"
+import type { PromptVariables } from "@/ai/prompts"
 import { canonicalJson, compareCodeUnits } from "@/rulebook/canonical"
 import { coreTerms } from "@/schema/coreTerms"
 import type { GoverningDocument, Provision, ValueType } from "@/schema/types"
 import type { JsonPath } from "@/schema/validate"
 import { createVocabulary } from "@/schema/vocabulary"
 import type { RuleContent, TermContent } from "@/schema/zod"
+import type { StructureCheck } from "./check"
+import type { CleanDocument } from "./clean"
 import { summarizeRule, type TermPair } from "./consolidate"
 import type { TermCandidate } from "./definedTerms"
 import type { EncodingUnit } from "./plan"
+import type { StructuredDocument } from "./provisions"
 import type { UnitProblem } from "./repair"
+import { cleanText, parserOutline } from "./structureRepair"
 
 // The prompt variables of the build's prompts (encoding.md, Prompts and models), as compact text in a fixed order, so
 // the same unit always reads the same and provider prompt caching covers the shared parts (core terms first in every
 // prompt's template, then the vocabulary, then the unit).
 
 type DocumentLine = Pick<GoverningDocument, "key" | "kind" | "title">
+type Variables<Prompt extends keyof typeof pipelinePrompts> = PromptVariables<(typeof pipelinePrompts)[Prompt]>
 
 const byKey = <T extends { key: string }>(records: readonly T[]) =>
   records.toSorted((a, b) => compareCodeUnits(a.key, b.key))
@@ -99,7 +106,7 @@ function provisionBlock(provision: Provision) {
 }
 
 /** hoa-provision-encoding: one unit and its context. */
-export function provisionEncodingVariables(unit: EncodingUnit, document: DocumentLine) {
+export function provisionEncodingVariables(unit: EncodingUnit, document: DocumentLine): Variables<"provisionEncoding"> {
   const context = unit.context.map((ancestor) =>
     [
       `[${ancestor.key}] ${headingOf(ancestor)}`,
@@ -124,7 +131,8 @@ export function provisionEncodingVariables(unit: EncodingUnit, document: Documen
   }
 }
 
-function pathText(path: JsonPath) {
+/** A JSON path as people write it: rules[1].appliesTo. */
+export function pathText(path: JsonPath) {
   return path
     .map((step) => (typeof step === "number" ? `[${step}]` : `.${step}`))
     .join("")
@@ -136,7 +144,7 @@ export function encodingRepairVariables(
   draft: unknown,
   problems: readonly UnitProblem[],
   terms: readonly TermContent[]
-) {
+): Variables<"encodingRepair"> {
   return {
     draft: canonicalJson(draft),
     problems: problems
@@ -159,7 +167,7 @@ export function termExtractionVariables(
   document: DocumentLine,
   definitions: readonly Provision[],
   candidates: readonly TermCandidate[]
-) {
+): Variables<"termExtraction"> {
   return {
     document: documentLine(document),
     definitions: definitions.map(provisionBlock).join("\n\n"),
@@ -174,7 +182,7 @@ export function rulebookConsolidationVariables(
   terms: readonly TermContent[],
   termPairs: readonly TermPair[],
   documents: readonly (DocumentLine & { edition?: GoverningDocument["edition"] })[]
-) {
+): Variables<"rulebookConsolidation"> {
   const vocabulary = createVocabulary([...terms])
   const pairs = termPairs.map(
     (pair) => `${pair.keys[0]} "${pair.labels[0]}" ~ ${pair.keys[1]} "${pair.labels[1]}" (${pair.score})`
@@ -185,5 +193,20 @@ export function rulebookConsolidationVariables(
       .join("\n"),
     termPairs: pairs.join("\n") || "none",
     documents: byKey(documents).map(documentLine).join("\n")
+  }
+}
+
+/** hoa-structure-repair: the cleaned text, the parser's outline of it and why the outline failed its check. */
+export function structureRepairVariables(
+  title: string,
+  clean: CleanDocument,
+  documents: readonly StructuredDocument[],
+  check: StructureCheck
+): Variables<"structureRepair"> {
+  return {
+    documentTitle: title,
+    pageText: cleanText(clean).text,
+    parserOutline: parserOutline(clean, documents),
+    problems: check.problems.map((problem) => `- ${problem.message} [${problem.code}]`).join("\n")
   }
 }

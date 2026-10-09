@@ -19,8 +19,8 @@ Work happens on the `feat/rules-schema` branch, committed locally at each milest
 | 1 Schema in the app | Done: `src/schema/` (types, Zod, drafts, core terms, validator, describe, statement links), 57 examples tested, the sample validates, guard test, `pnpm docs:schema` |
 | 2 Engine | Done: `src/engine/` (exact numbers, vocabulary, values, calendar, paths, operands, conditions, derived properties, checks, deadlines, overrides, evaluate, decide), the fence fixture and the sample's expected result, the garage enclosure and its variants; 2.15 sanctions deferred to violations |
 | 3 Storage | Done: additive migration 0001, provisions and rulebook content repositories, assemble and canonical hash, carry forward, `pnpm db:seed:sample`, `pnpm db:reset:rules` |
-| 4 Encoding pipeline | In progress: pure modules done (`src/encoding`, `src/text`: structure, references, term candidates, plan, prompt variables, merge, consolidation, repair grouping); registry, model stages and Workflow next |
-| E1 Evaluation round: encoding | Not started |
+| 4 Encoding pipeline | Done except the text-analysis service (4.7a, 4.7b, 4.14a, moved to E1.6): `buildRulebook` (`src/encoding/build.ts`) runs every stage with the real prompts, the `RulebookBuild` Workflow wraps it, save-draft, scores, publish; checked once end to end on a slice with the real models (below) |
+| E1 Evaluation round: encoding | E1.2's runner built (`pnpm eval:encoding`); scorers (E1.3) next |
 | 5 Rules UX | Not started |
 | 6 Review pipeline | Not started |
 | E2 Evaluation round: review | Not started |
@@ -61,6 +61,42 @@ Work happens on the `feat/rules-schema` branch, committed locally at each milest
 | 2026-10-09 | Duplicate rule keys get `-2`, not `~2` (the schema's key pattern rejects `~`); encoding.md updated. | Keys must validate. |
 | 2026-10-09 | Structure rules: a paragraph after a list of clauses belongs to the list's parent, otherwise to the last item; counted paragraphs number from the provision's own text; an intro is a separate paragraph ending in a colon; wrap-ups only from text starting lowercase; pages up to the table of contents are dropped; headings Azure tags as page headers or numbers at a page top are restored. | Matches the golden encoding's conventions. |
 | 2026-10-09 | Consolidation candidate pairs use statement similarity, not embeddings; every term a unit returns becomes an organization term (no `proposedCore` from units yet). | YAGNI until evaluation shows a need. |
+| 2026-10-09 | An upload's structure (document key, kind, the names its text uses for itself, exhibits that are documents of their own) is stored in a new nullable `governing_documents.structure_json` (migration 0002); `document_json` stays the schema's `GoverningDocument`, which the build writes at save-draft. Without a structure, the upload's kind gives one (`declaration`, `guidelines`, `by-laws`, `rules`). `pnpm db:structure:sample` sets the sample's (Exhibit C as `use-restrictions`) on local uploads; the rules UX sets it per upload in phase 5. The module is `src/documents/documentStructure.ts`. | `document_json` holds one document; an exhibit split is a second one plus the exhibit letter, which doesn't fit it. |
+| 2026-10-09 | The kind defaults and the default settings live outside the guarded folders (`src/documents/`, `src/schema/defaultSettings.ts`): the guard test matches literals, and the document key `declaration` and kind `supplemental-declaration` are also organization term keys in the sample. | The guard stays strict. |
+| 2026-10-09 | `runCheckedObjectPrompt` returns an answer that fails Zod with its issues (and caches it); `runObjectPrompt` still throws. Both share one implementation, and both take `codeFields`: fields hidden from the model's schema and filled in before Zod (a rule's `effectiveFrom`, from its main citation's document edition; a term's `organizationId`). | The model can't know either; asking for them invites wrong values and Zod failures. |
+| 2026-10-09 | The build is one module with an injected step runner `step(name, schema, run, kind)`. The Workflow writes every step's output to R2 (`rulebookBuildKeys(...).step(name)`: `{stage}/{item}.json`, `{stage}/result.json`) and reads it back through the schema, on replay too; tests and the evaluation runner run steps in process through JSON. | Step outputs (plan, merge) pass Workflows' 1 MiB limit, and a schema checks what comes back. |
+| 2026-10-09 | Repair: round 1 for problems a draft shows alone; then `verify:merged` merges the valid drafts and puts the merged set's problems back on units; round 2 for those and for drafts still failing Zod. A unit whose problems are all references to terms or rules other units define skips round 1 (`UnitProblem.reference`, `keysDefinedElsewhere`). A draft still failing Zod is left out and recorded as a job failure; other problems left become issues on their records. | encoding.md, Repair, with cross-unit rule references (overrides) treated like terms. |
+| 2026-10-09 | The schema's `IssueCode` gains the validator's `duplicate-key`, `invalid-key`, `undefined-rule`, `invariant` and `coverage`, so every problem the build leaves can be stored on its record. | Issues on records could hold only the older codes. |
+| 2026-10-09 | Structure repair applies the model's outline by starting a paragraph at each proposed marker and parsing again; the repaired structure is kept only when its check is better. Levels aren't used: the parser's grammar decides them. | The model never rewrites text, and a worse outline can't make things worse. |
+| 2026-10-09 | Vocabulary calls only for documents with `definition` provisions (the Declaration; not the Design Guidelines, whose terms come from their units). | encoding.md, Vocabulary. |
+| 2026-10-09 | Default settings where the documents say nothing: the usual precedence of document kinds, calendar days, `us-federal` holidays, `America/Los_Angeles` (organizations don't record a time zone yet), the decision policy and 0.8 thresholds of the sample. Publishing needs the settings reviewed, like every record. | A rules file needs whole settings. |
+| 2026-10-09 | Build scores go on a `rulebook-build` span (one per build, `recordScores`, step `save-draft:scores`) under the job's session: units, valid after encode and after repair, repaired units, problems before and after repair, coverage, rules per kind, requirements, approvals, terms, text conditions, SCHEMA GAP notes. | Each model call is its own trace; the build needs one observation to hold its scores. |
+| 2026-10-09 | Save draft keys each upload (`key`, `document_json`), writes exhibits and named documents as file-less rows with id `{hoaId}:{key}`, releases the keys (and provisions) other rows held, replaces the provisions, saves the records and makes the rulebook the draft, deleting the previous draft with its records. | One draft per organization; a rebuild replaces it. |
+| 2026-10-09 | The first build's rule editor (`RuleTable`, `RuleCard`, `RuleSchema`, `CheckEditor`, `rulebookEditing`), its editing server functions, its build modules (`pipeline/structure`, `consolidate`, `carryForward`, `verify`) and its three build prompts are deleted. Until phase 5 the rules page shows the build card, counts, publish blockers and a plain rule list; nothing can be approved in the UI, so publishing from it waits for phase 5 (`db:seed:sample` still publishes the sample). | They read and wrote the old `rules` table the new build no longer fills. |
+| 2026-10-09 | `pnpm eval:encoding` runs the build in process on `.fixtures/ocr/` with the real models, traced like the app (session id = run id), caching model results in `.fixtures/eval/encoding/cache/`, and writes `draft.json`, `issues.json`, `report.md` and every step's output to `.fixtures/eval/encoding/<run id>/`. `--split dev` is the Declaration's Articles 1 to 8 and the use restrictions, `test` Articles 9 to 21, by provision key; `--units` takes provision or document keys. | E1.2; scoring against the golden is E1.3. |
+| 2026-10-09 | Build model steps time out after 15 minutes, not 5: the smoke run's encoding calls wrote 39,000 to 49,000 tokens and took 5 to 6.5 minutes each; repairs about 3. | Measured (below). |
+| 2026-10-09 | Under a unit filter, every provision still resolves citations (the vocabulary cites Article 2's definitions), and coverage counts only the encoded units' provisions. | The first smoke run reported 65 citations of Article 2 as missing provisions. |
+| 2026-10-09 | `seedRulebook.test.ts` runs the seed SQL in batches of 250 statements. | One batch of every statement reset the local runtime's connection when the new repository tests ran beside it. |
+
+## Smoke run (phase 4)
+
+2026-10-09, `pnpm eval:encoding --split dev --documents declaration --units declaration:article-4,use-restrictions`
+(Declaration Article 4, one unit of 40 provisions, and the use restrictions, one unit of 26), prompts version 1
+(development), `anthropic/claude-opus-5.5` for every call:
+
+| Measure | Result |
+| --- | --- |
+| Vocabulary | 66 terms from the Declaration's 39 definitions; 47,000 tokens in, 14,600 out, 114 s, $0.48 |
+| Units Zod-valid after encode | 0 of 2: Article 4 had 34 Zod problems (15 sanctions without `appliesTo`, 15 rules with a null `appliesTo` and no selector, 4 judgment checks without `decidedBy`), the use restrictions 7 of the same kinds |
+| Repair | Article 4 valid after round 1 with no problems left; the use restrictions valid after round 2 |
+| Rules | 86: 69 norms (7 requirements, 15 approval checks), 1 discretion, 16 sanctions; 204 terms; 13 text conditions; 6 SCHEMA GAP notes |
+| Left for review | 3 issues: a provision cited and also given a no-rule reason, a term (`reviewer`) defined twice, and an override consolidation proposed on a rule whose overrides are a selector |
+| Coverage | 66 of 66 provisions |
+| Cost and time | 8 model calls, $6.21, 436,000 tokens in and 223,000 out, 16 minutes (calls in sequence after the vocabulary: 2 encodes in parallel, then repairs) |
+
+The rerun after the citation-scope fix reused every cached call ($0, 1 s) and gave the numbers above. Encoding cost is
+dominated by output: about $1 per unit and as much again per repair round, so the encoding guide's handling of
+sanctions' `appliesTo` and judgments' `decidedBy` is the first thing evaluation round 1 should tune.
 
 ## Questions
 

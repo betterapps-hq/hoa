@@ -266,6 +266,11 @@ export type IssueCode =
   | "undefined-document"
   | "unencoded-quantity"
   | "modality-cue-mismatch"
+  | "duplicate-key"
+  | "invalid-key"
+  | "undefined-rule"
+  | "invariant"
+  | "coverage"
 
 export type Issue = {
   code: IssueCode

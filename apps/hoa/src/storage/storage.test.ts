@@ -84,11 +84,10 @@ describe("keys", () => {
       file: "hoas/hoa/rulebooks/rb/rules.json"
     })
     const build = rulebookBuildKeys("hoa", "job")
-    expect(build.structure("doc")).toBe("hoas/hoa/jobs/job/structure/doc.json")
-    expect(build.analyze("doc")).toBe("hoas/hoa/jobs/job/analyze/doc.json")
-    expect(build.encode("declaration:article-4")).toBe("hoas/hoa/jobs/job/encode/declaration:article-4.json")
-    expect(build.merge).toBe("hoas/hoa/jobs/job/merge/draft.json")
-    expect(build.consolidate).toBe("hoas/hoa/jobs/job/consolidate/result.json")
+    expect(build.step("structure:doc")).toBe("hoas/hoa/jobs/job/structure/doc.json")
+    expect(build.step("encode:declaration:article-4")).toBe("hoas/hoa/jobs/job/encode/declaration:article-4.json")
+    expect(build.step("repair:declaration:article-4:2")).toBe("hoas/hoa/jobs/job/repair/declaration:article-4:2.json")
+    expect(build.step("merge")).toBe("hoas/hoa/jobs/job/merge/result.json")
   })
 })
 

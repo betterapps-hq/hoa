@@ -34,6 +34,8 @@ export function createAiContext() {
     smallModelId: env.OPENROUTER_SMALL_MODEL ?? env.OPENROUTER_MODEL,
     loadPrompt: createPromptLoader(langfuse.prompt, env.LANGFUSE_PROMPT_LABEL),
     environment: env.LANGFUSE_TRACING_ENVIRONMENT,
+    /** Scores observations, such as a build's root span. */
+    scores: langfuse.score,
     /** Sends buffered spans to Langfuse; call before a server function returns or a Workflow step ends. */
     flush: async () => {
       await telemetry.forceFlush()

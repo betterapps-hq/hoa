@@ -1,19 +1,20 @@
-import type { GoverningDocument, Provision, ProvisionKey, TermKey } from "@/schema/types"
-import { validateRulebook, type JsonPath, type RulebookIssue, type ValidationCode } from "@/schema/validate"
+import type { GoverningDocument, IssueCode, Provision, ProvisionKey } from "@/schema/types"
+import { validateRulebook, type JsonPath, type RulebookIssue } from "@/schema/validate"
 import { encodingDraft, type EncodingDraftContent, type TermContent } from "@/schema/zod"
 import { questionId, type DraftLocation } from "./merge"
 
 // Verify and repair (encoding.md, Verify and Repair): Zod and validateRulebook problems on one unit's draft, each with
 // its JSON path in the draft, so hoa-encoding-repair can fix them; after merge, the whole rulebook's issues grouped
-// back by unit. A unit whose only problems are terms another unit defines waits for the merge instead of a repair.
+// back by unit. A unit whose only problems are terms or rules another unit defines waits for the merge instead of a
+// repair.
 
 export type UnitProblem = {
   source: "zod" | "validator"
   code: string
   message: string
   path: JsonPath
-  /** For an undefined term: its key. */
-  term: TermKey | null
+  /** For an undefined term or rule: its key. */
+  reference: string | null
 }
 
 export type UnitContext = {
@@ -41,9 +42,9 @@ function valueAt(root: unknown, path: JsonPath) {
   return current
 }
 
-/** The term an undefined-term issue names: the string at its path, or the first word of its message. */
-function undefinedTerm(code: ValidationCode, draft: unknown, path: JsonPath, message: string) {
-  if (code !== "undefined-term") {
+/** The key an undefined-term or undefined-rule issue names: the string at its path, or its message's first word. */
+function undefinedReference(code: IssueCode, draft: unknown, path: JsonPath, message: string) {
+  if (code !== "undefined-term" && code !== "undefined-rule") {
     return null
   }
   const value = valueAt(draft, path)
@@ -56,7 +57,7 @@ function validatorProblem(issue: RulebookIssue, path: JsonPath, draft: unknown):
     code: issue.code,
     message: `${issue.recordKey}: ${issue.message}`,
     path,
-    term: undefinedTerm(issue.code, draft, path, issue.message)
+    reference: undefinedReference(issue.code, draft, path, issue.message)
   }
 }
 
@@ -84,7 +85,7 @@ export function verifyUnit(answer: unknown, unitProvisions: readonly ProvisionKe
       code: issue.code,
       message: issue.message,
       path: issue.path.map((step) => (typeof step === "number" ? step : String(step))),
-      term: null
+      reference: null
     }))
     return { draft: null, problems }
   }
@@ -139,20 +140,22 @@ export function groupByUnit(
 }
 
 /**
- * Repair or wait (encoding.md, Repair): a unit whose only problems are references to terms that other units define
- * is verified again after the merge; any other problem goes to hoa-encoding-repair.
+ * Repair or wait (encoding.md, Repair): a unit whose only problems are references to terms or rules that other units
+ * define is verified again after the merge; any other problem goes to hoa-encoding-repair.
  */
-export function decideRepair(problems: readonly UnitProblem[], definedElsewhere: ReadonlySet<TermKey>): RepairDecision {
+export function decideRepair(problems: readonly UnitProblem[], definedElsewhere: ReadonlySet<string>): RepairDecision {
   if (problems.length === 0) {
     return "none"
   }
-  const isWaiting = problems.every((problem) => problem.term !== null && definedElsewhere.has(problem.term))
+  const isWaiting = problems.every((problem) => problem.reference !== null && definedElsewhere.has(problem.reference))
   return isWaiting ? "after-merge" : "repair"
 }
 
-/** The terms each unit's draft defines, so a unit can see which of its missing terms another unit defines. */
-export function termsDefinedElsewhere(unitId: string, drafts: ReadonlyMap<string, EncodingDraftContent>) {
+/** The terms and rules the other units' drafts define, so a unit can see which of its missing keys they define. */
+export function keysDefinedElsewhere(unitId: string, drafts: ReadonlyMap<string, EncodingDraftContent>) {
   return new Set(
-    [...drafts].filter(([id]) => id !== unitId).flatMap(([, draft]) => draft.terms.map((term) => term.key))
+    [...drafts]
+      .filter(([id]) => id !== unitId)
+      .flatMap(([, draft]) => [...draft.terms.map((term) => term.key), ...draft.rules.map((rule) => rule.key)])
   )
 }

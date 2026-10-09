@@ -1,34 +1,20 @@
-import { PencilIcon, ScrollTextIcon } from "lucide-react"
+import { ScrollTextIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { GoverningDocument } from "@/documents/governingDocument"
-import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import type { RulebookView } from "../rulebook.functions"
-import { readyToApprove } from "../rulebookEditing"
-import type { RuleCardActions } from "../RuleCard/RuleCard"
-import { RuleTable } from "../RuleTable/RuleTable"
+import { approvedRuleLines, rulebookCounts, ruleLines } from "../rulebookView"
+import { RuleList } from "../RuleList/RuleList"
 
 export type RulebookPageProps = {
   draft: RulebookView
@@ -36,15 +22,7 @@ export type RulebookPageProps = {
   documents: GoverningDocument[]
   loadJob: (jobId: string) => Promise<Job | null>
   onBuild: (documentIds: string[]) => Promise<void>
-  /** Approves every pending rule with no open issues; resolves to how many. */
-  onApproveReady: () => Promise<number>
   onPublish: (rulebookId: string) => Promise<void>
-  /** Copies the published rulebook into a draft to edit. */
-  onEditPublished: () => Promise<void>
-  onDiscardDraft: () => Promise<void>
-  actions: RuleCardActions
-  /** The documents citations come from. */
-  source: CitationSource
   onChanged: () => void
 }
 
@@ -60,32 +38,22 @@ async function attempt(action: () => Promise<unknown>, fallback: string) {
   }
 }
 
-/** The administrator's rulebook: build from documents, review and edit the draft, publish; or edit the published one. */
+/** The administrator's rulebook: build a draft from documents, see what it holds, publish it. */
 export function RulebookPage({
   draft,
   published,
   documents,
   loadJob,
   onBuild,
-  onApproveReady,
   onPublish,
-  onEditPublished,
-  onDiscardDraft,
-  actions,
-  source,
   onChanged
 }: RulebookPageProps) {
   const ready = documents.filter((document) => document.status === "ready")
   const [selected, setSelected] = useState<string[]>(() => ready.map((document) => document.id))
   const [isBusy, setIsBusy] = useState(false)
   const [tab, setTab] = useState(draft.rulebook || !published.rulebook ? "draft" : "published")
-  const counts = {
-    pending: draft.rules.filter((rule) => rule.review.status === "pending").length,
-    approved: draft.rules.filter((rule) => rule.review.status === "approved").length,
-    rejected: draft.rules.filter((rule) => rule.review.status === "rejected").length
-  }
-  const readyCount = readyToApprove(draft.rules).length
-  const publishedRules = published.rules.filter((rule) => rule.review.status === "approved")
+  const counts = draft.content ? rulebookCounts(draft.content) : null
+  const publishedRules = published.content ? approvedRuleLines(published.content) : []
 
   const run = async (action: () => Promise<unknown>, fallback: string) => {
     setIsBusy(true)
@@ -95,20 +63,14 @@ export function RulebookPage({
     return succeeded
   }
 
-  const editPublished = async () => {
-    if (await run(onEditPublished, "The draft wasn't created.")) {
-      setTab("draft")
-    }
-  }
-
   return (
     <div className="flex flex-col gap-4 px-4 lg:px-6">
       <Card>
         <CardHeader>
           <CardTitle>Build the rulebook</CardTitle>
           <CardDescription>
-            Rules are extracted section by section from the documents you choose, checked against their pages, and saved
-            as a draft for you to review. Earlier approvals and edits carry over.
+            The documents you choose are read provision by provision, encoded as rules, checked and saved as a draft for
+            you to review. Approvals of rules that didn’t change carry over.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -157,22 +119,24 @@ export function RulebookPage({
 
       <Tabs value={tab} onValueChange={(value) => setTab(value === "published" ? "published" : "draft")}>
         <TabsList>
-          <TabsTrigger value="draft">Draft{draft.rulebook ? ` (${draft.rules.length})` : ""}</TabsTrigger>
+          <TabsTrigger value="draft">Draft{counts ? ` (${counts.rules})` : ""}</TabsTrigger>
           <TabsTrigger value="published">
             Published{published.rulebook?.version ? ` (version ${published.rulebook.version})` : ""}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="draft" className="flex flex-col gap-4">
-          {draft.rulebook ? (
+          {draft.rulebook && draft.content && counts ? (
             <>
               <Card size="sm">
                 <CardHeader>
-                  <CardTitle>Review the draft</CardTitle>
+                  <CardTitle>The draft</CardTitle>
                   <CardDescription className="flex flex-wrap gap-2">
-                    <Badge variant="outline">{counts.pending} pending</Badge>
-                    <Badge variant="outline">{counts.approved} approved</Badge>
-                    <Badge variant="outline">{counts.rejected} rejected</Badge>
+                    <Badge variant="outline">{counts.rules} rules</Badge>
+                    <Badge variant="outline">{counts.terms} terms</Badge>
+                    <Badge variant="outline">{counts.questions} questions</Badge>
+                    <Badge variant="outline">{counts.uncovered} uncovered provisions</Badge>
+                    <Badge variant="outline">{counts.withIssues} with problems</Badge>
                   </CardDescription>
                 </CardHeader>
                 {draft.blockers.length > 0 ? (
@@ -184,19 +148,7 @@ export function RulebookPage({
                     </ul>
                   </CardContent>
                 ) : null}
-                <CardFooter className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    disabled={isBusy || readyCount === 0}
-                    onClick={() =>
-                      void run(async () => {
-                        const count = await onApproveReady()
-                        toast.success(`Approved ${count} ${count === 1 ? "rule" : "rules"}.`)
-                      }, "Approving failed.")
-                    }
-                  >
-                    Approve all ready ({readyCount})
-                  </Button>
+                <CardFooter>
                   <Button
                     disabled={isBusy || draft.blockers.length > 0}
                     onClick={() => {
@@ -211,54 +163,9 @@ export function RulebookPage({
                   >
                     Publish
                   </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger render={<Button variant="ghost" disabled={isBusy} />}>
-                      Discard draft
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Discard the draft?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Every change in this draft is lost. The published rulebook stays as it is.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Keep editing</AlertDialogCancel>
-                        <AlertDialogAction
-                          variant="destructive"
-                          onClick={() => void run(onDiscardDraft, "The draft wasn't discarded.")}
-                        >
-                          Discard
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
                 </CardFooter>
               </Card>
-              {draft.removed.length > 0 ? (
-                <Alert>
-                  <AlertTitle>
-                    {draft.removed.length} published {draft.removed.length === 1 ? "rule isn’t" : "rules aren’t"} in
-                    this draft
-                  </AlertTitle>
-                  <AlertDescription>
-                    {draft.removed.length === 1 ? "It’s" : "They’re"} removed when you publish.
-                    <Accordion className="w-full">
-                      <AccordionItem value="removed">
-                        <AccordionTrigger>Show which</AccordionTrigger>
-                        <AccordionContent>
-                          <ul className="list-disc pl-5">
-                            {draft.removed.map((rule) => (
-                              <li key={rule.ruleKey}>{rule.title}</li>
-                            ))}
-                          </ul>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  </AlertDescription>
-                </Alert>
-              ) : null}
-              <RuleTable rules={draft.rules} actions={actions} source={source} />
+              <RuleList rules={ruleLines(draft.content)} showStatus />
             </>
           ) : (
             <Empty>
@@ -267,20 +174,8 @@ export function RulebookPage({
                   <ScrollTextIcon />
                 </EmptyMedia>
                 <EmptyTitle>No draft</EmptyTitle>
-                <EmptyDescription>
-                  {published.rulebook
-                    ? "To change the rules, edit the published rulebook, or build a new draft from the documents."
-                    : "Build the rulebook from the HOA’s documents to review its rules."}
-                </EmptyDescription>
+                <EmptyDescription>Build the rulebook from the HOA’s documents to review its rules.</EmptyDescription>
               </EmptyHeader>
-              {published.rulebook ? (
-                <EmptyContent>
-                  <Button disabled={isBusy || draft.isBuilding} onClick={() => void editPublished()}>
-                    <PencilIcon />
-                    Edit published rules
-                  </Button>
-                </EmptyContent>
-              ) : null}
             </Empty>
           )}
         </TabsContent>
@@ -298,21 +193,16 @@ export function RulebookPage({
                       : ""}
                     . Applications are reviewed against this version.
                   </CardDescription>
-                  <CardAction>
-                    {draft.rulebook ? (
-                      <Button variant="outline" onClick={() => setTab("draft")}>
-                        Open the draft
-                      </Button>
-                    ) : (
-                      <Button disabled={isBusy || draft.isBuilding} onClick={() => void editPublished()}>
-                        <PencilIcon />
-                        Edit rules
-                      </Button>
-                    )}
-                  </CardAction>
                 </CardHeader>
+                {published.fileSha256 ? (
+                  <CardContent>
+                    <p className="text-sm break-all text-muted-foreground">
+                      Rules file SHA-256: <span className="font-mono">{published.fileSha256}</span>
+                    </p>
+                  </CardContent>
+                ) : null}
               </Card>
-              <RuleTable rules={publishedRules} source={source} />
+              <RuleList rules={publishedRules} />
             </>
           ) : (
             <Empty>

@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm"
+import { and, desc, eq, ne } from "drizzle-orm"
 import { ruleContentHash, termContentHash } from "@/rulebook/carryForward"
 import { rulebookCoverage, type RulebookCoverage } from "@/rulebook/coverage"
 import type { Question, Rule, Settings, Term } from "@/schema/types"
@@ -10,7 +10,7 @@ import {
 } from "@/schema/zod"
 import { insertChunks, runBatch } from "./batching"
 import type { Database } from "./database"
-import { rulebookQuestions, rulebookRules, rulebooks, rulebookTerms } from "./schema"
+import { rulebookQuestions, rulebookRules, rulebooks, rulebookTerms, rules } from "./schema"
 
 // A rulebook's records in the rules schema (encoding.md, Storage): rules, terms and questions in their own tables, and
 // the settings and coverage report on the rulebook row. Records are validated with the schema's Zod when written and
@@ -106,6 +106,30 @@ export async function saveRulebookContent(db: Database, hoaId: string, rulebookI
       .update(rulebooks)
       .set({ settings: settingsSchema.parse(content.settings), coverage: rulebookCoverage.parse(content.coverage) })
       .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId)))
+  ])
+}
+
+/**
+ * Makes a built rulebook the organization's draft, replacing the draft it had (encoding.md, Save draft): the old draft
+ * and its records go in the same batch, so there's never more than one.
+ */
+export async function promoteToDraft(db: Database, hoaId: string, rulebookId: string) {
+  const previous = await db
+    .select({ id: rulebooks.id })
+    .from(rulebooks)
+    .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.status, "draft"), ne(rulebooks.id, rulebookId)))
+  await runBatch(db, [
+    ...previous.flatMap(({ id }) => [
+      db.delete(rulebookRules).where(inRulebook(rulebookRules, hoaId, id)),
+      db.delete(rulebookTerms).where(inRulebook(rulebookTerms, hoaId, id)),
+      db.delete(rulebookQuestions).where(inRulebook(rulebookQuestions, hoaId, id)),
+      db.delete(rules).where(and(eq(rules.hoaId, hoaId), eq(rules.rulebookId, id))),
+      db.delete(rulebooks).where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, id)))
+    ]),
+    db
+      .update(rulebooks)
+      .set({ status: "draft" })
+      .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId), eq(rulebooks.status, "building")))
   ])
 }
 

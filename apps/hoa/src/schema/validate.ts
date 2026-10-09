@@ -10,12 +10,10 @@ import type { QuestionContent, RuleContent, TermContent } from "./zod"
 // shape and what it can check alone. The build runs it on parsed drafts, the editor on edited records, and a rules file
 // is a rulebook as it stands.
 
-export type ValidationCode = T.IssueCode | "duplicate-key" | "invalid-key" | "undefined-rule" | "invariant" | "coverage"
-
 export type JsonPath = (string | number)[]
 
 /** A problem with one record: its key (a question's id, or its position) and the JSON path within it. */
-export type RulebookIssue = { code: ValidationCode; message: string; recordKey: string; path: JsonPath }
+export type RulebookIssue = { code: T.IssueCode; message: string; recordKey: string; path: JsonPath }
 
 export type Rulebook = {
   organization: { id: T.Id }
@@ -28,7 +26,7 @@ export type Rulebook = {
   questions: (QuestionContent & { id?: T.Id })[]
 }
 
-type Site = { report: (code: ValidationCode, message: string, path: JsonPath) => void }
+type Site = { report: (code: T.IssueCode, message: string, path: JsonPath) => void }
 type Things = T.TermKey[] | "any"
 /** What paths start from (the subject is a thing, or an item of a list), and whether a text condition is allowed. */
 type Scope = { subject: Type; request: Things; isApplicability: boolean }

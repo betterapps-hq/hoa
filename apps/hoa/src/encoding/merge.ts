@@ -135,14 +135,11 @@ function citedKeys(records: unknown) {
 
 export const questionId = (n: number) => `question-${n}`
 
-export function mergeDrafts(input: MergeInput) {
-  const conflicts: MergeConflict[] = []
-  const sources = new Map<string, DraftLocation[]>()
-  const from = (recordKey: string, location: DraftLocation) =>
-    sources.set(recordKey, [...(sources.get(recordKey) ?? []), location])
+/** Collects terms by key, owned by the organization; a key defined two ways is reported to `conflicts`. */
+function termMerger(organizationId: string, conflicts: MergeConflict[]) {
   const terms = new Map<string, TermContent>()
-  const addTerm = (term: TermContent) => {
-    const owned = { ...structuredClone(term), organizationId: input.organizationId }
+  const add = (term: TermContent) => {
+    const owned = { ...structuredClone(term), organizationId }
     const existing = terms.get(term.key)
     const message = existing ? mergeTerm(existing, owned) : null
     if (!existing) {
@@ -152,6 +149,24 @@ export function mergeDrafts(input: MergeInput) {
       conflicts.push({ recordKey: term.key, message, related: [] })
     }
   }
+  return { add, terms: () => [...terms.values()] }
+}
+
+/** The documents' vocabularies as one (encoding.md, Vocabulary): terms merged by key. */
+export function mergeTerms(organizationId: string, terms: readonly TermContent[]) {
+  const conflicts: MergeConflict[] = []
+  const merger = termMerger(organizationId, conflicts)
+  terms.forEach(merger.add)
+  return { terms: merger.terms(), conflicts }
+}
+
+export function mergeDrafts(input: MergeInput) {
+  const conflicts: MergeConflict[] = []
+  const sources = new Map<string, DraftLocation[]>()
+  const from = (recordKey: string, location: DraftLocation) =>
+    sources.set(recordKey, [...(sources.get(recordKey) ?? []), location])
+  const terms = termMerger(input.organizationId, conflicts)
+  const addTerm = terms.add
   input.vocabulary.forEach(addTerm)
 
   const rules = new Map<RuleKey, RuleContent>()
@@ -208,7 +223,7 @@ export function mergeDrafts(input: MergeInput) {
       const noRule = noRules.get(provision.key)
       return noRule ? { ...provision, noRule: { ...noRule, review: proposed } } : provision
     }),
-    terms: [...terms.values()],
+    terms: terms.terms(),
     proposedCore: [],
     rules: [...rules.values()],
     settings: { clauses },

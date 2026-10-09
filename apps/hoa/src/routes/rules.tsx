@@ -1,72 +1,46 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
-import { getDocumentPage, getJobStatus, listDocuments } from "@/features/documents/documents.functions"
-import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
+import { getJobStatus, listDocuments } from "@/features/documents/documents.functions"
 import {
-  addRuleCitation,
-  approveReadyRules,
-  deleteDraftRule,
-  discardRulebookDraft,
-  editPublishedRulebook,
   getRulebookView,
   publishRulebook,
-  removeRuleCitation,
-  replaceRuleCitation,
-  resolveIssue,
-  reviewRule,
-  saveRule,
   startRulebookBuild,
   type RulebookView
 } from "@/features/rulebook/rulebook.functions"
 import { RulebookPage } from "@/features/rulebook/RulebookPage/RulebookPage"
-import { RuleTable } from "@/features/rulebook/RuleTable/RuleTable"
+import { approvedRuleLines } from "@/features/rulebook/rulebookView"
+import { RuleList } from "@/features/rulebook/RuleList/RuleList"
 import { getSession } from "@/session/session.functions"
 
 type Documents = Awaited<ReturnType<typeof listDocuments>>
 
 type RulesData =
-  | { isAdministrator: false; published: RulebookView; documents: Documents }
+  | { isAdministrator: false; published: RulebookView }
   | { isAdministrator: true; draft: RulebookView; published: RulebookView; documents: Documents }
 
 export const Route = createFileRoute("/rules")({
   staticData: { title: "Rulebook" },
   loader: async (): Promise<RulesData> => {
     const session = await getSession()
-    const [published, documents] = await Promise.all([
-      getRulebookView({ data: { which: "published" } }),
-      listDocuments()
-    ])
+    const published = await getRulebookView({ data: { which: "published" } })
     if (session.roleId !== "administrator") {
-      return { isAdministrator: false, published, documents }
+      return { isAdministrator: false, published }
     }
-    return { isAdministrator: true, draft: await getRulebookView({ data: { which: "draft" } }), published, documents }
+    const [draft, documents] = await Promise.all([getRulebookView({ data: { which: "draft" } }), listDocuments()])
+    return { isAdministrator: true, draft, published, documents }
   },
   component: RulesRoute
 })
 
-/** The documents citations come from: every document that has been read. */
-function citationSource(documents: Documents): CitationSource {
-  return {
-    documents: documents.flatMap((document) =>
-      document.status === "ready" && document.pageCount
-        ? [{ id: document.id, title: document.title, pageCount: document.pageCount }]
-        : []
-    ),
-    loadPage: (documentId, pageIndex) => getDocumentPage({ data: { documentId, pageIndex } })
-  }
-}
-
 function RulesRoute() {
   const data = Route.useLoaderData()
   const router = useRouter()
-  const refresh = () => void router.invalidate()
-  const source = citationSource(data.documents)
   if (!data.isAdministrator) {
-    const rules = data.published.rules.filter((rule) => rule.review.status === "approved")
+    const { content } = data.published
     return (
       <div className="px-4 lg:px-6">
-        {data.published.rulebook ? (
-          <RuleTable rules={rules} source={source} />
+        {content ? (
+          <RuleList rules={approvedRuleLines(content)} />
         ) : (
           <Empty>
             <EmptyHeader>
@@ -83,53 +57,14 @@ function RulesRoute() {
       draft={data.draft}
       published={data.published}
       documents={data.documents}
-      source={source}
       loadJob={(jobId) => getJobStatus({ data: { jobId } })}
       onBuild={async (documentIds) => {
         await startRulebookBuild({ data: { documentIds } })
       }}
-      onApproveReady={async () => {
-        const { count } = await approveReadyRules()
-        return count
-      }}
       onPublish={async (rulebookId) => {
         await publishRulebook({ data: { rulebookId } })
       }}
-      onEditPublished={async () => {
-        await editPublishedRulebook()
-      }}
-      onDiscardDraft={() => discardRulebookDraft()}
-      onChanged={refresh}
-      actions={{
-        review: async (ruleId, status) => {
-          await reviewRule({ data: { ruleId, status, note: null } })
-          refresh()
-        },
-        save: async (ruleId, changes) => {
-          await saveRule({ data: { ruleId, changes } })
-          refresh()
-        },
-        resolveIssue: async (ruleId, issueIndex, note) => {
-          await resolveIssue({ data: { ruleId, issueIndex, note } })
-          refresh()
-        },
-        remove: async (ruleId) => {
-          await deleteDraftRule({ data: { ruleId } })
-          refresh()
-        },
-        addCitation: async (ruleId, selection) => {
-          await addRuleCitation({ data: { ruleId, ...selection } })
-          refresh()
-        },
-        replaceCitation: async (ruleId, index, selection) => {
-          await replaceRuleCitation({ data: { ruleId, index, ...selection } })
-          refresh()
-        },
-        removeCitation: async (ruleId, index) => {
-          await removeRuleCitation({ data: { ruleId, index } })
-          refresh()
-        }
-      }}
+      onChanged={() => void router.invalidate()}
     />
   )
 }

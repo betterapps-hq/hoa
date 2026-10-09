@@ -7,8 +7,10 @@ import type { StructuredDocument } from "./provisions"
 // runs without gaps, and whether keys are unique. A document with more than 2 percent of its text outside any
 // provision, a broken sequence or a repeated key goes to hoa-structure-repair; inferred numbers only need confirming.
 
+export const structureProblemCodes = ["uncovered-text", "broken-sequence", "duplicate-key", "inferred-number"] as const
+
 export type StructureProblem = {
-  code: "uncovered-text" | "broken-sequence" | "duplicate-key" | "inferred-number"
+  code: (typeof structureProblemCodes)[number]
   message: string
   key: string | null
 }

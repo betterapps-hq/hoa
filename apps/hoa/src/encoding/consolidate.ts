@@ -27,8 +27,15 @@ export type Consolidation = z.input<typeof consolidation>
 export type TermPair = { keys: [TermKey, TermKey]; labels: [string, string]; score: number }
 export type RulePair = { keys: [RuleKey, RuleKey]; score: number }
 
+export const consolidationProblemCodes = [
+  "undefined-rule",
+  "undefined-term",
+  "override-not-allowed",
+  "invalid-override"
+] as const
+
 export type ConsolidationProblem = {
-  code: "undefined-rule" | "undefined-term" | "override-not-allowed" | "invalid-override"
+  code: (typeof consolidationProblemCodes)[number]
   recordKey: string
   message: string
 }

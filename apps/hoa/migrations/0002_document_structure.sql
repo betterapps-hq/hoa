@@ -1,0 +1,1 @@
+ALTER TABLE `governing_documents` ADD `structure_json` text;

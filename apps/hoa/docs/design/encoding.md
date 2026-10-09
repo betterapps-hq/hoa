@@ -1,7 +1,7 @@
 # Encoding governing documents
 
-> **Spec, not built.** Replaces the first build's rulebook pipeline and rule model. The rules it produces follow
-> [schema.md](schema.md). The tasks that build it are in
+> **Built through save-draft and publishing (phase 4); the rules UX is phase 5.** Replaces the first build's rulebook
+> pipeline and rule model. The rules it produces follow [schema.md](schema.md). The tasks that build it are in
 > [implementation-plan.md](implementation-plan.md).
 
 How an organization's governing documents become a rulebook: a single rules file, validated by the Zod schema, that an
@@ -37,16 +37,20 @@ and every Workflow step name starts with it.
 | 4 | `vocabulary` | `vocabulary:{documentId}` | The organization's terms from definitions and defined-term usage | Model, one call per document with definitions |
 | 5 | `plan` | `plan` | Encoding units: provision subtrees within a token budget, with their context | Code |
 | 6 | `encode` | `encode:{unitId}` | An encoding draft per unit | Model, one call per unit, in parallel |
-| 7 | `verify` | `verify` | Zod and checker problems per draft | Code |
+| 7 | `verify` | `verify`, `verify:merged` | Zod and checker problems per draft, then per unit in the merged set | Code |
 | 8 | `repair` | `repair:{unitId}:{round}` | Corrected drafts, at most two rounds | Model, only for units with problems |
 | 9 | `merge` | `merge` | One vocabulary, one rule set, settings, questions, coverage | Code |
 | 10 | `consolidate` | `consolidate` | Duplicates, cross-unit overrides, conflicts and questions | Model over summaries, then code |
-| 11 | `save-draft` | `save-draft` | The draft rulebook in D1, with carried-forward review decisions | Code |
+| 11 | `save-draft` | `save-draft`, `save-draft:scores`, `save-draft:finish` | The draft rulebook in D1, with carried-forward review decisions; the build's scores in Langfuse | Code |
 | 12 | Review | | Approved, edited and rejected records | Administrator |
 | 13 | Publish | | The rules file in R2, with its hash | Code, in a server function |
 
 Model results are cached per organization as today (`hoas/{hoaId}/cache/{stage}/{hash}.json`), so rebuilding after one
 document changes only pays for units whose text or context changed.
+
+The stages are one module, `buildRulebook` ([src/encoding/build.ts](../../src/encoding/build.ts)), with its step runner,
+models, cache, page records and previous rulebook injected: the `RulebookBuild` Workflow runs each stage step as a
+Workflow step whose output goes to R2, and `pnpm eval:encoding` runs the same module in process.
 
 ### 1. Resolve prompts
 
@@ -71,11 +75,14 @@ Page records are already stored by ingest ([ocr.md](ocr.md)). Structure turns on
    become counted paragraphs (`/p2`). A paragraph ending in a colon directly before its children is the parent's
    `intro`; text after the last child that continues the parent is its `wrapUp`.
 4. **Key.** `{document key}:{label}`, with labels per the schema's convention. Exhibit C of the sample is its own
-   document (`use-restrictions`) when the administrator marks it as one at upload; otherwise it's an `exhibit`.
+   document (`use-restrictions`) when the administrator marks it as one at upload; otherwise it's an `exhibit`. An
+   upload's structure (its key, kind, the names its text uses for itself, and its exhibits that are documents of their
+   own) is stored in `governing_documents.structure_json`; without one, the upload's kind gives a default key.
 5. **Check.** Coverage of the cleaned text (every character belongs to exactly one provision), monotonic sequences,
    and unique keys. A document with more than 2 percent of its text outside any numbered provision, or broken
    sequences, goes to `hoa-structure-repair`, which proposes the outline (markers and their offsets) for the parser to
-   apply. The model never rewrites text.
+   apply: a paragraph starts at each proposed marker and the text is parsed again, keeping whichever structure checks
+   better. The model never rewrites text.
 
 Each provision stores its `anchors` (file, page, start, end) so the document viewer can highlight it.
 
@@ -171,8 +178,13 @@ the build, the editor and the tests).
 A unit with problems goes back to the model with `hoa-encoding-repair`: the draft, the problem list (each with its
 path in the draft), and the vocabulary slice. The model returns the whole corrected draft. Two rounds at most; a
 problem left after that becomes an issue on the record it belongs to, which blocks approval until an administrator
-fixes it. A unit whose problems are only unresolved references to terms another unit defines is re-verified after
-[merge](#9-merge) before it's repaired.
+fixes it. A unit whose problems are only unresolved references to terms or rules another unit defines is re-verified
+after [merge](#9-merge) before it's repaired. Round 1 repairs what each draft shows alone; round 2 repairs what the
+merged set shows (`verify:merged`) and drafts still failing Zod. A draft that still fails Zod is left out and recorded
+as a failure on the job.
+
+Code, not the model, sets each rule's `effectiveFrom` (from its main citation's document edition) and each term's
+`organizationId`: those fields are left out of the schema the model sees.
 
 ### 9. Merge
 
@@ -244,7 +256,7 @@ The partial unique indexes (one `building`, one `draft` rulebook per organizatio
 | --- | --- |
 | `hoas/{hoaId}/governing/{documentId}/…` | As today: source, OCR, pages, layout, figures |
 | `hoas/{hoaId}/rulebooks/{rulebookId}/rules.json` | The published rules file, immutable |
-| `hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json` | Stage outputs: `structure/{documentId}`, `encode/{unitId}`, `merge/draft`, `consolidate/result` |
+| `hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json` | Every build step's output, by step name: `structure/{documentId}`, `encode/{unitId}`, `repair/{unitId}:{round}`, and `{stage}/result` for steps without an item (`plan`, `merge`, `consolidate`) |
 | `hoas/{hoaId}/cache/{stage}/{hash}.json` | Model results, as today |
 
 A review records the rulebook id and the file's SHA-256, so it can always be reproduced against the exact file.
@@ -253,9 +265,10 @@ A review records the rulebook id and the file's SHA-256, so it can always be rep
 
 The `/rules` route keeps its shape: a build card, a Draft tab and a Published tab. What changes:
 
-- **Build card:** documents are chosen as today. `JobProgress` gets labels for the new stages (structure, analysis,
+- **Build card:** documents are chosen as today. `JobProgress` has labels for the new stages (structure, analysis,
   vocabulary, planning, encoding, checking, repairing, merging, consolidating, saving). A finished build shows its
-  counts and links to the problems.
+  counts and links to the problems. Until the rest of this UX is built, the Draft and Published tabs show counts, the
+  publish blockers and a plain list of rules.
 - **Draft tab**, as tabs inside it:
   - **Rules:** `RuleTable` lists rules by domain (instead of topic), filtered by status, kind and request type. Each row
     shows the title and the statement with term links rendered as labels.

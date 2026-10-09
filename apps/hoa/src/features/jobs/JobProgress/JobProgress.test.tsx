@@ -29,10 +29,10 @@ function wrapper({ children }: { children: ReactNode }) {
 
 describe("JobProgress", () => {
   it("shows the stage and count while running", async () => {
-    render(<JobProgress jobId="job-1" loadJob={async () => job({ stage: "extract", done: 12, total: 40 })} />, {
+    render(<JobProgress jobId="job-1" loadJob={async () => job({ stage: "encode", done: 12, total: 40 })} />, {
       wrapper
     })
-    expect(await screen.findByText("Extracting rules: 12 of 40")).toBeInTheDocument()
+    expect(await screen.findByText("Encoding rules: 12 of 40")).toBeInTheDocument()
     expect(screen.getByLabelText("Progress")).toBeInTheDocument()
   })
 
@@ -67,6 +67,8 @@ describe("JobProgress", () => {
   it("labels stages for people", () => {
     expect(stageLabel(null)).toBe("Starting")
     expect(stageLabel("facts")).toBe("Reading the application")
+    expect(stageLabel("repair")).toBe("Repairing rules")
+    expect(stageLabel("vocabulary")).toBe("Building the vocabulary")
     expect(stageLabel("unknown")).toBe("Working")
   })
 })

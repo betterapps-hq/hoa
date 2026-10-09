@@ -12,17 +12,13 @@ import { organizationTerms } from "@/schema/examples.test-data"
 const src = join(import.meta.dirname, "..")
 const guardedFolders = ["engine", "review", "pipeline", "rulebook", "encoding", "text"]
 
-// The first build's files that phase 9 deletes (implementation-plan.md, 9.1), and verify.ts, whose catalog checks 9.1
-// deletes (guard it again then). Every other file is guarded, including each new one; tests aren't, since fixtures
-// name the sample's terms.
+// The first build's review files that phase 9 deletes (implementation-plan.md, 9.1). Every other file is guarded,
+// including each new one; tests aren't, since fixtures name the sample's terms.
 const firstBuild = new Set([
-  "pipeline/carryForward.ts",
   "pipeline/catalogPrompt.ts",
-  "pipeline/consolidate.ts",
   "pipeline/decide.ts",
   "pipeline/evaluate.ts",
-  "pipeline/reviewInputs.ts",
-  "pipeline/verify.ts"
+  "pipeline/reviewInputs.ts"
 ])
 
 const sampleTerms = z.object({ terms: z.array(z.object({ key: z.string(), organizationId: z.string().nullable() })) })

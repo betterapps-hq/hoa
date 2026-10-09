@@ -7,7 +7,7 @@ import { z } from "zod"
 import { candidateRuleSchema } from "@/rules/rule"
 import type { PromptLoader } from "./promptLoader"
 import { prompts } from "./prompts"
-import { answerOf, outputSchema, runObjectPrompt, runTextPrompt } from "./runPrompt"
+import { answerOf, outputSchema, runCheckedObjectPrompt, runObjectPrompt, runTextPrompt } from "./runPrompt"
 import { registerTracerProvider } from "./telemetry.server"
 
 function createModel(
@@ -217,6 +217,78 @@ describe("runObjectPrompt", () => {
         environment: "test"
       })
     ).rejects.toThrow("No object generated")
+  })
+})
+
+describe("runCheckedObjectPrompt", () => {
+  const schema = z.object({
+    rules: z.array(z.object({ title: z.string(), effectiveFrom: z.string() })),
+    terms: z.array(z.object({ key: z.string(), organizationId: z.string() }))
+  })
+  const codeFields = {
+    names: ["effectiveFrom", "organizationId"],
+    fill: (answer: unknown) => {
+      const records = z.array(z.record(z.string(), z.unknown())).default([])
+      const parsed = z.object({ rules: records, terms: records })
+      const result = parsed.safeParse(answer)
+      return result.success
+        ? {
+            rules: result.data.rules.map((rule) => ({ ...rule, effectiveFrom: "2001-12-04" })),
+            terms: result.data.terms.map((term) => ({ ...term, organizationId: "org-1" }))
+          }
+        : answer
+    }
+  }
+  const run = (
+    answer: unknown,
+    cache?: { get: (key: string) => Promise<unknown>; put: (key: string, value: unknown) => Promise<void> }
+  ) => {
+    const model = objectModel(answer)
+    return {
+      model,
+      result: runCheckedObjectPrompt({
+        loadPrompt: langfusePrompt,
+        createModel: () => model,
+        defaultModelId: "test-model",
+        prompt: applicantPrompt,
+        variables: { applicant: "Lot 12" },
+        schema,
+        codeFields,
+        traceName: "provision-encoding",
+        environment: "test",
+        ...(cache ? { cache } : {})
+      })
+    }
+  }
+
+  it("hides the fields code fills from the model and fills them before Zod checks the answer", async () => {
+    const { model, result } = run({ rules: [{ title: "Pets" }], terms: [{ key: "pet" }] })
+    expect(await result).toMatchObject({
+      isValid: true,
+      object: {
+        rules: [{ title: "Pets", effectiveFrom: "2001-12-04" }],
+        terms: [{ key: "pet", organizationId: "org-1" }]
+      }
+    })
+    const sent = JSON.stringify(model.doGenerateCalls[0]?.tools)
+    expect(sent).toContain("title")
+    expect(sent).not.toContain("effectiveFrom")
+    expect(sent).not.toContain("organizationId")
+  })
+
+  it("returns an answer that fails Zod with its issues, and caches it", async () => {
+    const stored = new Map<string, unknown>()
+    const cache = {
+      get: async (key: string) => stored.get(key),
+      put: async (key: string, value: unknown) => {
+        stored.set(key, value)
+      }
+    }
+    const first = await run({ rules: [{}], terms: [] }, cache).result
+    expect(first).toMatchObject({ isValid: false, answer: { rules: [{ effectiveFrom: "2001-12-04" }], terms: [] } })
+    expect(first.isValid ? [] : first.issues.map((issue) => issue.path)).toEqual([["rules", 0, "title"]])
+    const again = await run({ rules: [{ title: "Unused" }], terms: [] }, cache).result
+    expect(again).toMatchObject({ isValid: false, isCached: true })
   })
 })
 

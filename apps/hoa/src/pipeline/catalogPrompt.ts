@@ -1,5 +1,4 @@
 import { projectTypes, type ProjectTypeId } from "@/rules/catalog"
-import { ruleTopics } from "@/rules/rule"
 
 /** The catalog as the extraction and facts prompts see it: every attribute with scope, unit and allowed values. */
 export function catalogForPrompt(projectType: ProjectTypeId) {
@@ -21,16 +20,6 @@ export function catalogForPrompt(projectType: ProjectTypeId) {
     null,
     1
   )
-}
-
-/** Project types and topics for the routing prompt. */
-export function routingOptions() {
-  return {
-    projectTypes: Object.values(projectTypes)
-      .map((type) => `${type.id}: ${type.label}, with ${type.components.join(" and ")} components`)
-      .join("\n"),
-    topics: ruleTopics.join(", ")
-  }
 }
 
 /** Keeps a prompt variable within a budget, cutting at a line break. */

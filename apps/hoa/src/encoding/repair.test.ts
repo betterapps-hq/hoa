@@ -8,7 +8,7 @@ import {
   secondDraft,
   vocabulary
 } from "@/tests/encodingDrafts"
-import { decideRepair, groupByUnit, termsDefinedElsewhere, verifyUnit, type UnitProblem } from "./repair"
+import { decideRepair, groupByUnit, keysDefinedElsewhere, verifyUnit, type UnitProblem } from "./repair"
 
 const context = { organizationId: "org-1", documents: draftDocuments, provisions: draftProvisions, vocabulary }
 const firstUnit = ["declaration:4.1", "rules:1"]
@@ -23,7 +23,7 @@ describe("verifyUnit", () => {
     const { draft, problems } = verifyUnit({ ...firstDraft, rules: [untitled] }, firstUnit, context)
     expect(draft).toBeNull()
     expect(problems).toEqual([
-      { source: "zod", code: "invalid_type", message: expect.any(String), path: ["rules", 0, "title"], term: null }
+      { source: "zod", code: "invalid_type", message: expect.any(String), path: ["rules", 0, "title"], reference: null }
     ])
   })
 
@@ -36,7 +36,7 @@ describe("verifyUnit", () => {
         code: "undefined-term",
         message: "rules:1#gazebo: gazebo isn't a term",
         path: ["rules", 1, "appliesTo"],
-        term: "gazebo"
+        reference: "gazebo"
       }
     ])
   })
@@ -82,7 +82,7 @@ describe("groupByUnit", () => {
         code: "undefined-term",
         message: "rules:2(a)#max-height: shed isn't a term",
         path: ["rules", 1, "appliesTo"],
-        term: "shed"
+        reference: "shed"
       }
     ])
     expect(grouped.get("unit-1")?.[0]?.path).toEqual(["clauses", "deciders", 0, "party"])
@@ -95,7 +95,7 @@ describe("decideRepair", () => {
     code: "undefined-term",
     message: `${term} isn't a term`,
     path: [],
-    term
+    reference: term
   })
 
   it("waits for the merge when every problem is a term another unit defines", () => {
@@ -104,17 +104,22 @@ describe("decideRepair", () => {
     expect(decideRepair([missing("gazebo")], new Set(["garden-shed"]))).toBe("repair")
     expect(
       decideRepair(
-        [missing("garden-shed"), { ...missing("x"), code: "invariant", term: null }],
+        [missing("garden-shed"), { ...missing("x"), code: "invariant", reference: null }],
         new Set(["garden-shed"])
       )
     ).toBe("repair")
   })
 
-  it("knows which terms the other units define", () => {
+  it("knows which terms and rules the other units define", () => {
     const drafts = new Map([
       ["unit-1", parsedDraft(firstDraft)],
       ["unit-2", parsedDraft(secondDraft)]
     ])
-    expect([...termsDefinedElsewhere("unit-1", drafts)]).toEqual(["shed", "garden-shed"])
+    expect([...keysDefinedElsewhere("unit-1", drafts)]).toEqual([
+      "shed",
+      "garden-shed",
+      "rules:1#max-height",
+      "rules:2(a)#max-height"
+    ])
   })
 })

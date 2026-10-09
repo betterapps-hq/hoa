@@ -1,5 +1,6 @@
-import { and, asc, eq, inArray, isNotNull, max } from "drizzle-orm"
+import { and, asc, eq, inArray, isNotNull, like, max, notInArray, or } from "drizzle-orm"
 import { z } from "zod"
+import { documentStructure, type DocumentStructure } from "@/documents/documentStructure"
 import {
   governingDocumentSchema,
   sectionRoutingSchema,
@@ -281,4 +282,108 @@ export async function getProvision(db: Database, hoaId: string, key: string): Pr
     .where(and(eq(provisions.hoaId, hoaId), eq(provisions.key, key)))
     .get()
   return row ? provisionSchema.parse(row.provision) : null
+}
+
+// ─── What a build writes (encoding.md, Save draft) ──────────────────────────────────────────────
+
+/** The structures set for uploads, by id; an upload without one is missing. */
+export async function getDocumentStructures(db: Database, hoaId: string, ids: readonly string[]) {
+  if (ids.length === 0) {
+    return new Map<string, DocumentStructure>()
+  }
+  const rows = await db
+    .select({ id: governingDocuments.id, structure: governingDocuments.structure })
+    .from(governingDocuments)
+    .where(and(eq(governingDocuments.hoaId, hoaId), inArray(governingDocuments.id, [...ids])))
+  return new Map(rows.flatMap((row) => (row.structure ? [[row.id, documentStructure.parse(row.structure)]] : [])))
+}
+
+/** Sets how builds structure an upload. */
+export async function setDocumentStructure(db: Database, hoaId: string, id: string, structure: DocumentStructure) {
+  await db
+    .update(governingDocuments)
+    .set({ structure: documentStructure.parse(structure) })
+    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id)))
+}
+
+/** The documents a build read: each upload's own documents (itself first, then its exhibits) with their provisions. */
+export type BuiltDocuments = {
+  uploads: { documentId: string; documents: { document: Rules.GoverningDocument; provisions: Rules.Provision[] }[] }[]
+  /** Documents the text names that nobody uploaded. */
+  referenced: Rules.GoverningDocument[]
+}
+
+/**
+ * Keys the uploads and writes their provisions, the exhibits that are documents of their own and the documents the
+ * text names, in one batch. A document of the organization that held one of these keys gives it up, with its
+ * provisions. Builds write these ids again on every run, so a retried step writes them once.
+ */
+export async function saveBuiltDocuments(
+  db: Database,
+  hoaId: string,
+  built: BuiltDocuments,
+  recordedBy: string,
+  recordedAt: string
+) {
+  const fileLessId = (key: string) => `${hoaId}:${key}`
+  const records = [
+    ...built.uploads.flatMap(({ documentId, documents }) =>
+      documents.map(({ document, provisions: items }, index) => ({
+        id: index === 0 ? documentId : fileLessId(document.key),
+        isUpload: index === 0,
+        document: governingDocument.parse(document),
+        provisions: items
+      }))
+    ),
+    ...built.referenced.map((document) => ({
+      id: fileLessId(document.key),
+      isUpload: false,
+      document: governingDocument.parse(document),
+      provisions: []
+    }))
+  ]
+  const keys = records.map((record) => record.document.key)
+  const ids = records.map((record) => record.id)
+  if (records.length === 0) {
+    return
+  }
+  await runBatch(db, [
+    db
+      .update(governingDocuments)
+      .set({ key: null, document: null })
+      .where(
+        and(
+          eq(governingDocuments.hoaId, hoaId),
+          inArray(governingDocuments.key, keys),
+          notInArray(governingDocuments.id, ids)
+        )
+      ),
+    db
+      .delete(provisions)
+      .where(and(eq(provisions.hoaId, hoaId), or(...keys.map((key) => like(provisions.key, `${key}:%`))))),
+    ...records.map((record) => {
+      if (record.isUpload) {
+        return db
+          .update(governingDocuments)
+          .set({ key: record.document.key, document: record.document })
+          .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, record.id)))
+      }
+      const row = fileLessDocumentRow(hoaId, record, recordedBy, recordedAt)
+      const { kind, title, effectiveDate, status, key, document } = row
+      return db.insert(governingDocuments).values(row).onConflictDoUpdate({
+        target: governingDocuments.id,
+        set: { kind, title, effectiveDate, status, key, document }
+      })
+    }),
+    ...records.flatMap((record) =>
+      insertChunks(
+        provisions,
+        provisionRows(
+          hoaId,
+          record.id,
+          record.provisions.map((item) => provisionSchema.parse(item))
+        )
+      ).map((group) => db.insert(provisions).values(group))
+    )
+  ])
 }

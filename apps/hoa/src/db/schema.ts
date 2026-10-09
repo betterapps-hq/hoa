@@ -38,7 +38,9 @@ export const governingDocuments = sqliteTable(
     uploadedAt: timestamp("uploaded_at"),
     // The rules schema's view of the document (its GoverningDocument), once a build or the seed has keyed it.
     key: text("key"),
-    document: json<unknown>("document_json")
+    document: json<unknown>("document_json"),
+    // How a build structures the upload (documents/documentStructure.ts); null until an administrator sets it.
+    structure: json<unknown>("structure_json")
   },
   (table) => [
     uniqueIndex("governing_documents_lineage_version").on(table.lineageId, table.version),
