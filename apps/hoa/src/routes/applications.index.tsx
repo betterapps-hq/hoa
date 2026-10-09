@@ -5,26 +5,26 @@ import {
   createApplication,
   createApplicationUpload,
   listApplications,
-  listProjectKinds,
   runReview,
   uploadApplicationFile
 } from "@/features/applications/applications.functions"
 import { ApplicationsPage } from "@/features/applications/ApplicationsPage/ApplicationsPage"
 import { uploadApplicationFiles } from "@/features/applications/uploadApplicationFiles"
+import { listActiveProjectTypes } from "@/features/projectTypes/projectTypes.functions"
 import { useRole } from "@/features/role/RoleProvider"
 
 export const Route = createFileRoute("/applications/")({
   staticData: { title: "Applications" },
   head: () => ({ meta: [{ title: "Applications | HOA design review" }] }),
   loader: async () => {
-    const [applications, projectKinds] = await Promise.all([listApplications(), listProjectKinds()])
-    return { applications, projectKinds }
+    const [applications, projectTypes] = await Promise.all([listApplications(), listActiveProjectTypes()])
+    return { applications, projectTypes }
   },
   component: ApplicationsRoute
 })
 
 function ApplicationsRoute() {
-  const { applications, projectKinds } = Route.useLoaderData()
+  const { applications, projectTypes } = Route.useLoaderData()
   const navigate = useNavigate()
   const { role } = useRole()
   const open = (applicationId: string) =>
@@ -32,9 +32,9 @@ function ApplicationsRoute() {
   return (
     <ApplicationsPage
       applications={applications}
-      projectKinds={projectKinds}
+      projectTypes={projectTypes}
       isCommittee={role.id === "administrator"}
-      onCreate={async ({ files, ...input }) => {
+      onCreate={async ({ files, purposes, ...input }) => {
         const application = await createApplication({ data: input })
         // Once the application exists, its page is where the homeowner retries a failed upload or review.
         try {
@@ -45,7 +45,8 @@ function ApplicationsRoute() {
               completeUpload: (fileId) => completeApplicationUpload({ data: { fileId } })
             },
             application.id,
-            files
+            files,
+            purposes
           )
           await runReview({ data: { applicationId: application.id } })
         } catch (error) {

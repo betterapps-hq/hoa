@@ -10,7 +10,14 @@ import { encodingJudgeAnswer, judgeGroups, judgeVariables } from "../src/evaluat
 import { splitMembership } from "../src/evaluation/encoding/provisions.ts"
 import { scoreReport } from "../src/evaluation/encoding/report.ts"
 import { runCost, runDraft, runInfo, runProvisions } from "../src/evaluation/encoding/run.ts"
-import { scoreRun, splitRules } from "../src/evaluation/encoding/score.ts"
+import { goldenTermsOf, scoreRun, splitRules, splitTermKeys } from "../src/evaluation/encoding/score.ts"
+import {
+  judgedTermPairs,
+  termJudgeAnswer,
+  termJudgeGroups,
+  termJudgeVariables
+} from "../src/evaluation/encoding/termJudge.ts"
+import { alignTerms, type TermPair } from "../src/evaluation/encoding/terms.ts"
 import { createVocabulary } from "../src/schema/vocabulary.ts"
 import { rulesFile } from "../src/schema/zod.ts"
 import { splitSelectors } from "./encodingSplits.ts"
@@ -19,8 +26,9 @@ import { encodingRuns, fileCache, readJson, writeJson } from "./evalFiles.ts"
 // Scores an evaluation run (eval-encoding.ts) against the golden encoding (samples/declaration/rules.json), on the
 // run's split (implementation-plan.md, Evaluation round 1): structure, coverage and reasons, the judge's pairing,
 // faithfulness and pairwise comparison (hoa-eval-encoding-judge, one call per provision, traced and cached), modality,
-// check agreement through the engine, term recall, validity and repair. Writes report.md and scores.json to the run's
-// folder and records the scores as a run of the Langfuse dataset encoding-evaluation, one item per split.
+// check agreement through the engine, term recall (with hoa-eval-term-judge pairing terms by meaning), validity and
+// repair. Writes report.md and scores.json to the run's folder and records the scores as a run of the Langfuse dataset
+// encoding-evaluation, one item per split.
 // Usage, from apps/hoa: pnpm eval:encoding:score <run id>
 const { positionals } = parseArgs({ allowPositionals: true })
 const [runId] = positionals
@@ -41,6 +49,18 @@ const membership = [selectors, run.units?.split(",") ?? null].flatMap((keys) =>
 )
 const inSplit = (key: string) => membership.every((isIn) => isIn(key))
 
+/** Runs a judge call again when it fails, as a Workflow step would be: a refused answer isn't cached. */
+async function retried<T>(run: () => Promise<T>, attempts = 3): Promise<T> {
+  try {
+    return await run()
+  } catch (error) {
+    if (attempts <= 1) {
+      throw error
+    }
+    return retried(run, attempts - 1)
+  }
+}
+
 const ai = createAiContext()
 if (!ai.isConfigured) {
   throw new Error(`Missing settings: ${ai.missing.join(", ")}`)
@@ -54,18 +74,20 @@ const groups = judgeGroups(splitRules(golden, inSplit), draft.rules)
 console.warn(`Judging ${groups.length} provisions of run ${runId}`)
 let done = 0
 const results = await settleEach(groups, 8, async (group) => {
-  const result = await runObjectPrompt({
-    loadPrompt: ai.loadPrompt,
-    createModel: ai.createModel,
-    defaultModelId: ai.modelId,
-    prompt: pipelinePrompts.encodingJudge,
-    schema: encodingJudgeAnswer,
-    variables: judgeVariables(group, provisions, vocabularies),
-    traceName: "encoding-judge",
-    environment: ai.environment,
-    sessionId: `${runId}-score`,
-    cache: fileCache("judge")
-  })
+  const result = await retried(() =>
+    runObjectPrompt({
+      loadPrompt: ai.loadPrompt,
+      createModel: ai.createModel,
+      defaultModelId: ai.modelId,
+      prompt: pipelinePrompts.encodingJudge,
+      schema: encodingJudgeAnswer,
+      variables: judgeVariables(group, provisions, vocabularies),
+      traceName: "encoding-judge",
+      environment: ai.environment,
+      sessionId: `${runId}-score`,
+      cache: fileCache("judge")
+    })
+  )
   done += 1
   if (done % 20 === 0) {
     console.warn(`  judged ${done}/${groups.length}`)
@@ -79,9 +101,49 @@ if (failed.length > 0) {
   throw new Error(`The judge failed on ${failed.length} provisions:\n${failed.join("\n")}`)
 }
 const judged = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []))
-const judgeCost = judged.reduce((total, item) => total + item.costUsd, 0)
 
-const scores = scoreRun({ golden, draft, report: run.report, inSplit, judged })
+// Terms no key or label matches: the term judge pairs them by meaning, parents first, then each aligned parent's
+// properties, categories and values.
+const goldenTerms = goldenTermsOf(golden)
+const termKeys = splitTermKeys(golden, inSplit)
+const termPairs: TermPair[] = []
+let termJudgeCost = 0
+for (const phase of ["parents", "members"] as const) {
+  const termGroups = termJudgeGroups(
+    goldenTerms,
+    draft.terms,
+    alignTerms(goldenTerms, draft.terms, termPairs),
+    termKeys,
+    phase
+  )
+  console.warn(`Judging ${termGroups.length} groups of terms (${phase})`)
+  const answers = await settleEach(termGroups, 8, async (group) => {
+    const result = await retried(() =>
+      runObjectPrompt({
+        loadPrompt: ai.loadPrompt,
+        createModel: ai.createModel,
+        defaultModelId: ai.modelId,
+        prompt: pipelinePrompts.termJudge,
+        schema: termJudgeAnswer,
+        variables: termJudgeVariables(group),
+        traceName: "encoding-term-judge",
+        environment: ai.environment,
+        sessionId: `${runId}-score`,
+        cache: fileCache("term-judge")
+      })
+    )
+    termJudgeCost += result.costUsd ?? 0
+    return judgedTermPairs(group, result.object)
+  })
+  const termFailures = answers.flatMap((answer) => (answer.status === "rejected" ? [String(answer.reason)] : []))
+  if (termFailures.length > 0) {
+    throw new Error(`The term judge failed on ${termFailures.length} groups:\n${termFailures.join("\n")}`)
+  }
+  termPairs.push(...answers.flatMap((answer) => (answer.status === "fulfilled" ? answer.value : [])))
+}
+const judgeCost = judged.reduce((total, item) => total + item.costUsd, 0) + termJudgeCost
+
+const scores = scoreRun({ golden, draft, report: run.report, inSplit, judged, termPairs })
 const report = scoreReport({
   runId,
   split: run.split,

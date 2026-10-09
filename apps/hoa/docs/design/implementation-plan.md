@@ -21,8 +21,8 @@ Exit: the open technical risks are measured and the decisions below are recorded
 | --- | --- | --- |
 | 0.1 | **Tool schema size.** Generate the JSON Schema for `EncodingDraft` (rule drafts included) with `z.toJSONSchema`, `reused: "inline"`, then `reused: "ref"`. Send each as the `respond` tool to `anthropic/claude-opus-5.5` and `OPENROUTER_MODEL` through OpenRouter with a one-provision prompt. | A note in `ai.md` with sizes, which form each provider accepts, and the chosen form. `runObjectPrompt` gains a `schemaForm` option if `ref` is needed. |
 | 0.2 | **Output length.** Encode the sample's largest unit (Article 7, section 7.4) by hand-prompting with the brief; record output tokens. | Unit token budget in `encoding.md` confirmed or lowered. |
-| 0.3 | **Text-analysis service.** Moved into [evaluation round 1](#evaluation-round-1-encoding-quality): built after the baseline, with only the extractors whose cross-checks the measured failures call for. | Recorded in the implementation log. |
-| 0.6 | **LexNLP license.** AGPL-3.0 or the commercial license; if neither, list the extractors to replace with our own grammars. | Decision recorded in the README decisions table. |
+| 0.3 | ~~**Text-analysis service.**~~ **Replaced** by recognition ([encoding.md, Recognition](encoding.md#recognition)): the model proposes values with quotes and code verifies them; no service is built. | Recorded in the implementation log. |
+| 0.6 | ~~**LexNLP license.**~~ **Moot:** LexNLP is dropped (implementation log). | Recorded. |
 | 0.4 | **Data reset.** Script that empties rulebooks, rules, sections, reviews and their R2 objects in local and preview environments. | `pnpm db:reset:rules` documented in `setup.md`. |
 | 0.5 | **Decisions.** Add rows to the README decisions table: rules file as the published artifact; per-record D1 rows for drafts; code-based rule selection; language tools chosen for accuracy, in a text-analysis service where they're Python; exact decimals in the engine; sample data committed under `apps/hoa/samples/`, redacted where it names people. | Merged. |
 
@@ -44,7 +44,7 @@ examples.
 | 1.9 | Add `src/schema/describe.ts`: `describeRule`, `describeCondition`, `describeCheck`, rendering sentences with term labels, for the UX and prompts. | Snapshot tests over the examples. |
 | 1.10 | Add `src/schema/statement.ts`: parse and render `{{term-key}}` and `{{term:plural}}` links. | Tests. |
 | 1.12 | Test that `apps/hoa/samples/declaration/rules.json` validates with `rulesFile` and `validateRulebook`. | Test passes; fails on a broken reference. |
-| 1.13 | **Guard test** `src/tests/noOrganizationTerms.test.ts`: fails if a string literal in `src/engine`, `src/review`, `src/pipeline` or `src/rulebook` is an organization term key (any term in `samples/` or the schema examples with an `organizationId`), so fence or garage knowledge can live only in rulebook data. | Test passes; adding `"fence-run"` to engine code fails it. |
+| 1.13 | ~~**Guard test** for organization term keys in code.~~ Removed 2026-10-09: a check against each organization's terms grows with every customer and flags ordinary words (`person`). Organization knowledge stays out of code and prompts by design, and held-out evaluation catches fitting (implementation-log.md). | Removed. |
 | 1.11 | Move the schema doc generator into `apps/hoa/scripts/build-schema-doc.ts` (from `build-doc.py` and `render.ts`), reading `src/schema/types.ts` and the examples. `pnpm docs:schema` regenerates `schema.md` and `schema-examples.md`. | Output matches the committed docs. |
 
 ## Phase 2: Engine
@@ -97,28 +97,31 @@ issues, traced in Langfuse. Depends on phases 1 and 3; 4.12 onward also on 0.1.
 | Id | Task | Done when |
 | --- | --- | --- |
 | 4.1 | `src/text/normalize.ts`: reuse `normalizeForMatching`; add plural handling from labels. | Tests. |
-| 4.2 | `src/text/match.ts`: normalized exact matching in TypeScript, then batch similarity through the service's RapidFuzz route, returning the match kind and score. | Tests incl. "Restnctions", "Winchester Gray", short labels never fuzzy. |
+| 4.2 | `src/text/match.ts`: normalized exact matching, then similarity with RapidFuzz's ratios in TypeScript (no service), returning the match kind and score. | Tests incl. "Restnctions", "Winchester Gray", short labels never fuzzy. |
 | 4.3 | `src/pipeline/structure/clean.ts`: drop Azure Layout's `pageHeader`, `pageFooter` and `pageNumber` paragraphs, then repeated lines; hyphenation; offset map to pages. | Tests on the sample Declaration's redacted page text (8.10), incl. recording stamps. |
 | 4.4 | `src/pipeline/structure/numbering.ts`: the marker grammar and sequence stack (articles, sections, letters, roman numerals, numbers, exhibits; letter-versus-numeral disambiguation; inferred repairs). | Table tests, incl. `(h)`,`(i)`,`(j)` letters and `(i)`,`(ii)` numerals. |
 | 4.5 | `src/pipeline/structure/provisions.ts`: split into provisions, counted paragraphs, intro and wrap-up detection, keys and labels per schema.md, anchors. | The sample Declaration's redacted page text (8.10) gives the provisions in `samples/declaration/rules.json`: keys, labels, intros and wrap-ups. |
 | 4.6 | `src/pipeline/structure/check.ts`: coverage of text, sequences, unique keys; the repair trigger. | Tests. |
 | 4.7 | `src/pipeline/references.ts`: reference grammar and resolution (absolute, relative, documents); referenced documents. | Table tests from the sample's phrasing. |
-| 4.7a | Service route `/analyze`: per provision, LexNLP definitions, amounts, money, percentages, durations, dates and citations, and spaCy deontic cues (modals with negation scope, exception markers). | Tests on sample provisions: "thirty (30) days", "$1,000,000", "shall not … unless". |
-| 4.7b | The `analyze` stage: references plus `/analyze` per document, stored per provision. | Stage output in R2 for the sample. |
-| 4.8 | `src/pipeline/definedTerms.ts`: LexNLP definitions plus capitalized-phrase candidates with counts and samples. | Tests. |
+| 4.7a | ~~Service route `/analyze`~~ **Replaced** by the audit (4.21, 4.22). | |
+| 4.7b | ~~The `analyze` stage's text analysis~~ **Replaced** by the audit (4.21, 4.22); `analyze` keeps the references. | |
+| 4.8 | `src/pipeline/definedTerms.ts`: quoted and capitalized definitions plus capitalized-phrase candidates with counts and samples, found by code (no LexNLP). | Tests. |
 | 4.9 | `src/pipeline/plan.ts`: encoding units within the token budget, with ancestors' intros, references, vocabulary slice (via 4.2) and request types. | Tests: the sample's articles split as expected. |
 | 4.10 | `src/pipeline/encodingPrompt.ts`: serialize provisions, context, references, terms and core terms for the prompt variables (compact, stable order for caching). | Snapshot tests. |
 | 4.11 | Register the build prompts in `src/ai/pipelinePrompts.ts`: `structureRepair`, `termExtraction`, `provisionEncoding`, `encodingRepair`, `rulebookConsolidation` with their variables. | Contract tests. |
 | 4.12 | **Write the prompts in Langfuse** (development label): `hoa-provision-encoding` from `BRIEF.md` (conventions and the revised-schema sections) plus schema.md sections 2 to 5; `hoa-encoding-repair`; `hoa-term-extraction`; `hoa-rulebook-consolidation`; `hoa-structure-repair`. `config.model` set. | Each resolves through the loader with matching variables. |
 | 4.13 | `src/pipeline/merge.ts`: merge unit drafts (terms, rules, clauses, referenced documents), coverage report. Port of `build-rules-file.ts`'s merge. | Tests incl. conflicting terms and duplicate keys. |
 | 4.14 | `src/pipeline/consolidate.ts`: candidate pairs from the service's embedding route; summaries for the prompt; apply `Consolidation` (duplicates, overrides, term merges with reference rewriting, conflict questions). | Tests. |
-| 4.14a | Cross-checks in `validateRulebook`: quantity coverage (`unencoded-quantity`) and modality cues (`modality-cue-mismatch`) from the stored analysis. | Tests: a deadline missing its 30 days is caught; a permission on "shall not" is flagged. |
+| 4.14a | ~~Cross-checks from the stored analysis~~ **Replaced** by the audit's checks (4.22). | |
 | 4.15 | `src/pipeline/repair.ts`: group problems by unit with JSON paths; decide repair versus re-verify after merge. | Tests. |
 | 4.16 | Rewrite `RulebookBuild` (`src/workflows/rulebookBuild.server.ts`) with the stages, step names, fan-out with concurrency 8, failures recorded per unit (`completed-with-errors`), caching per stage, progress per stage. | Runs locally on the sample Declaration end to end. |
 | 4.17 | `save-draft`: write provisions, terms, rules, questions, settings and coverage; carry forward approvals. | Repository-level test with a small fixture. |
 | 4.18 | Build scores to Langfuse on the build's root span: valid units, problems before and after repair, coverage, rules per kind, text conditions, gap notes. | Visible in Langfuse for a local build. |
 | 4.19 | `JobProgress.utils.ts`: labels for the new stages. | Component test. |
 | 4.20 | Update `startRulebookBuild`, `getRulebookView` and `publishRulebook` in `rulebook.functions.ts` for the new model; publish assembles and writes the file (3.7). | Server-function tests where testable; manual run. |
+| 4.21 | **Audit prompt** `hoa-provision-audit` in Langfuse (development label, Haiku by `config.model`, generic: no organization, project or product in its text), registered in `pipelinePrompts.ts` with `document`, `provisions`; its output schema (items per provision: kind, quote, value in schema terms). After evaluation round 1. | Contract test; resolves through the loader. |
+| 4.22 | **Audit step and checks:** `audit:{unitId}` in the verify stage; the review's generic verifier (`valueCheck.ts`) on each item's quote and numerals; `unencoded-value`, `unencoded-party` and `unencoded-condition` in verify, sent to repair (encoding.md, Recognition). | Tests: a deadline missing its 30 days, a dropped approver and a dropped "unless" are caught; an item whose quote isn't in the provision is dropped and recorded. |
+| 4.23 | **Audit corrections:** rejected audit items and how each audit problem was resolved (repair, no-rule note, dismissed by the administrator) recorded on the build, exportable as `provision-encoding` items like the review's. | Tests; the export runs on an evaluation build. |
 
 ## Evaluation round 1: encoding quality
 
@@ -152,7 +155,7 @@ only to measure, never to tune.
 | E1.3 | Scorers: key and text matching, coverage and reasons, rule pairing by provision with an LLM judge (same requirement; faithful to the text), modality, check agreement via the engine on facts generated from each rule's paths and values, term recall, pairwise judge. | Unit tests for the deterministic scorers; judge prompts in Langfuse. |
 | E1.4 | Baseline run on dev and test; record scores and the failure categories in the implementation log. | Logged. |
 | E1.5 | **Iterate on dev** until it clears every bar, then measure test once. Each round changes one thing and is logged with its scores: prompt text (development label), context assembly (vocabulary slice, references, intros), unit size, repair instructions, consolidation, and agentic patterns (a critic pass that checks a unit's rules against its provisions before verify; two encodings of a unit reconciled; a dedicated pass for checks the engine disagrees on). If test misses a bar, return to dev with the failure categories. | Test clears every bar; the winning prompt versions labeled `preview`. |
-| E1.6 | Text-analysis service, if the baseline's failures call for it (dropped quantities, flipped modality): only those extractors, behind the cross-checks in 4.14a. | Built, or recorded as unneeded. |
+| E1.6 | ~~Text-analysis service~~ **Replaced** by the audit (4.21 to 4.23), built after this round's baseline. | |
 
 ## Phase 5: Rules UX
 
@@ -195,7 +198,7 @@ Depends on phases 2, 3 and 5.14.
 | 6.7 | `src/review/factPlan.ts`: walk selected rules to the fact plan; split into entity groups; text conditions. | Tests: properties per type for the fence fixture. |
 | 6.8 | `src/review/factSchema.ts`: build the dynamic Zod schema from a fact plan group. | Tests: rejects an unplanned property. |
 | 6.9 | `src/text/quantity.ts`: the quantity grammar. | Table tests: `6'`, `6 ft`, `72"`, `6'-0"`, `six (6) feet`, `4 to 6 feet`, failures. |
-| 6.10 | Service route `/dates`: dateparser in the organization's time zone and US month-day order; client in `src/text/date.ts`. | Table tests. |
+| 6.10 | ~~Service route `/dates`~~ **Replaced:** dates are the model's reading, verified (6.22), with `src/text/date.ts` as a fast check. | |
 | 6.11 | `src/review/normalize.ts`: stated values to `FactValue` (quantities, choices via 4.2, dates via 6.10, references) in one service batch per review, conflicts, confidence threshold. | Tests incl. "River Birch" to the Frame It All value, "Winchester Gray". |
 | 6.12 | `src/review/verifyEvidence.ts`: `matchQuote` per evidence; downgrade unmatched facts. | Tests. |
 | 6.13 | `src/review/promptInputs.ts`: serializers for every review prompt (pages with markers as today, candidate types, plan slices, requirements, judgment context, findings for the writer). | Snapshot tests. |
@@ -207,6 +210,11 @@ Depends on phases 2, 3 and 5.14.
 | 6.18 | `runReview` and `getApplicationView`: require a published rulebook; load `ReviewRule`s and cited provisions from the review's rules file. | Manual run; unit tests for the selection of cited rules. |
 | 6.19 | `JobProgress` labels for the review stages. | Component test. |
 | 6.20 | Write and commit the synthetic garage enclosure packet and its variants under `samples/garage-enclosure/` (form, description, floor plan, elevation; no personal data). | The review pipeline gives the expected result on each. |
+| 6.21 | **Numerals** (`src/text/numerals.ts`): digits, decimals, fractions, mixed numbers and a fixed list of number and fraction words, read exactly; the quantity grammar reads its numbers through it. | Table tests. Done. |
+| 6.22 | **Model-first normalization** (application-review.md, Recognition): quantities, counts and dates from the model's reading, checked by the generic verifier (`src/review/valueCheck.ts`: numerals agree after unit conversion, compounds, the unit's dimension), the grammars as fast checks feeding it; the reading may give an exact fraction. | Tests: forms no grammar reads verify; a wrong numeral is rejected and the grammar's value stands; 6 ft read as 6 inches is held. Done. |
+| 6.23 | **Second readings decide disputes:** the verification pass reads every fact that alone decides a finding (any outcome), and escalates a reading that doesn't confirm it once to `config.escalationModel`; still disputed stays conflicting or uncertain. | Tests: escalation settles a dispute; without an escalation model it stays conflicting. Done. |
+| 6.24 | **Corrections recorded and exported:** `corrections` on the review record; `pnpm review:corrections` exports them to the Langfuse dataset `entity-facts`. | Tests; the export runs on an evaluation run. Done. |
+| 6.25 | **People's corrections** (later): a committee member or homeowner corrects a fact on the review, recorded as `person-corrected` with the reading it replaces; the export already carries them. | Component test; browser check. |
 
 ## Evaluation round 2: review quality
 
@@ -229,7 +237,7 @@ after phase 6, before the review UX is finished (phase 7).
 | E2.1 | Expected facts, documents and findings for every case, as data next to the cases (the fence packet's stay in `.fixtures/` until 8.12 redacts it). | Data files load in scripts. |
 | E2.2 | `scripts/eval-review.ts`: run the review stages in process on a case and score it; Langfuse experiment and Markdown report. | One command scores all cases. |
 | E2.3 | Baseline on every case; failure categories in the implementation log. | Logged. |
-| E2.4 | **Iterate** until every bar clears, one change per round, logged: prompts, entity grouping, the fact plan's wording, normalization thresholds, and agentic patterns (a verification pass on each fact that alone decides a not-met finding; two readings of low-confidence facts reconciled; a page-targeted second look when evidence doesn't verify). Variants are held out: tune on the fence and garage packets, measure on the variants. | Every bar clears on the variants; prompt versions labeled `preview`. |
+| E2.4 | **Iterate** until every bar clears, one change per round, logged: prompts, entity grouping, the fact plan's wording, normalization thresholds, and agentic patterns (a verification pass on each fact that alone decides a not-met finding; two readings of low-confidence facts reconciled; a page-targeted second look when evidence doesn't verify). Tuning and measurement are separate ([evaluation.md](evaluation.md#tuning-and-measurement)): tune on the garage enclosure cases; the fence project type is held out and measured, never tuned on. | Every bar clears on the held-out slices; prompt versions labeled `preview`. |
 
 ## Phase 7: Review UX
 
@@ -237,7 +245,7 @@ Exit: the homeowner and committee views show the new review in the browser. Depe
 
 | Id | Task | Done when |
 | --- | --- | --- |
-| 7.1 | Project kind picker from the rulebook's `work` categories, with "Something else". | Component test; browser check. |
+| 7.1 | ~~Project kind picker from the rulebook's `work` categories~~ **Replaced by 7.12:** the picker lists the organization's project types, with "Something else". | Component test; browser check. |
 | 7.2 | `recommendationLabels` and variants: add "Refer to the committee", rename "Reject" to "Deny". | Component test. |
 | 7.3 | `ReviewReport` action lists with entities, plus "Suggestions"; every rule named through `RuleReference`, and the written summary's markers rendered as `RuleReference`s. | Component test; browser check. |
 | 7.4 | Findings grouped by the new outcomes, each with statement, entity, reason and cited provision text, "View in document". | Component test; browser check. |
@@ -248,6 +256,7 @@ Exit: the homeowner and committee views show the new review in the browser. Depe
 | 7.9 | `ReviewMatrix` component: chips per outcome, fixed rule column with scrolling entity columns, "Only what needs attention" and outcome filters, card layout below 480 pixels. | Component test; browser check at desktop and phone widths, light and dark. |
 | 7.10 | Finding sheet from a cell: statement, provision text, reason, every input marked read from the packet (page, quote, thumbnail, confidence), matched (with fuzzy score), computed or not provided; judgment and document results. | Component test; browser check on the sample. |
 | 7.11 | Entity header detail (type, label, identifying evidence) and the homeowner and committee variations (action item links; discretion rule and judgment rationale). | Component test; browser check in both roles. |
+| 7.12 | **Project types as organization data** (application-review.md, Project types): D1 `project_types` (migration 0004, additive), definitions built from the rules, model suggestions checked by code, the requirements list, the administrator's `/project-types` pages (add, edit questions, retire, delete), the homeowner's form rendered from the definition, and the answers in the review. | Done: unit and component tests; browser check of adding a type and the homeowner's form. |
 
 ## Phase 8: Datasets and evaluation
 
@@ -276,10 +285,10 @@ Exit: no code or doc refers to the first build's rule model. Depends on phases 5
 
 | Id | Task | Done when |
 | --- | --- | --- |
-| 9.1 | Delete `src/rules/catalog.ts`, `src/rules/rule.ts`, `src/rules/ruleKey.ts`, `src/pipeline/catalogPrompt.ts`, `evaluate.ts`, `decide.ts`, `reviewInputs.ts`, `consolidate.ts`, `carryForward.ts` (old), `verify.ts`'s catalog checks, `fenceRulebook.ts`, `CheckEditor`, `RuleSchema`, and their tests. | knip clean. |
+| 9.1 | Done: `src/rules/catalog.ts`, `src/rules/ruleKey.ts`, the first build's `Rule` schemas and repository functions, `fenceRulebook.ts` and their tests are deleted, and the first build's pipeline files were already gone; `src/rules/rule.ts` keeps only the rulebook record's schema, which moves with the `rulebooks` columns at 9.6. | knip clean. |
 | 9.2 | Remove the retired prompts from the registry; archive them in Langfuse. | Registry lists only new prompts. |
 | 9.3 | Update [README.md](README.md) (status banner, architecture diagram, decisions) and [platform.md](platform.md) (workflow step names, storage) for the built pipelines. | Links checked. |
-| 9.4 | `Dashboard.tsx` and `ApplicationsPage`: project kind labels from the rulebook. | Browser check. |
+| 9.4 | `Dashboard.tsx` and `ApplicationsPage`: project type labels from the organization's project types. | `ApplicationsPage` done; the dashboard is being redesigned separately. |
 | 9.5 | Reset preview and demo data, run the build on the sample documents, publish, and run the sample review. | The demo shows the expected result. |
 | 9.6 | Migration dropping `sections`, `rules` and the old `governing_documents` columns, once main no longer reads them. | Migration applied to preview after merge. |
 

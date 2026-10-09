@@ -30,6 +30,7 @@
     "eval:encoding": "tsx --env-file=.env scripts/eval-encoding.ts",
     "eval:encoding:score": "tsx --env-file=.env scripts/eval-encoding-score.ts",
     "eval:review": "tsx --env-file=.env scripts/eval-review.ts",
+    "review:corrections": "tsx --env-file=.env scripts/export-corrections.ts",
     "docs:schema": "node scripts/build-schema-doc.ts",
     "lint": "oxlint --max-warnings=0",
     "test": "vitest run",

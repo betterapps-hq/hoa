@@ -1,16 +1,13 @@
 import { match } from "ts-pattern"
-import { definitionOf, rulebookVocabulary } from "@/review/documentTypes"
 import type { Review } from "@/review/reviewModel"
-import { projectKinds } from "@/review/reviewRules"
 import { parseStatement } from "@/schema/statement"
 import type * as T from "@/schema/types"
 import { citationIndex, referencedRule } from "../rulebook/rulebookRecords"
 import type { ReferencedRule } from "../rulebook/RuleReference/RuleReference"
-import { sentenceCase } from "./applicationDisplay"
 
 // What the application pages read from a rules file (application-review.md, UX): the rules a review considered with
-// their cited provisions, the terms its screens name, and the project kinds a homeowner picks from. Everything comes
-// from the review's own rules file, so the text can't drift from what the review read.
+// their cited provisions, and the terms its screens name. Everything comes from the review's own rules file, so the
+// text can't drift from what the review read.
 
 /** A rule as the review screens show it: a rule reference plus its statement with term links. */
 export type ReportRule = ReferencedRule & { statement: string }
@@ -73,17 +70,4 @@ export function reviewTerms(rulesFile: T.RulesFile, review: Review, rules: reado
     }
   }
   return [...found.values()]
-}
-
-/** A project kind the homeowner can pick: a category of work the rulebook defines. */
-export type ProjectKindOption = { key: T.TermKey; label: string; description: string | null }
-
-/** The rulebook's project kinds in sentence case, each with what the rulebook says it is. */
-export function projectKindOptions(rulesFile: T.RulesFile): ProjectKindOption[] {
-  const vocabulary = rulebookVocabulary(rulesFile)
-  return projectKinds(rulesFile).map((kind) => ({
-    key: kind.key,
-    label: sentenceCase(kind.label),
-    description: definitionOf(vocabulary, kind.key)
-  }))
 }

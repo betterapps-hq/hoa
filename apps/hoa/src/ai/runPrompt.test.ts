@@ -4,7 +4,7 @@ import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base"
 import { MockLanguageModelV4 } from "ai/test"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
-import { candidateRuleSchema } from "@/rules/rule"
+import { ruleDraft } from "@/schema/zod"
 import type { PromptLoader } from "./promptLoader"
 import type { PromptDefinition } from "./prompts"
 import { answerOf, outputSchema, runCheckedObjectPrompt, runObjectPrompt, runTextPrompt } from "./runPrompt"
@@ -278,6 +278,19 @@ describe("runCheckedObjectPrompt", () => {
     expect(sent).not.toContain("organizationId")
   })
 
+  it("parses a field the model sent as JSON text, then fills and checks the answer", async () => {
+    const answer = { rules: JSON.stringify([{ title: "Pets" }]), terms: [{ key: "pet" }] }
+    expect(await run(answer).result).toMatchObject({
+      isValid: true,
+      object: { rules: [{ title: "Pets", effectiveFrom: "2001-12-04" }], terms: [{ key: "pet" }] }
+    })
+    // A model that closes the answer's object inside the text too.
+    const closed = { rules: [{ title: "Pets" }], terms: `${JSON.stringify([{ key: "pet", note: "a } in text" }])}}` }
+    expect(await run(closed).result).toMatchObject({ isValid: true, object: { terms: [{ key: "pet" }] } })
+    const text = await run({ rules: "Pets are allowed.", terms: [] }).result
+    expect(text.isValid ? [] : text.issues.map((issue) => issue.path)).toEqual([["rules"]])
+  })
+
   it("returns an answer that fails Zod with its issues, and caches it", async () => {
     const stored = new Map<string, unknown>()
     const cache = {
@@ -379,7 +392,7 @@ describe("content cache", () => {
 
 describe("outputSchema", () => {
   it("writes unions as anyOf, which every provider accepts, and still validates with Zod", async () => {
-    const schema = outputSchema(z.object({ rules: z.array(candidateRuleSchema) }))
+    const schema = outputSchema(z.object({ rules: z.array(ruleDraft) }))
     const json = JSON.stringify(await schema.jsonSchema)
     expect(json).not.toContain("oneOf")
     expect(json).toContain("anyOf")

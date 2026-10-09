@@ -3,7 +3,7 @@ import { type CheckAgreement, checkAgreement, type KeyTranslation, type Side } f
 import { type EncodingJudgeAnswer, type JudgeGroup, judgeScores, type RulePair } from "./judge"
 import { compareProvisions, coverageScores } from "./provisions"
 import { type RunDraft, type RunInfo, runDocuments, runProvisions, validityScores } from "./run"
-import { alignTerms, isCoreKey, type TermMatch, termKeysIn, termRecall } from "./terms"
+import { alignTerms, isCoreKey, type TermMatch, type TermPair, termKeysIn, termRecall } from "./terms"
 
 // Evaluation round 1's scores for one run against the golden encoding, and the bars each must clear
 // (implementation-plan.md, Evaluation round 1).
@@ -50,6 +50,8 @@ export type ScoreInput = {
   /** Whether a provision key belongs to the run's split. */
   inSplit: (key: T.ProvisionKey) => boolean
   judged: readonly { group: JudgeGroup; answer: EncodingJudgeAnswer }[]
+  /** The term judge's pairs (termJudge.ts). */
+  termPairs: readonly TermPair[]
 }
 
 const mainCitation = (rule: T.Rule) => rule.citations[0]?.provisionKey ?? ""
@@ -58,25 +60,36 @@ const mainCitation = (rule: T.Rule) => rule.citations[0]?.provisionKey ?? ""
 export const splitRules = (golden: T.RulesFile, inSplit: (key: T.ProvisionKey) => boolean) =>
   golden.rules.filter((rule) => inSplit(mainCitation(rule)))
 
+/** The golden terms and proposed core terms, which the pipeline's vocabulary is aligned with. */
+export const goldenTermsOf = (golden: T.RulesFile) => [...golden.terms, ...golden.proposedCore]
+
+/** The golden terms term recall counts on a split: those its provisions cite or its golden rules use. */
+export function splitTermKeys(golden: T.RulesFile, inSplit: (key: T.ProvisionKey) => boolean) {
+  const goldenTerms = goldenTermsOf(golden)
+  const goldenKeys = new Set(goldenTerms.map((term) => term.key))
+  return new Set([
+    ...goldenTerms
+      .filter((term) => term.citations.some((citation) => inSplit(citation.provisionKey)))
+      .map((term) => term.key),
+    ...termKeysIn(splitRules(golden, inSplit), goldenKeys)
+  ])
+}
+
 /** Every score of a run, the measures against their bars, and the details behind each miss. */
-export function scoreRun({ golden, draft, report, inSplit, judged }: ScoreInput) {
+export function scoreRun({ golden, draft, report, inSplit, judged, termPairs }: ScoreInput) {
   const goldenProvisions = golden.provisions.filter((provision) => inSplit(provision.key))
   const ourProvisions = runProvisions(draft).filter((provision) => inSplit(provision.key))
   const structure = compareProvisions(goldenProvisions, ourProvisions)
   const coverage = coverageScores(goldenProvisions, ourProvisions, draft.coverage)
   const judge = judgeScores(judged)
 
-  const goldenTerms = [...golden.terms, ...golden.proposedCore]
-  const matches = alignTerms(goldenTerms, draft.terms)
-  const goldenKeys = new Set(goldenTerms.map((term) => term.key))
-  const rules = splitRules(golden, inSplit)
-  const splitTermKeys = new Set([
-    ...goldenTerms
-      .filter((term) => term.citations.some((citation) => inSplit(citation.provisionKey)))
-      .map((term) => term.key),
-    ...termKeysIn(rules, goldenKeys)
-  ])
-  const terms = termRecall([...splitTermKeys].toSorted(), matches)
+  const goldenTerms = goldenTermsOf(golden)
+  const matches = alignTerms(goldenTerms, draft.terms, termPairs)
+  const termKeys = [...splitTermKeys(golden, inSplit)].toSorted()
+  const terms = {
+    ...termRecall(termKeys, matches),
+    byJudge: termKeys.filter((key) => matches.get(key)?.by === "judge").length
+  }
 
   const modalityMisses = judge.pairs.filter((pair) => modalityOf(pair.reference) !== modalityOf(pair.pipeline))
   const keys = keyTranslation(matches)

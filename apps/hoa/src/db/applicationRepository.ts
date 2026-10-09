@@ -19,12 +19,16 @@ const legacyProjectType = "fence"
 
 export async function createApplication(
   db: Database,
-  input: Pick<Application, "hoaId" | "projectKind" | "description" | "createdBy"> & { now: string; deleteAfter: string }
+  input: Pick<Application, "hoaId" | "projectTypeId" | "answers" | "description" | "createdBy"> & {
+    now: string
+    deleteAfter: string
+  }
 ): Promise<Application> {
   const application: Application = {
     id: crypto.randomUUID(),
     hoaId: input.hoaId,
-    projectKind: input.projectKind,
+    projectTypeId: input.projectTypeId,
+    answers: input.answers,
     description: input.description,
     createdBy: input.createdBy,
     createdAt: input.now,
@@ -36,7 +40,7 @@ export async function createApplication(
     decision: null,
     deleteAfter: input.deleteAfter
   }
-  await db.insert(applications).values({ ...application, projectType: legacyProjectType })
+  await db.insert(applications).values({ ...application, firstBuildProjectType: legacyProjectType })
   return application
 }
 

@@ -100,6 +100,7 @@ export function fenceReview() {
     ],
     judgments: [],
     conditionAnswers: [],
+    corrections: [],
     findings,
     recommendation: decision.recommendation,
     ...items,

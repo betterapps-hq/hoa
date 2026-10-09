@@ -21,6 +21,8 @@ export const pipelinePrompts = {
   rulebookConsolidation: { name: "hoa-rulebook-consolidation", variables: ["rules", "termPairs", "documents"] },
   // Evaluation round 1 (implementation-plan.md): the judge comparing the build's rules with the golden encoding's.
   encodingJudge: { name: "hoa-eval-encoding-judge", variables: ["provision", "referenceRules", "pipelineRules"] },
+  // The judge pairing golden terms no key or label matches with the build's terms of the same meaning.
+  termJudge: { name: "hoa-eval-term-judge", variables: ["parent", "referenceTerms", "pipelineTerms"] },
   // The application review (application-review.md). The subjects and facts calls also receive the packet's images.
   pageClassification: {
     name: "hoa-page-classification",
@@ -48,7 +50,10 @@ export const pipelinePrompts = {
   reviewJudge: {
     name: "hoa-eval-review-judge",
     variables: ["recommendation", "findings", "actionItems", "suggestions", "writing"]
-  }
+  },
+  // Project types (application-review.md, Project types): the project types a rulebook suggests, with their fields
+  // and documents, which code checks against the rules before an administrator sees them.
+  projectTypeSuggestion: { name: "hoa-project-type-suggestion", variables: ["rulebook", "projectTypes"] }
 } as const satisfies Record<string, PromptDefinition>
 
 /** The prompts a rulebook build pins in resolve-prompts. */

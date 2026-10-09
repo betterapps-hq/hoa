@@ -18,7 +18,8 @@ import {
 } from "@/documents/documentStructure"
 import { modelCallOf, type ModelCall, type StepRunner } from "@/jobs/steps"
 import type { Page } from "@/ocr/page"
-import type { Edition, GoverningDocument, ProvisionKey, Rule, Term } from "@/schema/types"
+import { carryNoRules, type PreviousReview } from "@/rulebook/carryForward"
+import type { Edition, GoverningDocument, ProvisionKey } from "@/schema/types"
 import { encodingDraft, termDraft } from "@/schema/zod"
 import { draftContent, type BuildFailure } from "./buildRecords"
 import { checkStructure } from "./check"
@@ -54,8 +55,8 @@ import { repairStructure, structureRepairAnswer } from "./structureRepair"
 
 // The rulebook build (encoding.md, Stages 2 to 11): structure, analyze, vocabulary, plan, encode, verify, repair, merge
 // and consolidate, then the draft's records. Everything it needs is injected: a step runner (Workflow steps in the app,
-// plain calls in scripts and tests), the models and cache, each upload's page records and structure, and the published
-// rulebook whose approvals carry forward.
+// plain calls in scripts and tests), the models and cache, each upload's page records and structure, and the earlier
+// review that carries forward.
 
 /** The job stages the build reports, in order (encoding.md, Stages). */
 export type BuildStage =
@@ -96,8 +97,11 @@ export type BuildInput = {
   sources: readonly BuildSource[]
   step: StepRunner
   ai: BuildAi
-  /** The published rulebook's records, whose approvals carry forward to unchanged records. */
-  previous: { rules: readonly Rule[]; terms: readonly Term[] } | null
+  /**
+   * The review that carries forward to unchanged records, read when the draft's records are made so review done while
+   * the build ran carries too.
+   */
+  previous: (() => Promise<PreviousReview>) | null
   /** When the records are proposed. */
   now: string
   progress?: (stage: BuildStage, done: number, total: number) => Promise<void>
@@ -396,12 +400,17 @@ export async function buildRulebook(input: BuildInput) {
         "model"
       )
     )
-    due.forEach(({ unit }, index) => {
+    due.forEach(({ unit, state }, index) => {
       const result = results[index]
       if (result?.status === "fulfilled") {
         calls.push(result.value.call)
-        states.set(unit.id, result.value.state)
         repairs.set(unit.id, round)
+        // A repair that breaks a valid draft, or leaves it with more problems, is set aside: the draft stays, and its
+        // problems become issues.
+        const repaired = result.value.state
+        if (state.draft === null || (repaired.draft !== null && repaired.problems.length <= state.problems.length)) {
+          states.set(unit.id, repaired)
+        }
       } else {
         failures.push({ stage: "repair", itemId: `${unit.id}:${round}`, message: messageOf(result?.reason) })
       }
@@ -479,19 +488,25 @@ export async function buildRulebook(input: BuildInput) {
     calls.push(consolidated.call)
   }
 
+  const previous = (await input.previous?.()) ?? { rulebooks: [], provisions: [] }
   const content = await draftContent({
     merged: mergedRulebook,
     consolidated,
     now: input.now,
-    previous: input.previous
+    previous: previous.rulebooks
   })
+  const reviewedProvisions = await carryNoRules(
+    consolidated.rulebook.provisions,
+    previous.provisions,
+    new Set(mergedRulebook.coverage.uncovered)
+  )
   return {
     /** The uploads' documents with their provisions, and the documents they name, for save-draft. */
     documents: structured.map(({ source }) => ({
       documentId: source.documentId,
       documents: documentsOf(source.title, source.structure, source.edition).map((document) => ({
         document,
-        provisions: consolidated.rulebook.provisions.filter((provision) => provision.key.startsWith(`${document.key}:`))
+        provisions: reviewedProvisions.filter((provision) => provision.key.startsWith(`${document.key}:`))
       }))
     })),
     referencedDocuments: consolidated.rulebook.documents.filter((document) => document.edition === null),

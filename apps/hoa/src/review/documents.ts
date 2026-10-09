@@ -5,7 +5,7 @@ import { normalizeForMatching } from "@/ocr/page"
 import { renderStatement } from "@/schema/statement"
 import type * as T from "@/schema/types"
 import { similarity } from "@/text/match"
-import { definitionOf, labelsOf } from "./documentTypes"
+import { labelsOf, meaningOf } from "./documentTypes"
 import { modelEvidence, toEvidence } from "./factSchema"
 import type { DocumentResult } from "./reviewModel"
 
@@ -50,7 +50,7 @@ export function documentRequirements(
           rule: renderStatement(rule.statement, label),
           documentType: check.document,
           documentLabels: labelsOf(vocabulary, check.document),
-          definition: definitionOf(vocabulary, check.document),
+          definition: meaningOf(vocabulary, check.document),
           mustState: check.mustState,
           signedBy: check.signedBy.map((party) => vocabulary.label(party)),
           entity: entity.id,
@@ -75,7 +75,7 @@ export function documentsAnswerSchema(requirements: readonly Requirement[]) {
             status: z
               .enum(["confirmed", "contradicted", "not-applicable", "not-found"])
               .describe(
-                "not-applicable only for a statement the requirement qualifies (as applicable, if any) when the project has nothing it covers: no landscaping in an interior conversion."
+                "not-applicable only for a statement the requirement qualifies (as applicable, if any) when the project has nothing it covers."
               ),
             quote: z.string().nullable()
           })

@@ -30,8 +30,9 @@ acceptable.
 
 ## Principles
 
-1. **Prompts are generic; HOA rules are data.** Every HOA uses the same prompts, rule schema and project-type catalog.
-   Onboarding an HOA means extracting its rules, not writing prompts.
+1. **Prompts are generic; HOA rules are data.** Every HOA uses the same prompts and rule schema. Its terms, rules and
+   project types are its own data. Onboarding an HOA means extracting its rules and choosing its project types, not
+   writing prompts or code.
 2. **Read once, store everything.** Each file is OCR'd once, at upload, into page records. Every later stage works on
    stored page text, so citations are exact and model calls are cheap.
 3. **The model reads; code judges.** Models turn documents into rules and applications into facts. Typed checks and the
@@ -75,7 +76,7 @@ acceptable.
 
 | Decision | Choice | Alternatives considered |
 | --- | --- | --- |
-| Rule representation | Typed checks over a global, versioned project-type catalog with components, plus `qualitative` for the rest | Free-text rules only (not checkable); HOA-specific prompts (don't scale) |
+| Rule representation | The rules schema: each organization's own vocabulary and typed checks ([schema.md](schema.md)); project types are each organization's data, built from its rules | Free-text rules only (not checkable); a global project-type catalog or HOA-specific prompts (don't scale) |
 | Text from documents | OCR every file once at upload with Azure Document Intelligence Layout; store per-page records | Mistral OCR (generative, can alter text); OpenRouter's PDF parser (only inside chat requests); sending PDFs to the model on every call |
 | Unit of extraction and citation | Document section | Whole document (can't cite, too long); single page (sections span pages) |
 | Recommendation | Code: a decision policy over findings | The model decides (not reproducible) |

@@ -24,8 +24,11 @@ import {
 import { getDb } from "@/db/client.server"
 import { listGoverningDocuments } from "@/db/documentRepository"
 import { getLatestJob, insertJob, newJob } from "@/db/jobRepository"
+import { getProjectType, listProjectTypes } from "@/db/projectTypeRepository"
 import { getPublishedRulesFile, type RulesFileRef } from "@/db/rulebookContentRepository"
 import type { Job } from "@/jobs/job"
+import { answersSchema } from "@/projectTypes/answers"
+import { projectAnswers, type ProjectType } from "@/projectTypes/projectType"
 import { toEvidence } from "@/review/factSchema"
 import { hasOpenRequests, reviewSchema, type Recommendation, type Review } from "@/review/reviewModel"
 import { subjectsAnswerSchema } from "@/review/subjects"
@@ -37,13 +40,7 @@ import { getJson, toBase64 } from "@/storage/objects"
 import { getBucket, getPresigner } from "@/storage/storage.server"
 import { validateUpload } from "@/storage/uploadRules"
 import type { SourceFile } from "../rulebook/rulebook.functions"
-import {
-  projectKindOptions,
-  reportRules,
-  reviewTerms,
-  type ProjectKindOption,
-  type ReportRule
-} from "./applicationView"
+import { reportRules, reviewTerms, type ReportRule } from "./applicationView"
 
 // Applications (docs/design/platform.md, "Server functions"): the homeowner creates one, uploads the packet, runs the
 // review as often as they like and submits; the committee decides.
@@ -84,7 +81,8 @@ export const createApplication = createServerFn({ method: "POST" })
   .validator((data: unknown) =>
     z
       .object({
-        projectKind: z.string().nullable(),
+        projectTypeId: z.string().nullable(),
+        answers: projectAnswers.nullable(),
         description: z.string().trim().max(4000).nullable()
       })
       .parse(data)
@@ -92,9 +90,17 @@ export const createApplication = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<Application> => {
     const context = await getRequestContext()
     const now = new Date().toISOString()
+    const type = data.projectTypeId ? await getProjectType(getDb(), context.hoa.id, data.projectTypeId) : null
+    if (data.projectTypeId && type?.status !== "active") {
+      throw new Error("That project type isn't offered. Choose another, or Something else.")
+    }
+    // The answers are checked against the type's own form, the same schema the form validates with.
+    const answers =
+      type && data.answers ? projectAnswers.parse(answersSchema(type.definition).parse(data.answers)) : null
     return createApplicationRecord(getDb(), {
       hoaId: context.hoa.id,
-      projectKind: data.projectKind,
+      projectTypeId: type?.id ?? null,
+      answers,
       description: data.description || null,
       createdBy: context.user.id,
       now,
@@ -114,7 +120,8 @@ export const createApplicationUpload = createServerFn({ method: "POST" })
         applicationId: z.string(),
         fileName: z.string().min(1),
         mediaType: z.string(),
-        sizeBytes: z.number().int().positive()
+        sizeBytes: z.number().int().positive(),
+        contextText: z.string().trim().max(500).optional()
       })
       .parse(data)
   )
@@ -134,6 +141,7 @@ export const createApplicationUpload = createServerFn({ method: "POST" })
       fileName: data.fileName,
       mediaType: validation.upload.mediaType,
       sizeBytes: data.sizeBytes,
+      contextText: data.contextText ?? null,
       now: new Date().toISOString()
     })
     const key = applicationKeys(context.hoa.id, application.id).source(file.id, file.fileName)
@@ -303,8 +311,8 @@ export const recordDecision = createServerFn({ method: "POST" })
 
 export type ApplicationListItem = Application & {
   recommendation: Recommendation | null
-  /** The project kind's label in the published rulebook; null for "Something else". */
-  projectKindLabel: string | null
+  /** The project type's label; null for "Something else". */
+  projectTypeLabel: string | null
 }
 
 /**
@@ -326,8 +334,9 @@ async function loadPublishedRulesFile(hoaId: string) {
   return published ? readRulesFileForDisplay(published) : null
 }
 
-const kindLabel = (kinds: readonly ProjectKindOption[], key: string | null) =>
-  key === null ? null : (kinds.find((kind) => kind.key === key)?.label ?? key)
+/** The project type's label, from the organization's types; null for "Something else" or a removed type. */
+const typeLabel = (types: readonly ProjectType[], id: string | null) =>
+  id === null ? null : (types.find((type) => type.id === id)?.label ?? null)
 
 /** A homeowner's own applications, or every application for the committee, with their latest recommendation. */
 export const listApplications = createServerFn({ method: "GET" }).handler(async (): Promise<ApplicationListItem[]> => {
@@ -338,25 +347,17 @@ export const listApplications = createServerFn({ method: "GET" }).handler(async 
     context.hoa.id,
     context.role === "administrator" ? {} : { createdBy: context.user.id }
   )
-  const published = await loadPublishedRulesFile(context.hoa.id)
-  const kinds = published ? projectKindOptions(published) : []
+  const types = await listProjectTypes(db, context.hoa.id)
   return Promise.all(
     applications.map(async (application) => {
       const [latest] = await listReviewSummaries(db, context.hoa.id, application.id)
       return {
         ...application,
         recommendation: latest?.recommendation ?? null,
-        projectKindLabel: kindLabel(kinds, application.projectKind)
+        projectTypeLabel: typeLabel(types, application.projectTypeId)
       }
     })
   )
-})
-
-/** The published rulebook's project kinds, for the homeowner's picker; none until a rulebook is published. */
-export const listProjectKinds = createServerFn({ method: "GET" }).handler(async (): Promise<ProjectKindOption[]> => {
-  const context = await getRequestContext()
-  const published = await loadPublishedRulesFile(context.hoa.id)
-  return published ? projectKindOptions(published) : []
 })
 
 /** The rules file a review read, checked against the hash it recorded. */
@@ -410,8 +411,8 @@ export type ApplicationView = {
   entityEvidence: EntityEvidence[]
   /** The governing documents a citation can be shown on. */
   sourceFiles: SourceFile[]
-  /** The project kind's label in the rulebook; null for "Something else". */
-  projectKindLabel: string | null
+  /** The project type's label; null for "Something else". */
+  projectTypeLabel: string | null
   history: Pick<ReviewSummary, "id" | "recommendation" | "createdAt">[]
   /** The latest review job, so the page can follow one in progress or show why it failed. */
   job: Job | null
@@ -429,12 +430,13 @@ export const getApplicationView = createServerFn({ method: "GET" })
     const isOwner = application.createdBy === context.user.id
     const isCommittee = context.role === "administrator" && !isOwner
     const reviewId = isCommittee && application.submittedReviewId ? application.submittedReviewId : application.reviewId
-    const [files, review, history, job, sourceFiles] = await Promise.all([
+    const [files, review, history, job, sourceFiles, types] = await Promise.all([
       listApplicationFiles(db, context.hoa.id, application.id),
       loadReview(context.hoa.id, application.id, reviewId),
       listReviewSummaries(db, context.hoa.id, application.id),
       getLatestJob(db, context.hoa.id, application.id),
-      loadSourceFiles(context.hoa.id)
+      loadSourceFiles(context.hoa.id),
+      listProjectTypes(db, context.hoa.id)
     ])
     const [rulesFile, entityEvidence] = await Promise.all([
       review ? reviewRulesFile(context.hoa.id, review) : loadPublishedRulesFile(context.hoa.id),
@@ -449,7 +451,7 @@ export const getApplicationView = createServerFn({ method: "GET" })
       terms: review && rulesFile ? reviewTerms(rulesFile, review, rules) : [],
       entityEvidence,
       sourceFiles,
-      projectKindLabel: kindLabel(rulesFile ? projectKindOptions(rulesFile) : [], application.projectKind),
+      projectTypeLabel: typeLabel(types, application.projectTypeId),
       history: history.map(({ id, recommendation, createdAt }) => ({ id, recommendation, createdAt })),
       job,
       isOwner,

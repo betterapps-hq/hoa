@@ -3,11 +3,14 @@ import type { TermKey } from "@/schema/types"
 import type { TermContent } from "@/schema/zod"
 import { matchLabel } from "@/text/match"
 
-// Term alignment (implementation-plan.md, Evaluation round 1): which pipeline term is each golden term, matched by key
-// or else by label, and term recall. The check-agreement scorer translates facts between the two vocabularies with the
-// same alignment.
+// Term alignment (implementation-plan.md, Evaluation round 1): which pipeline term is each golden term, matched by key,
+// else by the term judge's pairing (termJudge.ts), else by label, and term recall. The check-agreement scorer translates
+// facts between the two vocabularies with the same alignment.
 
-export type TermMatch = { golden: TermKey; pipeline: TermKey; by: "key" | "label"; score: number }
+export type TermMatch = { golden: TermKey; pipeline: TermKey; by: "key" | "judge" | "label"; score: number }
+
+/** A golden term and the pipeline term the term judge found to mean the same. */
+export type TermPair = { golden: TermKey; pipeline: TermKey }
 
 const coreKeys = new Set(coreTerms.map((term) => term.key))
 
@@ -15,7 +18,7 @@ const coreKeys = new Set(coreTerms.map((term) => term.key))
 export const isCoreKey = (key: TermKey) => coreKeys.has(key)
 
 /** The term a property or value belongs to, which must align for the two to be the same term. */
-function parentOf(term: TermContent) {
+export function parentOf(term: TermContent) {
   if (term.kind === "property" || term.kind === "category") {
     return term.of
   }
@@ -36,11 +39,17 @@ function labelScore(golden: TermContent, pipeline: TermContent) {
 }
 
 /**
- * Aligns golden terms with pipeline terms one to one: the same key and kind, else the best label match of the same kind
- * whose parent (a property's thing, a value's set) is the golden parent's match. Core terms align with themselves.
+ * Aligns golden terms with pipeline terms one to one: the same key and kind, else the term judge's pair, else the best
+ * label match; a pair and a label match must be of the same kind, with a parent (a property's thing, a value's set) that
+ * is the golden parent's match. Core terms align with themselves.
  */
-export function alignTerms(golden: readonly TermContent[], pipeline: readonly TermContent[]) {
+export function alignTerms(
+  golden: readonly TermContent[],
+  pipeline: readonly TermContent[],
+  judged: readonly TermPair[] = []
+) {
   const pipelineByKey = new Map(pipeline.map((term) => [term.key, term]))
+  const judgedByGolden = new Map(judged.map((pair) => [pair.golden, pair.pipeline]))
   const matches = new Map<TermKey, TermMatch>()
   const taken = new Set<TermKey>()
   const aligned = (key: TermKey) => (isCoreKey(key) ? key : matches.get(key)?.pipeline)
@@ -54,12 +63,19 @@ export function alignTerms(golden: readonly TermContent[], pipeline: readonly Te
     }
     const parent = parentOf(term)
     const wantedParent = parent === null ? null : aligned(parent)
+    const fits = (candidate: TermContent) =>
+      candidate.kind === term.kind &&
+      !taken.has(candidate.key) &&
+      (wantedParent === undefined || wantedParent === null || parentOf(candidate) === wantedParent)
+    const pick = pipelineByKey.get(judgedByGolden.get(term.key) ?? "")
+    if (pick && fits(pick)) {
+      matches.set(term.key, { golden: term.key, pipeline: pick.key, by: "judge", score: 1 })
+      taken.add(pick.key)
+      continue
+    }
     let best: TermMatch | null = null
     for (const candidate of pipeline) {
-      if (candidate.kind !== term.kind || taken.has(candidate.key)) {
-        continue
-      }
-      if (wantedParent !== undefined && wantedParent !== null && parentOf(candidate) !== wantedParent) {
+      if (!fits(candidate)) {
         continue
       }
       const score = labelScore(term, candidate)

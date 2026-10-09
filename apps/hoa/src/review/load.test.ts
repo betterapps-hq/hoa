@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
 import { localDate, requestSkeleton } from "./load"
-import { projectKinds } from "./reviewRules"
 
 const rulesFile = sampleRulesFile()
 const input = {
@@ -35,11 +34,5 @@ describe("requestSkeleton", () => {
   it("reads dates in the organization's time zone", () => {
     expect(localDate("2026-10-02T05:00:00Z", "America/Los_Angeles")).toBe("2026-10-01")
     expect(localDate("2026-10-02T05:00:00Z", "UTC")).toBe("2026-10-02")
-  })
-})
-
-describe("projectKinds", () => {
-  it("lists the rulebook's categories of work", () => {
-    expect(projectKinds(rulesFile).map((kind) => kind.key)).toEqual(["utility-work"])
   })
 })

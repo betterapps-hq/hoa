@@ -80,12 +80,31 @@ pipeline end to end.
 - **Administrator edits are labels.** When an administrator edits or rejects an extracted rule, the before and after go
   to the `rule-corrections` dataset. Corrections that hold up are copied into `rule-extraction` as test cases.
 
+## Tuning and measurement
+
+Tuning fits whatever it's measured on, so the cases a prompt is tuned on never measure it.
+
+- **Slices.** Every case belongs to slices: its organization, its project type, and whether it's a real or a synthetic
+  packet. Every run reports its scores per slice as well as per case, and a change is judged on the held-out slices.
+- **Held out.** Measurement cases are never read while tuning: no prompt, code, validation or rulebook term is written
+  from what they contain or what they got wrong. Whole project types are held out, and whole organizations once there
+  is more than one: a fix that only helps one organization or one type is fitting.
+- **Today.** Two project types, from one organization. **The fence is held out for all prompt tuning**: prompts are
+  tuned on the garage enclosure cases and measured on the fence packet. The fence is the one real packet and the type
+  the first round of tuning fitted to, so it's the better measure of whether the prompts generalize. Its failures are
+  recorded, but they're fixed only by a generic change shown on the tuning slice first, or by rulebook data with a
+  cited reason (a definition or scope note the governing text supports), never by naming its terms in a prompt.
+- **More data, not more checks.** Adding a customer adds cases and a slice; it never adds a check, a prompt or code.
+  The plan for the next slices: more organizations' governing documents (some held out from all tuning), and a second
+  packet of each project type.
+- **Expected data** changes only with a cited reason, recorded in the implementation log.
+
 ## Tuning loop
 
 1. Change a prompt in Langfuse as a new version, without the `production` label. The version's `config.model` names
    its model, so a model change is a prompt version too.
-2. Run the dataset experiment against it.
-3. Compare scores with the current `production` version in Langfuse.
+2. Run the dataset experiment against it, on the tuning cases while iterating.
+3. Measure on the held-out slices, and compare scores per slice with the current `production` version in Langfuse.
 4. Move the `production` label only when nothing regresses.
 
 Jobs resolve labels to versions when they start, so promoting a prompt (and its model) needs no deploy, and a job in

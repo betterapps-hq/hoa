@@ -3,14 +3,19 @@ import { indexRulebook } from "@/engine/overrides"
 import type { EngineVocabulary } from "@/engine/vocabulary"
 import type * as T from "@/schema/types"
 import { valueType } from "@/schema/zod"
-import { labelsOf, rulebookVocabulary } from "./documentTypes"
+import { labelsOf, meaningOf, rulebookVocabulary } from "./documentTypes"
 
 // The fact plan (application-review.md, Plan): every property the selected rules read, through their applicability,
 // checks, subject categories and selectors, with what the model needs to answer it; and the text conditions with the
 // types they're asked about. Derived properties are left out (code computes them) but what they read is planned, and so
 // is the request type's governing date property, which code supplies.
 
-const plannedValue = z.object({ key: z.string(), labels: z.array(z.string()) })
+const plannedValue = z.object({
+  key: z.string(),
+  labels: z.array(z.string()),
+  /** What the value means, from its definition and scope note. */
+  meaning: z.string().nullable().default(null)
+})
 export type PlannedValue = z.infer<typeof plannedValue>
 
 const plannedProperty = z.object({
@@ -19,6 +24,7 @@ const plannedProperty = z.object({
   owner: z.string(),
   labels: z.array(z.string()),
   definition: z.string().nullable(),
+  scopeNote: z.string().nullable(),
   valueType,
   /** A quantity's unit, with its labels. */
   unit: plannedValue.nullable(),
@@ -139,14 +145,21 @@ function planProperty(vocabulary: EngineVocabulary, terms: readonly T.Term[], ke
       owner: vocabulary.thingOf(property.of),
       labels: labelsOf(vocabulary, key),
       definition: property.definition,
+      scopeNote: property.scopeNote,
       valueType,
       unit:
-        valueType.type === "quantity" ? { key: valueType.unit, labels: labelsOf(vocabulary, valueType.unit) } : null,
+        valueType.type === "quantity"
+          ? { key: valueType.unit, labels: labelsOf(vocabulary, valueType.unit), meaning: null }
+          : null,
       values:
         valueType.type === "choice"
           ? terms
               .filter((term) => term.kind === "value" && term.set === valueType.set)
-              .map((term) => ({ key: term.key, labels: labelsOf(vocabulary, term.key) }))
+              .map((term) => ({
+                key: term.key,
+                labels: labelsOf(vocabulary, term.key),
+                meaning: meaningOf(vocabulary, term.key)
+              }))
           : null,
       isComplete: set?.kind === "value-set" ? set.complete : null,
       ifUnstated: property.ifUnstated,
@@ -201,7 +214,7 @@ export function planFacts(rulesFile: T.RulesFile, selected: readonly T.RuleKey[]
 
 /**
  * Splits the plan into calls (application-review.md, Facts): one for the request, lot, community and work, and one per
- * other entity type (all fence runs together, all gates together). A group with nothing to ask is left out.
+ * other entity type (all items of one type together). A group with nothing to ask is left out.
  */
 export function entityGroups(
   plan: FactPlan,

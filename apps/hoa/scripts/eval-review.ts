@@ -197,7 +197,9 @@ for (const item of cases) {
     failures: result.failures,
     durationSeconds
   })
-  console.warn(`  ${item.id}: ${JSON.stringify(score.scores)}; $${costOf(result.calls).toFixed(4)}`)
+  console.warn(
+    `  ${item.id}: ${JSON.stringify(score.scores)}; $${costOf(result.calls).toFixed(4)}; corrections ${result.corrections.map((correction) => correction.kind).join(", ") || "none"}`
+  )
 }
 
 const report = reviewReport(runId, promptVersions, reports)

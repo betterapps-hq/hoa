@@ -8,7 +8,7 @@ import { fenceAnswers, fenceRequest, fenceRulesFile } from "@/tests/fenceSchemaF
 import { scriptedModel, variableOf, variablesPromptLoader } from "@/tests/scriptedModel"
 import { rulebookVocabulary } from "./documentTypes"
 import type { Packet } from "./packet"
-import { reviewApplication } from "./run"
+import { reviewApplication, type ReviewAi } from "./run"
 
 // The whole review on the fence fixture with a scripted model that reads the fixture's facts and documents the way
 // the real models would answer: the pipeline must reach the same findings as the engine does on the fixture itself.
@@ -162,36 +162,41 @@ function answer(text: string): unknown {
   throw new Error(`Unexpected prompt: ${prompt}`)
 }
 
-const names: string[] = []
-const step: StepRunner = async (name, schema, run) => {
-  names.push(name)
-  const stored = JSON.stringify(await run())
-  return schema.parse(JSON.parse(stored))
+const reviewWith = (ai: Pick<ReviewAi, "loadPrompt" | "createModel">, onStep?: (name: string) => void) => {
+  const step: StepRunner = async (name, schema, run) => {
+    onStep?.(name)
+    const stored = JSON.stringify(await run())
+    return schema.parse(JSON.parse(stored))
+  }
+  return reviewApplication({
+    organizationId: "org-sample",
+    rulesFile,
+    application: {
+      requestType: "architectural-application",
+      projectType: null,
+      answers: null,
+      description: "Replace the fence.",
+      submittedOn: "2026-09-04"
+    },
+    packet,
+    step,
+    ai: {
+      ...ai,
+      modelId: "test-model",
+      smallModelId: "test-small-model",
+      environment: "test",
+      sessionId: "job-1",
+      promptVersions: {}
+    },
+    now: "2026-09-10T12:00:00Z"
+  })
 }
 
-const result = await reviewApplication({
-  organizationId: "org-sample",
-  rulesFile,
-  application: {
-    requestType: "architectural-application",
-    projectKind: null,
-    description: "Replace the fence.",
-    submittedOn: "2026-09-04"
-  },
-  packet,
-  step,
-  ai: {
-    loadPrompt: variablesPromptLoader,
-    createModel: () => scriptedModel(answer),
-    modelId: "test-model",
-    smallModelId: "test-small-model",
-    environment: "test",
-    sessionId: "job-1",
-    promptVersions: {}
-  },
-  now: "2026-09-10T12:00:00Z"
-})
-
+const names: string[] = []
+const result = await reviewWith(
+  { loadPrompt: variablesPromptLoader, createModel: () => scriptedModel(answer) },
+  (name) => names.push(name)
+)
 const outcomes = (findings: readonly T.Finding[]) =>
   Object.fromEntries(findings.map((found) => [`${found.ruleKey} ${found.entity}`, found.outcome]))
 
@@ -208,13 +213,20 @@ describe("reviewApplication on the fence fixture", () => {
       "normalize",
       "documents",
       "judgment:declaration:4.3(b)/p2#harmony:work-1",
-      // Each fact that alone decides a not-met finding, read again: the gate's run isn't one, since every run's boards
-      // are horizontal.
+      // Each fact that alone decides a finding, read again: the gate's run isn't one, since every run's boards are
+      // horizontal, and the return run borders nothing a rule reads. Every second reading confirms its fact, so nothing
+      // escalates.
       ...["run-1", "run-2", "run-3", "run-4"].flatMap((run) =>
-        ["material", "manufacturer", "color", "board-orientation"].map(
-          (property) => `facts:${run}:fence-run.${property}:verify`
-        )
+        [
+          "location",
+          ...(run === "run-4" ? [] : ["boundary-with"]),
+          "material",
+          "manufacturer",
+          "color",
+          "board-orientation"
+        ].map((property) => `facts:${run}:fence-run.${property}:verify`)
       ),
+      "facts:gate-1:gate.material:verify",
       "facts:gate-1:gate.board-orientation:verify",
       "evaluate",
       "decide",
@@ -256,5 +268,68 @@ describe("reviewApplication on the fence fixture", () => {
     expect(result.failures).toEqual([])
     expect(result.calls.map((call) => call.stage)).toContain("judgment-check")
     expect(result.costUsd).toBeCloseTo(result.calls.length * 0.01)
+  })
+})
+
+// A dispute: the second reading of the left run's boards reads them vertical; the stronger model reads them as the
+// first reading did.
+const isRunOneBoards = (text: string) =>
+  variableOf(text, "properties").match(/"property":"/g)?.length === 1 &&
+  variableOf(text, "properties").includes("fence-run.board-orientation") &&
+  variableOf(text, "entities").match(/"id":"/g)?.length === 1 &&
+  variableOf(text, "entities").includes('"id":"run-1"')
+const reading = (boards: "vertical" | "horizontal") => (text: string) =>
+  text.startsWith(`# ${pipelinePrompts.entityFacts.name}`) && isRunOneBoards(text)
+    ? {
+        facts: [
+          {
+            entity: "run-1",
+            property: "fence-run.board-orientation",
+            state: "known",
+            stated: boards,
+            reading: `board-orientation.${boards}`,
+            evidence: evidence(boards),
+            confidence: 0.95
+          }
+        ],
+        conditions: []
+      }
+    : answer(text)
+const strongModel = "strong-model"
+const disputedModels = (modelId: string) => scriptedModel(reading(modelId === strongModel ? "horizontal" : "vertical"))
+const escalating: typeof variablesPromptLoader = async (prompt, selector) => ({
+  ...(await variablesPromptLoader(prompt, selector)),
+  config: { escalationModel: strongModel }
+})
+const boardsOf = (review: Awaited<ReturnType<typeof reviewWith>>) =>
+  review.request.facts.find((fact) => fact.entity === "run-1" && fact.property === "fence-run.board-orientation")
+
+describe("reviewApplication when a second reading disagrees", () => {
+  it("escalates the dispute to the stronger model, which settles it, and records it", async () => {
+    const steps: string[] = []
+    const review = await reviewWith({ loadPrompt: escalating, createModel: disputedModels }, (name) => steps.push(name))
+    expect(steps).toContain("facts:run-1:fence-run.board-orientation:escalate")
+    expect(boardsOf(review)).toMatchObject({ state: "known", value: { term: "board-orientation.horizontal" } })
+    expect(review.corrections).toContainEqual(
+      expect.objectContaining({
+        kind: "escalated",
+        entity: "run-1",
+        property: "fence-run.board-orientation",
+        result: { state: "known", value: expect.objectContaining({ term: "board-orientation.horizontal" }) }
+      })
+    )
+    expect(outcomes(review.findings)).toEqual(outcomes(result.findings))
+  })
+
+  it("holds the fact conflicting when the prompt names no stronger model", async () => {
+    const review = await reviewWith({ loadPrompt: variablesPromptLoader, createModel: disputedModels })
+    expect(boardsOf(review)).toMatchObject({ state: "conflicting", value: null })
+    expect(review.corrections).toContainEqual(
+      expect.objectContaining({ kind: "second-reading-disagrees", result: { state: "conflicting", value: null } })
+    )
+    expect(review.failures).toContainEqual(
+      expect.objectContaining({ itemId: "run-1:fence-run.board-orientation:escalate" })
+    )
+    expect(outcomes(review.findings)["guidelines:5.2.5#no-horizontal run-1"]).not.toBe("not-met")
   })
 })

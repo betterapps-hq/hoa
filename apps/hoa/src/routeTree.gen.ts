@@ -14,6 +14,9 @@ import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as ApplicationsIndexRouteImport } from './routes/applications.index'
 import { Route as ApplicationsApplicationIdRouteImport } from './routes/applications.$applicationId'
+import { Route as ProjectTypesIndexRouteImport } from './routes/project-types.index'
+import { Route as ProjectTypesProjectTypeIdRouteImport } from './routes/project-types.$projectTypeId'
+import { Route as FilesGoverningDocumentIdRouteImport } from './routes/files.governing.$documentId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -41,20 +44,43 @@ const ApplicationsApplicationIdRoute =
     path: '/applications/$applicationId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ProjectTypesIndexRoute = ProjectTypesIndexRouteImport.update({
+  id: '/project-types/',
+  path: '/project-types/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectTypesProjectTypeIdRoute =
+  ProjectTypesProjectTypeIdRouteImport.update({
+    id: '/project-types/$projectTypeId',
+    path: '/project-types/$projectTypeId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FilesGoverningDocumentIdRoute =
+  FilesGoverningDocumentIdRouteImport.update({
+    id: '/files/governing/$documentId',
+    path: '/files/governing/$documentId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/documents': typeof DocumentsRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/applications/': typeof ApplicationsIndexRoute
+  '/project-types/': typeof ProjectTypesIndexRoute
+  '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/documents': typeof DocumentsRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/applications': typeof ApplicationsIndexRoute
+  '/project-types': typeof ProjectTypesIndexRoute
+  '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,7 +88,10 @@ export interface FileRoutesById {
   '/documents': typeof DocumentsRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/applications/': typeof ApplicationsIndexRoute
+  '/project-types/': typeof ProjectTypesIndexRoute
+  '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -71,21 +100,30 @@ export interface FileRouteTypes {
     | '/documents'
     | '/rules'
     | '/applications/$applicationId'
+    | '/project-types/$projectTypeId'
     | '/applications/'
+    | '/project-types/'
+    | '/files/governing/$documentId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/documents'
     | '/rules'
     | '/applications/$applicationId'
+    | '/project-types/$projectTypeId'
     | '/applications'
+    | '/project-types'
+    | '/files/governing/$documentId'
   id:
     | '__root__'
     | '/'
     | '/documents'
     | '/rules'
     | '/applications/$applicationId'
+    | '/project-types/$projectTypeId'
     | '/applications/'
+    | '/project-types/'
+    | '/files/governing/$documentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -93,7 +131,10 @@ export interface RootRouteChildren {
   DocumentsRoute: typeof DocumentsRoute
   RulesRoute: typeof RulesRoute
   ApplicationsApplicationIdRoute: typeof ApplicationsApplicationIdRoute
+  ProjectTypesProjectTypeIdRoute: typeof ProjectTypesProjectTypeIdRoute
   ApplicationsIndexRoute: typeof ApplicationsIndexRoute
+  ProjectTypesIndexRoute: typeof ProjectTypesIndexRoute
+  FilesGoverningDocumentIdRoute: typeof FilesGoverningDocumentIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -133,6 +174,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApplicationsApplicationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/project-types/': {
+      id: '/project-types/'
+      path: '/project-types'
+      fullPath: '/project-types/'
+      preLoaderRoute: typeof ProjectTypesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/project-types/$projectTypeId': {
+      id: '/project-types/$projectTypeId'
+      path: '/project-types/$projectTypeId'
+      fullPath: '/project-types/$projectTypeId'
+      preLoaderRoute: typeof ProjectTypesProjectTypeIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/files/governing/$documentId': {
+      id: '/files/governing/$documentId'
+      path: '/files/governing/$documentId'
+      fullPath: '/files/governing/$documentId'
+      preLoaderRoute: typeof FilesGoverningDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -141,7 +203,10 @@ const rootRouteChildren: RootRouteChildren = {
   DocumentsRoute: DocumentsRoute,
   RulesRoute: RulesRoute,
   ApplicationsApplicationIdRoute: ApplicationsApplicationIdRoute,
+  ProjectTypesProjectTypeIdRoute: ProjectTypesProjectTypeIdRoute,
   ApplicationsIndexRoute: ApplicationsIndexRoute,
+  ProjectTypesIndexRoute: ProjectTypesIndexRoute,
+  FilesGoverningDocumentIdRoute: FilesGoverningDocumentIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

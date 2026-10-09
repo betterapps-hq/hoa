@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { projectAnswers, projectTypeDefinition } from "@/projectTypes/projectType"
 import { recommendations } from "@/review/reviewModel"
 import { factValue, outcome } from "@/schema/zod"
 import { packetFixture } from "./packetFixture"
@@ -37,7 +38,12 @@ export const reviewCase = z.object({
   id: z.string(),
   title: z.string(),
   application: z.object({
-    projectKind: z.string().nullable(),
+    /** The organization's project type the homeowner chose, as its label and description; null for none. */
+    projectType: z
+      .object({ label: z.string(), description: z.string().nullable(), definition: projectTypeDefinition.nullable() })
+      .nullable(),
+    /** The homeowner's answers to the project type's form; null when there's none. */
+    answers: projectAnswers.nullable().default(null),
     description: z.string().nullable(),
     submittedOn: z.string().nullable()
   }),

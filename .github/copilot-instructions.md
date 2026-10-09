@@ -48,11 +48,20 @@ needs a human discussion**, not a silent add.
 
 ## AI features
 
+- **Model runs need the user's approval, every time.** Anything that calls a model through the app's OpenRouter key or
+  writes to Langfuse (evaluation rounds, encoding builds, reviews, document uploads that start a build, prompt
+  experiments) bills the user's accounts. Before each run, say what will run, on which model, and roughly what it costs,
+  and wait for a yes. Unit tests and `pnpm verify` use mocked models and need no approval. Judging and comparing
+  evaluation results is done by the coding agent itself, not by model calls through the app's key.
 - **Prompts live in Langfuse.** Fetch them through the app's prompt helper: by label for a single call, and by the
   version the job resolved for a Workflow step. Never put prompt text in source: prompts are created and edited only in
   Langfuse, and code refers to them by name.
 - **Every model call is traced.** Use the app's model helper so the call reaches Langfuse with its prompt version, token
   usage, cost and latency.
+- **Nothing is fitted to one instance.** Code, prompts, validations and evaluation data stay generic: no prompt or code
+  may name an organization's terms, a project type, a product or an example from a sample case. Organization and project
+  knowledge lives only in rulebook data (term definitions, scope notes, value relations). Tune on some cases and measure
+  on held-out ones, including whole project types; change expected data only with a cited reason.
 - **Every model stage is measured.** It has a Langfuse dataset (or is measured through the stage that consumes it),
   listed in the app's design/evaluation.md; production evaluators exist only where that page lists them. See
   [apps/hoa/docs/ai.md](../apps/hoa/docs/ai.md).

@@ -104,11 +104,19 @@ export function exampleRun() {
     problemsBefore: 3,
     calls: []
   }
-  return scoreRun({ golden, draft, report, inSplit, judged })
+  return scoreRun({ golden, draft, report, inSplit, judged, termPairs: [] })
 }
 
 export const renamedTerms = (renames: Readonly<Record<string, string>>): Term[] =>
   term.array().parse(renameKeys(golden.terms, renames))
+
+/** The golden terms with a fence run's manufacturer renamed and relabeled, so no key or label matches it. */
+export const relabeledManufacturer = (): Term[] =>
+  renamedTerms({ "fence-run.manufacturer": "fence-run.brand" }).map((item) =>
+    item.key === "fence-run.brand"
+      ? { ...item, labels: item.labels.map((label) => ({ ...label, text: "trade name of the maker" })) }
+      : item
+  )
 
 export const renamedRule = (source: Rule, renames: Readonly<Record<string, string>>): Rule =>
   rule.parse(renameKeys(source, renames))

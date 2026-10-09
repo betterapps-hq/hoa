@@ -61,3 +61,12 @@ describe("application review prompts", () => {
     })
   })
 })
+
+describe("project type prompts", () => {
+  it("are registered with the variables the code fills in", () => {
+    expect(pipelinePrompts.projectTypeSuggestion).toEqual({
+      name: "hoa-project-type-suggestion",
+      variables: ["rulebook", "projectTypes"]
+    })
+  })
+})

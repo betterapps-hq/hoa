@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { golden, goldenRule, renamedTerms } from "./pair.test-data"
+import { golden, goldenRule, relabeledManufacturer, renamedTerms } from "./pair.test-data"
 import { alignTerms, termKeysIn, termRecall } from "./terms"
 
 describe("alignTerms", () => {
@@ -10,6 +10,21 @@ describe("alignTerms", () => {
     expect(matches.get("fence-run")).toMatchObject({ pipeline: "fence-section", by: "label", score: 1 })
     expect(matches.get("fence-run.height")).toMatchObject({ pipeline: "fence-section.height", by: "label" })
     expect(matches.get("fence-location.front")).toMatchObject({ pipeline: "run-location.front", by: "label" })
+  })
+
+  it("takes the term judge's pairs of the same kind under the aligned parent", () => {
+    const pipeline = relabeledManufacturer()
+    expect(alignTerms(golden.terms, pipeline).has("fence-run.manufacturer")).toBe(false)
+    expect(
+      alignTerms(golden.terms, pipeline, [{ golden: "fence-run.manufacturer", pipeline: "fence-run.brand" }]).get(
+        "fence-run.manufacturer"
+      )
+    ).toMatchObject({ pipeline: "fence-run.brand", by: "judge" })
+    expect(
+      alignTerms(golden.terms, pipeline, [{ golden: "fence-run.manufacturer", pipeline: "gate" }]).has(
+        "fence-run.manufacturer"
+      )
+    ).toBe(false)
   })
 
   it("matches each pipeline term once, and leaves a golden term without a match out", () => {

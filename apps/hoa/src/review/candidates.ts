@@ -1,17 +1,18 @@
 import type * as T from "@/schema/types"
-import { definitionOf, labelsOf, rulebookVocabulary, rulesInRequestType } from "./documentTypes"
+import { definitionOf, labelsOf, rulebookVocabulary, rulesInRequestType, scopeNoteOf } from "./documentTypes"
 
 // The candidate entity types for subject identification (application-review.md, Subjects): every thing a rule in the
-// request type applies to (a category counts as its thing, listed with it), the things those can reference (a gate
-// references its fence run), and the parties whose signatures a document check needs. The request, the lot and the
-// community aren't candidates: code adds them.
+// request type applies to (a category counts as its thing, listed with it), the things those can reference (an item
+// that refers to the item it sits on), and the parties whose signatures a document check needs. The request, the lot
+// and the community aren't candidates: code adds them.
 
 export type CandidateType = {
   key: T.TermKey
   labels: string[]
   definition: string | null
+  scopeNote: string | null
   /** Its kinds (the rulebook's categories of it), which tell the model what to split apart and what each one is. */
-  categories: { key: T.TermKey; labels: string[]; definition: string | null }[]
+  categories: { key: T.TermKey; labels: string[]; definition: string | null; scopeNote: string | null }[]
   /** Its reference properties: what it can refer to. */
   references: { property: T.TermKey; labels: string[]; to: T.TermKey | null }[]
   /** A party whose people sign documents: each one named in the packet is an entity. */
@@ -57,12 +58,14 @@ export function candidateTypes(rulesFile: T.RulesFile, requestType: T.TermKey): 
     key,
     labels: labelsOf(vocabulary, key),
     definition: definitionOf(vocabulary, key),
+    scopeNote: scopeNoteOf(vocabulary, key),
     categories: terms
       .filter((term) => term.kind === "category" && vocabulary.thingOf(term.key) === key)
       .map((term) => ({
         key: term.key,
         labels: labelsOf(vocabulary, term.key),
-        definition: definitionOf(vocabulary, term.key)
+        definition: definitionOf(vocabulary, term.key),
+        scopeNote: scopeNoteOf(vocabulary, term.key)
       })),
     references: referencesOf(key).map((property) => ({
       property: property.key,

@@ -1,6 +1,6 @@
 import { normalizeForMatching } from "@/ocr/page"
 
-// Label normalization (encoding.md, Language processing): case, spacing, punctuation and quote marks don't count, and a
+// Label normalization (encoding.md, Recognition): case, spacing, punctuation and quote marks don't count, and a
 // label matches its plural too, the stored one or the regular English one.
 
 /** The regular English plural of a word or phrase: its last word takes the ending. */

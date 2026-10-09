@@ -31,6 +31,13 @@ export function definitionOf(vocabulary: EngineVocabulary, key: T.TermKey) {
   return term?.kind === "category" && term.criteria.type === "text" ? term.criteria.text : null
 }
 
+/** Where a term applies and doesn't, for the models: the rulebook's scope note. */
+export const scopeNoteOf = (vocabulary: EngineVocabulary, key: T.TermKey) => vocabulary.get(key)?.scopeNote ?? null
+
+/** A term's definition and scope note together, for a model that reads one description per term. */
+export const meaningOf = (vocabulary: EngineVocabulary, key: T.TermKey) =>
+  [definitionOf(vocabulary, key), scopeNoteOf(vocabulary, key)].filter(Boolean).join(" ") || null
+
 /** Rules a request of this type considers, of the kinds an application evaluates. */
 export function rulesInRequestType(rulesFile: T.RulesFile, requestType: T.TermKey) {
   return rulesFile.rules.filter(
@@ -53,7 +60,7 @@ export function documentTypes(rulesFile: T.RulesFile, requestType: T.TermKey): D
   const fromRulebook = [...named, ...categories.map((term) => term.key)].map((key) => ({
     key,
     labels: labelsOf(vocabulary, key),
-    definition: definitionOf(vocabulary, key) ?? ""
+    definition: meaningOf(vocabulary, key) ?? ""
   }))
   const keys = new Set(fromRulebook.map((kind) => kind.key))
   return [...fromRulebook, ...genericDocumentKinds.filter((kind) => !keys.has(kind.key))]

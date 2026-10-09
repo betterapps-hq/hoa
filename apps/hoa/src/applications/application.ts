@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { projectAnswers } from "@/projectTypes/projectType"
 import { errorInfoSchema } from "@/shared/schemas"
 
 // Applications and their files (docs/design/documents.md, "Applications").
@@ -34,8 +35,10 @@ export const decisionSchema = z.object({
 export const applicationSchema = z.object({
   id: z.string(),
   hoaId: z.string(),
-  /** The project kind the homeowner chose: a category of work in the rulebook; null for "Something else". */
-  projectKind: z.string().nullable(),
+  /** The organization's project type the homeowner chose (src/projectTypes/projectType.ts); null for "Something else". */
+  projectTypeId: z.string().nullable(),
+  /** The homeowner's answers to the project type's form; null without a project type. */
+  answers: projectAnswers.nullable(),
   description: z.string().nullable(),
   createdBy: z.string(),
   createdAt: z.string(),

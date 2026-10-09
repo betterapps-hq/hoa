@@ -207,14 +207,39 @@ export const rulebookQuestions = sqliteTable(
   ]
 )
 
+// Each organization's project types (application-review.md, Project types): what a homeowner picks when starting an
+// application, with the form it fills in and the documents it uploads. The definition is a ProjectTypeDefinition,
+// built against the rulebook named here.
+export const projectTypes = sqliteTable(
+  "project_types",
+  {
+    id: text("id").primaryKey(),
+    hoaId: text("hoa_id").notNull(),
+    label: text("label").notNull(),
+    description: text("description"),
+    // "active", or "retired": hidden from new applications, kept for the ones that use it.
+    status: text("status").notNull(),
+    rulebookId: text("rulebook_id"),
+    definition: json<unknown>("definition_json").notNull(),
+    createdAt: timestamp("created_at"),
+    updatedAt: timestamp("updated_at")
+  },
+  (table) => [index("project_types_hoa").on(table.hoaId)]
+)
+
 export const applications = sqliteTable(
   "applications",
   {
     id: text("id").primaryKey(),
     hoaId: text("hoa_id").notNull(),
     // The first build's project type, written as its one value until cutover drops it (implementation-plan.md, 9.6).
-    projectType: text("project_type").notNull(),
+    firstBuildProjectType: text("project_type").notNull(),
+    // The rulebook project kind the first review build stored; unused since project types, dropped at cutover.
     projectKind: text("project_kind"),
+    // The organization's project type the homeowner chose (project_types.id); null for "Something else".
+    projectTypeId: text("project_type_id"),
+    // The homeowner's answers to the project type's form (ProjectAnswers).
+    answers: json<unknown>("answers_json"),
     description: text("description"),
     createdBy: text("created_by").notNull(),
     createdAt: timestamp("created_at"),

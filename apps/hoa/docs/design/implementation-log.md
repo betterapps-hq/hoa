@@ -19,10 +19,10 @@ Work happens on the `feat/rules-schema` branch, committed locally at each milest
 | 1 Schema in the app | Done: `src/schema/` (types, Zod, drafts, core terms, validator, describe, statement links), 57 examples tested, the sample validates, guard test, `pnpm docs:schema` |
 | 2 Engine | Done: `src/engine/` (exact numbers, vocabulary, values, calendar, paths, operands, conditions, derived properties, checks, deadlines, overrides, evaluate, decide), the fence fixture and the sample's expected result, the garage enclosure and its variants; 2.15 sanctions deferred to violations |
 | 3 Storage | Done: additive migration 0001, provisions and rulebook content repositories, assemble and canonical hash, carry forward, `pnpm db:seed:sample`, `pnpm db:reset:rules` |
-| 4 Encoding pipeline | Done except the deferred text-analysis tasks (4.7a, 4.7b, 4.14a) and a full Workflow build, which evaluation round 1 replaces with in-process runs |
+| 4 Encoding pipeline | Done except a full Workflow build, which evaluation round 1 replaces with in-process runs; the text-analysis tasks (4.7a, 4.7b, 4.14a) are replaced by the audit (4.21 to 4.23, specified, built after round 1) |
 | E1 Evaluation round: encoding | E1.3 scorers built (`src/evaluation/encoding/`, `pnpm eval:encoding:score`) and checked on the cached Article 4 and use-restrictions slice; prompts on Opus 5.5 at high effort created; E1.4 blocked: the OpenRouter account has about $5.50 of credit, which doesn't cover a dev run (below) |
 | 5 Rules UX | Done: `RuleReference`, `TermChip`, `Statement`, `RuleTable`, `RuleCard` with citations, issues, the rule form, check and condition editors, the JSON editor and the preview; the Vocabulary, Coverage, Questions and Settings tabs; publish blockers, the published tab's hash and download; review server functions; the coverage report with its document view and passage panel (5.16). Browser-checked on the sample draft |
-| 6 Review pipeline | Built except 6.10's dates service (a TypeScript grammar for now) and 6.15 (prompts already in Langfuse): `reviewApplication` (`src/review/run.ts`) runs stages 4 to 14, the `ApplicationReview` Workflow wraps it with resolve-prompts, load, OCR and save; the application page shows the new review until phase 7 |
+| 6 Review pipeline | Recognition built (6.21 to 6.24: model-first values, the generic verifier, second readings with escalation, corrections and their export); 6.10's dates service replaced; 6.25 (people's corrections) later. Built except 6.15 (prompts already in Langfuse): `reviewApplication` (`src/review/run.ts`) runs stages 4 to 14, the `ApplicationReview` Workflow wraps it with resolve-prompts, load, OCR and save; the application page shows the new review until phase 7 |
 | E2 Evaluation round: review | E2.1 to E2.3 done; E2.4 tuned through 40 rounds (below): the engine decides across unsettled references, the verification pass, model and effort per stage (Haiku at high only for classification, Sonnet for the document review), app and runner parity, Option A for the replacement garage. The attic and replacement-plans variants clear every bar on every sample, fee-not-paid all but facts (the fee question), the fence not facts, findings or action items; no `preview` label yet |
 | 7 Review UX | Done: the project kind picker, `ReviewReport` (recommendation labels, action lists with entities and suggestions, the writer's markers as `RuleReference`s, the provisional notice), findings by outcome, "What we read from your packet", the rule matrix (`ReviewMatrix`, its model, filters, cards below 480 pixels), the finding sheet and the entity header in both roles. Browser-checked on a real fence review and a garage enclosure review (below) |
 | 8 Datasets and evaluation | Not started |
@@ -125,6 +125,13 @@ Work happens on the `feat/rules-schema` branch, committed locally at each milest
 | 2026-10-09 | Review stage models and effort, each in its prompt's `config`: classification on Haiku at high effort, the document review on Sonnet, every other stage on Haiku at its default effort; the writer's judge stays on Sonnet. | Evaluation round 2, rounds 26 to 32 and 37: high effort helped only classification, and Haiku didn't match Sonnet on the document review. |
 | 2026-10-09 | One rules file for app and evaluation reviews (`scripts/reviewRulesFile.ts`, used by `pnpm db:seed:sample --review` and `pnpm eval:review`), and one packet loader for the Workflow (`src/review/storedPacket.ts`) whose packets read like the runner's fixtures (`storedPacket.test.ts`). | The app's reviews disagreed with the runner's; part of it was different rules and two packet builders. |
 | 2026-10-09 | Normalization cites a quote found on another page of the packet where it is (`recited`), and a facts answer whose reading doesn't fit its type keeps its other fields with the reading dropped. | Evaluation round 2, rounds 36 and 38: wrong file ids and an invalid key failed whole fence answers. |
+| 2026-10-09 | Uploading builds the rulebook: a document that becomes `ready` requests a build of the current documents (each lineage's latest ready upload), coalesced so nothing starts while an upload is processing or a build runs, and a build that ends with the documents changed requests the next. The manual build takes no document choice. A rebuild carries forward the review decisions (approved and rejected), issue resolutions, answers, settings review and policy, and no-rule reasons of unchanged records from the current draft first, then the published rulebook. Rule deletion is gone (Reject replaces it); a whole draft can be discarded. | The person: "Generating the rulebook should happen when uploading the document. It's also not clear how to discard a draft." With builds on every upload, a rebuild mustn't wipe the review done on the draft. |
+| 2026-10-09 | The Rulebook page is one administrator flow (encoding.md, UX): the rules in force by default, the governing documents beside them (`/documents` redirects to `/rules`, one sidebar entry for both roles), and a status line with at most one action. Reviewing a draft is a focused mode (`?review=draft`) that shows what changes against the published rulebook, a to-do list in the order the work goes, Discard and Publish. Rule deletion and the whole-rule JSON editor are gone: Reject drops a record and a rebuild carries it forward. The domain column is gone (a filter now). | The person found the page loud, with no clear next step, and the Documents/Rulebook split and Draft/Published tabs confusing. |
+| 2026-10-09 | Citations open `CitationViewer`, a side sheet with the governing document at the cited page and the provision highlighted, built on `DocumentViewer`. It shows the page text read at upload, not a page image: page records hold the text the anchors index exactly, R2 holds no page images, and drawing the PDF with the Layout polygons as boxes needs a PDF renderer, a new library. "Open the original" opens the uploaded file at the page. | What the stored data supports exactly, without a new library; the polygons keep the PDF route open. |
+| 2026-10-09 | Governing documents download through `/files/governing/{documentId}` (a server route streaming the R2 object with its original name), for every member of the organization, since governing documents are members' documents ([documents.md, Access](documents.md#access)). The document is looked up in the requester's organization only. | One organization can never fetch another's file; no presigning is needed, so it works where the environment has no R2 token. |
+| 2026-10-09 | **Nothing is fitted to one instance.** The review prompts are rewritten generic (`hoa-subject-identification` v13, `hoa-entity-facts` v11, `hoa-page-classification` v4, `hoa-document-review` v5, `hoa-review-summary` v5, `hoa-visual-description` v3, the writer's judge `hoa-eval-review-judge` v3; `hoa-judgment-check` v2 was already generic), each on the `development` label with its `config` unchanged, and so are the review's Zod descriptions, which the models read too. What the fitted versions knew about the sample (return runs and gates, a product's material, golf courses, garage parts, replacement garages) is either a generic principle now or rulebook data with a citation: the fence fixture's `fence-location.side` and `.return`, `fence-run.boundary-with`, `boundary.lot`, `fence-run.manufacturer` and `composite-manufacturer` gain definitions and scope notes cited to Guidelines 5.5.1(i), 5.6.1 and 5.3.2, and the Declaration's `space-conversion` a scope note from Use Restrictions (a)(vii). The review sends a term's scope note and each allowed value's meaning with it. | The person: "We can't add a unique prompt for every application type, and every organization." Organization knowledge lives only in rulebook data. |
+| 2026-10-09 | The global project-type catalog (`src/rules/catalog.ts`) and the first build's rule model are deleted (9.1). Project types are each organization's data (D1 `project_types`, migration 0004): a label, a description and a form definition built from the rules, suggested by `hoa-project-type-suggestion` and checked by code (application-review.md, Project types). The homeowner's picker and form and the review's `projectKind` read them; `scripts/reviewRulesFile.ts` only merges the sample files, the fence's category of work moved into the fence fixture's terms, and the hand-added garage enclosure category of work is gone (the Declaration models garage enclosures as a kind of work and `space-conversion`). | "Always consider what will happen when there are 5, 10, 100 customers": a catalog grows with every customer; rows don't. |
+| 2026-10-09 | The fence is held out from prompt tuning; prompts are tuned on the garage enclosure cases (evaluation.md, Tuning and measurement). | The fence is the one real packet and the type the first tuning fitted to. |
 
 ## Smoke run (phase 4)
 
@@ -174,6 +181,10 @@ browser at 1440, 1280 and 375 pixels wide, light and dark (the `dark` class), as
   the sheet's initial focus, the action item's focus ring and the provisional notice's wording.
 | 2026-10-09 | LexNLP and Microsoft Recognizers-Text are dropped (the person's decision). Recognizers-Text was tested: it misses "six (6) feet", `6'-0"`, `6'`, "within thirty (30) days" and business days, gives two thirds as 0.666…, and its JavaScript release is from 2023. | Neither handles the forms governing documents and packets use most; hand-maintained rule libraries don't scale to many document styles either. Direction proposed to the person: the model proposes values with exact quotes, code verifies them generically, second readings decide disputes, corrections become dataset items. |
 | 2026-10-09 | `tiny-invariant` is an app dependency (the person's answer); the engine uses `invariant` for its assertions. | Matches docs/typescript.md. |
+| 2026-10-09 | **Recognition is model-first: the model proposes, code verifies, corrections become data** (the person's decision). The model returns every value with its exact words and the value in schema terms; code checks it generically (the quote is on its page; every numeral agrees after unit conversion; the unit is of the property's dimension); a value that alone decides a finding is read twice on Haiku and a disagreement escalates once to a stronger model, staying uncertain if still disputed; the grammars become fast checks feeding the same verifier; every rejection, disagreement, escalation and (later) person's correction is recorded and exportable as a dataset item. Recognition uses Haiku through the prompt's `config.model`, never Opus. On the encoding side (spec, built after evaluation round 1), a Haiku audit lists each provision's numbers, durations, parties and conditions with quotes and code checks each is encoded, replacing the text-analysis cross-checks (4.7a, 4.7b, 4.14a); structure keeps the parser's fast path and the model outline code verifies. application-review.md and encoding.md, Recognition. | The person: hand-written recognizers (LexNLP, Recognizers-Text, our own grammars as the primary reader) don't scale to 1,000 document styles, so recognition must work for any phrasing, with checks that know no format, on a cheaper model. |
+| 2026-10-09 | Built for the review: `src/text/numerals.ts` (exact numerals, words from a fixed list, fractions; the quantity grammar reads its numbers through it, and "four and six" is no longer read as ten); `src/review/valueCheck.ts` (the generic verifier); normalization model-first for quantities, counts and dates, with the grammars as fast checks (normalization kind `verified` when only the verifier vouches for a value); the facts reading may give an exact fraction (`"2/3"`, described on the output schema, so the prompt text is unchanged); the verification pass now reads every fact that alone decides any finding and escalates a second reading that names another value or none to `config.escalationModel`; `corrections` on the review record (an empty list for reviews saved before); `pnpm review:corrections` exports them to the Langfuse dataset `entity-facts`. | application-review.md, Recognition; implementation-plan.md 6.21 to 6.24. |
+| 2026-10-09 | A second reading confirms a fact when it names the same value, however sure it is; only another value or none is a dispute. The escalation settles a dispute only when it's sure (known, or at or above the fact threshold) of a value one of the readings gave. | The first after-run escalated three readings that agreed with the first on the value at 0.6 to 0.75, and kept a return run conflicting where Haiku's second reading and Sonnet both read a side run. |
+| 2026-10-09 | `hoa-entity-facts` v10 (development label): v9's text unchanged, config `{ "model": "anthropic/claude-haiku-5.5", "escalationModel": "anthropic/claude-sonnet-5.5" }`. The facts prompt already asks for values in the property's terms (the allowed value, the number and unit), so its text and variables didn't change; the exact-fraction wording is on the output schema. | The escalation's model comes from prompt config like every other model choice. The coordinator noted v9's text carries case-specific instructions (fence and garage examples); this version doesn't add any, and moving that knowledge into the vocabulary is left to whoever generalizes the prompt. |
 | 2026-10-09 | Deferred until after the proof of concept: numbering tests across document styles (the person expects structure at scale to need a corpus and a mix of NLP, a classifier or a model, not more grammar), and the review fee (Declaration 4.2(d)), which belongs with payments (Stripe) in a full launch. | Out of the prototype's scope. |
 
 ## Questions
@@ -181,9 +192,7 @@ browser at 1440, 1280 and 375 pixels wide, light and dark (the `dark` class), as
 | Date | Question | Meanwhile |
 | --- | --- | --- |
 | 2026-10-09 | **Blocking evaluation runs:** the OpenRouter account had $6.66 of credit at 14:12 and $5.51 at 14:21 (other agents' runs), though a top-up was reported; the app's key has a $100 limit with $80.75 left. Evaluation round 1 at high effort needs about $30 per dev or test run and about $30 per tuning round, up to about $400 in all. Please add account credit and raise the key's limit (a person must; it's a payment). | Code, tests and UX keep going; model runs are limited to what the balance covers, and round 1's baseline and tuning wait. |
-| 2026-10-09 | `garage-replacement-plans`: is building the replacement garage a second item of Work (the term's scope note says one item per change), so the case should expect two? Identification names it so on one sample in three. | Answered (Option A): the replacement garage's plans are supporting evidence, the document that satisfies (a)(vii) and a condition the Reviewer may attach; the new garage isn't an entity or a second item of work, and gets its own review when the homeowner applies to build it. Only a homeowner who explicitly asks to approve both together has two items of work. The case expects the conversion's work and space only; `hoa-subject-identification` v11 follows it. |
 | 2026-10-09 | In dark mode every `link` button (rule references, "View in document", the finding's action link) is the preset's dark `--primary` on the card, about 2.4:1, below WCAG AA's 4.5:1. The conventions keep `styles.css` as the preset left it. Change the dark `--primary`, give links their own token, or accept it? | Left as the preset has it. |
-| 2026-10-09 | `reviewRules` and `ReviewRule` in `src/review/reviewRules.ts` (and their test in `load.test.ts`) are superseded by the application view's `reportRules`; nothing else uses them. Delete them with the review stages' next change, or at cutover (9.1)? | Answered: deleted with the review stages' round 2 work; `projectKinds` stays. |
 
 ## Evaluation rounds
 
@@ -504,3 +513,77 @@ Not every bar clears on every sample, so no version is labeled `preview`. What's
 
 Spend on these rounds: about $9.60 of OpenRouter credit (reviews $6.30, the writer's judge $3.30); the account ran
 out once during round 39.
+
+### Round 2 (review): recognition (model proposes, code verifies)
+
+2026-10-09, `pnpm eval:review` and `--sample 1`, `--sample 2`, all five cases. Before: runs `22-43-30`,
+`22-43-36-sample-1`, `22-43-40-sample-2` (the round 38 configuration, every call cached). After: runs `22-57-46`,
+`22-58-21-sample-1`, `22-58-25-sample-2`, with model-first normalization and the generic verifier, the verification
+pass on every fact that alone decides a finding with escalation to Sonnet (`hoa-entity-facts` v10), and correction
+recording. The first after-runs (`22-54-11` and its samples) used a stricter confirmation (a second reading had to be
+sure of the value) and escalated readings that agreed with the first on the value at 0.6 to 0.75: six escalations on
+sample 0 and findings .915; the decision row above records the change. Fence scores as entities / facts / documents /
+normalization / evidence / findings / recommendation / action items / writer:
+
+| Sample | Before | After | Corrections after |
+| --- | --- | --- | --- |
+| 0 | 1 .93 1 .96 1 .95 1 .93 1 | 1 .95 1 1 1 .96 1 .94 .94 | 2 escalations: the rear run's location (Haiku's second reading gave none; Sonnet confirmed rear), and run-3's location, read as a return by identification, settled to side (Haiku's second reading and Sonnet agreed) |
+| 1 | .75 .76 1 .81 .98 .70 1 .77 1 | .75 .76 1 .81 .98 .70 1 .77 1 | none: every second reading confirmed its fact (the return run is lost at identification, before any reading) |
+| 2 | 1 .89 1 .96 .96 .93 1 .91 1 | 1 .89 1 .96 .94 .91 1 .90 .94 | 1 escalation, unsettled: run-3's location read as a return by identification, a side by Sonnet, none by Haiku's second reading, so it's held conflicting and its findings ask for information |
+
+The garage cases score the same before and after on every sample (all 1.00 but baseline's writer .75 on sample 1 and
+documents .88 on sample 2, and fee-not-paid's facts .80 on samples 1 and 2), with no corrections: their values verify
+and their deciding facts' second readings confirm. The writer's .94 on two fence samples is the judge faulting one part
+of a summary written over the changed findings.
+
+So the change holds the scores within sample noise (fence findings .96, .70, .91 against .95, .70, .93) and turns two
+places where the review used a value only one reading supported into either a settled value or an open question. The
+fence's remaining misses are the ones listed above (the return run, facts near the threshold, the review fee); none of
+the cases' stated values exercise the verifier's rejection path, since no packet states a height or a date the
+grammars couldn't read, so its benefit for unusual phrasing shows in the unit tests rather than these scores.
+
+Cost: the verification pass now reads 18 to 25 fence facts instead of 17 (about $0.003 more), and an escalation reads
+the whole packet on Sonnet at about $0.04 each, so a fence review costs about $0.10 to $0.18 depending on disputes
+(before: about $0.10); the garage packets are unchanged. Spend on this work: about $0.60 (the first after-runs'
+escalations $0.49, Haiku second readings $0.02, the writer's judge on changed summaries about $0.08). The three
+corrections from the final after-runs were exported to the new Langfuse dataset `entity-facts`
+(`pnpm review:corrections`).
+
+### Round 2 (review): generic prompts
+
+2026-10-09, `pnpm eval:review` and `--sample 1`, `--sample 2`, all five cases: runs `23-21-48`, `23-21-50-sample-1`,
+`23-21-52-sample-2`. Everything that named the sample came out at once (decisions above): the generic prompt versions,
+generic schema descriptions, the cited rulebook data, scope notes and value meanings in the prompts' inputs, the merged
+rules file without the hand-added garage enclosure category, and the fence packet's image descriptions regenerated
+with `hoa-visual-description` v3 (its earlier descriptions were written by the fitted v2; the old packet is kept as
+`packet-visuals-v2.json` beside the fixture). Before: the last recorded runs, `22-57-46` and its samples (the section
+above). Scores as entities / facts / documents / normalization / evidence / findings / recommendation / action items /
+writer:
+
+| Case (slice) | Before, samples 0, 1, 2 | After, sample 0 | After, sample 1 | After, sample 2 |
+| --- | --- | --- | --- | --- |
+| fence-application (real; held out from now on) | findings .96 .70 .91; return run lost on sample 1 | .75 .73 1 .95 .71 .66 1 .64 1 | .75 .71 1 1 .79 .66 1 .65 1 | .75 .69 1 .86 .89 .62 1 .60 1 |
+| garage-baseline (synthetic, tuning) | all 1.00 but writer .75 (s1), documents .88 (s2) | entities .75, else 1.00 | entities .75, else 1.00 | all 1.00 |
+| garage-attic (synthetic, tuning) | all 1.00 | all 1.00 | all 1.00 | all 1.00 |
+| garage-fee-not-paid (synthetic, tuning) | all 1.00 but facts .80 (s1, s2) | entities .75, facts .80 | entities .75, facts .80, findings .93, action items .80 | entities .75, facts .80 |
+| garage-replacement-plans (synthetic, tuning) | all 1.00 | .67 .80 1 1 1 .93 1 .67 .67 | all 1.00 | all 1.00 |
+
+Every recommendation is still right. The drop is the expected cost of removing instance hints, and it's reported here
+rather than fixed by adding them back:
+
+- **Fence: the return run.** Identification no longer names the short stretch from the side lot line to the house that
+  holds the gate, on any sample (the fitted v11 lost it one time in three). Its findings are missing, and the gate is
+  placed on a side run. The rulebook's return fence definition (from Guidelines 5.5.1(i)) reaches the model; how a
+  gate symbol fills that stretch was the fitted hint.
+- **Fence: facts held uncertain.** Board orientation is read from the photo offered as a copy of the new fence at 0.8,
+  below the fact threshold, so 5.2.5 and 5.9.1 become missing information instead of not met; the fitted prompt's
+  example ("boards plainly horizontal in the photo" at 0.9) set that confidence. Side runs' borders and locations
+  read uncertain on some samples. Evidence fell (.71 to .89) with the new image descriptions.
+- **Garages: one extra entity.** The baseline and fee-not-paid packets get an `exterior-item` for the wall and window
+  that close the garage door opening on most samples (the fitted prompt named that case); replacement-plans named the
+  replacement garage as a second work item on sample 0. The fee's "paid" reading is still uncertain, as before.
+
+Next, on the tuning slice only: the garage extra entity is a generic question (when is a part of the work its own
+item?) to answer with the garage cases; the fence's misses are recorded and stay unfixed until a generic change helps
+the tuning slice or the Design Guidelines' text supports more rulebook data. Spend: about $0.88 for the three runs and
+$0.30 for the writer's judge, plus about $0.01 to regenerate the image descriptions.

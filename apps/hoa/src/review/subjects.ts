@@ -6,15 +6,15 @@ import { modelEvidence, toEvidence, type FactAnswer } from "./factSchema"
 
 // Subjects (application-review.md, Subjects): the entities the model names, kept when their type is a candidate, plus
 // the request, the lot and the community, and one work entity for the project when the model named none. What an
-// entity is and how it relates are part of naming it: the run a gate is on, and a kind whose criteria fix one of its
-// properties (a return fence's location is return), become readings of those properties. A reading identification gives
-// at or above the fact threshold stands for its entity and property; below it, the facts stage's reading is weighed
-// with it in normalization.
+// entity is and how it relates are part of naming it: what it refers to, and a kind whose criteria fix one of its
+// properties (a kind defined by one location fixes the location), become readings of those properties. A reading
+// identification gives at or above the fact threshold stands for its entity and property; below it, the facts
+// stage's reading is weighed with it in normalization.
 
 export const subjectsAnswerSchema = z.object({
   entities: z.array(
     z.object({
-      id: z.string().describe("A short id: run-1, gate-1, space-1."),
+      id: z.string().describe("A short id: a word for its type and a number, such as item-1."),
       type: z.string().describe("A type from the candidate types."),
       label: z.string().describe("A label a homeowner would recognize."),
       evidence: z.array(modelEvidence),
@@ -27,7 +27,7 @@ export const subjectsAnswerSchema = z.object({
           })
         )
         .default([])
-        .describe("What it refers to, when the packet places it: the fence run a gate is on."),
+        .describe("What it refers to, when the packet places it."),
       kinds: z
         .array(
           z.object({
@@ -36,9 +36,7 @@ export const subjectsAnswerSchema = z.object({
           })
         )
         .default([])
-        .describe(
-          "Which of its type's kinds it is, when the packet shows it: a run from a lot line to the house is a return fence."
-        )
+        .describe("Which of its type's kinds it is, by each kind's definition, when the packet shows it.")
     })
   )
 })

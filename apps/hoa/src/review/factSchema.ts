@@ -50,6 +50,9 @@ export type FactSchemaContext = {
   units: readonly { key: T.TermKey; dimension: T.Dimension }[]
 }
 
+/** A fraction a quantity reading may give where a decimal can't be exact: "2/3". */
+export const exactFraction = /^\d+\/[1-9]\d*$/
+
 const enumOr = (values: readonly string[]) => {
   const [first, ...rest] = values
   return first === undefined ? z.string() : z.enum([first, ...rest])
@@ -61,7 +64,14 @@ function readingOf(property: PlannedProperty, context: FactSchemaContext): z.Zod
     case "quantity": {
       const dimension = context.vocabulary.unit(valueType.unit)?.dimension
       const units = context.units.filter((unit) => unit.dimension === dimension).map((unit) => unit.key)
-      return z.object({ value: z.number(), unit: enumOr(units.length > 0 ? units : [valueType.unit]) })
+      return z.object({
+        value: z
+          .union([z.number(), z.string().regex(exactFraction)])
+          .describe(
+            'The amount exactly as the words give it, in the unit you name: a number such as 6 or 6.5, or a fraction such as "2/3" when it has no exact decimal.'
+          ),
+        unit: enumOr(units.length > 0 ? units : [valueType.unit])
+      })
     }
     case "count":
       return z.number().int().nonnegative()
@@ -104,7 +114,7 @@ function askedOf(property: Pick<PlannedProperty, "owner">, group: Group, context
   )
 }
 
-/** An answer for every entity of a type (one color for the whole fence) as one answer per entity without its own. */
+/** An answer for every entity of a type (one color for the whole project) as one answer per entity without its own. */
 export function expandShared(
   answer: FactsAnswer,
   plan: FactPlan,
@@ -140,7 +150,9 @@ export function factsAnswerSchema(plan: FactPlan, group: Group, context: FactSch
       stated: z
         .string()
         .nullable()
-        .describe("The value exactly as the packet writes it; null when only drawn or shown."),
+        .describe(
+          "The value exactly as the packet writes it, and only the value: code checks every number in it against the reading. Null when only drawn or shown."
+        ),
       // A reading that doesn't fit its type (a label where a value's key belongs) is dropped rather than failing the
       // whole answer: normalization reads the stated value instead. (The fallback must be a constant: the schema the
       // model sees is generated from this one.)

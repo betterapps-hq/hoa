@@ -2,7 +2,7 @@
   "id": "garage-replacement-plans",
   "title": "Garage enclosure with plans for a replacement garage",
   "application": {
-    "projectKind": null,
+    "projectType": null,
     "description": "Convert the attached two-car garage into a family room.",
     "submittedOn": "2026-10-01"
   },

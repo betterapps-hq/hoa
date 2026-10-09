@@ -42,8 +42,13 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
   the call with the prompt's name and label. There's no local copy to fall back to.
 - To add a prompt, create it in Langfuse as a **text** prompt using `{{variable}}` placeholders, label the version to
   serve, then add its name to the registry. The Langfuse MCP server or the Langfuse UI can create and edit prompts.
-- Rule extraction and consolidation run on `anthropic/claude-opus-5.5`, the review's document review on
-  `anthropic/claude-sonnet-5.5` and its other stages on `anthropic/claude-haiku-5.5`, through their prompts'
+- **Prompts are generic.** No prompt names an organization's terms, a project type, a product, a material, a place or
+  an example from a sample case. A prompt takes inputs (the request, the project type's label and description, the
+  relevant rules, the rulebook's vocabulary); what's known about one organization lives in its rulebook's terms (definitions,
+  scope notes, value meanings) and its project types. Before adding any mechanism, ask what it costs with 5, 10 and 100
+  customers.
+- Rule extraction and consolidation run on `anthropic/claude-opus-5.5`, the review's document review and the project
+  type suggestions on `anthropic/claude-sonnet-5.5` and the review's other stages on `anthropic/claude-haiku-5.5`, through their prompts'
   `config.model`, as do the evaluation judges; a stage whose prompt names no model uses `OPENROUTER_MODEL` or
   `OPENROUTER_SMALL_MODEL`.
 - A prompt whose contract changes (new variables or output) gets a new name, so two contracts never share a label.
@@ -89,7 +94,8 @@ When a feature needs a production evaluator:
 - **Model per prompt.** `runTextPrompt` and `runObjectPrompt` take a model factory and a default model id, and build
   the model after loading the prompt: the version's `config.model` when it names one, else the default
   (`OPENROUTER_MODEL`, or `OPENROUTER_SMALL_MODEL` for routing, structure and classification). Results report the
-  `modelId` used.
+  `modelId` used. A stage that escalates a disputed answer runs the same version on its `config.escalationModel` (the
+  review's facts: design/application-review.md, Recognition).
 - **Content cache.** Pass a `cache` to reuse results: the key covers the trace name, model, compiled prompt and
   attachments, so only a real change triggers a new model call. Cached results report `isCached` and cost 0.
 

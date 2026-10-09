@@ -1,20 +1,27 @@
-import type { EngineVocabulary } from "@/engine/vocabulary"
+import invariant from "tiny-invariant"
+import { z } from "zod"
+import * as D from "@/engine/decimal"
+import { toBase, type EngineVocabulary } from "@/engine/vocabulary"
 import { coreTerms } from "@/schema/coreTerms"
 import type * as T from "@/schema/types"
 import type { TermContent } from "@/schema/zod"
 import { parseDate } from "@/text/date"
 import { matchLabel } from "@/text/match"
 import { parseQuantity, type UnitLabels } from "@/text/quantity"
+import type { Correction, CorrectionReading } from "./corrections"
 import { labelsOf } from "./documentTypes"
 import type { FactPlan, PlannedProperty, PlannedValue } from "./factPlan"
-import { toEvidence, type FactAnswer } from "./factSchema"
+import { exactFraction, toEvidence, type FactAnswer } from "./factSchema"
 import type { Normalization } from "./reviewModel"
+import { checkCount, checkDate, checkQuantity, type ExactQuantity, type ValueProblem } from "./valueCheck"
 import { isFound, recited, type PageTexts } from "./verifyEvidence"
 
-// Normalize (application-review.md, Normalize): stated values to typed values with no model. Quantities through the
-// quantity grammar, choices matched to the property's value terms (exact, normalized, fuzzy), dates through the date
-// grammar, references to entity ids. Then evidence verification (a quote cited on the wrong page is cited where it is),
-// conflicts between readings, and the organization's fact confidence threshold.
+// Normalize (application-review.md, Normalize): the model's readings to typed values, checked by code. Quantities,
+// counts and dates are the model's values verified generically against the words they were read from, with the
+// grammars as fast checks; choices are matched to the property's value terms (exact, normalized, fuzzy), else the
+// model's reading; references to entity ids. Then evidence verification (a quote cited on the wrong page is cited
+// where it is), conflicts between readings, and the organization's fact confidence threshold. Every value code
+// rejects or reads differently is recorded as a correction.
 
 export type NormalizeContext = {
   plan: FactPlan
@@ -33,7 +40,18 @@ export type NormalizeContext = {
   at: T.Timestamp
 }
 
-type Reading = { value: T.FactValue | null; normalization: Omit<Normalization, "entity" | "property"> | null }
+type Reading = {
+  value: T.FactValue | null
+  /** Values read but not accepted, held as the fact's candidates; the value alone when not given. */
+  candidates?: T.FactValue[]
+  normalization: Omit<Normalization, "entity" | "property"> | null
+  /** A value code rejected, or a fast check that read the words differently. */
+  check?: {
+    kind: Extract<Correction["kind"], "verifier-rejected" | "check-disagrees">
+    problems: ValueProblem[]
+    readings: { by: "model" | "grammar"; value: T.FactValue }[]
+  }
+}
 
 const unread: Reading = { value: null, normalization: null }
 
@@ -78,7 +96,7 @@ function readChoice(answer: FactAnswer, values: readonly PlannedValue[], isCompl
       normalization: { stated: text, matchedLabel: matched.label, kind: matched.kind, score: matched.score }
     }
   }
-  // Labels can be phrases the packet never uses ("enclosing a garage as living space"): the model's reading names the
+  // Labels can be phrases the packet never uses (a value term labeled with a phrase from the governing text): the model's reading names the
   // allowed value it took the stated words for, and stands when no label matches them.
   if (fromReading) {
     return {
@@ -91,34 +109,119 @@ function readChoice(answer: FactAnswer, values: readonly PlannedValue[], isCompl
   return { value: isComplete ? null : { type: "value", term: null, text }, normalization }
 }
 
-function readQuantity(answer: FactAnswer, property: PlannedProperty, context: NormalizeContext): Reading {
-  if (answer.stated === null) {
-    return unread
+/**
+ * A value the model proposed, checked by the generic verifier, with a fast check (a grammar) read from the same words
+ * when it has one. The model's value stands when it verifies and the fast check doesn't verify another; a fast check's
+ * value stands when the model's doesn't verify; two verified values that differ leave both as candidates. The grammar
+ * never gates: a form it can't read leaves the model's verified value standing.
+ */
+type Proposal<V> = {
+  model: V | null
+  fast: V | null
+  problems: (value: V) => ValueProblem[]
+  isSame: (a: V, b: V) => boolean
+  toValue: (value: V) => T.FactValue
+  label: (value: V) => string | null
+}
+
+function verifiedReading<V>(stated: string | null, proposal: Proposal<V>): Reading {
+  const { model, fast } = proposal
+  const normalization = (kind: "parsed" | "verified" | "none", value: V | null) =>
+    stated === null ? null : { stated, matchedLabel: value === null ? null : proposal.label(value), kind, score: null }
+  const readings = [
+    ...(model === null ? [] : [{ by: "model" as const, value: proposal.toValue(model) }]),
+    ...(fast === null ? [] : [{ by: "grammar" as const, value: proposal.toValue(fast) }])
+  ]
+  const modelProblems = model === null ? [] : proposal.problems(model)
+  const isFastVerified = fast !== null && proposal.problems(fast).length === 0
+  if (model !== null && modelProblems.length === 0) {
+    if (fast !== null && isFastVerified && !proposal.isSame(model, fast)) {
+      return {
+        value: null,
+        candidates: readings.map((reading) => reading.value),
+        normalization: normalization("none", null),
+        check: { kind: "check-disagrees", problems: [], readings }
+      }
+    }
+    const isParsed = fast !== null && proposal.isSame(model, fast)
+    return { value: proposal.toValue(model), normalization: normalization(isParsed ? "parsed" : "verified", model) }
   }
-  const parsed = parseQuantity(answer.stated, context.units)
-  const unit = property.valueType.type === "quantity" ? property.valueType.unit : null
-  const dimension = unit ? context.vocabulary.unit(unit)?.dimension : undefined
-  const isSameDimension = parsed !== null && context.vocabulary.unit(parsed.unit)?.dimension === dimension
-  const normalization = { stated: answer.stated, matchedLabel: null, score: null }
-  if (parsed?.type !== "single" || !isSameDimension) {
-    return { value: null, normalization: { ...normalization, kind: "none" } }
+  const check = model === null ? undefined : { kind: "verifier-rejected" as const, problems: modelProblems, readings }
+  if (fast !== null && isFastVerified) {
+    return { value: proposal.toValue(fast), normalization: normalization("parsed", fast), check }
   }
   return {
-    value: { type: "quantity", value: parsed.value, unit: parsed.unit },
-    normalization: { ...normalization, matchedLabel: context.vocabulary.label(parsed.unit), kind: "parsed" }
+    value: null,
+    candidates: model === null ? [] : [proposal.toValue(model)],
+    normalization: normalization("none", null),
+    check
   }
 }
 
+const quantityReading = z.object({ value: z.union([z.number(), z.string().regex(exactFraction)]), unit: z.string() })
+
+/** A quantity reading's amount, exactly: a number by its decimal form, or a fraction. */
+function exactAmount(value: number | string) {
+  if (typeof value === "number") {
+    return D.exact(value)
+  }
+  const [numerator = "0", denominator = "1"] = value.split("/")
+  return D.divide(D.exact(numerator), D.exact(denominator))
+}
+
+function readQuantity(answer: FactAnswer, property: PlannedProperty, context: NormalizeContext): Reading {
+  const { vocabulary } = context
+  invariant(property.valueType.type === "quantity", "a quantity property")
+  const expectedUnit = property.valueType.unit
+  const reading = quantityReading.safeParse(answer.reading)
+  const parsed = answer.stated === null ? null : parseQuantity(answer.stated, context.units)
+  const units = context.units.map((unit) => unit.unit)
+  const inBase = (quantity: ExactQuantity) => toBase(vocabulary, quantity.value, quantity.unit)
+  return verifiedReading<ExactQuantity>(answer.stated, {
+    model: reading.success ? { value: exactAmount(reading.data.value), unit: reading.data.unit } : null,
+    fast: parsed?.type === "single" ? { value: D.exact(parsed.value), unit: parsed.unit } : null,
+    problems: (quantity) => checkQuantity(answer.stated, quantity, expectedUnit, { vocabulary, units }),
+    isSame: (a, b) => {
+      const [first, second] = [inBase(a), inBase(b)]
+      return (
+        first !== undefined &&
+        second !== undefined &&
+        first.dimension === second.dimension &&
+        D.compare(first.value, second.value) === 0
+      )
+    },
+    toValue: (quantity) => ({ type: "quantity", value: D.toNumber(quantity.value), unit: quantity.unit }),
+    label: (quantity) => vocabulary.label(quantity.unit)
+  })
+}
+
+const isIsoDate = (value: unknown): value is T.IsoDate =>
+  isString(value) && isoDate.test(value) && new Date(`${value}T00:00:00Z`).toISOString().startsWith(value)
+
 function readDate(answer: FactAnswer, context: NormalizeContext): Reading {
-  const text = answer.stated ?? (isString(answer.reading) ? answer.reading : null)
-  if (text === null) {
-    return unread
-  }
-  const value = parseDate(text, context.referenceDate)
-  return {
-    value: value ? { type: "date", value } : null,
-    normalization: { stated: text, matchedLabel: value, kind: value ? "parsed" : "none", score: null }
-  }
+  return verifiedReading<T.IsoDate>(answer.stated, {
+    model: isIsoDate(answer.reading) ? answer.reading : null,
+    fast: answer.stated === null ? null : parseDate(answer.stated, context.referenceDate),
+    problems: (date) => checkDate(answer.stated, date),
+    isSame: (a, b) => a === b,
+    toValue: (date) => ({ type: "date", value: date }),
+    label: (date) => date
+  })
+}
+
+/** A count: the model's number, checked against any numerals its words write. Counts record no normalization. */
+function readCount(answer: FactAnswer): Reading {
+  const { reading } = answer
+  const count = typeof reading === "number" && Number.isInteger(reading) && reading >= 0 ? reading : null
+  const verified = verifiedReading<number>(answer.stated, {
+    model: count,
+    fast: null,
+    problems: (value) => checkCount(answer.stated, value),
+    isSame: (a, b) => a === b,
+    toValue: (value) => ({ type: "number", value }),
+    label: () => null
+  })
+  return { ...verified, normalization: null }
 }
 
 /**
@@ -157,7 +260,7 @@ function readValue(answer: FactAnswer, property: PlannedProperty, context: Norma
     case "boolean":
       return { value: typeof reading === "boolean" ? { type: "boolean", value: reading } : null, normalization: null }
     case "count":
-      return { value: typeof reading === "number" ? { type: "number", value: reading } : null, normalization: null }
+      return readCount(answer)
     case "reference":
       return {
         value:
@@ -218,9 +321,9 @@ function toFact(answer: FactAnswer, property: PlannedProperty, context: Normaliz
   }
   if (answer.state === "absent") {
     const fact: T.Fact = { ...base, state: "absent", value: null, candidates: [] }
-    return { fact, normalization: null }
+    return { fact, normalization: null, correction: null }
   }
-  const { value, normalization } = readValue(answer, property, context)
+  const { value, candidates, normalization, check } = readValue(answer, property, context)
   const isVerified = evidence.some((item) => isFound(item, context.pageText))
   const isReliable =
     answer.state === "known" && value !== null && isVerified && answer.confidence >= context.factConfidence
@@ -230,11 +333,28 @@ function toFact(answer: FactAnswer, property: PlannedProperty, context: Normaliz
         ...base,
         state: answer.state === "conflicting" ? "conflicting" : "uncertain",
         value: null,
-        candidates: value ? [value] : []
+        candidates: value ? [value] : (candidates ?? [])
       }
+  const correction: Correction | null = check
+    ? {
+        kind: check.kind,
+        entity: answer.entity,
+        property: property.key,
+        stated: answer.stated,
+        problems: check.problems,
+        readings: check.readings.map(({ by, value: read }): CorrectionReading =>
+          by === "model"
+            ? { by, modelId: null, state: answer.state, value: read, confidence: answer.confidence, evidence }
+            : { by, modelId: null, state: null, value: read, confidence: null, evidence: [] }
+        ),
+        result: { state: fact.state, value: fact.value },
+        at: context.at
+      }
+    : null
   return {
     fact,
-    normalization: normalization ? { entity: answer.entity, property: property.key, ...normalization } : null
+    normalization: normalization ? { entity: answer.entity, property: property.key, ...normalization } : null,
+    correction
   }
 }
 
@@ -285,7 +405,8 @@ export function normalizeFacts(answers: readonly FactAnswer[], context: Normaliz
       ),
       ...normalized.filter((item) => item.many).map((item) => item.fact)
     ],
-    normalizations: normalized.flatMap((item) => (item.normalization ? [item.normalization] : []))
+    normalizations: normalized.flatMap((item) => (item.normalization ? [item.normalization] : [])),
+    corrections: normalized.flatMap((item) => (item.correction ? [item.correction] : []))
   }
 }
 
@@ -307,7 +428,7 @@ export function unitLabels(rulesFile: T.RulesFile, vocabulary: EngineVocabulary)
 export function partyValues(rulesFile: T.RulesFile, vocabulary: EngineVocabulary): PlannedValue[] {
   return allTerms(rulesFile).flatMap((term) =>
     term.kind === "thing" && term.nature === "party" && vocabulary.get(term.key) === term
-      ? [{ key: term.key, labels: labelsOf(vocabulary, term.key) }]
+      ? [{ key: term.key, labels: labelsOf(vocabulary, term.key), meaning: null }]
       : []
   )
 }

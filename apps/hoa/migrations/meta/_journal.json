@@ -29,6 +29,13 @@
       "when": 1791564637107,
       "tag": "0003_application_project_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791588330869,
+      "tag": "0004_project_types",
+      "breakpoints": true
     }
   ]
 }

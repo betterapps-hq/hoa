@@ -69,8 +69,13 @@ function encode(text: string, isFirstTry: boolean) {
   }
 }
 
-/** Answers each build prompt the way the model would. */
-function answer(text: string) {
+/** Answers a repair like an encoder: the whole draft again, for the provisions it names. */
+function repair(text: string) {
+  const keys = [...variableOf(text, "draft").matchAll(/"key":"([^"#]+)"/g)].map((match) => `[${match[1] ?? ""}]`)
+  return encode(`## provisions\n${keys.join("\n")}`, false)
+}
+
+/** Answers each build prompt the way the model would. */ function answer(text: string) {
   if (text.startsWith(`# ${pipelinePrompts.termExtraction.name}`)) {
     return {
       terms: [
@@ -89,8 +94,7 @@ function answer(text: string) {
     return encode(text, true)
   }
   if (text.startsWith(`# ${pipelinePrompts.encodingRepair.name}`)) {
-    const keys = [...variableOf(text, "draft").matchAll(/"key":"([^"#]+)"/g)].map((match) => `[${match[1] ?? ""}]`)
-    return encode(`## provisions\n${keys.join("\n")}`, false)
+    return repair(text)
   }
   if (text.startsWith(`# ${pipelinePrompts.rulebookConsolidation.name}`)) {
     return { duplicates: [], overrides: [], conflicts: [], termMerges: [] }
@@ -301,6 +305,46 @@ describe("buildRulebook", () => {
         message: expect.stringContaining("Zod")
       })
     ])
+  })
+
+  it("keeps a valid draft when its repair fails Zod", async () => {
+    // The conduct rules' rule applies to a term nobody defines, and every repair answer lacks its provisions.
+    const breaking = scriptedModel((text) => {
+      if (text.startsWith(`# ${pipelinePrompts.encodingRepair.name}`)) {
+        return { provisions: null }
+      }
+      if (
+        text.startsWith(`# ${pipelinePrompts.provisionEncoding.name}`) &&
+        unitKeys(text).includes("conduct-rules:a")
+      ) {
+        const draft = encode(text, false)
+        return { ...draft, rules: draft.rules.map((rule) => ({ ...rule, appliesTo: "noise-source" })) }
+      }
+      return answer(text)
+    })
+    const { step, names } = stepRunner()
+    const result = await buildRulebook(input({ step, ai: { ...input().ai, createModel: () => breaking } }))
+    expect(names).toContain("repair:conduct-rules:exhibit-a:1")
+    expect(result.report.units.find((unit) => unit.id === "conduct-rules:exhibit-a")).toMatchObject({ isValid: true })
+    expect(result.content.rules.find((rule) => rule.key === "conduct-rules:a#no-noise")?.issues).not.toEqual([])
+    expect(result.failures).toEqual([])
+  })
+
+  it("keeps a valid draft when its repair leaves more problems", async () => {
+    // The conduct rules' rule applies to a term nobody defines; the repair adds a second undefined term.
+    const worsening = scriptedModel((text) => {
+      const isRepair = text.startsWith(`# ${pipelinePrompts.encodingRepair.name}`)
+      if (isRepair || unitKeys(text).includes("conduct-rules:a")) {
+        const draft = isRepair ? repair(text) : encode(text, false)
+        const bearer = isRepair ? { bearer: "noise-maker" } : {}
+        return { ...draft, rules: draft.rules.map((rule) => ({ ...rule, appliesTo: "noise-source", ...bearer })) }
+      }
+      return answer(text)
+    })
+    const result = await buildRulebook(input({ ai: { ...input().ai, createModel: () => worsening } }))
+    const rule = result.content.rules.find((item) => item.key === "conduct-rules:a#no-noise")
+    expect(rule).toMatchObject({ bearer: "owner" })
+    expect(result.failures).toEqual([])
   })
 
   it("asks the model for the outline when the parser can't number a document", async () => {

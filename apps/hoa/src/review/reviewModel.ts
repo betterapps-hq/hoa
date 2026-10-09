@@ -1,6 +1,7 @@
 import { z } from "zod"
 import { evaluationRequest, evidence, finding } from "@/schema/zod"
 import { promptVersionSchema } from "@/shared/schemas"
+import { correctionSchema } from "./corrections"
 
 // The review record (application-review.md, Save): what the review read from the packet, the rules it considered,
 // the engine's findings and decision, and the written summary. It goes to R2 as JSON; D1 keeps a summary.
@@ -38,8 +39,11 @@ export const documentResultSchema = z.object({
 })
 export type DocumentResult = z.infer<typeof documentResultSchema>
 
-/** How a stated value became a typed value; "reading" is the model's reading, when no label matched the words. */
-export const normalizationKinds = ["exact", "normalized", "fuzzy", "reading", "parsed", "none"] as const
+/**
+ * How a stated value became a typed value; "reading" is the model's reading, when no label matched the words;
+ * "verified" the model's value checked against the words by the generic verifier, "parsed" one a grammar read too.
+ */
+export const normalizationKinds = ["exact", "normalized", "fuzzy", "reading", "parsed", "verified", "none"] as const
 
 export const normalizationSchema = z.object({
   entity: z.string(),
@@ -81,6 +85,11 @@ export const reviewSchema = z.object({
   normalizations: z.array(normalizationSchema),
   judgments: z.array(judgmentResultSchema),
   conditionAnswers: z.array(conditionAnswerSchema),
+  /**
+   * Values code rejected or read differently, and disputes between readings (application-review.md, Recognition).
+   * Reviews saved before corrections were recorded have none.
+   */
+  corrections: z.array(correctionSchema).default([]),
   findings: z.array(finding),
   recommendation: z.enum(recommendations),
   changes: z.array(actionItemSchema),

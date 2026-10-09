@@ -35,7 +35,7 @@ export function scoreReport(input: {
       .map(([name, version]) => `${name} v${version}`)
       .join(", ")}; judge hoa-eval-encoding-judge v${input.judgeVersion}.`,
     `Cost: encoding $${input.cost.encoding.toFixed(2)}, judging $${input.cost.judge.toFixed(2)}.`,
-    `Counts: ${judge.counts.references} golden rules, ${judge.counts.judgedRules} pipeline rules judged, ${judge.counts.provisions} provisions judged, ${judge.pairs.length} pairs, ${details.checks.filter((check) => check.isComparable).length} of ${details.checks.length} pairs the engine evaluates comparable, ${terms.terms} golden terms, ${validity.units} units.`,
+    `Counts: ${judge.counts.references} golden rules, ${judge.counts.judgedRules} pipeline rules judged, ${judge.counts.provisions} provisions judged, ${judge.pairs.length} pairs, ${details.checks.filter((check) => check.isComparable).length} of ${details.checks.length} pairs the engine evaluates comparable, ${terms.terms} golden terms (${terms.byJudge} matched by the term judge), ${validity.units} units.`,
     "",
     `${passed} of ${measures.length} bars cleared.`,
     "",

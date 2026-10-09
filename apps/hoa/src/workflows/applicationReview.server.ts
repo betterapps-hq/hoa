@@ -21,6 +21,7 @@ import {
 import { createDatabase } from "@/db/database"
 import { getHoa } from "@/db/hoaRepository"
 import { getJob, updateJob } from "@/db/jobRepository"
+import { getProjectType } from "@/db/projectTypeRepository"
 import { getPublishedRulesFile } from "@/db/rulebookContentRepository"
 import { env } from "@/env.server"
 import type { StepRunner } from "@/jobs/steps"
@@ -113,7 +114,7 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
         return versions
       })
 
-      // 2. Load: the application, the published rules file and the settings.
+      // 2. Load: the application and its type, the published rules file and the settings.
       await progress("load")
       const loaded = await step.do("load", storageStep, async () => {
         const application = await getApplication(db, hoaId, applicationId)
@@ -128,9 +129,13 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
         if (!hoa) {
           throw new NonRetryableError("The HOA no longer exists.")
         }
-        return { application, rulesFile, settings: hoa.settings, startedAt: now() }
+        const type = application.projectTypeId ? await getProjectType(db, hoaId, application.projectTypeId) : null
+        const projectType = type
+          ? { label: type.label, description: type.description, definition: type.definition }
+          : null
+        return { application, projectType, rulesFile, settings: hoa.settings, startedAt: now() }
       })
-      const { application } = loaded
+      const { application, projectType } = loaded
       // The file is read on every replay, never stored in a step: it's checked against its hash each time.
       const rulesFile = await readRulesFile(bucket, loaded.rulesFile)
 
@@ -254,7 +259,8 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
         rulesFile,
         application: {
           requestType: applicationRequestType,
-          projectKind: application.projectKind,
+          projectType,
+          answers: application.answers,
           description: application.description,
           // A review before submission is provisional; one after the committee asked for more is judged as of
           // the original submission.
@@ -296,6 +302,7 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
           normalizations: result.normalizations,
           judgments: result.judgments,
           conditionAnswers: result.conditionAnswers,
+          corrections: result.corrections,
           findings: result.findings,
           recommendation: result.recommendation,
           changes: result.changes,

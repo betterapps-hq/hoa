@@ -1,8 +1,8 @@
 import type { IsoDate } from "@/schema/types"
 
-// Dates as applications write them (application-review.md, Language processing), in US month-day order: "09/04/26",
-// "9-4-2026", "2026-09-04", "September 4, 2026", "Sept. 4", "4 September 2026". A small grammar of our own until the
-// text-analysis service's dateparser route exists; a date without a year takes the reference date's year.
+// Dates as applications write them (application-review.md, Recognition), in US month-day order: "09/04/26",
+// "9-4-2026", "2026-09-04", "September 4, 2026", "Sept. 4", "4 September 2026". A fast check on the model's reading of
+// a date, never a gate; a date without a year takes the reference date's year.
 
 const months: Record<string, number> = {
   jan: 1,
@@ -58,7 +58,8 @@ const patterns: { pattern: RegExp; read: (match: RegExpExecArray, year: number) 
   }
 ]
 
-function monthOf(name: string | undefined) {
+/** The month a name or abbreviation names ("Sept", "september"), or 0. */
+export function monthOf(name: string | undefined) {
   return months[(name ?? "").toLowerCase()] ?? 0
 }
 

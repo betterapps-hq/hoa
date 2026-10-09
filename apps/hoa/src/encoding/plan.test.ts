@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Provision } from "@/schema/types"
+import { termDraft } from "@/schema/zod"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
 import { estimateTokens, planUnits } from "./plan"
 import { analyzeReferences, citedProvisions } from "./references"
@@ -48,7 +49,7 @@ describe("planUnits on the sample Declaration", () => {
 
   it("stays within the token budget", () => {
     for (const unit of units) {
-      expect(tokensOf(unit.provisions)).toBeLessThanOrEqual(6000)
+      expect(tokensOf(unit.provisions)).toBeLessThanOrEqual(3000)
     }
   })
 
@@ -74,6 +75,36 @@ describe("planUnits on the sample Declaration", () => {
     expect(keys).toContain("lease")
     expect(keys).not.toContain("antenna-service")
     expect(unit?.matches.find((match) => match.key === "lot")).toMatchObject({ kind: "exact", score: 1 })
+  })
+
+  it("brings in the value sets the slice's choice properties choose from, with their values", () => {
+    const [first] = file.provisions
+    if (!first) {
+      throw new Error("No provision")
+    }
+    const provision = { ...first, key: "rules:1", label: "1", parentLabel: null, heading: null, intro: null }
+    const draft = (term: Record<string, unknown>) =>
+      termDraft.parse({ labels: [{ text: String(term.key), role: "preferred" }], citations: [], ...term })
+    const vocabulary = [
+      draft({ key: "widget", kind: "thing", nature: "object", labels: [{ text: "Widget", role: "preferred" }] }),
+      draft({
+        key: "widget.style",
+        kind: "property",
+        of: "widget",
+        valueType: { type: "choice", set: "style" },
+        ifUnstated: "unknown"
+      }),
+      draft({ key: "style", kind: "value-set" }),
+      draft({ key: "style.plain", kind: "value", set: "style" }),
+      draft({ key: "shade", kind: "value-set" }),
+      draft({ key: "shade.dark", kind: "value", set: "shade" })
+    ]
+    const [unit] = planUnits({
+      documents: [{ key: "rules", provisions: [{ ...provision, text: "Every Widget must be kept in good repair." }] }],
+      references: new Map(),
+      vocabulary
+    })
+    expect(unit?.terms.map((term) => term.key)).toEqual(["style", "style.plain", "widget", "widget.style"])
   })
 
   it("lists the core request types with their data", () => {

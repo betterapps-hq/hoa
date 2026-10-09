@@ -135,9 +135,100 @@ function forModel(value: unknown, hidden: ReadonlySet<string>): unknown {
 function checkAnswer<T>(schema: z.ZodType<T>, answer: unknown, codeFields?: CodeFields): CheckedAnswer<T> {
   const filled = codeFields ? codeFields.fill(answer) : answer
   const parsed = schema.safeParse(filled)
-  return parsed.success
-    ? { isValid: true, object: parsed.data }
-    : { isValid: false, answer: filled, issues: parsed.error.issues }
+  if (parsed.success) {
+    return { isValid: true, object: parsed.data }
+  }
+  const unwrapped = parsedJsonStrings(answer, parsed.error.issues)
+  return unwrapped === null
+    ? { isValid: false, answer: filled, issues: parsed.error.issues }
+    : checkAnswer(schema, unwrapped, codeFields)
+}
+
+/**
+ * The answer with every value the model sent as JSON text, where the schema wants an object or an array, parsed; null
+ * when there's none. Claude models sometimes send a large nested field of a tool call as its JSON text.
+ */
+function parsedJsonStrings(answer: unknown, issues: readonly z.core.$ZodIssue[]) {
+  let result = answer
+  for (const issue of issues) {
+    if (issue.code !== "invalid_type" || (issue.expected !== "object" && issue.expected !== "array")) {
+      continue
+    }
+    const value = valueAt(result, issue.path)
+    const parsed = typeof value === "string" ? leadingJson(value) : undefined
+    if (issue.expected === "array" ? Array.isArray(parsed) : isRecord(parsed)) {
+      result = withValueAt(result, issue.path, parsed)
+    }
+  }
+  return result === answer ? null : result
+}
+
+const isRecord = (value: unknown): value is Record<PropertyKey, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+function parseJson(text: string): unknown {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The JSON array or object a text starts with, ignoring what follows it: a model writing a field as JSON text sometimes
+ * closes the object around it inside the text too.
+ */
+function leadingJson(text: string): unknown {
+  const trimmed = text.trimStart()
+  let depth = 0
+  let isInString = false
+  let isEscaped = false
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const character = trimmed[index]
+    if (isInString) {
+      if (isEscaped) {
+        isEscaped = false
+      } else if (character === "\\") {
+        isEscaped = true
+      } else if (character === '"') {
+        isInString = false
+      }
+      continue
+    }
+    if (character === '"') {
+      isInString = true
+    } else if (character === "[" || character === "{") {
+      depth += 1
+    } else if (character === "]" || character === "}") {
+      depth -= 1
+      if (depth === 0) {
+        return parseJson(trimmed.slice(0, index + 1))
+      }
+    }
+  }
+  return undefined
+}
+
+function valueAt(value: unknown, path: readonly PropertyKey[]): unknown {
+  const [key, ...rest] = path
+  if (key === undefined) {
+    return value
+  }
+  if (Array.isArray(value) && typeof key === "number") {
+    return valueAt(value[key], rest)
+  }
+  return isRecord(value) ? valueAt(value[key], rest) : undefined
+}
+
+function withValueAt(value: unknown, path: readonly PropertyKey[], replacement: unknown): unknown {
+  const [key, ...rest] = path
+  if (key === undefined) {
+    return replacement
+  }
+  if (Array.isArray(value) && typeof key === "number") {
+    return value.map((item, index) => (index === key ? withValueAt(item, rest, replacement) : item))
+  }
+  return isRecord(value) ? { ...value, [key]: withValueAt(value[key], rest, replacement) } : value
 }
 
 /**

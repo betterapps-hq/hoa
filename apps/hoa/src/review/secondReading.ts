@@ -5,7 +5,7 @@ import type { FactAnswer } from "./factSchema"
 // value for, but below the organization's fact confidence, is read again in a focused call that asks only for it. When
 // both readings name the same value, the fact stands at the more confident of the two; when they don't, the first
 // reading stands as it was, uncertain. An entity the first reading skipped altogether while answering others of its
-// type (three fence runs answered, the fourth left out) is read again for every property of its group, and that
+// type (three items answered, the fourth left out) is read again for every property of its group, and that
 // reading is its only one.
 
 /** Whether an answer gives a value its reader wasn't confident enough in. */

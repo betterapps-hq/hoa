@@ -33,15 +33,15 @@ and every Workflow step name starts with it.
 | --- | --- | --- | --- | --- |
 | 1 | `resolve-prompts` | `resolve-prompts` | Prompt versions on the job | Code |
 | 2 | `structure` | `structure:{documentId}` | Provisions with keys, labels, intro, text, wrap-up and page anchors | Code; a model only for documents the parser can't number |
-| 3 | `analyze` | `analyze:{documentId}` | Cross-references, named documents, and per provision: definitions, quantities, durations and deontic cues | Code and the text-analysis service |
+| 3 | `analyze` | `analyze:{documentId}` | Cross-references and named documents | Code |
 | 4 | `vocabulary` | `vocabulary:{documentId}` | The organization's terms from definitions and defined-term usage | Model, one call per document with definitions |
 | 5 | `plan` | `plan` | Encoding units: provision subtrees within a token budget, with their context | Code |
 | 6 | `encode` | `encode:{unitId}` | An encoding draft per unit | Model, one call per unit, in parallel |
-| 7 | `verify` | `verify`, `verify:merged` | Zod and checker problems per draft, then per unit in the merged set | Code |
+| 7 | `verify` | `audit:{unitId}`, `verify`, `verify:merged` | The audit's values per provision; Zod, checker and audit problems per draft, then per unit in the merged set | Small model (the audit), then code |
 | 8 | `repair` | `repair:{unitId}:{round}` | Corrected drafts, at most two rounds | Model, only for units with problems |
 | 9 | `merge` | `merge` | One vocabulary, one rule set, settings, questions, coverage | Code |
 | 10 | `consolidate` | `consolidate` | Duplicates, cross-unit overrides, conflicts and questions | Model over summaries, then code |
-| 11 | `save-draft` | `save-draft`, `save-draft:scores`, `save-draft:finish` | The draft rulebook in D1, with carried-forward review decisions; the build's scores in Langfuse | Code |
+| 11 | `save-draft` | `save-draft`, `save-draft:scores`, `save-draft:finish`, then `follow-up:ids`, `follow-up` | The draft rulebook in D1, with carried-forward review decisions; the build's scores in Langfuse; a further build when the documents changed while this one ran | Code |
 | 12 | Review | | Approved, edited and rejected records | Administrator |
 | 13 | Publish | | The rules file in R2, with its hash | Code, in a server function |
 
@@ -55,7 +55,7 @@ Workflow step whose output goes to R2, and `pnpm eval:encoding` runs the same mo
 ### 1. Resolve prompts
 
 As today: pin every prompt the build uses (`hoa-term-extraction`, `hoa-provision-encoding`, `hoa-encoding-repair`,
-`hoa-rulebook-consolidation`, `hoa-structure-repair`) on the job.
+`hoa-rulebook-consolidation`, `hoa-structure-repair`, and `hoa-provision-audit` once built) on the job.
 
 ### 2. Structure
 
@@ -93,10 +93,8 @@ A reference grammar finds "Section 7.4(a)", "Article 4", "subsection (b) above",
 the citing provision's position). Unresolved document names become **referenced documents** (`edition: null`) so rules
 can enforce them by key and coverage can list them. References feed each encoding unit's context.
 
-The text-analysis service then reads every provision ([Language processing](#language-processing)) and stores, per
-provision: the definitions it states, the amounts, percentages, counts, durations and dates it mentions, and its
-deontic cues (modals with their negation, and exception markers). Vocabulary uses the definitions; verify uses the
-rest as cross-checks.
+The values each provision states (numbers, durations, parties, conditions) aren't extracted here: the audit in
+[Verify](#7-verify) reads them with a model and code checks them ([Recognition](#recognition)).
 
 ### 4. Vocabulary
 
@@ -123,7 +121,7 @@ items. Every unit gets:
 - the intros and wrap-ups of its ancestors, and the headings above it;
 - the text of every provision it references (step 3), truncated to 1,500 tokens each;
 - the **vocabulary slice**: every term whose labels appear in the unit's text or references (matched on normalized
-  labels and plurals, then fuzzily for OCR noise, see [Language processing](#language-processing)), every property of those things, and
+  labels and plurals, then fuzzily for OCR noise, see [Recognition](#recognition)), every property of those things, and
   the core terms;
 - the request types (core request things with their flow);
 - the keys of rules already proposed for provisions it references, when they're known from the previous rulebook.
@@ -165,8 +163,9 @@ Code, run on every draft and again whenever an administrator edits a record:
   `compliance-period`, clause `except` lists name sanctions.
 - **Coverage:** every provision in the unit has a rule, a term or clause citing it, or a no-rule reason; a cited
   provision with a no-rule reason is a problem.
-- **Language cross-checks:** quantity coverage (`unencoded-quantity`) and modality cues (`modality-cue-mismatch`),
-  from the analysis in step 3.
+- **Audit:** every number, duration, party and condition the audit read from a provision appears in a record citing it,
+  or the provision's no-rule note explains it (`unencoded-value`, `unencoded-party`, `unencoded-condition`;
+  [Recognition](#recognition)).
 - **Typing:** path steps are properties of the thing before them; comparisons and arithmetic follow the typing rules;
   values belong to their sets.
 
@@ -221,17 +220,43 @@ again.
 
 ### 11. Save draft
 
-The draft rulebook is written to D1 ([Storage](#storage)). **Carry forward:** a record whose key and content hash
-equal a record approved in the organization's last published rulebook keeps its approval, so a rebuild after one
-amendment only asks the administrator to review what changed. Everything else is `proposed`. The job reports counts:
-provisions, terms, rules by kind, uncovered provisions, issues.
+**When a build runs.** Uploading builds the rulebook: when `DocumentIngest` leaves a document `ready` (not a duplicate
+or a failure), it requests a build (`requestRulebookBuild`, `src/workflows/rulebookTrigger.server.ts`). A build reads
+the **current documents** (`currentDocumentIds`, `src/rulebook/currentDocuments.ts`): for each upload lineage, its
+highest version that is `ready`; an amendment is a lineage of its own. Requests coalesce. Nothing starts while an
+upload is still `processing` (the last one to finish requests the build, so several uploads in a row make one build),
+while a rulebook is `building`, or when no document is ready; the partial unique index settles two requests racing.
+When a build ends, finished or failed, its `follow-up` step requests another if the current documents differ from the
+ones it read; an unchanged set starts nothing, so a failed build isn't retried in a loop. The administrator's manual
+build (`startRulebookBuild`, the "try again") makes the same request without waiting for a change. A request's ids come from a
+Workflow step of their own, so a retried step reuses them: it finds the rulebook it inserted and creates the missing
+workflow instance, and a request whose workflow never starts fails its rulebook rather than leave it `building`. The
+build reads its documents in order of their keys, so a new version of one document doesn't reorder the others (term
+merging and rule key collisions follow document order, and with them the encoding units' cached context).
+
+The draft rulebook is written to D1 ([Storage](#storage)) and replaces the previous draft. **Carry forward**
+(`src/rulebook/carryForward.ts`): for each record, the first earlier rulebook holding one with the same key and content
+hash decides its review, approved, rejected or still proposed, with the resolutions of the issues it had then. The
+current draft decides first, then the published rulebook, so a rebuild keeps the review work on the draft and only asks
+about what changed. Rejected records stay in the draft with their status, so rejecting a record is how it's dropped,
+and stays dropped. The same goes for the settings (whose decision policy, which only the administrator sets, always
+carries), for a question asked again in the same words (its answer), and for a provision's no-rule reason: a reason
+the build gives again for the same wording keeps its review, and a reason someone gave a provision the build leaves
+uncovered comes back. Edits don't carry: a rule, term or clause an administrator edited comes back as the build
+encodes it, proposed. The job reports counts: provisions, terms, rules by kind, uncovered provisions, issues.
 
 ### 12. Review and 13. Publish
 
-The administrator works in [the rules UX](#ux). Publishing requires every record approved or rejected, every no-rule
-reason approved, no blocking issue, no uncovered provision, and approved records that make a valid rules file. Code assembles the rules file from the approved records (schema.md, Rules file),
-validates it with `rulesFile`, writes it to R2, stores its SHA-256 on the rulebook and marks the previous published
-rulebook `superseded`.
+The administrator works in [the rules UX](#ux). The draft view lists what it changes against the published rulebook
+(`src/rulebook/changes.ts`): records added, changed (the same key with another content hash) and removed (published,
+not rejected, and missing from the draft), whether the settings changed, and the uploads it reads that the published
+rulebook didn't, and the reverse. Nothing is deleted from a draft: Reject replaces deletion. The whole draft can be
+discarded (`discardRulebookDraft`), which deletes it and its records and leaves the published rulebook as it is.
+
+Publishing requires every record approved or rejected, every no-rule reason approved, no blocking issue, no uncovered
+provision, and approved records that make a valid rules file. Code assembles the rules file from the approved records
+(schema.md, Rules file), validates it with `rulesFile`, writes it to R2, stores its SHA-256 on the rulebook and marks
+the previous published rulebook `superseded`.
 
 ## Storage
 
@@ -263,60 +288,94 @@ A review records the rulebook id and the file's SHA-256, so it can always be rep
 
 ## UX
 
-The `/rules` route keeps its shape: a build card, a Draft tab and a Published tab. What changes:
+One page, `/rules` ("Rulebook" in the sidebar, for every role), holds the rulebook and the governing documents it's
+built from; `/documents` redirects to it. The page is quiet: one sentence about what's happening or next, at most one
+primary action, few counters, plain headings, and details behind a sheet, a disclosure or a secondary tab. Nothing on
+it names a document, organization, project type or term from a sample; lists are paged (25 to a page), so an
+organization with 2 documents or 20, 50 rules or 2,000, sees the same page.
 
-- **Build card:** documents are chosen as today. `JobProgress` has labels for the new stages (structure, analysis,
-  vocabulary, planning, encoding, checking, repairing, merging, consolidating, saving). A finished build shows its
-  counts and links to the problems. The Draft tab starts with the draft's counts, what blocks publishing, and
-  Publish.
-- **Draft tab**, as tabs inside it:
-  - **Rules:** `RuleTable` lists rules by domain (instead of topic), filtered by status, kind and request type. Each row
-    shows the title and the statement with term links rendered as labels. "Approve the rules shown" approves what a
-    filter shows, skipping (and saying why) any record something blocks; the Vocabulary and Coverage tabs have the
-    same.
-  - **Vocabulary:** terms with labels, kind, definition, where they're used, and review status. Approving a term is
-    separate from approving rules; a rule can't be approved while a term it reads is proposed.
-  - **Coverage:** a coverage report, read like a test coverage report. Each passage of a document's text counts as
-    one kind: cited by a rule (or a question deciding between rules), a term's definition, a settings clause, an
-    approved no-rule reason, a reason still to review, uncovered (a provision nothing cites, with no reason), or
-    outside any provision (page text the structure stage read but placed in no provision, found from the provisions'
-    anchors in the cleaned page text; page furniture and skipped front matter don't count). The report gives the share
-    of characters each kind covers, overall, per document and per article, as stacked bars. Below it, two views:
-    - **Document text:** the chosen document's text in reading order (parents before children, wrap-ups after
-      them, outside text where its page puts it), each passage tinted and labelled by its kind, with an icon and a
-      label as well as a color, and the gaps striped; the values the citing rules hold (amounts with their units,
-      numbers, fractions, dates, times) are underlined where the text states them, matched from the rules' own
-      constants. A list of gaps (uncovered provisions and outside text) jumps to each. Choosing a passage lists
-      everything that covers or cites it in a panel beside the text on wide screens and in a sheet on narrow ones:
-      the rules with their statements, the terms it defines with their definitions, the settings clauses, the
-      questions, its no-rule reason, the values its rules encode, and the provisions whose text refers to it (found
-      with the reference grammar of [References and analysis](#3-references-and-analysis)). Each item opens what it
-      names: a rule's card, a term's definition, a provision on its page. Choosing a passage from its label moves
-      focus to the panel, which leads back to the passage.
-    - **Provision list:** every provision in order with what cites it or its no-rule reason, uncovered provisions
-      first, searchable and filtered to the uncovered ones or the reasons to review, which can be approved together.
+**In force (an administrator's default view).** Three parts, top to bottom:
 
-    In either view an uncovered provision can be given a reason for having no rule. A reason an administrator gives
-    is approved as given; the build's are approved here. Coverage is computed from the records in
-    `src/rulebook/coverage.ts`, and the text outside provisions by `getSourceText`, which reads the uploads' pages.
-  - **Questions:** each interpretation or conflict question with its options; answering one approves the rules the
-    chosen option keeps and rejects the candidates it drops. A candidate can't be approved on its own while its
-    question is open.
-  - **Settings:** the clauses (precedence, time, liability, cure, deciders, sanction preconditions), each cited and
-    edited as JSON, and the policy; the settings are approved like a record.
-- **Every rule reference links to its citation**, through the same `RuleReference` the review uses
-  ([application-review.md, UX](application-review.md#ux)): rule rows, overrides and enforced rules on a card, the
-  rules a question keeps, the rules citing a provision in the coverage tab, and every issue's related rules.
-- **`RuleCard`** (in the Sheet) shows modality, bearer, subject, request types, applicability and the check, rendered
-  as sentences from the schema (`describeRule`), with every term as a `TermChip` (a popover with the term's labels and
-  definition, replacing `AttributeChip`). Citations open `DocumentViewer` at the provision, highlighted from its
-  anchors. Issues (resolved with a note), approve, reject and delete work as today, and a preview evaluates the rule
-  with the engine against facts typed in the card.
-- **Editing:** title, statement, modality, bearer, remedy and request types in a form. Checks and conditions in a
-  structured editor for the common shapes (compare, in, between, all/any, table rows, approval, document), and a JSON
-  editor with live validation for anything else. Every edit runs `validateRulebook` and shows its issues inline; an
-  edit with problems can be saved, and they block its approval.
-- **Published tab:** the same views, read-only, with the file's hash and "Download rules file".
+- **Status:** shown only when there's something to say, most pressing first (`rulebookStatus`): a build is running
+  (with `JobProgress`); a document is being read; a draft is ready ("A new draft of the rulebook is ready to review.
+  It was built after the Design Guidelines changed. It adds 5 rules, changes 12 rules and removes 2 rules." and
+  **Review changes**); the last build failed (**Try again**); the documents differ from the published rulebook's and
+  there's no draft (**Build a draft**); nothing is built yet (**Build the rulebook**).
+- **Governing documents:** each document's current version (kind, version, pages, date) with its earlier versions
+  behind a disclosure, and quiet actions: **Read** (the document viewer, page by page), **Download** (the original
+  file), and **New version** (a new edition that replaces it, or an amendment that changes part of it). **Upload** adds
+  a document. Uploading builds the rulebook on its own once the file is read ([Save draft](#11-save-draft)); there's
+  no separate build step.
+- **Rules in force:** the published version and date, the rules file to download, and the rulebook's records
+  read-only in quiet tabs (Rules, Terms, Coverage, Questions when there are any, Settings).
+
+**Reviewing a draft** is a focused mode (`/rules?review=draft`; with nothing published, it's what the page shows). It
+leads with the way back to the rules in force, what the draft changes against them, and **Discard draft**, whose
+confirmation says how many review decisions are lost and that the published version stays in force. Then the next step
+as one sentence with one action, from the draft's to-do list in the order the work goes (`draftTodos`): terms to
+review (a rule waits for the terms it reads), questions to answer, rules to review, the settings, reasons for having no
+rule, provisions with no rule and no reason, and approved rules with open problems. The rest of the list follows as
+links, each opening its tab with the matching filter. With nothing left, the sentence says so and the action is
+**Publish**, after a confirmation; anything the server still finds (`publishBlockers`, such as problems in the rules
+file) is listed instead. Below are the tabs: **Changes** (new, changed and removed rules and terms, each changed one
+beside what it said before, each with its review; unchanged records keep their review and aren't listed), then Rules,
+Terms, Coverage, Questions and Settings.
+
+**Reviewing a record.** Approve is the primary action; Reject and Edit are quieter. A decided record says so in words
+("Approved", "Rejected") with **Undo**, never as a faded button. Rejecting is how a record is dropped: it stays in the
+draft with its status, stops counting as coverage, and a rebuild carries the decision forward; nothing is deleted. Rows
+in the rules, terms and changes lists carry the same controls in a compact form; a row something blocks says it can't
+be approved yet, and its card says why. Rules, terms and the settings share `ReviewControls`.
+
+- **Rules:** a search box, with the other filters (review status, kind, area, request type) behind **Filters**; the
+  domain is a filter, not a column. Each row has the title, which opens the rule's card, its main citation and its
+  statement in words. "Approve the N rules shown" approves what a filter shows, skipping (and saying why) any record
+  something blocks; Terms and Coverage have the same.
+- **Rule card** (a side sheet): the review, the statement, its sources (the main citation's text, the others as
+  links), its problems when it has any, and two disclosures: "What it says, in detail" (the schema's words from
+  `describeRule`, kind, applicability, request types, bearer, remedy, cure, related rules, area and key) and "Try it
+  against facts" (the engine's preview). Editing is the form (title, statement, modality, bearer, remedy, request
+  types, and the structured check and condition editors with their JSON fallback). There's no whole-rule JSON editor
+  and no delete.
+- **Terms:** each term with its kind, definition and the rules that use it.
+- **Questions:** each question with its citations and readings; Answer becomes the primary action once a reading is
+  chosen.
+- **Settings:** the review, then each clause in words with its citations (edited as JSON), and the policy.
+- **Coverage:** one share for the documents the build read from their pages ("97.7% of the text of 2 documents is
+  covered by a rule, a term, a setting or a reason for having no rule"), one bar and a small legend. A document whose
+  provisions aren't linked to any upload's pages says it's not built yet instead of showing a share. Two views:
+  - **On the pages:** the document in the document viewer, every passage highlighted by what covers it (a tint per
+    kind, plus an underline or stripes for the gaps, so color isn't the only cue). Clicking a passage, or choosing it
+    from the list beside the page ("On page N", then the gaps), shows what covers or cites it: rules, terms, settings
+    clauses, questions, its no-rule reason, the values its rules encode, and the provisions that refer to it. The panel
+    sits beside the page on wide screens and in a sheet on narrow ones; choosing from the list moves focus to it.
+  - **As a list:** every provision with what cites it or its reason, uncovered ones first, searchable, and filtered to
+    the uncovered ones or the reasons to review.
+
+  In either view an uncovered provision can be given a reason for having no rule. Coverage is computed in
+  `src/rulebook/coverage.ts`, and the text outside provisions by `getSourceText`.
+
+**Citations open the document.** Every citation (`ProvisionReference` and `RuleReference`, so the application review's
+too) shows the provision's text on hover and focus, and opens `CitationViewer`: a side sheet, full width on a phone,
+with the governing document at the cited page and the provision highlighted from its anchors. A provision that spans
+pages lists them; a rule's "and N more" opens the same viewer with a picker over all its citations. The viewer's header
+has **Open the original** (the uploaded file at that page, in a new tab) and **Download**. Without the document's pages
+it shows the provision as stored.
+
+The viewer shows the page text read at upload (`getDocumentPage`), rendered from its Markdown, with highlights placed
+by character range. That's what the stored data supports exactly: page records hold the text the anchors index, and no
+page images are stored. The raw Layout responses keep word polygons, so the real page with highlight boxes is possible
+later by rendering the PDF; a PDF renderer would be a new library, which needs a discussion first. Until then, **Open
+the original** shows the real page.
+
+**Files.** `/files/governing/{documentId}` serves an upload's original file from R2 with its media type and original
+name (`?download` saves it). It looks the document up in the requester's organization only, so one organization can
+never fetch another's file. Every member may read the governing documents ([documents.md](documents.md#access)).
+
+**Members** (homeowners) see the same page read-only, with only the published rulebook, never a draft: a plain
+introduction, the rules (Rules and Terms tabs; a rule's card has its statement, sources and details, without the
+preview or keys), and the governing documents to read or download. There's no build, review, upload or coverage. The
+draft and every review action are checked on the server (`requireAdministrator`), not only hidden.
 
 ## Prompts and models
 
@@ -327,6 +386,7 @@ The `/rules` route keeps its shape: a build card, a Draft tab and a Published ta
 | `hoa-provision-encoding` | `provision-encoding` | `anthropic/claude-opus-5.5`, high effort | `document`, `provisions`, `context`, `references`, `terms`, `coreTerms`, `requestTypes` | `EncodingDraft` |
 | `hoa-encoding-repair` | `encoding-repair` | `anthropic/claude-opus-5.5`, high effort | `draft`, `problems`, `terms`, `coreTerms` | `EncodingDraft` |
 | `hoa-rulebook-consolidation` | `rulebook-consolidation` | `anthropic/claude-opus-5.5`, high effort | `rules`, `termPairs`, `documents` | `Consolidation` |
+| `hoa-provision-audit` (not built) | `provision-audit` | `anthropic/claude-haiku-5.5` (`config.model`) | `document`, `provisions` | `{ items: { provisionKey, kind: "number" \| "duration" \| "party" \| "condition", quote, value }[] }` |
 
 `hoa-rules-encoding-guide` holds the encoding conventions and the schema's rules in one text with no variables; the
 encoding, repair and term prompts include it by pinned version (Langfuse prompt composition), so it's written once.
@@ -342,44 +402,54 @@ measure it against the model ([implementation-plan.md](implementation-plan.md), 
 recursive definitions go out as `$defs` references, and if that's rejected too, the schema is described in the prompt
 text and the answer validated by Zod alone (the `answerOf` JSON fallback).
 
-## Language processing
+## Recognition
 
-Tools are chosen for accuracy; where they run is a hosting detail. The Python tools run in a small text-analysis
-service (`text-tools`, a container next to the Workers) that Workflow steps call over HTTP in batches. Everything that
-needs the provision index or the vocabulary at hand stays in TypeScript.
+The encoding reads values the way the review does ([application-review.md, Recognition](application-review.md#recognition)):
+**the model proposes, code verifies, corrections become data.** Hand-written recognizers (LexNLP, Recognizers-Text,
+grammars of our own as the primary reader) don't scale to a thousand document styles, so no stage depends on one. The
+text-analysis service (spaCy, LexNLP, dateparser, embeddings) isn't built; everything here is TypeScript plus model
+calls.
 
-| Job | Technique | Tool |
-| --- | --- | --- |
-| Running heads, footers, page stamps | Azure Layout's paragraph roles, then repeated-line detection | TypeScript |
-| Provision numbering | A numbering grammar with a sequence stack (letters versus roman numerals, counted paragraphs, inferred repairs) | TypeScript |
-| Cross-references | A reference grammar, resolved against the provision index | TypeScript |
-| Label matching: vocabulary slices, value terms, document names, near-duplicate terms | Normalized exact match, then edit-distance similarity (ratio, token-set and partial ratios) with per-length thresholds | RapidFuzz |
-| Definitions, amounts, money, percentages, durations, dates and citations in legal text | Legal extractors built for contracts and covenants ("thirty (30) days", "$1,000,000", "two-thirds (2/3)") | LexNLP |
-| Deontic cues: modals, negation scope, exceptions ("unless", "except", "provided that", "subject to") | Dependency-pattern matching on a parse | spaCy (a transformer English model) |
-| Similar rules and terms | Sentence embeddings and cosine similarity | An embedding model, hosted or in the service |
+| Job | Technique |
+| --- | --- |
+| Running heads, footers, page stamps | Azure Layout's paragraph roles, then repeated-line detection (code) |
+| Provision numbering | The parser's numbering grammar as the fast path; for a document it can't number, a model's outline that code applies and keeps only when its check is better ([Structure](#2-structure)) |
+| Cross-references | A reference grammar, resolved against the provision index (code) |
+| Label matching: vocabulary slices, value terms, document names, near-duplicate terms | Normalized exact match, then edit-distance similarity (ratio, token-set and partial ratios) with per-length thresholds (`src/text/match.ts`) |
+| Defined terms | Quoted and capitalized definitions and capitalized phrases found by code, as vocabulary candidates; the model writes the terms |
+| Similar rules for consolidation | Statement similarity (code), confirmed by the model |
+| The values provisions state | The audit (below): a small model proposes with quotes, code verifies |
 
 A fuzzy match is recorded as fuzzy, with its score, and never silently treated as exact; no label under four
 characters is matched fuzzily. When nothing matches, the model decides, with the candidates listed.
 
-**Cross-checks on the model's encoding.** The extractors don't encode anything; they check what the model encoded, in
-[Verify](#7-verify), so a dropped number or a flipped "shall not" goes to repair instead of to the administrator:
+**The audit.** One call per encoding unit (`audit:{unitId}`, `hoa-provision-audit` on Haiku through `config.model`,
+never Opus), independent of the encoding: it lists, per provision, every number (amounts, money, percentages, counts,
+fractions), duration, party and condition (including exceptions: "unless", "except", "provided that", "subject to")
+the text states, each with its exact quote and its value in schema terms (an exact number or fraction with a unit term
+key; a party's wording and the party term it names; a condition's words). Code checks the audit before using it,
+generically, as the review's verifier does: each quote is in its provision's text, every numeral in a number's or
+duration's quote agrees with its value after unit conversion, and the unit is a vocabulary unit. Then it checks each
+item against the encoded records citing that provision, so a dropped number or party goes to repair instead of to the
+administrator:
 
-1. **Quantity coverage.** Every amount, percentage, count and duration LexNLP finds in a provision appears in a rule,
-   term or clause citing that provision (as a value, an offset or a fraction), or the provision's no-rule note explains
-   it. A missing one raises `unencoded-quantity`. This catches the commonest silent error: "within thirty (30) days"
-   dropped from a deadline.
-2. **Modality cues.** Each rule's modality is compared with the deontic cues in the sentences it cites: a permission
-   on "shall not", an obligation on "may", or an "unless" with no override or condition raises `modality-cue-mismatch`.
-   It's a warning, sent to repair once.
-3. **Defined terms.** Every definition LexNLP finds is a vocabulary candidate, and every capitalized defined term a
-   unit uses must resolve to a term in its slice.
-4. **Consolidation candidates.** Embeddings propose pairs of rules and terms above a similarity threshold; the model
-   confirms duplicates among them. Consolidation then scales past one context window.
+1. **Numbers and durations** appear as a constant, an offset or a fraction in a rule, term or clause citing the
+   provision, equal after unit conversion with exact arithmetic, or the provision's no-rule note explains them; else
+   `unencoded-value`. This catches the commonest silent error: "within thirty (30) days" dropped from a deadline.
+2. **Parties** appear as a bearer, approver, signer, subject or party value of a record citing the provision; else
+   `unencoded-party`.
+3. **Conditions** appear as an `appliesWhen`, condition, exception (an overriding rule) or text condition on a record
+   citing the provision; else `unencoded-condition`, a warning sent to repair once with its quote.
 
-**Licensing.** LexNLP is AGPL-3.0 with a commercial license available. That's a legal decision, not a technical one:
-before production, either take the commercial license or replace its extractors with grammars of our own for the same
-patterns.
+An audit item that fails its own check (a quote not in the provision, a numeral that disagrees) is dropped and recorded,
+not raised. These checks replace the planned text-analysis cross-checks (quantity coverage and modality cues from
+LexNLP and spaCy); modality is measured by evaluation round 1's modality agreement and gets a check only if its
+failures call for one.
 
+**Corrections become data.** Every audit item code rejects, every problem the audit raises, and how repair or the
+administrator resolved it (encoded, explained in a no-rule note, or dismissed as the audit's error) is recorded on the
+build, so it can become an item of the `provision-encoding` dataset, as the review's corrections become `entity-facts`
+items.
 ## Quality
 
 - **Gold encodings.** The hand-run encoding of the sample Declaration, once an administrator has reviewed it, is the

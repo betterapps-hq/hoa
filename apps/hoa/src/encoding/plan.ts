@@ -105,6 +105,14 @@ function related(term: TermContent, vocabulary: readonly TermContent[]) {
   )
 }
 
+/** The value sets the slice's choice properties choose from, with their values, so the encoder can name each value. */
+function choiceSets(slice: readonly TermContent[], vocabulary: readonly TermContent[]) {
+  const sets = new Set(
+    slice.flatMap((term) => (term.kind === "property" && term.valueType.type === "choice" ? [term.valueType.set] : []))
+  )
+  return vocabulary.filter((term) => sets.has(term.key) || (term.kind === "value" && sets.has(term.set)))
+}
+
 function coreRequestTypes(): TermContent[] {
   const requests = new Set(
     coreTerms.filter((term) => term.kind === "thing" && term.nature === "request").map((term) => term.key)
@@ -114,7 +122,7 @@ function coreRequestTypes(): TermContent[] {
 
 /** Divides the documents into encoding units with their context (encoding.md, Plan). */
 export function planUnits(input: PlanInput, options: PlanOptions = {}): EncodingUnit[] {
-  const maxTokens = options.maxTokens ?? 6000
+  const maxTokens = options.maxTokens ?? 3000
   const referenceTokens = options.referenceTokens ?? 1500
   const byKey = new Map(input.documents.flatMap((document) => document.provisions.map((p) => [p.key, p] as const)))
   const labels = input.vocabulary.flatMap((term) =>
@@ -160,6 +168,9 @@ export function planUnits(input: PlanInput, options: PlanOptions = {}): Encoding
         for (const term of related(hit.item, input.vocabulary)) {
           mentioned.set(term.key, term)
         }
+      }
+      for (const term of choiceSets([...mentioned.values()], input.vocabulary)) {
+        mentioned.set(term.key, term)
       }
       const bestHits = new Map<TermKey, TermMatch>()
       for (const hit of hits) {

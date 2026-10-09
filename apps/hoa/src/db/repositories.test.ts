@@ -1,6 +1,5 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { fenceRules } from "@/tests/fenceRulebook"
 import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
 import {
   createApplication,
@@ -31,23 +30,7 @@ import {
   updateGoverningDocument
 } from "./documentRepository"
 import { getJob, getLatestJob, getLatestJobOfKind, insertJob, listJobs, newJob, updateJob } from "./jobRepository"
-import {
-  copyRulebookAsDraft,
-  deleteRule,
-  discardDraft,
-  failRulebook,
-  getRule,
-  getRulebook,
-  getRulebookByStatus,
-  getRulesById,
-  insertRule,
-  insertRulebook,
-  listRules,
-  publishRulebook,
-  saveDraft,
-  updateRule,
-  updateRules
-} from "./rulebookRepository"
+import { failRulebook, getRulebook, getRulebookByStatus, insertRulebook, publishRulebook } from "./rulebookRepository"
 
 const hoaId = "demo-hoa"
 const now = "2026-10-08T00:00:00.000Z"
@@ -107,9 +90,9 @@ describe("repositories", () => {
     const { db } = database
     await saveSections(db, hoaId, [section])
     await saveSections(db, hoaId, [{ ...section, heading: "Changed" }])
-    await setSectionRouting(db, hoaId, "doc:0", { projectTypes: ["fence"], topics: ["color"], isRelevant: true })
+    await setSectionRouting(db, hoaId, "doc:0", { projectTypes: ["project"], topics: ["topic"], isRelevant: true })
     expect(await listSections(db, hoaId, "doc")).toEqual([
-      { ...section, routing: { projectTypes: ["fence"], topics: ["color"], isRelevant: true } }
+      { ...section, routing: { projectTypes: ["project"], topics: ["topic"], isRelevant: true } }
     ])
   })
 
@@ -145,7 +128,7 @@ describe("repositories", () => {
     expect(await getLatestJobOfKind(db, hoaId, "application-review")).toBeNull()
   })
 
-  it("saves a draft over the old one, publishes it as the next version, and allows one draft at a time", async () => {
+  it("publishes a draft as the next version, superseding the last, and allows one draft at a time", async () => {
     const { db } = database
     const rulebook = (id: string, status: "building" | "draft") => ({
       id,
@@ -153,85 +136,39 @@ describe("repositories", () => {
       version: null,
       status,
       error: null,
-      catalogVersion: 1,
+      catalogVersion: 0,
       sourceDocumentIds: ["guidelines"],
       jobId: `job-${id}`,
       createdAt: now,
       publishedBy: null,
       publishedAt: null
     })
-    const rules = (rulebookId: string) =>
-      fenceRules.slice(0, 3).map((rule) => ({ ...rule, id: `${rulebookId}-${rule.id}`, rulebookId }))
 
-    await insertRulebook(db, rulebook("first", "building"))
-    await saveDraft(db, hoaId, { rulebookId: "first", previousDraftId: null, rules: rules("first") })
+    await insertRulebook(db, rulebook("first", "draft"))
     expect((await getRulebookByStatus(db, hoaId, "draft"))?.id).toBe("first")
     await expect(insertRulebook(db, rulebook("second-draft", "draft"))).rejects.toThrow("Failed query")
-
-    await insertRulebook(db, rulebook("second", "building"))
-    await saveDraft(db, hoaId, { rulebookId: "second", previousDraftId: "first", rules: rules("second") })
-    expect(await getRulebook(db, hoaId, "first")).toBeNull()
-    expect(await listRules(db, hoaId, "second")).toHaveLength(3)
-
-    expect(await publishRulebook(db, hoaId, { rulebookId: "second", userId: "admin", now })).toBe(1)
+    expect(await publishRulebook(db, hoaId, { rulebookId: "first", userId: "admin", now })).toBe(1)
     expect(await getRulebookByStatus(db, hoaId, "published")).toMatchObject({
-      id: "second",
+      id: "first",
       version: 1,
       publishedBy: "admin"
     })
 
-    await insertRulebook(db, rulebook("third", "building"))
-    await saveDraft(db, hoaId, { rulebookId: "third", previousDraftId: null, rules: rules("third") })
-    expect(await publishRulebook(db, hoaId, { rulebookId: "third", userId: "admin", now })).toBe(2)
-    expect((await getRulebook(db, hoaId, "second"))?.status).toBe("superseded")
-
-    // Editing the published rulebook copies it into a draft, which can lose a rule or be thrown away.
-    const third = (await getRulebook(db, hoaId, "third"))!
-    const copy = await copyRulebookAsDraft(db, hoaId, {
-      source: third,
-      sourceRules: await listRules(db, hoaId, "third"),
-      draftId: "edit",
-      jobId: "none",
-      now
-    })
-    expect(copy).toMatchObject({ status: "draft", version: null, publishedBy: null })
-    const copied = await listRules(db, hoaId, "edit")
-    expect(copied.map((rule) => rule.ruleKey).toSorted()).toEqual(
-      rules("third")
-        .map((rule) => rule.ruleKey)
-        .toSorted()
-    )
-    expect(copied.every((rule) => rule.change === "unchanged" && !rule.id.startsWith("third"))).toBe(true)
-    await deleteRule(db, hoaId, copied[0]!.id)
-    expect(await listRules(db, hoaId, "edit")).toHaveLength(2)
-    await discardDraft(db, hoaId, "edit")
-    expect(await getRulebook(db, hoaId, "edit")).toBeNull()
-    expect(await listRules(db, hoaId, "edit")).toEqual([])
-    expect(await listRules(db, hoaId, "third")).toHaveLength(3)
+    await insertRulebook(db, rulebook("second", "draft"))
+    expect(await publishRulebook(db, hoaId, { rulebookId: "second", userId: "admin", now })).toBe(2)
+    expect((await getRulebook(db, hoaId, "first"))?.status).toBe("superseded")
 
     await insertRulebook(db, rulebook("broken", "building"))
     await failRulebook(db, hoaId, "broken", { stage: "extract", message: "x", isRetryable: true })
     expect((await getRulebook(db, hoaId, "broken"))?.status).toBe("failed")
   })
 
-  it("edits, adds and looks up rules", async () => {
-    const { db } = database
-    const rule = { ...fenceRules[0]!, id: "r1", rulebookId: "rb" }
-    await insertRule(db, hoaId, rule)
-    await updateRule(db, hoaId, { ...rule, statement: "Edited" })
-    expect((await getRule(db, hoaId, "r1"))?.statement).toBe("Edited")
-    await updateRules(db, hoaId, [{ ...rule, statement: "Batched" }])
-    await updateRules(db, hoaId, [])
-    expect((await getRule(db, hoaId, "r1"))?.statement).toBe("Batched")
-    expect(await getRulesById(db, hoaId, ["r1", "missing"])).toHaveLength(1)
-    expect(await getRulesById(db, hoaId, [])).toEqual([])
-  })
-
   it("moves an application only from the expected statuses", async () => {
     const { db } = database
     const application = await createApplication(db, {
       hoaId,
-      projectKind: null,
+      projectTypeId: null,
+      answers: null,
       description: "New fence",
       createdBy: "demo-homeowner",
       now,
@@ -254,7 +191,8 @@ describe("repositories", () => {
     const { db } = database
     const application = await createApplication(db, {
       hoaId,
-      projectKind: null,
+      projectTypeId: null,
+      answers: null,
       description: null,
       createdBy: "h",
       now,

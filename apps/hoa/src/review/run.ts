@@ -14,9 +14,12 @@ import type { Answers, ConditionAnswer } from "@/engine/context"
 import { decide } from "@/engine/decide"
 import { evaluate } from "@/engine/evaluate"
 import { modelCall, modelCallOf, type ModelCall, type StepRunner } from "@/jobs/steps"
+import { answerReadings, withAnswersPage } from "@/projectTypes/answers"
+import type { ProjectAnswers, ProjectTypeDefinition } from "@/projectTypes/projectType"
 import type * as T from "@/schema/types"
 import { evaluationRequest, fact, finding } from "@/schema/zod"
 import { candidateTypes, rootTypes } from "./candidates"
+import { correctionSchema } from "./corrections"
 import { documentAnswers, documentRequirements, documentResults, documentsAnswerSchema } from "./documents"
 import { documentTypes, rulebookVocabulary } from "./documentTypes"
 import { entityGroup, entityGroups, factPlan, planFacts, type EntityGroup } from "./factPlan"
@@ -26,6 +29,7 @@ import { requestSkeleton } from "./load"
 import { normalizeFacts, partyValues, unitLabels, type NormalizeContext } from "./normalize"
 import { imagesFor, packetPageTexts, pagesForPrompt, type Packet, type PageRef, type PacketImage } from "./packet"
 import {
+  projectTypeForPrompt,
   candidateTypesForPrompt,
   documentTypesForPrompt,
   entitiesForPrompt,
@@ -46,7 +50,15 @@ import {
 import { reconcileReadings, secondReadingGroups } from "./secondReading"
 import { selectRules, selectedRulesFile } from "./select"
 import { requestEntities, subjectsAnswerSchema, withIdentified, workType } from "./subjects"
-import { citedPages, decidingFacts, isSameFact, verificationGroup, verified } from "./verification"
+import {
+  citedPages,
+  decidingFacts,
+  escalationGroup,
+  isConfirmed,
+  isSameFact,
+  settle,
+  verificationGroup
+} from "./verification"
 import { actionItems, applySummary, markableRules, summaryAnswerSchema, summaryVariables } from "./write"
 
 // The application review after OCR (application-review.md, Stages 4 to 14): classify, subjects, select, plan, facts,
@@ -82,13 +94,21 @@ export type ReviewAi = {
   cache?: (traceName: string) => PromptCache
 }
 
+/**
+ * The organization's project type the homeowner chose: its label and description, which the models read as a hint,
+ * and its form's definition, which turns the homeowner's answers into a page of the packet and readings of facts.
+ */
+export type ProjectTypeHint = { label: string; description: string | null; definition: ProjectTypeDefinition | null }
+
 export type ReviewInput = {
   organizationId: string
   rulesFile: T.RulesFile
   application: {
     requestType: T.TermKey
-    /** The project kind the homeowner chose: a hint, never a filter. */
-    projectKind: T.TermKey | null
+    /** The organization's project type the homeowner chose: a hint, never a filter. */
+    projectType: ProjectTypeHint | null
+    /** The homeowner's answers to the project type's form. */
+    answers: ProjectAnswers | null
     description: string | null
     submittedOn: T.IsoDate | null
   }
@@ -121,7 +141,8 @@ const plannedOutput = z.object({ plan: factPlan, groups: z.array(entityGroup) })
 const normalizedOutput = z.object({
   facts: z.array(fact),
   normalizations: z.array(normalizationSchema),
-  conditionAnswers: z.array(conditionAnswerSchema)
+  conditionAnswers: z.array(conditionAnswerSchema),
+  corrections: z.array(correctionSchema)
 })
 
 const decisionGroup = z.object({ ruleKey: z.string(), entities: z.array(z.string()), remedy: finding.shape.remedy })
@@ -158,13 +179,29 @@ async function attachmentsOf(images: readonly PacketImage[]): Promise<PromptAtta
 
 /** Reviews an application packet against a rules file (application-review.md, Stages 4 to 14). */
 export async function reviewApplication(input: ReviewInput) {
-  const { ai, step, packet, rulesFile, application } = input
+  const { ai, step, rulesFile, application } = input
+  // The form's answers are one more page the homeowner gave, read and cited like the others.
+  const packet = withAnswersPage(input.packet, {
+    projectType: application.projectType?.label ?? null,
+    definition: application.projectType?.definition ?? null,
+    answers: application.answers
+  })
   const progress = async (stage: ReviewStage, done: number, total: number) => input.progress?.(stage, done, total)
   const failures: ReviewFailure[] = []
   const calls: ModelCall[] = []
   const vocabulary = rulebookVocabulary(rulesFile)
   const requestType = application.requestType
   const label = (key: T.TermKey) => vocabulary.label(key)
+
+  // An escalation runs the same prompt version on the stronger model its config names.
+  const escalationLoader: PromptLoader = async (prompt, selector) => {
+    const template = await ai.loadPrompt(prompt, selector)
+    const model = template.config.escalationModel
+    if (!model) {
+      throw new Error(`${prompt.name} version ${template.version} names no escalationModel in its config.`)
+    }
+    return { ...template, config: { ...template.config, model } }
+  }
 
   const run = async <Answer, Prompt extends PromptDefinition>(
     prompt: Prompt,
@@ -174,11 +211,12 @@ export async function reviewApplication(input: ReviewInput) {
       variables: PromptVariables<Prompt>
       attachments?: PromptAttachment[]
       isSmall?: boolean
+      isEscalated?: boolean
     }
   ) => {
     const traceName = traceNames[prompt.name] ?? prompt.name
     const result = await runObjectPrompt({
-      loadPrompt: ai.loadPrompt,
+      loadPrompt: options.isEscalated ? escalationLoader : ai.loadPrompt,
       createModel: ai.createModel,
       defaultModelId: options.isSmall ? ai.smallModelId : ai.modelId,
       prompt,
@@ -255,7 +293,7 @@ export async function reviewApplication(input: ReviewInput) {
         schema: subjectsAnswerSchema,
         variables: {
           requestType: label(requestType),
-          projectKind: application.projectKind ? label(application.projectKind) : "not given",
+          projectKind: projectTypeForPrompt(application.projectType),
           description: application.description ?? "none",
           candidateTypes: candidateTypesForPrompt(candidates),
           pages: allPages
@@ -268,7 +306,7 @@ export async function reviewApplication(input: ReviewInput) {
   const identified = requestEntities(
     subjects.answer,
     candidates,
-    { requestType, projectLabel: application.projectKind ? label(application.projectKind) : null },
+    { requestType, projectLabel: application.projectType?.label ?? null },
     vocabulary
   )
   failures.push(
@@ -316,7 +354,7 @@ export async function reviewApplication(input: ReviewInput) {
     })
   }
   const everyPage = () => true
-  const readFacts = async (group: EntityGroup, includes: (page: PageRef) => boolean) => {
+  const readFacts = async (group: EntityGroup, includes: (page: PageRef) => boolean, isEscalated: boolean) => {
     const schema = factsAnswerSchema(plan, group, schemaContext)
     return step(
       `facts:${group.id}`,
@@ -324,6 +362,7 @@ export async function reviewApplication(input: ReviewInput) {
       async () =>
         run(pipelinePrompts.entityFacts, group.id, {
           schema,
+          isEscalated,
           variables: {
             requestType: label(requestType),
             description: application.description ?? "none",
@@ -337,16 +376,21 @@ export async function reviewApplication(input: ReviewInput) {
       "model"
     )
   }
+  /** Reads groups in parallel; each group read gives its answer and the model that answered. */
   const readAll = async (
     toRead: readonly EntityGroup[],
-    stage: ReviewStage = "facts",
-    pagesOf: (group: EntityGroup) => (page: PageRef) => boolean = () => everyPage
+    options: {
+      stage?: ReviewStage
+      pagesOf?: (group: EntityGroup) => (page: PageRef) => boolean
+      isEscalated?: boolean
+    } = {}
   ) => {
+    const { stage = "facts", pagesOf = () => everyPage, isEscalated = false } = options
     let done = 0
     await progress(stage, done, toRead.length)
     const results = await Promise.allSettled(
       toRead.map(async (group) => {
-        const output = await readFacts(group, pagesOf(group))
+        const output = await readFacts(group, pagesOf(group), isEscalated)
         done += 1
         await progress(stage, done, toRead.length)
         return { group, output }
@@ -356,24 +400,32 @@ export async function reviewApplication(input: ReviewInput) {
       if (result.status === "fulfilled") {
         const { group, output } = result.value
         calls.push(output.call)
-        return [expandShared(output.answer, plan, group, schemaContext)]
+        return [
+          { group, answer: expandShared(output.answer, plan, group, schemaContext), modelId: output.call.modelId }
+        ]
       }
       failures.push({ stage: "facts", itemId: toRead[index]?.id ?? String(index), message: messageOf(result.reason) })
       return []
     })
   }
-  const factAnswers: FactsAnswer[] = await readAll(groups)
+  const factAnswers: FactsAnswer[] = (await readAll(groups)).map((read) => read.answer)
 
-  // What identification read (the run a gate is on, a return fence's location) joins the facts stage's readings. Then
-  // 8b: a second, focused reading of every fact read below the confidence threshold, reconciled with the first.
+  // What identification read (what an entity refers to, a kind that fixes one of its properties) and what the homeowner
+  // answered in the form about the work join the facts stage's readings. Then 8b: a second, focused reading of every
+  // fact read below the confidence threshold, reconciled with the first.
   const factConfidence = rulesFile.settings.policy.thresholds.factConfidence
   const firstFacts = withIdentified(
     factAnswers.flatMap((answer) => answer.facts),
-    identified.readings,
+    [
+      ...identified.readings,
+      ...answerReadings(application.projectType?.definition ?? null, application.answers, entities, (key) =>
+        vocabulary.thingOf(key)
+      )
+    ],
     factConfidence
   )
   const secondFacts = (await readAll(secondReadingGroups(groups, firstFacts, entities, factConfidence))).flatMap(
-    (answer) => answer.facts
+    (read) => read.answer.facts
   )
   const readFactAnswers = reconcileReadings(firstFacts, secondFacts, factConfidence)
 
@@ -392,7 +444,7 @@ export async function reviewApplication(input: ReviewInput) {
     at: input.now
   }
   const normalized = await step("normalize", normalizedOutput, async () => {
-    const { facts, normalizations } = normalizeFacts(readFactAnswers, normalizeContext)
+    const { facts, normalizations, corrections } = normalizeFacts(readFactAnswers, normalizeContext)
     const conditionText = new Map(plan.conditions.map((condition) => [condition.id, condition.text]))
     const conditionAnswers: ConditionAnswer[] = factAnswers
       .flatMap((answer): ConditionResponse[] => answer.conditions)
@@ -402,7 +454,7 @@ export async function reviewApplication(input: ReviewInput) {
           ? [{ entity: response.entity, text, holds: response.answer === "unknown" ? null : response.answer === "yes" }]
           : []
       })
-    return { facts: [...skeleton.facts, ...facts], normalizations, conditionAnswers }
+    return { facts: [...skeleton.facts, ...facts], normalizations, conditionAnswers, corrections }
   })
   const request: T.EvaluationRequest = {
     organizationId: skeleton.organizationId,
@@ -513,29 +565,57 @@ export async function reviewApplication(input: ReviewInput) {
   })
   answers.judgments.push(...judgments)
 
-  // 12. Evaluate: one finding per rule and subject, after a focused second reading, alone on the pages it cites, of
-  // each fact that alone decides a not-met finding.
+  // 12. Evaluate: one finding per rule and subject, after a second, independent reading, alone on the pages it cites,
+  // of each fact that alone decides a finding; a reading that doesn't confirm it escalates once to the stronger model.
   const evaluateFacts = (facts: T.Fact[]) =>
     evaluate({ rulesFile: reviewedFile, request: { ...request, facts }, answers, evaluatedAt: input.now })
   const toVerify = decidingFacts(evaluateFacts(request.facts), request.facts, evaluateFacts)
   const verifying = new Map(toVerify.map((fact) => [verificationGroup(fact).id, fact]))
-  const verificationAnswers = await readAll(toVerify.map(verificationGroup), "evaluate", (group) => {
-    const fact = verifying.get(group.id)
-    return fact ? citedPages(fact, packet) : everyPage
+  const verificationReads = await readAll(toVerify.map(verificationGroup), {
+    stage: "evaluate",
+    pagesOf: (group) => {
+      const fact = verifying.get(group.id)
+      return fact ? citedPages(fact, packet) : everyPage
+    }
   })
-  const readings = normalizeFacts(
-    verificationAnswers.flatMap((answer) => answer.facts),
-    normalizeContext
-  ).facts
-  request.facts = request.facts.map((fact) =>
-    toVerify.includes(fact)
-      ? verified(
-          fact,
-          readings.filter((reading) => isSameFact(reading, fact)),
-          factConfidence
-        )
-      : fact
+  const readingsOf = (reads: readonly { answer: FactsAnswer }[]) =>
+    normalizeFacts(
+      reads.flatMap((read) => read.answer.facts),
+      normalizeContext
+    ).facts
+  const secondReadings = readingsOf(verificationReads)
+  const disputed = toVerify.filter(
+    (fact) =>
+      !isConfirmed(
+        fact,
+        secondReadings.filter((reading) => isSameFact(reading, fact))
+      )
   )
+  const escalationReads = await readAll(disputed.map(escalationGroup), { stage: "evaluate", isEscalated: true })
+  const escalationReadings = readingsOf(escalationReads)
+  const modelOf = (reads: readonly { group: EntityGroup; modelId: string }[], id: string) =>
+    reads.find((read) => read.group.id === id)?.modelId ?? null
+  const settlements = toVerify.map((fact) => {
+    const isEscalated = escalationReads.some((read) => read.group.id === escalationGroup(fact).id)
+    return settle(
+      fact,
+      {
+        second: secondReadings.filter((reading) => isSameFact(reading, fact)),
+        escalation: isEscalated ? escalationReadings.filter((reading) => isSameFact(reading, fact)) : null
+      },
+      {
+        threshold: factConfidence,
+        at: input.now,
+        secondModelId: modelOf(verificationReads, verificationGroup(fact).id),
+        escalationModelId: modelOf(escalationReads, escalationGroup(fact).id)
+      }
+    )
+  })
+  request.facts = request.facts.map((fact) => settlements[toVerify.indexOf(fact)]?.fact ?? fact)
+  const corrections = [
+    ...normalized.corrections,
+    ...settlements.flatMap((settlement) => (settlement.correction ? [settlement.correction] : []))
+  ]
   await progress("evaluate", 0, 1)
   const findings = await step(
     "evaluate",
@@ -585,6 +665,7 @@ export async function reviewApplication(input: ReviewInput) {
     normalizations: normalized.normalizations,
     judgments,
     conditionAnswers: normalized.conditionAnswers,
+    corrections,
     findings: findings.findings,
     recommendation: decision.recommendation,
     changes: written.changes,

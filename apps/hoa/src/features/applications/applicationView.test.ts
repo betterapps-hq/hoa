@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { fenceReview } from "@/tests/fenceReview"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
-import { projectKindOptions, reportRules } from "./applicationView"
+import { reportRules } from "./applicationView"
 
 describe("reportRules", () => {
   it("gives the selected rules with their statements and citations, the provision's lead-ins included", () => {
@@ -28,17 +28,5 @@ describe("reviewTerms", () => {
     expect(keys).toContain("composite-color.river-birch")
     expect(keys).toContain("composite-color")
     expect(keys.has("vehicle")).toBe(false)
-  })
-})
-
-describe("projectKindOptions", () => {
-  it("lists the rulebook's categories of work in sentence case, with their definitions", () => {
-    expect(projectKindOptions(sampleRulesFile())).toEqual([
-      {
-        key: "utility-work",
-        label: "Installation or relocation of utilities",
-        description: "Work that installs or relocates utilities on the Residential Community"
-      }
-    ])
   })
 })

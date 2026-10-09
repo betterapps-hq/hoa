@@ -12,6 +12,14 @@ type Entity = T.EvaluationRequest["entities"][number]
 
 const json = (value: unknown) => JSON.stringify(value)
 
+/** The project type the homeowner chose, as the organization labels and describes it. */
+export function projectTypeForPrompt(type: { label: string; description: string | null } | null) {
+  if (!type) {
+    return "not given"
+  }
+  return type.description ? `${type.label}: ${type.description}` : type.label
+}
+
 export function documentTypesForPrompt(kinds: readonly DocumentKind[]) {
   return kinds
     .map((kind) => `- ${kind.key}: ${kind.labels.join(", ")}${kind.definition ? `. ${kind.definition}` : ""}`)
@@ -24,7 +32,15 @@ export function candidateTypesForPrompt(candidates: readonly CandidateType[]) {
       type: candidate.key,
       labels: candidate.labels,
       definition: candidate.definition,
-      ...(candidate.categories.length > 0 ? { kinds: candidate.categories } : {}),
+      ...(candidate.scopeNote ? { scopeNote: candidate.scopeNote } : {}),
+      ...(candidate.categories.length > 0
+        ? {
+            kinds: candidate.categories.map(({ scopeNote, ...category }) => ({
+              ...category,
+              ...(scopeNote ? { scopeNote } : {})
+            }))
+          }
+        : {}),
       ...(candidate.references.length > 0 ? { refersTo: candidate.references } : {}),
       ...(candidate.isSigner ? { note: "A party who signs documents: name each person of it the packet names." } : {})
     }))
@@ -32,8 +48,8 @@ export function candidateTypesForPrompt(candidates: readonly CandidateType[]) {
 }
 
 /**
- * A facts call's entities, then the other entities its reference properties can point to (a gate's fence run), marked
- * as there only to be referred to: without them the model can't name a gate's run.
+ * A facts call's entities, then the other entities its reference properties can point to (the item another sits on), marked
+ * as there only to be referred to: without them the model can't name what a reference points to.
  */
 export function entitiesForPrompt(
   group: EntityGroup,
@@ -80,9 +96,16 @@ export function propertiesForPrompt(plan: FactPlan, keys: readonly T.TermKey[], 
         of: vocabulary.label(property.owner),
         labels: property.labels,
         ...(property.definition ? { definition: property.definition } : {}),
+        ...(property.scopeNote ? { scopeNote: property.scopeNote } : {}),
         type: typeOf(property, vocabulary),
         ...(property.values
-          ? { allowed: property.values.map((value) => ({ key: value.key, labels: value.labels })) }
+          ? {
+              allowed: property.values.map((value) => ({
+                key: value.key,
+                labels: value.labels,
+                ...(value.meaning ? { meaning: value.meaning } : {})
+              }))
+            }
           : {}),
         silence: property.ifUnstated === "absent" ? "none" : "missing",
         ...(property.many ? { many: true } : {})

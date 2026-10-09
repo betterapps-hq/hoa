@@ -1,7 +1,7 @@
 import { normalizeForMatching } from "@/ocr/page"
 import { labelForms } from "./normalize"
 
-// Label matching (encoding.md, Language processing): normalized exact first, then a similarity score with RapidFuzz's
+// Label matching (encoding.md, Recognition): normalized exact first, then a similarity score with RapidFuzz's
 // semantics (ratio, partial ratio, token-set ratio, combined as its WRatio). A fuzzy match is always reported as fuzzy,
 // with its score, and no label under four characters is ever matched fuzzily.
 

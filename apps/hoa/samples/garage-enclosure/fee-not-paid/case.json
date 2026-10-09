@@ -2,7 +2,7 @@
   "id": "garage-fee-not-paid",
   "title": "Garage enclosure with the review fee not yet paid",
   "application": {
-    "projectKind": null,
+    "projectType": null,
     "description": "Convert the attached two-car garage into a family room.",
     "submittedOn": "2026-10-01"
   },

@@ -2,7 +2,7 @@
   "id": "garage-attic",
   "title": "Converting the attic instead of the garage",
   "application": {
-    "projectKind": null,
+    "projectType": null,
     "description": "Finish the unfinished attic as a bedroom.",
     "submittedOn": "2026-10-01"
   },

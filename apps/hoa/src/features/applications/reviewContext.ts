@@ -54,22 +54,36 @@ export const entityLabel = (context: Pick<ReviewContext, "review">, id: string) 
 export const evidenceFile = (context: Pick<ReviewContext, "files">, fileId: string) =>
   context.files.find((file) => file.id === fileId || file.fileName === fileId)
 
-/** The action lists, by the outcome whose findings they gather. */
-export const actionLists = [
-  { key: "changes", outcome: "not-met", title: "What to change" },
-  { key: "missingInformation", outcome: "missing-information", title: "What to provide" },
-  { key: "committeeDecisions", outcome: "committee", title: "For the committee" },
-  { key: "suggestions", outcome: "advisory", title: "Suggestions" }
-] as const satisfies readonly { key: keyof Review; outcome: T.Outcome; title: string }[]
+/** The outcome whose findings each action list gathers. */
+export const actionOutcomes = {
+  changes: "not-met",
+  missingInformation: "missing-information",
+  committeeDecisions: "committee",
+  suggestions: "advisory"
+} as const satisfies Record<string, T.Outcome>
 
-/** The element id of an action item, so a matrix cell can link to it. */
+export type ActionListKey = keyof typeof actionOutcomes
+
+const actionListKeys: readonly ActionListKey[] = ["changes", "missingInformation", "committeeDecisions", "suggestions"]
+
+/** The element id of an action item, so a finding can link to it. */
 export const actionItemId = (item: Pick<ActionItem, "id">) => `action-${item.id}`
 
-/** The action item that covers a finding, with the title of its list. */
+/** The action item that covers a finding, with the list it's in. */
 export function actionItemFor(review: Review, finding: Pick<T.Finding, "ruleKey" | "entity" | "outcome">) {
-  const list = actionLists.find((item) => item.outcome === finding.outcome)
-  const item = list
-    ? review[list.key].find((found) => found.ruleKey === finding.ruleKey && found.entities.includes(finding.entity))
+  const key = actionListKeys.find((found) => actionOutcomes[found] === finding.outcome)
+  const item = key
+    ? review[key].find((found) => found.ruleKey === finding.ruleKey && found.entities.includes(finding.entity))
     : undefined
-  return list && item ? { item, title: list.title } : null
+  return key && item ? { item, key } : null
+}
+
+/** The findings an action item gathers, one per entity it covers. */
+export function itemFindings(review: Review, key: ActionListKey, item: ActionItem) {
+  return item.entities.flatMap((entity) => {
+    const finding = review.findings.find(
+      (found) => found.ruleKey === item.ruleKey && found.entity === entity && found.outcome === actionOutcomes[key]
+    )
+    return finding ? [finding] : []
+  })
 }

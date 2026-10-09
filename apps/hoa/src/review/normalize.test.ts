@@ -95,6 +95,72 @@ describe("normalizeFacts", () => {
     ])
   })
 
+  it("takes the model's quantity when its words verify it, a form the grammar can't read included", () => {
+    const height = (stated: string, reading: unknown) =>
+      normalize(answer({ property: "fence-run.height", stated, reading, evidence: evidence("six (6) feet tall") }))
+    const both = height("six (6) feet", { value: 72, unit: "inch" })
+    expect(both.facts[0]).toMatchObject({ state: "known", value: { type: "quantity", value: 72, unit: "inch" } })
+    expect(both.normalizations[0]).toMatchObject({ kind: "parsed" })
+    expect(both.corrections).toEqual([])
+    // "6 tall" names no unit, so the grammar reads nothing; the model's 6 feet still verifies.
+    const modelOnly = height("6 tall", { value: 6, unit: "foot" })
+    expect(modelOnly.facts[0]).toMatchObject({ state: "known", value: { value: 6, unit: "foot" } })
+    expect(modelOnly.normalizations[0]).toMatchObject({ kind: "verified" })
+  })
+
+  it("records a value the verifier rejects, and the grammar's value standing in its place", () => {
+    const { facts, corrections } = normalize(
+      answer({ property: "fence-run.height", stated: "six (6) feet", reading: { value: 8, unit: "foot" } })
+    )
+    expect(facts[0]).toMatchObject({ state: "known", value: { value: 6, unit: "foot" } })
+    expect(corrections).toEqual([
+      expect.objectContaining({
+        kind: "verifier-rejected",
+        entity: "run-1",
+        property: "fence-run.height",
+        problems: ["numeral-disagrees"],
+        readings: [
+          expect.objectContaining({ by: "model", value: { type: "quantity", value: 8, unit: "foot" } }),
+          expect.objectContaining({ by: "grammar", value: { type: "quantity", value: 6, unit: "foot" } })
+        ],
+        result: { state: "known", value: { type: "quantity", value: 6, unit: "foot" } }
+      })
+    ])
+    const unverified = normalize(
+      answer({ property: "fence-run.height", stated: null, reading: { value: 6, unit: "foot" } })
+    )
+    expect(unverified.facts[0]).toMatchObject({ state: "uncertain", candidates: [{ value: 6, unit: "foot" }] })
+    expect(unverified.corrections[0]).toMatchObject({ problems: ["no-quote"], result: { state: "uncertain" } })
+  })
+
+  it("holds both values when the words verify the model's and the grammar's differently", () => {
+    // The numerals agree with 6 inches as well as 6 feet; the grammar reads the unit the words name.
+    const { facts, corrections } = normalize(
+      answer({ property: "fence-run.height", stated: "6 ft", reading: { value: 6, unit: "inch" } })
+    )
+    expect(facts[0]).toMatchObject({ state: "uncertain", value: null })
+    expect(facts[0]?.candidates).toHaveLength(2)
+    expect(corrections[0]).toMatchObject({ kind: "check-disagrees", problems: [] })
+  })
+
+  it("takes the model's date when its words verify it", () => {
+    const paidOn = (stated: string, reading: string) =>
+      normalize(
+        answer({
+          entity: "request",
+          property: "architectural-application.review-fee-paid-on",
+          stated,
+          reading,
+          evidence: evidence("paid on Sept. 30")
+        })
+      )
+    expect(paidOn("Sept. 30", "2026-09-30").facts[0]).toMatchObject({ value: { type: "date", value: "2026-09-30" } })
+    expect(paidOn("Sept. 30", "2026-09-03")).toMatchObject({
+      facts: [{ value: { type: "date", value: "2026-09-30" } }],
+      corrections: [{ kind: "verifier-rejected" }]
+    })
+  })
+
   it("reads a party from the model's role, and keeps a role no party term names as written", () => {
     const { facts } = normalize(
       answer({ entity: "work-1", property: "work.performed-by", stated: "Built by the owners.", reading: "owner" }),
@@ -154,10 +220,10 @@ describe("normalizeFacts", () => {
 describe("matchValue", () => {
   it("prefers a verbatim label over a normalized one", () => {
     const values = [
-      { key: "a", labels: ["Trex"] },
-      { key: "b", labels: ["trex!"] }
+      { key: "a", labels: ["Acme"], meaning: null },
+      { key: "b", labels: ["acme!"], meaning: null }
     ]
-    expect(matchValue("Trex", values)).toMatchObject({ value: { key: "a" }, kind: "exact" })
-    expect(matchValue("TREX", values)).toMatchObject({ kind: "normalized" })
+    expect(matchValue("Acme", values)).toMatchObject({ value: { key: "a" }, kind: "exact" })
+    expect(matchValue("ACME", values)).toMatchObject({ kind: "normalized" })
   })
 })

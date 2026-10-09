@@ -104,6 +104,18 @@ const completedTerms: TermDraft[] = [
   thing("project-description", "document", "project description"),
   thing("checklist", "document", "application checklist"),
   thing("product-specification", "document", "product specification"),
+  // The category of work the guidelines' encoding adds for its fence chapter (encoding.md: one per improvement
+  // chapter), which the rulebook offers as an application type.
+  {
+    key: "fence-work",
+    organizationId: SAMPLE,
+    kind: "category",
+    of: "work",
+    criteria: { type: "text", text: "Work that builds, replaces or changes a fence or a gate" },
+    labels: label("fence"),
+    definition: "building, replacing or changing a fence or a gate",
+    citations: cite("guidelines:5")
+  },
   {
     key: "plot-plan",
     organizationId: SAMPLE,
@@ -113,6 +125,41 @@ const completedTerms: TermDraft[] = [
     labels: label("plot plan")
   }
 ]
+
+// What the guidelines say a term means, where the examples leave it bare: definitions and scope notes the review's
+// models read with the term, each cited to the provision that supports it. Organization knowledge lives here, in the
+// rulebook's terms, never in prompts or code.
+const refinements: Record<string, Pick<TermDraft, "definition" | "scopeNote" | "citations">> = {
+  "fence-location.side": {
+    definition: "on or along a side yard boundary of the Unit",
+    citations: cite("guidelines:5.5.1(i)")
+  },
+  "fence-location.return": {
+    definition: "running from a side yard boundary to the house, along no boundary line",
+    citations: cite("guidelines:5.5.1(i)")
+  },
+  "fence-run.boundary-with": {
+    definition:
+      "what lies across the boundary line the fence is on or along: a neighboring Unit or adjacent Common Area",
+    scopeNote:
+      "A fence that is on or along no boundary line, such as a return fence from a side yard boundary to the house, has none.",
+    citations: cite("guidelines:5.6.1", "guidelines:5.5.1(i)")
+  },
+  "boundary.lot": {
+    definition: "a neighboring Unit, across the boundary line that separates the two Units",
+    citations: cite("guidelines:5.6.1")
+  },
+  "fence-run.manufacturer": {
+    definition: "the manufacturer of a composite fence's material",
+    scopeNote: "Every manufacturer the guidelines list makes composite fencing.",
+    citations: cite("guidelines:5.3.2")
+  },
+  "composite-manufacturer": {
+    definition: "a manufacturer of composite fencing",
+    citations: cite("guidelines:5.3.2")
+  }
+}
+const refined = (term: TermDraft): TermDraft => ({ ...term, ...refinements[term.key] })
 
 // ─── Rules ────────────────────────────────────────────────────────────────────────────────────────
 
@@ -446,6 +493,7 @@ const guidelineSummaries: Record<string, string> = {
   "3.1.5": "Applications are reviewed within 30 days of receipt and must be complete before review.",
   "3.4.1": "The current Design Review Committee application packet is available from the Association.",
   "3.4.2": "Owners are responsible for the accuracy of their plans; photos are recommended.",
+  "5": "Fences: their design, materials, colors, heights, placement and gates.",
   "5.2.1": "Wood fences and gates have vertical boards; horizontal boards aren't permitted.",
   "5.2.2": "Composite fences should be K style; other styles are considered case by case.",
   "5.2.3": "Metal fences and gates are 2-rail or 3-rail open metal view fencing.",
@@ -461,6 +509,8 @@ const guidelineSummaries: Record<string, string> = {
   "5.5.1(ii)": "Lattice at most 18 inches, and fence plus lattice at most 90 inches.",
   "5.5.1(iii)": "Fence, lattice and arbor together at most 96 inches.",
   "5.5.2": "Metal boundary fences between 4 and 6 feet; the Reviewer may consider variations.",
+  "5.6.1":
+    "Boundary fences go on, or along and within, the boundary line between neighboring Units or a Unit and Common Area.",
   "5.6.1(i)": "Boundary fences between Units need the neighboring owner's approval in the packet.",
   "5.6.2(i)": "Front yard fences must not block a driver's view of the roadway.",
   "5.6.2(ii)": "Front and return fences should be at least 5 feet behind the house's front corner.",
@@ -511,7 +561,9 @@ export function fenceRulesFile(): T.RulesFile {
   const sampleKeys = new Set(sample.terms.map((term) => term.key))
   const terms = [
     ...sample.terms,
-    ...[...exampleTerms, ...completedTerms].filter((term) => !sampleKeys.has(term.key)).map(storedTerm)
+    ...[...exampleTerms, ...completedTerms]
+      .filter((term) => !sampleKeys.has(term.key))
+      .map((term) => storedTerm(refined(term)))
   ]
   // Applications don't reach the liability and sanction clauses, whose exceptions name rules outside the fixture.
   const settings = {
