@@ -7,7 +7,6 @@ import {
   answerQuestion,
   approvalBlockers,
   approvalContext,
-  coverageOf,
   questionsIn,
   resolveIssue,
   reviewedRulebook,
@@ -229,28 +228,6 @@ describe("questionsIn", () => {
     expect(pruned?.options).toHaveLength(question.options.length)
     expect(pruned?.options[1]?.keeps).toEqual([])
     expect(pruned?.about.rules).toEqual([question.options[0]?.keeps[0]])
-  })
-})
-
-describe("coverageOf", () => {
-  it("lists what cites each provision, and uncovers one whose only rule is rejected", () => {
-    const records = sampleRecords()
-    const rule = ruleOf(records, ageRule)
-    const cited = rule.citations[0]?.provisionKey ?? ""
-    expect(coverageOf(records).byProvision.get(cited)?.rules).toContain(ageRule)
-    expect(coverageOf(records).uncovered).toEqual([])
-
-    const onlyRule = {
-      ...records,
-      rules: records.rules
-        .filter((item) => item.key === ageRule || !item.citations.some((citation) => citation.provisionKey === cited))
-        .map((item) =>
-          item.key === ageRule ? { ...item, review: { ...approved, status: "rejected" as const } } : item
-        ),
-      terms: records.terms.filter((term) => !JSON.stringify(term).includes(`"${cited}"`)),
-      questions: []
-    }
-    expect(coverageOf(onlyRule).uncovered).toEqual([cited])
   })
 })
 

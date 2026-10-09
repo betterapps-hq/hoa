@@ -1,7 +1,6 @@
 import { useState } from "react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import { CoverageTab } from "../CoverageTab/CoverageTab"
 import { QuestionsTab } from "../QuestionsTab/QuestionsTab"
@@ -9,14 +8,14 @@ import { citationLabel } from "../rulebookRecords"
 import { RuleCard } from "../RuleCard/RuleCard"
 import { RuleTable } from "../RuleTable/RuleTable"
 import { SettingsTab } from "../SettingsTab/SettingsTab"
-import { RulebookWorkspaceContext, type RulebookActions } from "../useRulebookWorkspace"
+import { RulebookWorkspaceContext, type RulebookActions, type RulebookSource } from "../useRulebookWorkspace"
 import { VocabularyTab } from "../VocabularyTab/VocabularyTab"
 import { workspaceOf, workToDo } from "./RulebookWorkspace.utils"
 
 export type RulebookWorkspaceProps = {
   records: RulebookRecords
   /** The uploads with pages, for showing citations on their pages. */
-  source: CitationSource
+  source: RulebookSource
   /** What an administrator can do; null shows the rulebook read-only. */
   actions: RulebookActions | null
 }

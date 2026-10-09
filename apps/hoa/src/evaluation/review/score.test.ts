@@ -94,6 +94,27 @@ describe("scoreReview", () => {
     expect(alignment.get("run-3")).toBe("run-1")
   })
 
+  it("pairs labels for the best match overall, not the closest pair first", () => {
+    const found = [
+      { id: "west", type: "fence-run", label: "West side run (along west side lot line)", ref: null },
+      {
+        id: "return",
+        type: "fence-run",
+        label: "Front-left return run (from west side lot line to the house)",
+        ref: null
+      }
+    ]
+    const alignment = alignEntities(
+      [
+        { id: "run-1", type: "fence-run", label: "Left side run" },
+        { id: "run-4", type: "fence-run", label: "Short run from the left side line to the garage's front corner" }
+      ],
+      found
+    )
+    expect(alignment.get("run-1")).toBe("west")
+    expect(alignment.get("run-4")).toBe("return")
+  })
+
   it("compares an expected reference through the alignment", () => {
     const gateRun: ExpectedReview = {
       ...expected,

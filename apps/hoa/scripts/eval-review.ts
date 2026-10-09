@@ -11,15 +11,13 @@ import { reviewCase, type ReviewCase } from "../src/evaluation/review/cases.ts"
 import { reviewJudgeAnswer, reviewJudgeVariables } from "../src/evaluation/review/judge.ts"
 import { packetFixture, toPacket } from "../src/evaluation/review/packetFixture.ts"
 import { costOf, reviewReport, type CaseReport } from "../src/evaluation/review/report.ts"
-import { mergeRulesFiles } from "../src/evaluation/review/rulesFile.ts"
 import { scoreReview } from "../src/evaluation/review/score.ts"
 import type { StepRunner } from "../src/jobs/steps.ts"
 import { rulebookVocabulary } from "../src/review/documentTypes.ts"
 import { packetPageTexts } from "../src/review/packet.ts"
 import { reviewApplication } from "../src/review/run.ts"
-import { fenceRulesFile } from "../src/tests/fenceSchemaFixture.ts"
-import { sampleRulesFile } from "../src/tests/sampleRulesFile.ts"
 import { fixtures, readJson, writeJson } from "./evalFiles.ts"
+import { reviewRulesFile } from "./reviewRulesFile.ts"
 
 // Evaluation round 2's runner (implementation-plan.md, E2.2): runs the review (`reviewApplication`, the code the
 // ApplicationReview Workflow runs) in process on each case, with the real models, traced like the app (session id = run
@@ -31,11 +29,11 @@ import { fixtures, readJson, writeJson } from "./evalFiles.ts"
 // fresh model answers (each sample is cached, so it reruns for free).
 // Cases: the synthetic garage enclosure packets in samples/garage-enclosure/, and the fence packet's case in the
 // git-ignored .fixtures/eval/review/fence-application/ (its packet comes from `pnpm ocr:fixture --packet`). The rules
-// file is the committed sample Declaration plus the fence rules of src/tests/fenceSchemaFixture.ts, until the Design
-// Guidelines' encoding is committed (implementation-log.md).
+// file is the one `pnpm db:seed:sample --review` publishes for the app (scripts/reviewRulesFile.ts).
 // --config overrides prompt versions' model and effort for an experiment, without new Langfuse versions:
 //   --config "review=anthropic/claude-haiku-5.5@high,hoa-document-review=anthropic/claude-sonnet-5.5"
-// `review` names every review prompt (not the judge, so scores stay comparable); any other name is a Langfuse prompt.
+// `review` names every review prompt (not the judge, so scores stay comparable); any other name is a Langfuse prompt,
+// the judge's (hoa-eval-review-judge) included.
 const { values } = parseArgs({
   options: { case: { type: "string" }, sample: { type: "string" }, config: { type: "string" } }
 })
@@ -73,7 +71,7 @@ const loadPrompt: PromptLoader = async (prompt, selector) => {
     overrides.get(prompt.name) ?? (reviewPromptNames.has(prompt.name) ? overrides.get("review") : undefined)
   return override ? { ...template, config: { ...template.config, ...override } } : template
 }
-const rulesFile = mergeRulesFiles(sampleRulesFile(), fenceRulesFile())
+const rulesFile = reviewRulesFile()
 const vocabulary = rulebookVocabulary(rulesFile)
 const runId = `${new Date().toISOString().replaceAll(":", "-").slice(0, 19)}${values.sample ? `-sample-${values.sample}` : ""}`
 const out = join(reviewRuns, runId)
@@ -160,7 +158,7 @@ for (const item of cases) {
   // The writer's judge: one call per review, cached like the review's own (its cost is the evaluation's, not the
   // review's).
   const judged = await runObjectPrompt({
-    loadPrompt: ai.loadPrompt,
+    loadPrompt,
     createModel: ai.createModel,
     defaultModelId: ai.modelId,
     prompt: pipelinePrompts.reviewJudge,
@@ -212,6 +210,7 @@ writeJson(
     costUsd: costOf(calls)
   }))
 )
+writeJson(join(out, "run.json"), { config: values.config ?? null, promptVersions })
 // The report holds rule keys, property keys and entity ids, never packet text.
 writeFileSync(join(out, "report.md"), `${report}\n`)
 console.warn(report)

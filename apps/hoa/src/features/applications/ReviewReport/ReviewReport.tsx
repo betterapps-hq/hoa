@@ -1,147 +1,86 @@
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { InfoIcon } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import type { ActionItem, Recommendation, Review } from "@/review/reviewModel"
-import type { ReviewRule } from "@/review/reviewRules"
-import { renderRuleMarkers } from "@/review/ruleMarkers"
-import { entityLabel, findingLabels, groupFindings, recommendationLabels } from "../applicationDisplay"
+import { ActionItemList } from "../ActionItemList/ActionItemList"
+import { recommendationLabels, recommendationVariants } from "../applicationDisplay"
+import { FindingList } from "../FindingList/FindingList"
+import { MarkedText } from "../MarkedText/MarkedText"
+import { PacketFacts } from "../PacketFacts/PacketFacts"
+import type { ReviewContext } from "../reviewContext"
+import { ReviewMatrix } from "../ReviewMatrix/ReviewMatrix"
 
-const recommendationVariants: Record<Recommendation, "default" | "secondary" | "destructive" | "outline"> = {
-  approve: "default",
-  "approve-with-conditions": "secondary",
-  "request-information": "outline",
-  "refer-to-committee": "outline",
-  deny: "destructive"
-}
+export type ReviewReportProps = { context: ReviewContext }
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" })
 
-function ItemList({
-  title,
-  description,
-  items,
-  render
-}: {
-  title: string
-  description: string
-  items: ActionItem[]
-  render: (text: string) => string
-}) {
-  if (items.length === 0) {
-    return null
-  }
+/**
+ * A review: the recommendation and the written summary, what to change, provide and leave to the committee, the rule
+ * matrix, every finding, and what the review read from the packet.
+ */
+export function ReviewReport({ context }: ReviewReportProps) {
+  const { review, audience } = context
   return (
-    <section aria-label={title} className="flex flex-col gap-2">
-      <div>
-        <h3 className="text-sm font-semibold">{title}</h3>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-      <ul className="list-disc pl-5 text-sm">
-        {items.map((item) => (
-          <li key={item.id}>{render(item.text)}</li>
-        ))}
-      </ul>
-    </section>
-  )
-}
-
-export type ReviewReportProps = {
-  review: Review
-  rules: ReviewRule[]
-  /** The committee reads the assessment; the homeowner reads the feedback. */
-  audience: "homeowner" | "committee"
-}
-
-/** A review's recommendation, what to change or provide, what the committee decides, and every finding. */
-export function ReviewReport({ review, rules, audience }: ReviewReportProps) {
-  const rulesByKey = new Map(rules.map((rule) => [rule.key, rule]))
-  const titleOf = (ruleKey: string) => rulesByKey.get(ruleKey)?.title ?? ruleKey
-  // The rule references in the written text become links in the review UX; until then they read as rule titles.
-  const render = (text: string) => renderRuleMarkers(text, titleOf)
-  const groups = groupFindings(review.findings)
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Review</CardTitle>
-        <CardDescription>
-          Checked against the published rulebook on {dateFormat.format(new Date(review.createdAt))}
-          {review.provisional ? ", before submission" : ""}
-        </CardDescription>
-        <CardAction>
-          <Badge variant={recommendationVariants[review.recommendation]}>
-            {recommendationLabels[review.recommendation]}
-          </Badge>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5">
-        <p className="text-sm whitespace-pre-line">
-          {render(audience === "committee" ? review.assessment : review.feedback)}
-        </p>
-        <ItemList
-          title="What to change"
-          description={
-            review.recommendation === "approve-with-conditions"
-              ? "The conditions of approval."
-              : "These don't meet the rules as described."
-          }
-          items={review.changes}
-          render={render}
-        />
-        <ItemList
-          title="What to provide"
-          description="The committee may deny an application that's missing these."
-          items={review.missingInformation}
-          render={render}
-        />
-        <ItemList
-          title="For the committee"
-          description="The committee decides these itself."
-          items={review.committeeDecisions}
-          render={render}
-        />
-        <ItemList
-          title="Suggestions"
-          description="Recommendations the application doesn't follow."
-          items={review.suggestions}
-          render={render}
-        />
-        <section aria-label="Findings" className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold">Findings</h3>
-          <Accordion>
-            {groups.map((group) => (
-              <AccordionItem key={group.outcome} value={group.outcome}>
-                <AccordionTrigger>
-                  {findingLabels[group.outcome]} ({group.findings.length})
-                </AccordionTrigger>
-                <AccordionContent>
-                  <ul className="flex flex-col gap-3">
-                    {group.findings.map((finding) => {
-                      const citation = rulesByKey.get(finding.ruleKey)?.citations[0]
-                      return (
-                        <li key={`${finding.ruleKey} ${finding.entity}`} className="flex flex-col gap-0.5 text-sm">
-                          <span className="font-medium">
-                            {titleOf(finding.ruleKey)}
-                            <span className="font-normal text-muted-foreground">
-                              {" "}
-                              ({entityLabel(review, finding.entity)})
-                            </span>
-                          </span>
-                          <span>{finding.reason}</span>
-                          {citation ? (
-                            <span className="text-muted-foreground">
-                              {citation.documentTitle} {citation.label}
-                            </span>
-                          ) : null}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </section>
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Review</CardTitle>
+          <CardDescription>
+            Checked against the published rulebook on {dateFormat.format(new Date(review.createdAt))}
+          </CardDescription>
+          <CardAction>
+            <Badge variant={recommendationVariants[review.recommendation]}>
+              {recommendationLabels[review.recommendation]}
+            </Badge>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-5">
+          {review.provisional ? (
+            <Alert>
+              <InfoIcon />
+              <AlertTitle>Provisional review</AlertTitle>
+              <AlertDescription>
+                This review ran before the application was submitted, so it checked it against the rules in force on the
+                day it ran. The decision goes by the rules in force on the date of submission.
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          <p className="text-sm whitespace-pre-line">
+            <MarkedText text={audience === "committee" ? review.assessment : review.feedback} context={context} />
+          </p>
+          <ActionItemList
+            title="What to change"
+            description={
+              review.recommendation === "approve-with-conditions"
+                ? "The conditions of approval."
+                : "These don't meet the rules as described."
+            }
+            items={review.changes}
+            context={context}
+          />
+          <ActionItemList
+            title="What to provide"
+            description="The committee may deny an application that's missing these."
+            items={review.missingInformation}
+            context={context}
+          />
+          <ActionItemList
+            title="For the committee"
+            description="The committee decides these itself."
+            items={review.committeeDecisions}
+            context={context}
+          />
+          <ActionItemList
+            title="Suggestions"
+            description="Recommendations the application doesn't follow. They don't affect the decision."
+            items={review.suggestions}
+            context={context}
+          />
+        </CardContent>
+      </Card>
+      <ReviewMatrix context={context} />
+      <FindingList context={context} />
+      <PacketFacts context={context} />
+    </div>
   )
 }

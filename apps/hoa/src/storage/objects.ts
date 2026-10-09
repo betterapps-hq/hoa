@@ -11,7 +11,11 @@ export async function putJson(bucket: ObjectBucket, key: string, value: unknown)
   await bucket.put(key, JSON.stringify(value), { httpMetadata: { contentType: "application/json" } })
 }
 
-export async function getJson<T>(bucket: ObjectBucket, key: string, schema: z.ZodType<T>): Promise<T | null> {
+export async function getJson<T>(
+  bucket: Pick<ObjectBucket, "get">,
+  key: string,
+  schema: z.ZodType<T>
+): Promise<T | null> {
   const object = await bucket.get(key)
   return object ? schema.parse(JSON.parse(await object.text())) : null
 }
@@ -35,4 +39,13 @@ export function createObjectPromptCache(bucket: ObjectBucket, keyFor: (hash: str
 
 export function toHex(buffer: ArrayBuffer) {
   return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, "0")).join("")
+}
+
+/** Bytes as base64, converted in chunks so a large file doesn't overflow the call stack. */
+export function toBase64(bytes: Uint8Array) {
+  let binary = ""
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
+  }
+  return btoa(binary)
 }

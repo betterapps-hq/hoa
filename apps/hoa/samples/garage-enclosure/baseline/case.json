@@ -259,7 +259,7 @@
       {
         "ruleKey": "use-restrictions:a(vii)#replacement-garage-plans",
         "entity": "space-1",
-        "present": false
+        "present": true
       }
     ],
     "findings": {

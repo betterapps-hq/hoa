@@ -19,3 +19,20 @@ export function verifyEvidence(evidence: readonly T.Evidence[], pageText: PageTe
   const found = evidence.filter((item) => isFound(item, pageText)).length
   return { total: evidence.length, found }
 }
+
+/**
+ * The evidence cited where its quote is: a quote not found on the page it names but found on another page of the
+ * packet is cited there instead, the first such page in packet order. Models sometimes name the picture beside a Word
+ * file's text, or a neighboring page.
+ */
+export function recited(
+  evidence: T.Evidence,
+  pageText: PageTexts,
+  pages: readonly { fileId: string; pageIndex: number }[]
+): T.Evidence {
+  if (evidence.quote === null || isFound(evidence, pageText)) {
+    return evidence
+  }
+  const found = pages.find((page) => isFound({ ...evidence, fileId: page.fileId, page: page.pageIndex }, pageText))
+  return found ? { ...evidence, fileId: found.fileId, page: found.pageIndex } : evidence
+}

@@ -208,6 +208,14 @@ describe("reviewApplication on the fence fixture", () => {
       "normalize",
       "documents",
       "judgment:declaration:4.3(b)/p2#harmony:work-1",
+      // Each fact that alone decides a not-met finding, read again: the gate's run isn't one, since every run's boards
+      // are horizontal.
+      ...["run-1", "run-2", "run-3", "run-4"].flatMap((run) =>
+        ["material", "manufacturer", "color", "board-orientation"].map(
+          (property) => `facts:${run}:fence-run.${property}:verify`
+        )
+      ),
+      "facts:gate-1:gate.board-orientation:verify",
       "evaluate",
       "decide",
       "write"
@@ -246,6 +254,7 @@ describe("reviewApplication on the fence fixture", () => {
     })
     expect(result.provisional).toBe(false)
     expect(result.failures).toEqual([])
+    expect(result.calls.map((call) => call.stage)).toContain("judgment-check")
     expect(result.costUsd).toBeCloseTo(result.calls.length * 0.01)
   })
 })

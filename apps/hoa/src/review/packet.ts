@@ -92,16 +92,19 @@ export function pagesForPrompt(
   return text.length > maxCharacters ? `${text.slice(0, maxCharacters)}\n[Truncated.]` : text
 }
 
+/** The file a citation names: by its id, or by its name with or without its extension (models sometimes use it). */
+export function citedFile(packet: Packet, cited: string) {
+  const named = (file: PacketFile) => file.fileName === cited || file.fileName.replace(/\.[^.]+$/, "") === cited
+  return packet.files.find((file) => file.id === cited) ?? packet.files.find(named)
+}
+
 /**
  * The text evidence is checked against: a page as the models read it, or the whole file for a null page. A file is
  * found by its id, or by its name with or without its extension.
  */
 export function packetPageTexts(packet: Packet): PageTexts {
-  // Models sometimes cite a file by its name rather than its id.
-  const named = (file: PacketFile, cited: string) =>
-    file.id === cited || file.fileName === cited || file.fileName.replace(/\.[^.]+$/, "") === cited
   return (fileId, pageIndex) => {
-    const file = packet.files.find((item) => item.id === fileId) ?? packet.files.find((item) => named(item, fileId))
+    const file = citedFile(packet, fileId)
     if (!file) {
       return null
     }

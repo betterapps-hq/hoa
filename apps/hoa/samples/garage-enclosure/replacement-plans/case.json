@@ -188,11 +188,6 @@
         "id": "owner-1",
         "type": "owner",
         "label": "The owner of record"
-      },
-      {
-        "id": "exterior-1",
-        "type": "exterior-item",
-        "label": "The replacement two-car garage at the rear of the lot"
       }
     ],
     "facts": [

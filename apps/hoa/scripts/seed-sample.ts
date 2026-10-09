@@ -5,13 +5,17 @@ import { join } from "node:path"
 import { z } from "zod"
 import { seedRulebook } from "../src/rulebook/seedRulebook.ts"
 import { rulesFile } from "../src/schema/zod.ts"
+import { reviewRulesFile } from "./reviewRulesFile.ts"
 
 // Publishes the committed sample rules file as the seeded organization's rulebook in the local database
 // (implementation-plan.md, 3.11). Run db:migrate:local and db:seed:local first. The rules file goes to Wrangler's local
-// R2; with --dev-bucket it goes to the hoa-dev bucket instead, which `pnpm dev` binds. Usage, from apps/hoa:
-//   pnpm db:seed:sample [--dev-bucket]
+// R2; with --dev-bucket it goes to the hoa-dev bucket instead, which `pnpm dev` binds. With --review it publishes the
+// rules file evaluation reviews against instead (scripts/reviewRulesFile.ts), so fence and garage applications are
+// reviewed locally with the same rules as `pnpm eval:review`. Usage, from apps/hoa:
+//   pnpm db:seed:sample [--dev-bucket] [--review]
 const appDirectory = join(import.meta.dirname, "..")
 const r2Target = process.argv.includes("--dev-bucket") ? "--remote" : "--local"
+const isReview = process.argv.includes("--review")
 
 function wrangler(args: string, output: "return" | "show" = "show") {
   return execSync(`wrangler ${args} --env dev`, {
@@ -36,9 +40,11 @@ if (!organization) {
 }
 
 const seed = await seedRulebook({
-  file: rulesFile.parse(JSON.parse(readFileSync(join(appDirectory, "samples/declaration/rules.json"), "utf8"))),
+  file: isReview
+    ? reviewRulesFile()
+    : rulesFile.parse(JSON.parse(readFileSync(join(appDirectory, "samples/declaration/rules.json"), "utf8"))),
   organization,
-  rulebookId: "sample-declaration",
+  rulebookId: isReview ? "review-sample" : "sample-declaration",
   approvedBy: "demo-administrator",
   now: new Date().toISOString()
 })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
 import { localDate, requestSkeleton } from "./load"
-import { projectKinds, reviewRules } from "./reviewRules"
+import { projectKinds } from "./reviewRules"
 
 const rulesFile = sampleRulesFile()
 const input = {
@@ -35,15 +35,6 @@ describe("requestSkeleton", () => {
   it("reads dates in the organization's time zone", () => {
     expect(localDate("2026-10-02T05:00:00Z", "America/Los_Angeles")).toBe("2026-10-01")
     expect(localDate("2026-10-02T05:00:00Z", "UTC")).toBe("2026-10-02")
-  })
-})
-
-describe("reviewRules", () => {
-  it("gives the selected rules with their cited provisions' text", () => {
-    const [rule] = reviewRules(rulesFile, ["declaration:4.2(d)#fee-before-review", "missing#rule"])
-    expect(rule).toMatchObject({ key: "declaration:4.2(d)#fee-before-review", citations: [{ label: "4.2(d)" }] })
-    expect(rule?.citations[0]?.text.length).toBeGreaterThan(0)
-    expect(rule?.citations[0]?.documentTitle).not.toBe("declaration")
   })
 })
 

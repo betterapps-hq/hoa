@@ -3,9 +3,12 @@ import { render } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import { vi } from "vitest"
-import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { workspaceOf } from "@/features/rulebook/RulebookWorkspace/RulebookWorkspace.utils"
-import { RulebookWorkspaceContext, type RulebookActions } from "@/features/rulebook/useRulebookWorkspace"
+import {
+  RulebookWorkspaceContext,
+  type RulebookActions,
+  type RulebookSource
+} from "@/features/rulebook/useRulebookWorkspace"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import type * as T from "@/schema/types"
 import { sampleRulesFile } from "./sampleRulesFile"
@@ -47,11 +50,12 @@ export function mockActions(): RulebookActions {
   }
 }
 
-export const noPages: CitationSource = {
+export const noPages: RulebookSource = {
   documents: [],
   loadPage: async () => {
     throw new Error("No pages in this test.")
-  }
+  },
+  loadSourceText: async () => []
 }
 
 /** Renders inside a workspace over the records: a draft with actions, or read-only with null. */
@@ -61,7 +65,7 @@ export function renderInWorkspace(
     records = sampleRecords(),
     actions = mockActions(),
     source = noPages
-  }: { records?: RulebookRecords; actions?: RulebookActions | null; source?: CitationSource } = {}
+  }: { records?: RulebookRecords; actions?: RulebookActions | null; source?: RulebookSource } = {}
 ) {
   const openRule = vi.fn<(key: string) => void>()
   const workspace = workspaceOf(records, { source, actions, openRule })

@@ -159,3 +159,64 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.552 0.016 285.938);
 }
+
+/*
+ * Coverage kinds (encoding.md, UX, Coverage): one color per kind, stepped for each theme and checked as a stacked set
+ * for color-vision separation. Text outside any provision is a neutral gray; it and uncovered text are also striped,
+ * and every kind has an icon and a label, so color is never the only cue.
+ */
+:root {
+  --coverage-rule: #2a78d6;
+  --coverage-term: #1baf7a;
+  --coverage-settings: #4a3aa7;
+  --coverage-reason: #e87ba4;
+  --coverage-to-review: #eda100;
+  --coverage-outside: #c3c2b7;
+  --coverage-uncovered: #e34948;
+}
+
+.dark {
+  --coverage-rule: #3987e5;
+  --coverage-term: #199e70;
+  --coverage-settings: #9085e9;
+  --coverage-reason: #d55181;
+  --coverage-to-review: #c98500;
+  --coverage-outside: #5c5b57;
+  --coverage-uncovered: #e66767;
+}
+
+@theme inline {
+  --color-coverage-rule: var(--coverage-rule);
+  --color-coverage-term: var(--coverage-term);
+  --color-coverage-settings: var(--coverage-settings);
+  --color-coverage-reason: var(--coverage-reason);
+  --color-coverage-to-review: var(--coverage-to-review);
+  --color-coverage-outside: var(--coverage-outside);
+  --color-coverage-uncovered: var(--coverage-uncovered);
+}
+
+@layer components {
+  /* Stripes over a passage nothing covers, and over text outside any provision, in the kind's own color. */
+  .coverage-stripes-uncovered {
+    background-image: repeating-linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--coverage-uncovered) 28%, transparent) 0 2px,
+      transparent 2px 8px
+    );
+  }
+  .coverage-stripes-outside {
+    background-image: repeating-linear-gradient(
+      45deg,
+      color-mix(in oklab, var(--coverage-outside) 55%, transparent) 0 2px,
+      transparent 2px 8px
+    );
+  }
+  /* Stripes over a filled bar segment, in the surface color. */
+  .coverage-hatch {
+    background-image: repeating-linear-gradient(
+      135deg,
+      color-mix(in oklab, var(--background) 60%, transparent) 0 2px,
+      transparent 2px 6px
+    );
+  }
+}

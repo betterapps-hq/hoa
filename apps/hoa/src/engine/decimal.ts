@@ -1,3 +1,5 @@
+import invariant from "tiny-invariant"
+
 // Exact numbers: decimals and fractions as reduced bigint ratios, so 72 inches equal 6 feet and two thirds stays two
 // thirds. Floats appear only where a value leaves the engine as a FactValue.
 
@@ -14,9 +16,7 @@ function gcd(a: bigint, b: bigint): bigint {
 }
 
 function reduce(numerator: bigint, denominator: bigint): Exact {
-  if (denominator === 0n) {
-    throw new Error("division by zero")
-  }
+  invariant(denominator !== 0n, "division by zero")
   const sign = denominator < 0n ? -1n : 1n
   const divisor = gcd(numerator, denominator) || 1n
   return { numerator: (sign * numerator) / divisor, denominator: (sign * denominator) / divisor }
@@ -26,9 +26,8 @@ function reduce(numerator: bigint, denominator: bigint): Exact {
 export function exact(value: number | string): Exact {
   const text = typeof value === "number" ? String(value) : value.trim()
   const parts = decimalPattern.exec(text)
-  if (!parts || !(parts[2] || parts[3])) {
-    throw new Error(`not a decimal: ${text}`)
-  }
+  // Decimals reach the engine through the schema's validation.
+  invariant(parts && (parts[2] || parts[3]), `not a decimal: ${text}`)
   const [, sign = "", whole = "", fractionDigits = "", exponent = "0"] = parts
   const digits = BigInt(`${sign}${whole}${fractionDigits}` || "0")
   const scale = BigInt(fractionDigits.length) - BigInt(exponent)

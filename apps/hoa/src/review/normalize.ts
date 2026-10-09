@@ -9,12 +9,12 @@ import { labelsOf } from "./documentTypes"
 import type { FactPlan, PlannedProperty, PlannedValue } from "./factPlan"
 import { toEvidence, type FactAnswer } from "./factSchema"
 import type { Normalization } from "./reviewModel"
-import { isFound, type PageTexts } from "./verifyEvidence"
+import { isFound, recited, type PageTexts } from "./verifyEvidence"
 
 // Normalize (application-review.md, Normalize): stated values to typed values with no model. Quantities through the
 // quantity grammar, choices matched to the property's value terms (exact, normalized, fuzzy), dates through the date
-// grammar, references to entity ids. Then evidence verification, conflicts between readings, and the organization's
-// fact confidence threshold.
+// grammar, references to entity ids. Then evidence verification (a quote cited on the wrong page is cited where it is),
+// conflicts between readings, and the organization's fact confidence threshold.
 
 export type NormalizeContext = {
   plan: FactPlan
@@ -28,6 +28,8 @@ export type NormalizeContext = {
   referenceDate: T.IsoDate
   factConfidence: number
   pageText: PageTexts
+  /** Every page of the packet, in order, where a quote cited on the wrong page is looked for. */
+  pages: readonly { fileId: string; pageIndex: number }[]
   at: T.Timestamp
 }
 
@@ -187,7 +189,7 @@ function readValue(answer: FactAnswer, property: PlannedProperty, context: Norma
 }
 
 /** Two readings agree when they name the same term, or the same value. */
-function sameValue(a: T.FactValue, b: T.FactValue) {
+export function sameValue(a: T.FactValue, b: T.FactValue) {
   if (a.type === "value" && b.type === "value") {
     return a.term !== null || b.term !== null ? a.term === b.term : a.text.toLowerCase() === b.text.toLowerCase()
   }
@@ -198,8 +200,12 @@ const uniqueValues = (values: readonly T.FactValue[]) =>
   values.filter((value, index) => values.findIndex((other) => sameValue(other, value)) === index)
 
 /** One answer as a fact: typed, its evidence checked, and held uncertain when it can't be relied on. */
+/** An answer's evidence, each quote cited where it is. */
+const evidenceOf = (answer: FactAnswer, context: NormalizeContext) =>
+  answer.evidence.map((item) => recited(toEvidence(item), context.pageText, context.pages))
+
 function toFact(answer: FactAnswer, property: PlannedProperty, context: NormalizeContext) {
-  const evidence = answer.evidence.map(toEvidence)
+  const evidence = evidenceOf(answer, context)
   const provenance = { by: "extraction" as const, at: context.at }
   const base = {
     entity: answer.entity,
@@ -256,7 +262,7 @@ export function normalizeFacts(answers: readonly FactAnswer[], context: Normaliz
   // "None" stands only on evidence found where it says: an absent answer with nothing behind it is a guess, and no
   // answer means unknown.
   const isGrounded = (answer: FactAnswer) =>
-    answer.state !== "absent" || answer.evidence.some((item) => isFound(toEvidence(item), context.pageText))
+    answer.state !== "absent" || evidenceOf(answer, context).some((item) => isFound(item, context.pageText))
   const normalized = answers.filter(isGrounded).flatMap((answer) => {
     const property = properties.get(answer.property)
     return property ? [{ ...toFact(answer, property, context), many: property.many }] : []

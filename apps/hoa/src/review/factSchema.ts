@@ -141,7 +141,10 @@ export function factsAnswerSchema(plan: FactPlan, group: Group, context: FactSch
         .string()
         .nullable()
         .describe("The value exactly as the packet writes it; null when only drawn or shown."),
-      reading: readingOf(property, context).nullable(),
+      // A reading that doesn't fit its type (a label where a value's key belongs) is dropped rather than failing the
+      // whole answer: normalization reads the stated value instead. (The fallback must be a constant: the schema the
+      // model sees is generated from this one.)
+      reading: readingOf(property, context).nullable().catch(null),
       evidence: z.array(modelEvidence),
       confidence: z.number().min(0).max(1)
     })

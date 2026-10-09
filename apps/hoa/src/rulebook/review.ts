@@ -6,7 +6,7 @@ import { createVocabulary } from "@/schema/vocabulary"
 import type { RulebookRecords } from "./assemble"
 
 // Reviewing a draft rulebook (encoding.md, Review and Publish): which records can be approved, the draft as validation
-// sees it while it's reviewed, answering questions, and coverage. The rules UX and its server functions share these, so
+// sees it while it's reviewed, and answering questions. The rules UX and its server functions share these, so
 // what a screen offers is what the server allows.
 
 /** A record an administrator reviews: a rule, a term, the settings, or a provision's no-rule reason. */
@@ -28,7 +28,7 @@ const advisoryCodes = new Set<T.IssueCode>([
 export const isBlocking = (code: T.IssueCode) => !advisoryCodes.has(code)
 
 const isOpenBlocking = (issue: T.Issue) => issue.resolution === null && isBlocking(issue.code)
-const isLive = (record: { review: T.Review }) => record.review.status !== "rejected"
+export const isLive = (record: { review: T.Review }) => record.review.status !== "rejected"
 
 /**
  * Questions as a rules file holds them: naming only the rules the file has. An answered question's dropped candidates
@@ -114,60 +114,6 @@ export function termKeysOf(rule: T.Rule) {
   visit(rule, "")
   return keys
 }
-
-/** The provision keys a record cites, wherever its citations are. */
-function citedKeys(record: unknown) {
-  const keys = new Set<T.ProvisionKey>()
-  JSON.stringify(record, (key, value: unknown) => {
-    if (key === "provisionKey" && typeof value === "string") {
-      keys.add(value)
-    }
-    return value
-  })
-  return keys
-}
-
-export type ProvisionCoverage = { rules: T.RuleKey[]; terms: T.TermKey[]; settings: boolean; questions: T.Id[] }
-
-/**
- * What covers each provision (schema.md, Sources, Coverage): the records citing it that aren't rejected. A provision
- * nothing cites and with no no-rule reason is uncovered.
- */
-export function coverageOf(
-  records: Pick<RulebookRecords, "provisions" | "rules" | "terms" | "settings" | "questions">
-) {
-  const byProvision = new Map<T.ProvisionKey, ProvisionCoverage>(
-    records.provisions.map((provision) => [provision.key, { rules: [], terms: [], settings: false, questions: [] }])
-  )
-  const cite = (record: unknown, add: (coverage: ProvisionCoverage) => void) => {
-    for (const key of citedKeys(record)) {
-      const coverage = byProvision.get(key)
-      if (coverage) {
-        add(coverage)
-      }
-    }
-  }
-  for (const rule of records.rules.filter(isLive)) {
-    cite(rule, (coverage) => coverage.rules.push(rule.key))
-  }
-  for (const term of records.terms.filter(isLive)) {
-    cite(term, (coverage) => coverage.terms.push(term.key))
-  }
-  cite(records.settings.clauses, (coverage) => {
-    coverage.settings = true
-  })
-  for (const question of records.questions) {
-    cite(question.citations, (coverage) => coverage.questions.push(question.id))
-  }
-  const isCited = (coverage: ProvisionCoverage) =>
-    coverage.rules.length > 0 || coverage.terms.length > 0 || coverage.settings || coverage.questions.length > 0
-  const uncovered = records.provisions
-    .filter((provision) => provision.noRule === null && !isCited(byProvision.get(provision.key) ?? emptyCoverage))
-    .map((provision) => provision.key)
-  return { byProvision, uncovered }
-}
-
-const emptyCoverage: ProvisionCoverage = { rules: [], terms: [], settings: false, questions: [] }
 
 /** Unanswered interpretation and conflict questions, by the candidate rules they decide. */
 function openQuestionsByRule(questions: T.Question[]) {

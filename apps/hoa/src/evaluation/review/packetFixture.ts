@@ -1,6 +1,8 @@
+import invariant from "tiny-invariant"
 import { z } from "zod"
 import type { Page } from "@/ocr/page"
 import type { Packet } from "@/review/packet"
+import { packetImageName } from "@/review/storedPacket"
 
 // An application packet as evaluation reads it: what OCR left for each file (its pages' text, its images'
 // descriptions and the images themselves), without a Workflow or storage. The fence packet's comes from
@@ -66,14 +68,19 @@ export function toPacket(fixture: PacketFixture, readImage: (path: string) => Pr
       pages: file.pages.map((page, index) => pageOf(file.id, index + 1, page.text)),
       visuals: file.visuals
     })),
+    // `pnpm ocr:fixture` writes each image beside the description of it, so they pair up in order.
     images: fixture.files.flatMap((file) =>
-      file.images.map((image) => ({
-        fileId: file.id,
-        pageIndex: image.pageIndex,
-        filename: image.path.split("/").at(-1) ?? image.path,
-        mediaType: image.mediaType,
-        load: () => readImage(image.path)
-      }))
+      file.images.map((image, index) => {
+        const visual = file.visuals[index]
+        invariant(visual, `${file.id}'s image ${image.path} has no description beside it.`)
+        return {
+          fileId: file.id,
+          pageIndex: image.pageIndex,
+          filename: packetImageName(file, visual.figureId),
+          mediaType: image.mediaType,
+          load: () => readImage(image.path)
+        }
+      })
     )
   }
 }

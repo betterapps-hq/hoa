@@ -1,11 +1,11 @@
-import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import type { RulebookRecords } from "@/rulebook/assemble"
-import { approvalContext, coverageOf } from "@/rulebook/review"
+import { coverageOf } from "@/rulebook/coverage"
+import { approvalContext } from "@/rulebook/review"
 import type * as T from "@/schema/types"
 import type { RulebookIssue } from "@/schema/validate"
 import { createVocabulary } from "@/schema/vocabulary"
 import { citationIndex } from "../rulebookRecords"
-import type { RulebookActions, RulebookWorkspaceValue } from "../useRulebookWorkspace"
+import type { RulebookActions, RulebookSource, RulebookWorkspaceValue } from "../useRulebookWorkspace"
 
 const noIssues = new Map<string, RulebookIssue[]>()
 
@@ -16,7 +16,7 @@ export function workspaceOf(
     source,
     actions,
     openRule
-  }: { source: CitationSource; actions: RulebookActions | null; openRule: (key: T.RuleKey) => void }
+  }: { source: RulebookSource; actions: RulebookActions | null; openRule: (key: T.RuleKey) => void }
 ): RulebookWorkspaceValue {
   const approval = actions ? approvalContext(records) : null
   return {

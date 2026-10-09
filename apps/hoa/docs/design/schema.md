@@ -416,10 +416,13 @@ How expressions evaluate:
 3. **Logic.** `all` is false if any part is false, otherwise unknown if any part is unknown, otherwise true. `any` is
    the mirror image. `not` swaps true and false and leaves unknown. `every`, `some` and `none` apply `all`, `any` and
    `not any` to the items that satisfy `where`; an item whose `where` is unknown counts as unknown.
-4. **Numbers with unknowns are ranges.** An unknown quantity, count or amount of money is anywhere from 0 up, and an
-   unknown date is any date. Arithmetic carries the range through, and a comparison is true or false only when every
-   value in the range agrees. So a 95-inch fence fails "fence plus lattice at most 90 inches" even when its lattice
-   height is unclear.
+4. **Numbers with unknowns are ranges, and references their candidates.** An unknown quantity, count or amount of
+   money is anywhere from 0 up, and an unknown date is any date. Arithmetic carries the range through, and a comparison
+   is true or false only when every value in the range agrees. So a 95-inch fence fails "fence plus lattice at most 90
+   inches" even when its lattice height is unclear. A single-valued reference that's `uncertain` or `conflicting` could
+   name any thing in the request of the type it refers to: when every one of them gives the rule the same outcome,
+   that's its outcome, and otherwise the reference is unknown. So a gate with vertical boards fails "gate boards
+   oriented like the fence's" when it's unclear which run it's on but every run's boards are horizontal.
 5. **Lists.** A many-valued fact says whether its values are `complete`. `count`, `sum-of`, `greatest-of` and
    `least-of` over an incomplete list are open-ended ranges, so "at most three pets" over a partial list can only be
    not met or unknown, never met.

@@ -1,6 +1,6 @@
 import type { Job } from "@/jobs/job"
 import type { RulebookRecords } from "@/rulebook/assemble"
-import { coverageOf } from "@/rulebook/review"
+import { coverageOf } from "@/rulebook/coverage"
 
 // What the rules page says about a rulebook as a whole: its counts, and why the last build had problems.
 

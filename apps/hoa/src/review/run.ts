@@ -23,7 +23,7 @@ import { entityGroup, entityGroups, factPlan, planFacts, type EntityGroup } from
 import { expandShared, factsAnswerSchema, type ConditionResponse, type FactsAnswer } from "./factSchema"
 import { judgmentAnswerSchema, judgmentCalls, judgmentFacts, judgmentPages, toJudgment } from "./judgments"
 import { requestSkeleton } from "./load"
-import { normalizeFacts, partyValues, unitLabels } from "./normalize"
+import { normalizeFacts, partyValues, unitLabels, type NormalizeContext } from "./normalize"
 import { imagesFor, packetPageTexts, pagesForPrompt, type Packet, type PageRef, type PacketImage } from "./packet"
 import {
   candidateTypesForPrompt,
@@ -46,6 +46,7 @@ import {
 import { reconcileReadings, secondReadingGroups } from "./secondReading"
 import { selectRules, selectedRulesFile } from "./select"
 import { requestEntities, subjectsAnswerSchema, withIdentified, workType } from "./subjects"
+import { citedPages, decidingFacts, isSameFact, verificationGroup, verified } from "./verification"
 import { actionItems, applySummary, markableRules, summaryAnswerSchema, summaryVariables } from "./write"
 
 // The application review after OCR (application-review.md, Stages 4 to 14): classify, subjects, select, plan, facts,
@@ -314,8 +315,8 @@ export async function reviewApplication(input: ReviewInput) {
       return dimension ? [{ key: unit.unit, dimension }] : []
     })
   }
-  const images = imagesFor(packet)
-  const readFacts = async (group: EntityGroup) => {
+  const everyPage = () => true
+  const readFacts = async (group: EntityGroup, includes: (page: PageRef) => boolean) => {
     const schema = factsAnswerSchema(plan, group, schemaContext)
     return step(
       `facts:${group.id}`,
@@ -329,21 +330,25 @@ export async function reviewApplication(input: ReviewInput) {
             entities: entitiesForPrompt(group, plan, entities, vocabulary),
             properties: propertiesForPrompt(plan, group.properties, vocabulary),
             textConditions: textConditionsForPrompt(plan, group.conditions, entities, vocabulary),
-            pages: allPages
+            pages: includes === everyPage ? allPages : pagesForPrompt(packet, pageTypes, includes)
           },
-          attachments: await attachmentsOf(images)
+          attachments: await attachmentsOf(imagesFor(packet, includes))
         }),
       "model"
     )
   }
-  const readAll = async (toRead: readonly EntityGroup[]) => {
+  const readAll = async (
+    toRead: readonly EntityGroup[],
+    stage: ReviewStage = "facts",
+    pagesOf: (group: EntityGroup) => (page: PageRef) => boolean = () => everyPage
+  ) => {
     let done = 0
-    await progress("facts", done, toRead.length)
+    await progress(stage, done, toRead.length)
     const results = await Promise.allSettled(
       toRead.map(async (group) => {
-        const output = await readFacts(group)
+        const output = await readFacts(group, pagesOf(group))
         done += 1
-        await progress("facts", done, toRead.length)
+        await progress(stage, done, toRead.length)
         return { group, output }
       })
     )
@@ -374,18 +379,20 @@ export async function reviewApplication(input: ReviewInput) {
 
   // 9. Normalize: typed values, evidence verified, conflicts, the confidence threshold.
   await progress("normalize", 0, 1)
+  const normalizeContext: NormalizeContext = {
+    plan,
+    vocabulary,
+    units: unitLabels(rulesFile, vocabulary),
+    parties: partyValues(rulesFile, vocabulary),
+    entities,
+    referenceDate: skeleton.governingDate,
+    factConfidence,
+    pageText,
+    pages: packet.files.flatMap((file) => file.pages.map((page) => ({ fileId: file.id, pageIndex: page.pageIndex }))),
+    at: input.now
+  }
   const normalized = await step("normalize", normalizedOutput, async () => {
-    const { facts, normalizations } = normalizeFacts(readFactAnswers, {
-      plan,
-      vocabulary,
-      units: unitLabels(rulesFile, vocabulary),
-      parties: partyValues(rulesFile, vocabulary),
-      entities,
-      referenceDate: skeleton.governingDate,
-      factConfidence,
-      pageText,
-      at: input.now
-    })
+    const { facts, normalizations } = normalizeFacts(readFactAnswers, normalizeContext)
     const conditionText = new Map(plan.conditions.map((condition) => [condition.id, condition.text]))
     const conditionAnswers: ConditionAnswer[] = factAnswers
       .flatMap((answer): ConditionResponse[] => answer.conditions)
@@ -490,6 +497,7 @@ export async function reviewApplication(input: ReviewInput) {
           }),
         "model"
       )
+      calls.push(output.call)
       judged += 1
       await progress("judgments", judged, pending.length)
       return toJudgment(call, output.answer)
@@ -505,7 +513,29 @@ export async function reviewApplication(input: ReviewInput) {
   })
   answers.judgments.push(...judgments)
 
-  // 12. Evaluate: one finding per rule and subject.
+  // 12. Evaluate: one finding per rule and subject, after a focused second reading, alone on the pages it cites, of
+  // each fact that alone decides a not-met finding.
+  const evaluateFacts = (facts: T.Fact[]) =>
+    evaluate({ rulesFile: reviewedFile, request: { ...request, facts }, answers, evaluatedAt: input.now })
+  const toVerify = decidingFacts(evaluateFacts(request.facts), request.facts, evaluateFacts)
+  const verifying = new Map(toVerify.map((fact) => [verificationGroup(fact).id, fact]))
+  const verificationAnswers = await readAll(toVerify.map(verificationGroup), "evaluate", (group) => {
+    const fact = verifying.get(group.id)
+    return fact ? citedPages(fact, packet) : everyPage
+  })
+  const readings = normalizeFacts(
+    verificationAnswers.flatMap((answer) => answer.facts),
+    normalizeContext
+  ).facts
+  request.facts = request.facts.map((fact) =>
+    toVerify.includes(fact)
+      ? verified(
+          fact,
+          readings.filter((reading) => isSameFact(reading, fact)),
+          factConfidence
+        )
+      : fact
+  )
   await progress("evaluate", 0, 1)
   const findings = await step(
     "evaluate",

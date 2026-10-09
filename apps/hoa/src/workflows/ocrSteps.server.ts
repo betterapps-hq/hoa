@@ -8,7 +8,7 @@ import { analyzeResultOf, layoutEngine, LayoutError, type LayoutClient } from "@
 import { layoutResultSchema } from "@/ocr/layoutResult"
 import { pageSchema, type Page } from "@/ocr/page"
 import { visualDescriptionSchema, type StoredVisual } from "@/ocr/visualDescription"
-import { createObjectPromptCache, getJson, putJson, toHex } from "@/storage/objects"
+import { createObjectPromptCache, getJson, putJson, toBase64, toHex } from "@/storage/objects"
 import type { Presigner } from "@/storage/presign"
 
 // The OCR steps shared by DocumentIngest and ApplicationReview (docs/design/ocr.md, "Flow"). Step names start with the
@@ -97,12 +97,7 @@ async function layoutSource(dependencies: OcrDependencies, key: string) {
   if (!object) {
     throw new NonRetryableError(`The uploaded file is missing from storage (${key}).`)
   }
-  const bytes = new Uint8Array(await object.arrayBuffer())
-  let binary = ""
-  for (let index = 0; index < bytes.length; index += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
-  }
-  return { base64Source: btoa(binary) }
+  return { base64Source: toBase64(new Uint8Array(await object.arrayBuffer())) }
 }
 
 function rethrowLayout(error: unknown): never {

@@ -25,12 +25,11 @@ import { getPublishedRulesFile } from "@/db/rulebookContentRepository"
 import { env } from "@/env.server"
 import type { StepRunner } from "@/jobs/steps"
 import { createLayoutClient } from "@/ocr/layoutClient"
-import { storedVisualSchema } from "@/ocr/visualDescription"
 import { extractWordPictures } from "@/ocr/wordMedia"
 import { localDate } from "@/review/load"
-import type { Packet, PacketFile, PacketImage } from "@/review/packet"
 import type { Review } from "@/review/reviewModel"
 import { reviewApplication } from "@/review/run"
+import { loadPacket } from "@/review/storedPacket"
 import { readRulesFile } from "@/rulebook/assemble"
 import { applicationKeys, jobStepKey } from "@/storage/keys"
 import { createObjectPromptCache, getJson, putJson } from "@/storage/objects"
@@ -71,62 +70,6 @@ function fileOcrKeys(hoaId: string, applicationId: string, file: Pick<Applicatio
     figureDescription: (figureId: string) => keys.figureDescription(file.id, figureId),
     cache: (hash: string) => keys.cache("visual-description", hash)
   }
-}
-
-/** Every file OCR has read or given up on, with its pages, image descriptions and images, in packet order. */
-async function loadPacket(bucket: R2Bucket, hoaId: string, applicationId: string, files: readonly ApplicationFile[]) {
-  const loaded = await Promise.all(
-    files
-      .filter((file) => file.status === "ready" || file.status === "unreadable")
-      .map(async (file) => {
-        const keys = fileOcrKeys(hoaId, applicationId, file)
-        const isReadable = file.status === "ready"
-        const pages = isReadable ? await loadPages(bucket, keys, file.pageCount ?? 0) : []
-        const isImage = file.mediaType.startsWith("image/")
-        const figures = isImage
-          ? [{ figureId: "image", pageIndex: 1 }]
-          : pages.flatMap((page) => page.figures.map((figure) => ({ figureId: figure.id, pageIndex: page.pageIndex })))
-        const visuals = (
-          await Promise.all(
-            figures.map((figure) => getJson(bucket, keys.figureDescription(figure.figureId), storedVisualSchema))
-          )
-        ).filter((visual) => visual !== null)
-        const load = (key: string) => async () => {
-          const object = await bucket.get(key)
-          if (!object) {
-            throw new Error(`The image ${key} is missing from storage.`)
-          }
-          return new Uint8Array(await object.arrayBuffer())
-        }
-        const sourceImage: PacketImage = {
-          fileId: file.id,
-          pageIndex: 1,
-          filename: file.fileName,
-          mediaType: file.mediaType,
-          load: load(keys.source)
-        }
-        const figureImages = figures.map((figure): PacketImage => ({
-          fileId: file.id,
-          pageIndex: figure.pageIndex,
-          filename: `${file.id}-${figure.figureId}.png`,
-          mediaType: "image/png",
-          load: load(keys.figureImage(figure.figureId))
-        }))
-        const images = isImage ? [sourceImage] : figureImages
-        const packetFile: PacketFile = {
-          id: file.id,
-          fileName: file.fileName,
-          mediaType: file.mediaType,
-          contextText: file.contextText,
-          isReadable,
-          pages,
-          visuals
-        }
-        return { file: packetFile, images: isReadable ? images : [] }
-      })
-  )
-  const packet: Packet = { files: loaded.map((item) => item.file), images: loaded.flatMap((item) => item.images) }
-  return packet
 }
 
 /**
@@ -286,7 +229,12 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
         })
       )
       const files = await step.do("ocr:files", storageStep, () => listApplicationFiles(db, hoaId, applicationId))
-      const packet = await loadPacket(bucket, hoaId, applicationId, files)
+      const packet = await loadPacket(
+        bucket,
+        files,
+        (file) => fileOcrKeys(hoaId, applicationId, file),
+        (file) => loadPages(bucket, fileOcrKeys(hoaId, applicationId, file), file.pageCount ?? 0)
+      )
 
       // 4 to 14. Each stage's steps keep their output in R2 (Workflows caps a step's output at 1 MiB) and read it back
       // through its schema, on replay too.

@@ -177,6 +177,7 @@ phase 4 (4.20) and 1.9.
 | 5.13 | Settings tab: clauses with citations, read and edit. | Component test. |
 | 5.14 | Publish: blockers (unreviewed records, blocking issues, uncovered provisions) and the published tab's hash and download. | Browser check: publish the sample. |
 | 5.15 | Rule preview: evaluate a rule against facts typed in the card, with the engine (2.11). | Component test. |
+| 5.16 | Coverage report in the Coverage tab, like a test coverage report: the share of each document's characters covered by rules, term definitions, settings clauses and approved no-rule reasons, per document and article as stacked bars; each document's text passage by passage, marked by what covers it (color, icon and label), with uncovered provisions and page text outside any provision striped and listed as gaps, and the values the citing rules encode underlined; choosing a passage lists everything that covers or cites it in a side panel (a sheet on narrow screens). | Pure computation tested (`src/rulebook/coverage.ts`); component tests; browser check at desktop and phone widths, light and dark, keyboard. |
 
 ## Phase 6: Fence review pipeline
 

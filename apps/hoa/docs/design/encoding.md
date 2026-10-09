@@ -276,9 +276,29 @@ The `/rules` route keeps its shape: a build card, a Draft tab and a Published ta
     same.
   - **Vocabulary:** terms with labels, kind, definition, where they're used, and review status. Approving a term is
     separate from approving rules; a rule can't be approved while a term it reads is proposed.
-  - **Coverage:** every provision of every document in order, showing the rules and terms citing it, or its no-rule
-    reason, with uncovered provisions first. A reason an administrator gives is approved as given; the build's are
-    approved here.
+  - **Coverage:** a coverage report, read like a test coverage report. Each passage of a document's text counts as
+    one kind: cited by a rule (or a question deciding between rules), a term's definition, a settings clause, an
+    approved no-rule reason, a reason still to review, uncovered (a provision nothing cites, with no reason), or
+    outside any provision (page text the structure stage read but placed in no provision, found from the provisions'
+    anchors in the cleaned page text; page furniture and skipped front matter don't count). The report gives the share
+    of characters each kind covers, overall, per document and per article, as stacked bars. Below it, two views:
+    - **Document text:** the chosen document's text in reading order (parents before children, wrap-ups after
+      them, outside text where its page puts it), each passage tinted and labelled by its kind, with an icon and a
+      label as well as a color, and the gaps striped; the values the citing rules hold (amounts with their units,
+      numbers, fractions, dates, times) are underlined where the text states them, matched from the rules' own
+      constants. A list of gaps (uncovered provisions and outside text) jumps to each. Choosing a passage lists
+      everything that covers or cites it in a panel beside the text on wide screens and in a sheet on narrow ones:
+      the rules with their statements, the terms it defines with their definitions, the settings clauses, the
+      questions, its no-rule reason, the values its rules encode, and the provisions whose text refers to it (found
+      with the reference grammar of [References and analysis](#3-references-and-analysis)). Each item opens what it
+      names: a rule's card, a term's definition, a provision on its page. Choosing a passage from its label moves
+      focus to the panel, which leads back to the passage.
+    - **Provision list:** every provision in order with what cites it or its no-rule reason, uncovered provisions
+      first, searchable and filtered to the uncovered ones or the reasons to review, which can be approved together.
+
+    In either view an uncovered provision can be given a reason for having no rule. A reason an administrator gives
+    is approved as given; the build's are approved here. Coverage is computed from the records in
+    `src/rulebook/coverage.ts`, and the text outside provisions by `getSourceText`, which reads the uploads' pages.
   - **Questions:** each interpretation or conflict question with its options; answering one approves the rules the
     chosen option keeps and rejects the candidates it drops. A candidate can't be approved on its own while its
     question is open.
@@ -303,10 +323,10 @@ The `/rules` route keeps its shape: a build card, a Draft tab and a Published ta
 | Prompt | Trace name | Model | Variables | Output |
 | --- | --- | --- | --- | --- |
 | `hoa-structure-repair` | `structure-repair` | `OPENROUTER_MODEL` | `documentTitle`, `pageText`, `parserOutline`, `problems` | `{ markers: { offset: number; marker: string; level: number }[] }` |
-| `hoa-term-extraction` | `term-extraction` | `anthropic/claude-opus-5.5` | `document`, `definitions`, `candidates`, `coreTerms` | `{ terms: EncodedTerm[]; notes: string[] }` |
-| `hoa-provision-encoding` | `provision-encoding` | `anthropic/claude-opus-5.5` | `document`, `provisions`, `context`, `references`, `terms`, `coreTerms`, `requestTypes` | `EncodingDraft` |
-| `hoa-encoding-repair` | `encoding-repair` | `anthropic/claude-opus-5.5` | `draft`, `problems`, `terms`, `coreTerms` | `EncodingDraft` |
-| `hoa-rulebook-consolidation` | `rulebook-consolidation` | `anthropic/claude-opus-5.5` | `rules`, `termPairs`, `documents` | `Consolidation` |
+| `hoa-term-extraction` | `term-extraction` | `anthropic/claude-opus-5.5`, high effort | `document`, `definitions`, `candidates`, `coreTerms` | `{ terms: EncodedTerm[]; notes: string[] }` |
+| `hoa-provision-encoding` | `provision-encoding` | `anthropic/claude-opus-5.5`, high effort | `document`, `provisions`, `context`, `references`, `terms`, `coreTerms`, `requestTypes` | `EncodingDraft` |
+| `hoa-encoding-repair` | `encoding-repair` | `anthropic/claude-opus-5.5`, high effort | `draft`, `problems`, `terms`, `coreTerms` | `EncodingDraft` |
+| `hoa-rulebook-consolidation` | `rulebook-consolidation` | `anthropic/claude-opus-5.5`, high effort | `rules`, `termPairs`, `documents` | `Consolidation` |
 
 `hoa-rules-encoding-guide` holds the encoding conventions and the schema's rules in one text with no variables; the
 encoding, repair and term prompts include it by pinned version (Langfuse prompt composition), so it's written once.

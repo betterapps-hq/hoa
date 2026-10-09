@@ -1,11 +1,11 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { getDocumentPage, getJobStatus, listDocuments } from "@/features/documents/documents.functions"
-import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { PublishedRulebook } from "@/features/rulebook/PublishedRulebook/PublishedRulebook"
 import {
   getPublishedRulesFileJson,
   getRulebookSources,
   getRulebookView,
+  getSourceText,
   publishRulebook,
   startRulebookBuild,
   type RulebookSources,
@@ -21,7 +21,7 @@ import {
   saveRulebookSettings,
   setProvisionNoRule
 } from "@/features/rulebook/rulebookReview.functions"
-import type { RulebookActions } from "@/features/rulebook/useRulebookWorkspace"
+import type { RulebookActions, RulebookSource } from "@/features/rulebook/useRulebookWorkspace"
 import { getSession } from "@/session/session.functions"
 
 type Documents = Awaited<ReturnType<typeof listDocuments>>
@@ -56,9 +56,10 @@ export const Route = createFileRoute("/rules")({
 function RulesRoute() {
   const data = Route.useLoaderData()
   const router = useRouter()
-  const source: CitationSource = {
+  const source: RulebookSource = {
     documents: data.sources.files,
-    loadPage: (documentId, pageIndex) => getDocumentPage({ data: { documentId, pageIndex } })
+    loadPage: (documentId, pageIndex) => getDocumentPage({ data: { documentId, pageIndex } }),
+    loadSourceText: () => getSourceText()
   }
   const loadRulesFile = () => getPublishedRulesFileJson()
   if (!data.isAdministrator) {

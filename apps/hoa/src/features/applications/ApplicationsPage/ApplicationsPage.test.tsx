@@ -25,7 +25,10 @@ const application: ApplicationListItem = {
 function setup(overrides: Partial<ApplicationsPageProps> = {}) {
   const props: ApplicationsPageProps = {
     applications: [application],
-    projectKinds: [{ key: "fence-work", label: "Fence" }],
+    projectKinds: [
+      { key: "fence-work", label: "Fence", description: "Building, replacing or changing a fence or gate." },
+      { key: "utility-work", label: "Installation or relocation of utilities", description: null }
+    ],
     isCommittee: false,
     onCreate: vi.fn<(input: NewApplication) => Promise<void>>(async () => undefined),
     onOpen: vi.fn<(id: string) => void>(),
@@ -39,6 +42,7 @@ describe("ApplicationsPage", () => {
   it("starts an application with the description and packet in one step", async () => {
     const { props, user } = setup()
     const pdf = new File(["%PDF"], "form.pdf", { type: "application/pdf" })
+    await user.click(screen.getByRole("radio", { name: "Fence" }))
     await user.type(screen.getByLabelText("Project description"), "  New rear fence  ")
     await user.upload(screen.getByLabelText("Application packet"), pdf)
     await user.click(screen.getByRole("button", { name: "Upload and review" }))
@@ -49,9 +53,12 @@ describe("ApplicationsPage", () => {
     })
   })
 
-  it("offers the rulebook's project kinds and something else", async () => {
+  it("offers the rulebook's project kinds with what each covers, and something else", async () => {
     const { props, user } = setup()
-    await user.selectOptions(screen.getByLabelText("Project type"), "Something else")
+    const picker = screen.getByRole("radiogroup")
+    expect(within(picker).getAllByRole("radio")).toHaveLength(3)
+    expect(screen.getByText("Building, replacing or changing a fence or gate.")).toBeInTheDocument()
+    await user.click(screen.getByRole("radio", { name: "Something else" }))
     await user.upload(
       screen.getByLabelText("Application packet"),
       new File(["%PDF"], "form.pdf", { type: "application/pdf" })
@@ -60,15 +67,17 @@ describe("ApplicationsPage", () => {
     expect(props.onCreate).toHaveBeenCalledWith(expect.objectContaining({ projectKind: null }))
   })
 
-  it("asks for the packet, and refuses files it can't read", async () => {
+  it("asks for the project type and the packet, and refuses files it can't read", async () => {
     const { props, user } = setup()
     await user.click(screen.getByRole("button", { name: "Upload and review" }))
+    expect(screen.getByText("Choose the kind of project, or Something else.")).toBeInTheDocument()
     expect(screen.getByText("Add your application packet.")).toBeInTheDocument()
     const loose = userEvent.setup({ applyAccept: false })
     await loose.upload(
       screen.getByLabelText("Application packet"),
       new File(["x"], "fence.heic", { type: "image/heic" })
     )
+    await user.click(screen.getByRole("radio", { name: "Fence" }))
     await user.click(screen.getByRole("button", { name: "Upload and review" }))
     expect(screen.getByText(/Save photos as JPEG or PNG/)).toBeInTheDocument()
     expect(props.onCreate).not.toHaveBeenCalled()
@@ -80,6 +89,7 @@ describe("ApplicationsPage", () => {
         throw new Error("Not now.")
       })
     })
+    await user.click(screen.getByRole("radio", { name: "Fence" }))
     await user.upload(
       screen.getByLabelText("Application packet"),
       new File(["%PDF"], "form.pdf", { type: "application/pdf" })

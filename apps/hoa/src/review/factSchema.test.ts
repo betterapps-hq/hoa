@@ -40,12 +40,18 @@ describe("factsAnswerSchema", () => {
     expect(schema.parse(answer).facts).toHaveLength(2)
   })
 
-  it("rejects an unplanned property, an unlisted value, an entity outside the group and a unit of another kind", () => {
+  it("rejects an unplanned property and an entity outside the group", () => {
     expect(schema.safeParse({ facts: [fact({ property: "fence-run.style" })] }).success).toBe(false)
-    expect(schema.safeParse({ facts: [fact({ reading: "composite-color.purple" })] }).success).toBe(false)
     expect(schema.safeParse({ facts: [fact({ entity: "gate-1" })] }).success).toBe(false)
-    const usd = fact({ property: "fence-run.height", reading: { value: 6, unit: "usd" } })
-    expect(schema.safeParse({ facts: [usd] }).success).toBe(false)
+  })
+
+  it("drops a reading that doesn't fit its type, keeping the stated value for normalization", () => {
+    const usd = fact({ property: "fence-run.height", stated: "6'", reading: { value: 6, unit: "usd" } })
+    const answer = schema.parse({ facts: [fact({ reading: "River Birch" }), usd] })
+    expect(answer.facts.map((item) => [item.stated, item.reading])).toEqual([
+      ["River Birch", null],
+      ["6'", null]
+    ])
   })
 
   it("takes one answer for a value every entity of the type shares, expanded to each without its own", () => {

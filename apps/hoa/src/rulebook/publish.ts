@@ -4,7 +4,8 @@ import { publishRulebook } from "@/db/rulebookRepository"
 import { validateRulebook } from "@/schema/validate"
 import type { ObjectBucket } from "@/storage/objects"
 import { assembleRulesFile, fileRecords, loadRulebookRecords, writeRulesFile, type RulebookRecords } from "./assemble"
-import { coverageOf, isBlocking } from "./review"
+import { coverageOf } from "./coverage"
+import { isBlocking } from "./review"
 
 // Publishing a draft (encoding.md, 12 and 13): allowed once every record is reviewed, no approved record has an open
 // issue, every provision is covered and the approved records make a valid rules file. The rules file is assembled from

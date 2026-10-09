@@ -24,13 +24,16 @@ import { sampleDocuments } from "./sampleDocuments.ts"
 // scorer reads) and build.md. `pnpm eval:encoding:score <run id>` scores it against the golden encoding. Usage, from
 // apps/hoa:
 //   pnpm eval:encoding [--split dev|test|all] [--documents declaration,design-guidelines] [--units <key>,<key>]
+//     [--prompts <prompt name>=<version>,...]
 // The split is by provision key (encodingSplits.ts). --units keeps only units holding or under the given provision
-// keys or in the given documents.
+// keys or in the given documents. --prompts pins versions no label points at yet (a staged candidate); the other
+// prompts are resolved by label, as a build does.
 const { values } = parseArgs({
   options: {
     split: { type: "string", default: "dev" },
     documents: { type: "string", default: "declaration" },
-    units: { type: "string" }
+    units: { type: "string" },
+    prompts: { type: "string" }
   }
 })
 
@@ -45,6 +48,21 @@ const documents = values.documents.split(",").map((fixture) => {
   }
   return found
 })
+
+/** `--prompts`: build prompt versions to pin, by name. */
+function pinnedVersions(option: string | undefined) {
+  return Object.fromEntries(
+    (option?.split(",").filter(Boolean) ?? []).map((pin) => {
+      const [name = "", version = ""] = pin.split("=")
+      if (!rulebookBuildPrompts.some((prompt) => prompt.name === name) || !/^\d+$/.test(version)) {
+        throw new Error(
+          `--prompts takes <prompt name>=<version> for ${rulebookBuildPrompts.map((prompt) => prompt.name).join(", ")}, not ${pin}`
+        )
+      }
+      return [name, Number(version)]
+    })
+  )
+}
 
 const ai = createAiContext()
 if (!ai.isConfigured) {
@@ -62,7 +80,10 @@ const step: StepRunner = async (name, schema, run) => {
 }
 
 const startedAt = performance.now()
-const promptVersions = await resolvePromptVersions(ai.loadPrompt, rulebookBuildPrompts)
+const promptVersions = {
+  ...(await resolvePromptVersions(ai.loadPrompt, rulebookBuildPrompts)),
+  ...pinnedVersions(values.prompts)
+}
 console.warn(
   `Run ${runId}: ${documents.map((document) => document.fixture).join(", ")}; prompts ${JSON.stringify(promptVersions)}`
 )

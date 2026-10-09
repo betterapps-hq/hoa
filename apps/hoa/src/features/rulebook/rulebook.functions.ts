@@ -13,11 +13,14 @@ import { getLatestJobOfKind, insertJob, newJob } from "@/db/jobRepository"
 import { getPublishedRulesFile, getRulebookContent, type RulebookContent } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus, insertRulebook } from "@/db/rulebookRepository"
 import { readRulesFileJson } from "@/rulebook/assemble"
+import { textOutsideProvisions, type SourceText } from "@/rulebook/coverage"
 import { publishBlockers, publishDraft } from "@/rulebook/publish"
 import type { rulebookSchema } from "@/rules/rule"
 import type * as Rules from "@/schema/types"
 import { getRequestContext, requireAdministrator } from "@/session/requestContext.server"
+import { governingKeys } from "@/storage/keys"
 import { getBucket } from "@/storage/storage.server"
+import { loadPages } from "@/workflows/ocrSteps.server"
 import { describeBuildProblem } from "./rulebookView"
 
 type Rulebook = z.infer<typeof rulebookSchema>
@@ -70,6 +73,28 @@ async function loadSources(db: Database, hoa: { id: string; name: string }): Pro
 export const getRulebookSources = createServerFn({ method: "GET" }).handler(async () => {
   const context = await getRequestContext()
   return loadSources(getDb(), context.hoa)
+})
+
+/**
+ * The text on each upload's pages that no provision holds (encoding.md, UX, Coverage), cleaned as the structure stage
+ * cleans it: only uploads some provision's anchors point into are read.
+ */
+export const getSourceText = createServerFn({ method: "GET" }).handler(async (): Promise<SourceText[]> => {
+  const context = await getRequestContext()
+  const sources = await loadSources(getDb(), context.hoa)
+  const anchored = new Set(sources.provisions.flatMap((provision) => provision.anchors.map((anchor) => anchor.fileId)))
+  const bucket = getBucket()
+  return Promise.all(
+    sources.files
+      .filter((file) => anchored.has(file.id))
+      .map(async (file) =>
+        textOutsideProvisions(
+          file.id,
+          await loadPages(bucket, governingKeys(context.hoa.id, file.id), file.pageCount),
+          sources.provisions
+        )
+      )
+  )
 })
 
 /** Starts a rulebook build from ready documents; refused while another build runs. */

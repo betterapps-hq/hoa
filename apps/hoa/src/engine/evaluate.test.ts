@@ -3,7 +3,7 @@ import { storedRule } from "@/schema/exampleRulebook.test-data"
 import * as ex from "@/schema/examples.test-data"
 import type { EvaluationRequest, Finding, RulesFile } from "@/schema/types"
 import type { RuleDraft } from "@/schema/zod"
-import { date, entity, exampleRequest, examples, fact, quantity, term } from "@/tests/engineContext"
+import { date, entity, exampleRequest, examples, fact, quantity, reference, term } from "@/tests/engineContext"
 import type { Answers } from "./context"
 import { evaluate } from "./evaluate"
 
@@ -172,6 +172,44 @@ describe("evaluating a request (schema.md, Evaluating a request)", () => {
     expect(of(all, ex.maxHeight.key, "run-1")).toMatchObject({
       outcome: "not-applicable",
       reason: "Doesn't apply here."
+    })
+  })
+
+  it("decides a rule across an unsettled reference only when every thing it could name gives the same outcome", () => {
+    const gate = entity("gate-1", "gate")
+    const runs = (secondColor: string) => [
+      ...["run-1", "run-2"].map((id) => fact(id, "fence-run.material", term("fence-material.composite"))),
+      fact("run-1", "fence-run.color", term("composite-color.saddle")),
+      fact("run-2", "fence-run.color", term(secondColor))
+    ]
+    const onRun = (state: "uncertain" | "conflicting") => ({
+      ...fact("gate-1", "gate.fence-run", null, state),
+      candidates: state === "uncertain" ? [reference("run-1")] : [reference("run-1"), reference("run-2")]
+    })
+    const gateColor = (secondColor: string, state: "uncertain" | "conflicting") =>
+      of(
+        findings(
+          [gate, run("run-1"), run("run-2")],
+          [fact("gate-1", "gate.color", term("composite-color.saddle")), onRun(state), ...runs(secondColor)]
+        ),
+        ex.gateColor.key,
+        "gate-1"
+      )
+
+    expect(gateColor("composite-color.saddle", "uncertain")).toMatchObject({
+      outcome: "met",
+      reason: "Meets: Gates match a composite fence's color. This holds whichever fence run it is."
+    })
+    expect(gateColor("composite-color.saddle", "uncertain")?.inputs).toEqual(
+      expect.arrayContaining([
+        { entity: "gate-1", property: "gate.fence-run", state: "uncertain" },
+        { entity: "run-2", property: "fence-run.color", state: "known" }
+      ])
+    )
+    expect(gateColor("composite-color.saddle", "conflicting")).toMatchObject({ outcome: "met" })
+    expect(gateColor("composite-color.teak", "conflicting")).toMatchObject({
+      outcome: "missing-information",
+      reason: "Needs fence run."
     })
   })
 

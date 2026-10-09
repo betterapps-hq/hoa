@@ -1,3 +1,4 @@
+import invariant from "tiny-invariant"
 import type * as T from "@/schema/types"
 
 // Calendar arithmetic in the organization's local time (schema.md, Expressions 10 and 11). Dates are whole days since
@@ -39,9 +40,7 @@ export const minutesOf = (time: T.TimeOfDay) => {
 /** A timestamp as local minutes in the zone. */
 export function localMinutes(timestamp: T.Timestamp, zone: string) {
   const instant = new Date(timestamp)
-  if (Number.isNaN(instant.getTime())) {
-    throw new Error(`not a timestamp: ${timestamp}`)
-  }
+  invariant(!Number.isNaN(instant.getTime()), `not a timestamp: ${timestamp}`)
   const format = new Intl.DateTimeFormat("en-US", {
     timeZone: zone,
     year: "numeric",

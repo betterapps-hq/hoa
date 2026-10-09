@@ -3,17 +3,17 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty"
-import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { attempt } from "../attempt"
 import type { RulebookSources, RulebookView } from "../rulebook.functions"
 import { recordsOf } from "../rulebookRecords"
 import { RulebookWorkspace } from "../RulebookWorkspace/RulebookWorkspace"
+import type { RulebookSource } from "../useRulebookWorkspace"
 import { saveFile } from "./PublishedRulebook.utils"
 
 export type PublishedRulebookProps = {
   published: RulebookView
   sources: RulebookSources
-  source: CitationSource
+  source: RulebookSource
   /** The published rules file's JSON, exactly as written. */
   loadRulesFile: () => Promise<string>
 }

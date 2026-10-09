@@ -163,9 +163,11 @@ Code turns stated values into typed `FactValue`s:
 
 Then two checks that need no model:
 
-- **Evidence verification:** every evidence quote is matched against its page with the existing `matchQuote`. A fact
-  whose only evidence doesn't match is downgraded to `uncertain`; an `absent` answer whose evidence doesn't match is
-  dropped, since "none" with nothing behind it is a guess and no answer means unknown.
+- **Evidence verification:** every evidence quote is matched against its page with the existing `matchQuote`; a quote
+  not on the page it cites but on another page of the packet is cited there instead. A fact whose only evidence
+  doesn't match is downgraded to `uncertain`; an `absent` answer whose evidence doesn't match is dropped, since "none"
+  with nothing behind it is a guess and no answer means unknown. A reading that doesn't fit its property's type is
+  dropped, and the stated value read instead.
 - **Conflicts:** two readings of one property for one entity that disagree become `conflicting`, with both as
   candidates.
 
@@ -193,6 +195,12 @@ The engine ([Engine](#engine)) evaluates every selected rule on every subject wi
 exactly as [schema.md, Evaluating a request](schema.md#evaluating-a-request) defines, and returns the schema's
 `Finding` for each: outcome, remedy, reason, every fact read, the rules that modified it, the judgment and confirmed
 statements.
+
+**Verification pass.** First, each fact read from the packet that alone decides a not-met finding (held unsure, the
+finding would no longer be not met) is read again by `hoa-entity-facts`, alone, on the pages its evidence cites
+(`facts:{entity}:{property}:verify`). It stands only when that reading confirms its value confidently; a reading of
+another value (or of none) leaves it conflicting, and anything else uncertain. A wrong not-met tells a homeowner to
+change something that's fine, so it needs two readings.
 
 ### 13. Decide
 
@@ -329,12 +337,15 @@ marks; js-quantities and chrono-node handle neither form. The grammar's tests li
 | Prompt | Trace name | Model | Variables | Output |
 | --- | --- | --- | --- | --- |
 | `hoa-visual-description` | `visual-description` | `OPENROUTER_MODEL` | as today | as today |
-| `hoa-page-classification` | `page-classification` | `OPENROUTER_SMALL_MODEL` | `documentTypes`, `contextText`, `visualDescriptions`, `pageText` | `{ type: string }` |
-| `hoa-subject-identification` | `subject-identification` | `OPENROUTER_MODEL` | `requestType`, `projectKind`, `description`, `candidateTypes`, `pages` | `SubjectsOutput` |
-| `hoa-entity-facts` | `entity-facts` | `OPENROUTER_MODEL` | `requestType`, `description`, `entities`, `properties`, `textConditions`, `pages` | facts and condition answers, typed by the fact schema |
+| `hoa-page-classification` | `page-classification` | `anthropic/claude-haiku-5.5` (`config.model`) | `documentTypes`, `contextText`, `visualDescriptions`, `pageText` | `{ type: string }` |
+| `hoa-subject-identification` | `subject-identification` | `anthropic/claude-haiku-5.5` (`config.model`) | `requestType`, `projectKind`, `description`, `candidateTypes`, `pages` | `SubjectsOutput` |
+| `hoa-entity-facts` | `entity-facts` | `anthropic/claude-haiku-5.5` (`config.model`) | `requestType`, `description`, `entities`, `properties`, `textConditions`, `pages` | facts and condition answers, typed by the fact schema |
 | `hoa-document-review` | `document-review` | `anthropic/claude-sonnet-5.5` (the prompt's `config.model`) | `requirements`, `parties`, `pages` | `{ documents: DocumentResult[] }` |
-| `hoa-judgment-check` | `judgment-check` | `OPENROUTER_MODEL` | `statement`, `question`, `subject`, `facts`, `evidencePages` | `{ answer, confidence, rationale, evidence }` |
-| `hoa-review-summary` | `review-summary` | `OPENROUTER_MODEL` | `recommendation`, `findings`, `actionItems`, `suggestions` | `{ assessment, feedback, items: { id, text }[] }` |
+| `hoa-judgment-check` | `judgment-check` | `anthropic/claude-haiku-5.5` (`config.model`) | `statement`, `question`, `subject`, `facts`, `evidencePages` | `{ answer, confidence, rationale, evidence }` |
+| `hoa-review-summary` | `review-summary` | `anthropic/claude-haiku-5.5` (`config.model`) | `recommendation`, `findings`, `actionItems`, `suggestions` | `{ assessment, feedback, items: { id, text }[] }` |
+
+Every review prompt runs at its model's default effort (no `config.effort`): evaluation round 2 found Haiku at high
+effort no better on any stage, and not a match for Sonnet on the document review (implementation-log.md).
 
 Retired with the code that calls them: `hoa-file-classification`, `hoa-fact-extraction`, `hoa-document-check`,
 `hoa-qualitative-check`, `hoa-review-writer`.
@@ -497,7 +508,11 @@ paid.
 **Recommendation:** request information. What to provide: plans for a replacement garage. For the committee: harmony
 with the community.
 
-**Variants:** with replacement garage plans (refer to the committee, for harmony); converting an attic instead
+**Variants:** with replacement garage plans (refer to the committee, for harmony). The replacement garage's plans
+are supporting evidence: the document that satisfies (a)(vii)'s requirement, and a condition the Reviewer may attach to
+approval. The new garage isn't an entity or a second item of work in this application; it gets its own review when
+the homeowner applies to build it, and only a homeowner who explicitly asks to approve both together has two items of
+work. So the entities stay `work-1` and `space-1`. Converting an attic instead
 (the Board's authorization under Exhibit C (a) is required and counts, so refer to the committee); fee not paid
 (request information).
 

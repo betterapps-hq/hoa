@@ -9,7 +9,6 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { GoverningDocument } from "@/documents/governingDocument"
-import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { attempt } from "../attempt"
@@ -18,7 +17,7 @@ import type { RulebookSources, RulebookView } from "../rulebook.functions"
 import { recordsOf } from "../rulebookRecords"
 import { rulebookCounts } from "../rulebookView"
 import { RulebookWorkspace } from "../RulebookWorkspace/RulebookWorkspace"
-import type { RulebookActions } from "../useRulebookWorkspace"
+import type { RulebookActions, RulebookSource } from "../useRulebookWorkspace"
 
 export type RulebookPageProps = {
   draft: RulebookView
@@ -26,7 +25,7 @@ export type RulebookPageProps = {
   sources: RulebookSources
   documents: GoverningDocument[]
   /** Loads document pages for citations. */
-  source: CitationSource
+  source: RulebookSource
   /** What the administrator can do to the draft. */
   actions: RulebookActions
   loadJob: (jobId: string) => Promise<Job | null>

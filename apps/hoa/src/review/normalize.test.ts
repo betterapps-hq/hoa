@@ -20,6 +20,10 @@ const plan = planFacts(
   request.type
 )
 const page = "Trex fence in River Birch, six (6) feet tall. Fee $50 paid on Sept. 30. Built by the owners."
+const pageTexts = new Map([
+  ["file-1", page],
+  ["file-2", "A photo of the yard."]
+])
 const context = {
   plan,
   vocabulary,
@@ -28,7 +32,11 @@ const context = {
   entities: request.entities,
   referenceDate: "2026-10-01",
   factConfidence: 0.8,
-  pageText: (fileId: string) => (fileId === "file-1" ? page : null),
+  pageText: (fileId: string) => pageTexts.get(fileId) ?? null,
+  pages: [
+    { fileId: "file-1", pageIndex: 1 },
+    { fileId: "file-2", pageIndex: 1 }
+  ],
   at: "2026-10-01T00:00:00Z"
 }
 const evidence = (quote: string) => [{ fileId: "file-1", page: 1, quote }]
@@ -115,6 +123,14 @@ describe("normalizeFacts", () => {
       ["uncertain", 1],
       ["uncertain", 1]
     ])
+  })
+
+  it("cites a quote on the page where it is when the answer names another", () => {
+    const { facts } = normalize(answer({ evidence: [{ fileId: "file-2", page: 1, quote: "in River Birch" }] }))
+    expect(facts[0]).toMatchObject({
+      state: "known",
+      evidence: [{ fileId: "file-1", page: 1, quote: "in River Birch" }]
+    })
   })
 
   it("makes disagreeing readings of one property conflicting, with both as candidates", () => {

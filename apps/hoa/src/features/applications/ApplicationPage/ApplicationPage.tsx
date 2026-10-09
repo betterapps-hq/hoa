@@ -30,6 +30,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
+import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { hasOpenRequests } from "@/review/reviewModel"
@@ -43,6 +44,7 @@ import {
   type DecisionOutcome
 } from "../applicationDisplay"
 import type { ApplicationView } from "../applications.functions"
+import { createReviewContext } from "../reviewContext"
 import { ReviewReport } from "../ReviewReport/ReviewReport"
 import { uploadProblem } from "../uploadApplicationFiles"
 
@@ -59,6 +61,10 @@ export type ApplicationPageProps = {
   loadJob: (jobId: string) => Promise<Job | null>
   actions: ApplicationActions
   onChanged: () => void
+  /** The governing documents' pages, for showing a cited provision where it is. */
+  source?: CitationSource
+  /** A packet photo's URL, for thumbnails beside what the review read from it. */
+  loadImage?: (fileId: string) => Promise<string>
 }
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
@@ -165,7 +171,7 @@ function DecisionForm({ onDecide }: { onDecide: ApplicationActions["decide"] }) 
 }
 
 /** One application: its packet, the latest review, submitting, and the committee's decision. */
-export function ApplicationPage({ view, loadJob, actions, onChanged }: ApplicationPageProps) {
+export function ApplicationPage({ view, loadJob, actions, onChanged, source, loadImage }: ApplicationPageProps) {
   const { application, review, job } = view
   const [selected, setSelected] = useState<File[]>([])
   const [fileInputKey, setFileInputKey] = useState(0)
@@ -323,7 +329,18 @@ export function ApplicationPage({ view, loadJob, actions, onChanged }: Applicati
       ) : null}
 
       {review ? (
-        <ReviewReport review={review} rules={view.rules} audience={view.isOwner ? "homeowner" : "committee"} />
+        <ReviewReport
+          context={createReviewContext({
+            review,
+            rules: view.rules,
+            terms: view.terms,
+            files: view.files,
+            entityEvidence: view.entityEvidence,
+            audience: view.isOwner ? "homeowner" : "committee",
+            source,
+            loadImage
+          })}
+        />
       ) : null}
 
       {canSubmit && review ? (

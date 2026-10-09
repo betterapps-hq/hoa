@@ -6,6 +6,7 @@ import { isA } from "./conditions"
 import { type Answers, type Context, createContext, type Input } from "./context"
 import { deriveProperty } from "./derived"
 import { indexRulebook, type Override, type Overrides, overridesOn, type Rulebook } from "./overrides"
+import { settledContext, settlements, unsettledReferences } from "./references"
 import { createEngineVocabulary } from "./vocabulary"
 
 // Evaluating a request (schema.md, Evaluating a request 1 to 7): every rule the request considers, on every subject
@@ -180,6 +181,35 @@ function judge(context: Context, rulebook: Rulebook, rule: EvaluatedRule, subjec
   return withUnknownOverrides(verdict(context, rule, subject, applies, overrides), overrides)
 }
 
+type Judged = { found: Verdict; reads: Input[] }
+
+function judged(context: Context, rulebook: Rulebook, rule: EvaluatedRule, subject: string): Judged {
+  const found = judge(context, rulebook, rule, subject)
+  return { found, reads: [...context.reads, ...(found.override?.reads ?? [])] }
+}
+
+// Missing information that waits only on which thing an unsettled reference names is decided when every thing it could
+// name gives the same outcome (Expressions 4). The finding keeps the reference's own state among its inputs.
+function judgedAcrossReferences(context: Context, rulebook: Rulebook, rule: EvaluatedRule, subject: string): Judged {
+  const first = judged(context, rulebook, rule, subject)
+  if (first.found.outcome !== "missing-information") {
+    return first
+  }
+  const references = unsettledReferences(context, first.reads)
+  const ways = settlements(references).map((facts) => judged(settledContext(context, facts), rulebook, rule, subject))
+  const [settled] = ways
+  const isSame = (other: Judged) =>
+    settled !== undefined &&
+    other.found.outcome === settled.found.outcome &&
+    other.found.override?.rule.key === settled.found.override?.rule.key
+  if (!settled || settled.found.outcome === "missing-information" || !ways.every(isSame)) {
+    return first
+  }
+  const labels = references.map(({ fact }) => context.vocabulary.label(fact.property))
+  const reason = `${settled.found.reason} This holds whichever ${labels.join(" and ")} it is.`
+  return { found: { ...settled.found, reason }, reads: [...first.reads, ...ways.flatMap((way) => way.reads)] }
+}
+
 export function evaluate({ rulesFile, request, answers = {}, evaluatedAt }: EvaluationInput): T.Finding[] {
   const rulebook = indexRulebook(rulesFile)
   const shared = createContext({
@@ -196,14 +226,14 @@ export function evaluate({ rulesFile, request, answers = {}, evaluatedAt }: Eval
     .flatMap((rule) =>
       subjectsOf(shared, rulebook, rule).map((subject): T.Finding => {
         const context: Context = { ...shared, reads: [], deriving: new Set() }
-        const found = judge(context, rulebook, rule, subject)
+        const { found, reads } = judgedAcrossReferences(context, rulebook, rule, subject)
         return {
           ruleKey: rule.key,
           entity: subject,
           outcome: found.outcome,
           remedy: remedyOf(rule, found),
           reason: found.reason,
-          inputs: uniqueInputs([...context.reads, ...(found.override?.reads ?? [])]),
+          inputs: uniqueInputs(reads),
           modifiedBy: modifiedBy(found),
           judgment: found.check?.judgment ?? null,
           statements: found.check?.statements ?? [],

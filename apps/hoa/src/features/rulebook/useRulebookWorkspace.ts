@@ -1,13 +1,17 @@
 import { createContext, useContext } from "react"
 import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import type { RulebookRecords } from "@/rulebook/assemble"
-import type { ApprovalContext, coverageOf, RecordRef } from "@/rulebook/review"
+import type { Coverage, SourceText } from "@/rulebook/coverage"
+import type { ApprovalContext, RecordRef } from "@/rulebook/review"
 import type * as T from "@/schema/types"
 import type { RulebookIssue } from "@/schema/validate"
 import type { Vocabulary } from "@/schema/vocabulary"
 import type { RuleDraft } from "@/schema/zod"
 import type { CitationIndex } from "./rulebookRecords"
 import type { ReviewResult } from "./rulebookReview.functions"
+
+/** The pages citations point into, and their text outside any provision, which the coverage tab reads. */
+export type RulebookSource = CitationSource & { loadSourceText: () => Promise<SourceText[]> }
 
 /** What an administrator can do to a draft; every action reloads the rulebook when it's done. */
 export type RulebookActions = {
@@ -31,12 +35,12 @@ export type RulebookWorkspaceValue = {
   records: RulebookRecords
   vocabulary: Vocabulary
   citations: CitationIndex
-  coverage: ReturnType<typeof coverageOf>
+  coverage: Coverage
   /** Problems validation finds, by record key: a rule's, a term's, a provision's, or "settings". */
   issues: Map<string, RulebookIssue[]>
   /** Why records can't be approved; null for a read-only rulebook. */
   approval: ApprovalContext | null
-  source: CitationSource
+  source: RulebookSource
   actions: RulebookActions | null
   /** Opens a rule's card. */
   openRule: (key: T.RuleKey) => void

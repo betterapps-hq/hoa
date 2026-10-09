@@ -8,17 +8,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import type { ProjectKind } from "@/review/reviewRules"
 import { acceptFor } from "@/storage/uploadRules"
 import { recommendationLabels, statusLabels } from "../applicationDisplay"
 import type { ApplicationListItem } from "../applications.functions"
+import type { ProjectKindOption } from "../applicationView"
+import { ProjectKindPicker, somethingElse } from "../ProjectKindPicker/ProjectKindPicker"
 import { uploadProblem } from "../uploadApplicationFiles"
 
 const newApplicationSchema = z.object({
-  projectKind: z.string(),
+  projectKind: z.string().min(1, "Choose the kind of project, or Something else."),
   description: z.string().trim().max(4000, "Keep the description under 4,000 characters."),
   files: z
     .array(z.instanceof(File))
@@ -36,7 +36,7 @@ export type NewApplication = { projectKind: string | null; description: string |
 export type ApplicationsPageProps = {
   applications: ApplicationListItem[]
   /** The rulebook's project kinds to choose from; "Something else" is always offered. */
-  projectKinds: ProjectKind[]
+  projectKinds: ProjectKindOption[]
   /** Committee members see every application; homeowners see their own and can start one. */
   isCommittee: boolean
   onCreate: (application: NewApplication) => Promise<void>
@@ -49,13 +49,13 @@ const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
 export function ApplicationsPage({ applications, projectKinds, isCommittee, onCreate, onOpen }: ApplicationsPageProps) {
   const [error, setError] = useState<string | null>(null)
   const form = useForm({
-    defaultValues: { projectKind: projectKinds[0]?.key ?? "", description: "", files: [] as File[] },
+    defaultValues: { projectKind: "", description: "", files: [] as File[] },
     validators: { onSubmit: newApplicationSchema },
     onSubmit: async ({ value }) => {
       setError(null)
       try {
         await onCreate({
-          projectKind: value.projectKind || null,
+          projectKind: value.projectKind === somethingElse ? null : value.projectKind,
           description: value.description.trim() || null,
           files: value.files
         })
@@ -86,21 +86,12 @@ export function ApplicationsPage({ applications, projectKinds, isCommittee, onCr
               <FieldGroup>
                 <form.Field name="projectKind">
                   {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor={field.name}>Project type</FieldLabel>
-                      <NativeSelect
-                        id={field.name}
-                        value={field.state.value}
-                        onChange={(event) => field.handleChange(event.target.value)}
-                      >
-                        {projectKinds.map((kind) => (
-                          <NativeSelectOption key={kind.key} value={kind.key}>
-                            {kind.label}
-                          </NativeSelectOption>
-                        ))}
-                        <NativeSelectOption value="">Something else</NativeSelectOption>
-                      </NativeSelect>
-                    </Field>
+                    <ProjectKindPicker
+                      kinds={projectKinds}
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                      errors={field.state.meta.errors}
+                    />
                   )}
                 </form.Field>
                 <form.Field name="description">

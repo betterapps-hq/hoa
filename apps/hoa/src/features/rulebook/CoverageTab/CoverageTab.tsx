@@ -1,233 +1,116 @@
-import { CheckIcon, SearchIcon } from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import type * as T from "@/schema/types"
-import { attempt, reviewRecord } from "../attempt"
-import { BulkApprove } from "../BulkApprove/BulkApprove"
-import { ChoiceSelect } from "../ChoiceSelect/ChoiceSelect"
-import { ProvisionReference } from "../ProvisionReference/ProvisionReference"
-import { citedProvision } from "../rulebookRecords"
-import { noRuleReasonLabels, reviewLabels } from "../ruleLabels"
-import { RuleLink } from "../RuleLink/RuleLink"
-import { TermChip } from "../TermChip/TermChip"
+import { cn } from "@/lib/utils"
+import { coverageKinds, coverageReport, coveredShare, totalOf, type CoverageTotals } from "@/rulebook/coverage"
+import { CoverageBar } from "../CoverageBar/CoverageBar"
+import { CoverageDocument } from "../CoverageDocument/CoverageDocument"
+import { coverageKindLabels, coverageKindStyles, percentText } from "../coverageKinds"
+import { ProvisionCoverageList } from "../ProvisionCoverageList/ProvisionCoverageList"
+import { countOf } from "../rulebookRecords"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
-import { filterProvisions, isCited, type CoverageFilter } from "./CoverageTab.utils"
 
-const pageSize = 50
-const reasons: T.NoRule["reason"][] = ["heading", "recital", "reserved", "explanatory", "duplicate", "not-evaluated"]
-const reasonChoices = reasons.map((reason) => ({ value: reason, label: noRuleReasonLabels[reason] }))
-const filterChoices: { value: CoverageFilter; label: string }[] = [
-  { value: "uncovered", label: "Uncovered" },
-  { value: "to-review", label: "Reasons to review" },
-  { value: "all", label: "All" }
-]
+const views = [
+  { value: "text", label: "Document text" },
+  { value: "list", label: "Provision list" }
+] as const
+type View = (typeof views)[number]["value"]
 
 /**
- * Every provision of every document (encoding.md, UX, Coverage), with the rules, terms and settings citing it, or its
- * reason for having no rule; uncovered provisions first, and in a draft a reason can be given or approved.
+ * How much of the governing documents the rulebook covers (encoding.md, UX, Coverage), like a test coverage report:
+ * the share of the text each kind covers, then either the documents' text marked passage by passage, or every
+ * provision as a list to search and review.
  */
 export function CoverageTab() {
-  const { records, coverage, actions } = useRulebookWorkspace()
-  const reasonsToReview = records.provisions.filter((provision) => provision.noRule?.review.status === "proposed")
-  const [filter, setFilter] = useState<CoverageFilter>(() => {
-    if (coverage.uncovered.length > 0) {
-      return "uncovered"
-    }
-    return actions && reasonsToReview.length > 0 ? "to-review" : "all"
+  const { records, coverage, vocabulary, source, actions } = useRulebookWorkspace()
+  const [view, setView] = useState<View>("text")
+  const sourceText = useQuery({
+    queryKey: ["rulebook-source-text"],
+    queryFn: () => source.loadSourceText(),
+    staleTime: Number.POSITIVE_INFINITY
   })
-  const [query, setQuery] = useState("")
-  const [shownCount, setShownCount] = useState(pageSize)
-  const shown = filterProvisions(records.provisions, coverage.byProvision, filter, query)
+  const report = coverageReport(records, coverage, vocabulary, sourceText.data ?? [])
+  const reasonsToReview = records.provisions.filter((provision) => provision.noRule?.review.status === "proposed")
+  const outsideCount = report.documents.reduce(
+    (sum, document) =>
+      sum + document.articles.flatMap((article) => article.passages).filter((item) => item.kind === "outside").length,
+    0
+  )
 
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-sm text-muted-foreground">
-        {records.provisions.length} provisions: {coverage.uncovered.length} uncovered
-        {actions ? `, ${reasonsToReview.length} reasons for having no rule to review` : ""}.
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-56 flex-1">
-          <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            aria-label="Search provisions"
-            placeholder="Search labels, headings and text"
-            className="pl-8"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value)
-              setShownCount(pageSize)
-            }}
-          />
-        </div>
-        <ToggleGroup
-          variant="outline"
-          size="sm"
-          spacing={0}
-          aria-label="Show"
-          value={[filter]}
-          onValueChange={(value) => {
-            const next = filterChoices.find((choice) => choice.value === value[0])
-            if (next) {
-              setFilter(next.value)
-              setShownCount(pageSize)
-            }
-          }}
-        >
-          {filterChoices.map((choice) => (
-            <ToggleGroupItem key={choice.value} value={choice.value}>
-              {choice.label}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        {filter === "to-review" ? (
-          <BulkApprove
-            refs={shown.map((provision) => ({ type: "provision" as const, key: provision.key }))}
-            noun="reasons"
-          />
-        ) : null}
-      </div>
-      {shown.length === 0 ? (
-        <p className="rounded-lg border py-8 text-center text-sm text-muted-foreground">
-          {filter === "uncovered" ? "Every provision is covered." : "No provisions match."}
+    <div className="flex flex-col gap-4">
+      <section aria-labelledby="coverage-summary" className="flex flex-col gap-3 rounded-lg border p-4">
+        <h3 id="coverage-summary" className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-3xl font-semibold tabular-nums">{percentText(coveredShare(report.totals))}</span>
+          <span className="text-sm text-muted-foreground">of the documents&rsquo; text is covered</span>
+        </h3>
+        <CoverageBar totals={report.totals} label="All documents" className="h-3" />
+        <CoverageLegend totals={report.totals} />
+        <p className="text-sm text-muted-foreground">
+          {totalOf(report.totals).toLocaleString("en-US")} characters in {records.provisions.length} provisions:{" "}
+          {countOf(coverage.uncovered.length, "uncovered provision", "uncovered provisions")},{" "}
+          {countOf(outsideCount, "passage", "passages")} outside any provision
+          {actions ? `, ${countOf(reasonsToReview.length, "reason", "reasons")} for having no rule to review` : ""}.
         </p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {shown.slice(0, shownCount).map((provision) => (
-            <li key={provision.key}>
-              <ProvisionCoverageItem provision={provision} />
-            </li>
-          ))}
-        </ul>
-      )}
-      {shown.length > shownCount ? (
-        <Button variant="outline" className="w-fit" onClick={() => setShownCount((count) => count + pageSize)}>
-          Show {Math.min(pageSize, shown.length - shownCount)} more
-        </Button>
-      ) : null}
+        {sourceText.isPending ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Spinner /> Reading the pages for text outside any provision
+          </p>
+        ) : null}
+        {sourceText.error ? (
+          <p className="text-sm text-destructive">
+            The pages couldn&rsquo;t be read, so text outside any provision isn&rsquo;t counted.
+          </p>
+        ) : null}
+      </section>
+      <ToggleGroup
+        variant="outline"
+        size="sm"
+        spacing={0}
+        aria-label="View"
+        value={[view]}
+        onValueChange={(value) => {
+          const next = views.find((choice) => choice.value === value[0])
+          if (next) {
+            setView(next.value)
+          }
+        }}
+      >
+        {views.map((choice) => (
+          <ToggleGroupItem key={choice.value} value={choice.value}>
+            {choice.label}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      {view === "text" ? <CoverageDocument report={report} /> : <ProvisionCoverageList />}
     </div>
   )
 }
 
-/** One provision: what covers it, or its reason for having no rule, and in a draft a way to give or change one. */
-function ProvisionCoverageItem({ provision }: { provision: T.Provision }) {
-  const { coverage, citations, vocabulary, source, actions } = useRulebookWorkspace()
-  const [isEditing, setIsEditing] = useState(false)
-  const [reason, setReason] = useState<T.NoRule["reason"]>(provision.noRule?.reason ?? "explanatory")
-  const [note, setNote] = useState(provision.noRule?.note ?? "")
-  const [isBusy, setIsBusy] = useState(false)
-  const cited = coverage.byProvision.get(provision.key)
-  const reference = citedProvision(citations, { provisionKey: provision.key, highlight: null, region: null })
-  const isUncovered = provision.noRule === null && !isCited(cited)
-  const fieldId = `reason-${provision.key.replaceAll(/\W+/g, "-")}`
-
-  const setNoRule = async (noRule: { reason: T.NoRule["reason"]; note: string | null } | null) => {
-    if (!actions) {
-      return
-    }
-    setIsBusy(true)
-    const done = await attempt(async () => {
-      await actions.setNoRule(provision.key, noRule)
-      return true
-    }, "The reason wasn't saved.")
-    setIsBusy(false)
-    if (done) {
-      setIsEditing(false)
-    }
-  }
-
+/** Each kind's color, icon and share of the characters, and how encoded values are marked. */
+function CoverageLegend({ totals }: { totals: CoverageTotals }) {
+  const total = totalOf(totals)
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-3 text-sm">
-      <div className="flex flex-wrap items-center gap-2">
-        <ProvisionReference citation={reference} source={source} />
-        {provision.heading ? <span className="font-medium">{provision.heading}</span> : null}
-        {isUncovered ? <Badge variant="destructive">Uncovered</Badge> : null}
-      </div>
-      <p className="line-clamp-3 text-muted-foreground">{provision.text}</p>
-      {cited && isCited(cited) ? (
-        <div className="flex flex-col gap-1.5">
-          {cited.rules.length > 0 ? (
-            <ul className="flex flex-col gap-1" aria-label={`Rules citing ${reference.label}`}>
-              {cited.rules.map((key) => (
-                <li key={key}>
-                  <RuleLink ruleKey={key} />
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {cited.terms.length > 0 ? (
-            <p className="flex flex-wrap gap-x-2">
-              <span className="text-muted-foreground">Defines</span>
-              {cited.terms.map((key) => (
-                <TermChip key={key} termKey={key} vocabulary={vocabulary} />
-              ))}
-            </p>
-          ) : null}
-          {cited.settings ? <p className="text-muted-foreground">The settings cite it.</p> : null}
-          {cited.questions.length > 0 ? <p className="text-muted-foreground">A question cites it.</p> : null}
-        </div>
-      ) : null}
-      {provision.noRule ? (
-        <div className="flex flex-wrap items-center gap-2">
-          <span>No rule: {noRuleReasonLabels[provision.noRule.reason]}</span>
-          <Badge variant="outline">{reviewLabels[provision.noRule.review.status]}</Badge>
-          {provision.noRule.note ? <span className="text-muted-foreground">{provision.noRule.note}</span> : null}
-        </div>
-      ) : null}
-      {actions && !isEditing ? (
-        <div className="flex flex-wrap gap-2">
-          {provision.noRule?.review.status === "proposed" ? (
-            <Button
-              size="sm"
-              disabled={isBusy}
-              onClick={() => {
-                setIsBusy(true)
-                void reviewRecord(actions, { type: "provision", key: provision.key }, "approved").finally(() =>
-                  setIsBusy(false)
-                )
-              }}
-            >
-              <CheckIcon />
-              Approve the reason
-            </Button>
-          ) : null}
-          {provision.noRule || isUncovered ? (
-            <Button size="sm" variant="outline" disabled={isBusy} onClick={() => setIsEditing(true)}>
-              {provision.noRule ? "Change the reason" : "Give a reason for having no rule"}
-            </Button>
-          ) : null}
-          {provision.noRule ? (
-            <Button size="sm" variant="ghost" disabled={isBusy} onClick={() => void setNoRule(null)}>
-              Remove the reason
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-      {isEditing ? (
-        <div className="flex flex-col gap-2">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor={fieldId}>Reason</FieldLabel>
-              <ChoiceSelect id={fieldId} value={reason} choices={reasonChoices} onChange={setReason} />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor={`${fieldId}-note`}>Note</FieldLabel>
-              <Input id={`${fieldId}-note`} value={note} onChange={(event) => setNote(event.target.value)} />
-            </Field>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" disabled={isBusy} onClick={() => void setNoRule({ reason, note: note.trim() || null })}>
-              Save the reason
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : null}
-    </div>
+    <ul aria-label="Legend" className="flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+      {coverageKinds.map((kind) => {
+        const style = coverageKindStyles[kind]
+        const Icon = style.icon
+        return (
+          <li key={kind} className="flex items-center gap-1.5">
+            <span className={cn("size-3 shrink-0 rounded-sm", style.fill)} aria-hidden />
+            <Icon className={cn("size-3.5 shrink-0", style.iconColor)} aria-hidden />
+            <span>{coverageKindLabels[kind]}</span>
+            <span className="tabular-nums text-muted-foreground">
+              {percentText(total === 0 ? 0 : totals[kind] / total)}
+            </span>
+          </li>
+        )
+      })}
+      <li className="flex items-center gap-1.5">
+        <span className="font-semibold underline decoration-2 underline-offset-4">30 days</span>
+        <span className="text-muted-foreground">A value a rule encodes</span>
+      </li>
+    </ul>
   )
 }

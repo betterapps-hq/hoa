@@ -11,7 +11,7 @@ import { writerScore, type ReviewJudgeAnswer } from "./judge"
 // Evaluation round 2's scores (implementation-plan.md, E2): entities, facts, normalization, evidence, findings, the
 // recommendation and the action items, each from 0 to 1, with the mismatches behind them. The model names entities
 // its own way, so expected entities are first aligned to the review's by type and label: ids only break ties, since
-// the model's run-1 needn't be the expected run-1.
+// the model's run-1 needn't be the expected run-1. Within a type, the pairing has the most similar labels overall.
 
 export type ReviewScores = {
   entities: number
@@ -31,30 +31,59 @@ const roots = new Set(["request", "lot", "community"])
 /** Small enough never to outweigh a difference in labels. */
 const idTieBreak = 0.001
 
+type Entity = { id: string; type: string; label: string }
+type Pairing = { total: number; picks: (Entity | undefined)[] }
+
+/** The pairing of wanted to found entities with the greatest total score; a wanted one left unpaired is undefined. */
+function bestPairing(wanted: readonly Entity[], found: readonly Entity[]) {
+  const score = (a: Entity, b: Entity) => similarity(a.label, b.label) + (a.id === b.id ? idTieBreak : 0)
+  const memo = new Map<string, Pairing>()
+  // `used` lists the found entities already paired, in order, so it also keys the memo.
+  const best = (index: number, used: readonly number[]): Pairing => {
+    const one = wanted[index]
+    if (one === undefined) {
+      return { total: 0, picks: [] }
+    }
+    const key = `${index} ${used.join(",")}`
+    const cached = memo.get(key)
+    if (cached) {
+      return cached
+    }
+    const skip = best(index + 1, used)
+    let result: Pairing = { total: skip.total, picks: [undefined, ...skip.picks] }
+    for (const [slot, entity] of found.entries()) {
+      if (!used.includes(slot)) {
+        const rest = best(
+          index + 1,
+          [...used, slot].toSorted((a, b) => a - b)
+        )
+        const total = score(one, entity) + rest.total
+        if (total > result.total) {
+          result = { total, picks: [entity, ...rest.picks] }
+        }
+      }
+    }
+    memo.set(key, result)
+    return result
+  }
+  return best(0, []).picks
+}
+
 /** Expected entity id to the review's, within each type by label similarity, ids breaking ties; roots map to themselves. */
-export function alignEntities(
-  expected: ExpectedReview["entities"],
-  actual: readonly T.EvaluationRequest["entities"][number][]
-) {
+export function alignEntities(expected: readonly Entity[], actual: readonly Entity[]) {
   const alignment = new Map<string, string>([...roots].map((id) => [id, id]))
   const free = actual.filter((entity) => !roots.has(entity.id))
-  const pairs = expected
-    .flatMap((wanted) =>
-      free
-        .filter((entity) => entity.type === wanted.type)
-        .map((entity) => ({
-          wanted,
-          entity,
-          score: similarity(wanted.label, entity.label) + (wanted.id === entity.id ? idTieBreak : 0)
-        }))
+  for (const [type, wanted] of Map.groupBy(expected, (entity) => entity.type)) {
+    const picks = bestPairing(
+      wanted,
+      free.filter((entity) => entity.type === type)
     )
-    .toSorted((a, b) => b.score - a.score)
-  const used = new Set<string>()
-  for (const { wanted, entity } of pairs) {
-    if (!alignment.has(wanted.id) && !used.has(entity.id)) {
-      alignment.set(wanted.id, entity.id)
-      used.add(entity.id)
-    }
+    wanted.forEach((entity, index) => {
+      const pick = picks[index]
+      if (pick) {
+        alignment.set(entity.id, pick.id)
+      }
+    })
   }
   return alignment
 }
