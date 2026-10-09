@@ -12,6 +12,7 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar"
 import { useRole } from "@/features/role/RoleProvider"
 import { roles } from "@/features/role/roles"
+import { ThemeSubmenu } from "@/features/theme/ThemeSubmenu"
 
 /** The demo user for the active role, with a shortcut to the other workspace. */
 export function NavUser() {
@@ -56,6 +57,7 @@ export function NavUser() {
                 <OtherIcon />
                 Switch to {other.name.toLowerCase()}
               </DropdownMenuItem>
+              <ThemeSubmenu />
             </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>

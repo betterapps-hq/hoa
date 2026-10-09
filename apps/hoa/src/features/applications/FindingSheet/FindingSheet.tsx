@@ -143,7 +143,7 @@ function FindingDetail({ context, finding, onClose, titleRef }: FindingDetailPro
           {action ? (
             <Button
               variant="link"
-              className="h-auto justify-start p-0 text-left whitespace-normal"
+              className="h-auto justify-start p-0 text-left whitespace-normal text-link"
               onClick={() => showActionItem(actionItemId(action.item))}
             >
               {action.title}: {renderRuleMarkers(action.item.text, (key) => context.rules.get(key)?.title ?? key)}

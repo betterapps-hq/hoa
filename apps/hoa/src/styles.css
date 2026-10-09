@@ -195,6 +195,23 @@
   --color-coverage-uncovered: var(--coverage-uncovered);
 }
 
+/*
+ * Links in running text (rule references, "View in document"). The preset's dark --primary is a fill for buttons
+ * that carry light text; as text on a dark card it reads at about 2.4:1, so text links use their own token: the
+ * primary blue in light mode and a lighter step of the same hue in dark (about 8:1 on the card).
+ */
+:root {
+  --link: var(--primary);
+}
+
+.dark {
+  --link: oklch(0.78 0.11 240.79);
+}
+
+@theme inline {
+  --color-link: var(--link);
+}
+
 @layer components {
   /* Stripes over a passage nothing covers, and over text outside any provision, in the kind's own color. */
   .coverage-stripes-uncovered {

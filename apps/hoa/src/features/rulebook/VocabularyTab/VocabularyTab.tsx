@@ -125,7 +125,7 @@ export function VocabularyTab() {
               const usedBy = (
                 <Button
                   variant="link"
-                  className="h-auto p-0"
+                  className="h-auto p-0 text-link"
                   aria-expanded={openUsage === term.key}
                   aria-label={`${label}: used by ${users.length} ${users.length === 1 ? "rule" : "rules"}`}
                   disabled={users.length === 0}

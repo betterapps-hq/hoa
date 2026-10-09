@@ -27,7 +27,7 @@ export function ProvisionReference({ citation, source, children }: ProvisionRefe
           render={
             <button
               type="button"
-              className="rounded-sm text-left text-primary underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+              className="rounded-sm text-left text-link underline decoration-dotted underline-offset-4 hover:decoration-solid focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               onClick={() => setIsOpen(true)}
             >
               {children ?? citation.label}

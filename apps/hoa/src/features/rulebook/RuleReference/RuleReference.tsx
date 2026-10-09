@@ -36,7 +36,7 @@ export function RuleReference({ rule, source, title }: RuleReferenceProps) {
         <>
           <Button
             variant="link"
-            className="h-auto p-0 text-sm"
+            className="h-auto p-0 text-sm text-link"
             aria-label={`${rule.title}: all ${rule.citations.length} citations`}
             onClick={() => setIsAllOpen(true)}
           >
