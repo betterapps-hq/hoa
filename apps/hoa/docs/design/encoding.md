@@ -181,7 +181,7 @@ Code combines every unit's draft, as the hand-run's `build-rules-file.ts` did:
 - **Terms** by key. The same key with the same kind merges labels and citations; different kinds, or two definitions,
   become a `conflict` issue on both. Near-duplicate terms (labels that match fuzzily, with the same kind) are listed for
   consolidation.
-- **Rules** by key; a duplicate key gets `~2` and a `conflict` issue.
+- **Rules** by key; a duplicate key gets `-2` (an aspect allows no other suffix) and a `conflict` issue.
 - **Clauses:** liability entries and precedence citations concatenate; other clauses must agree or raise a conflict.
 - **Referenced documents** by key.
 - **Coverage report:** provisions without a rule, term, clause or reason.

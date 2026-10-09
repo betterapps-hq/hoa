@@ -1,3 +1,4 @@
+import { pluralOf } from "@/text/normalize"
 import { coreTerms } from "./coreTerms"
 import type { RequestType, TermKey } from "./types"
 import type { TermContent } from "./zod"
@@ -48,7 +49,7 @@ export function createVocabulary(organizationTerms: TermContent[]): Vocabulary {
       if (!preferred) {
         return key
       }
-      return plural ? (preferred.plural ?? pluralize(preferred.text)) : preferred.text
+      return plural ? (preferred.plural ?? pluralOf(preferred.text)) : preferred.text
     },
     thingOf,
     isKindOf: (key, ancestor) => chain(key).includes(ancestor),
@@ -61,14 +62,4 @@ export function createVocabulary(organizationTerms: TermContent[]): Vocabulary {
       return found?.kind === "thing" ? found.request : null
     }
   }
-}
-
-function pluralize(text: string) {
-  if (/(s|x|z|ch|sh)$/.test(text)) {
-    return `${text}es`
-  }
-  if (/[^aeiou]y$/.test(text)) {
-    return `${text.slice(0, -1)}ies`
-  }
-  return `${text}s`
 }

@@ -726,6 +726,7 @@ export type EncodingDraft = z.input<typeof encodingDraft>
 export type RuleContent = z.output<typeof ruleDraft>
 export type TermContent = z.output<typeof termDraft>
 export type QuestionContent = z.output<typeof questionDraft>
+export type EncodingDraftContent = z.output<typeof encodingDraft>
 
 // ─── The Zod output and the TypeScript types agree, both ways ─────────────────────────────────────
 

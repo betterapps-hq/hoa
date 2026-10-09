@@ -1,0 +1,303 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`prompt variables > serializes a draft and its problems for hoa-encoding-repair 1`] = `
+{
+  "coreTerms": "applicant | thing (party) | "applicant"
+approval | thing (event) | "approval"
+approval-status | value set (complete) | "approval status"
+approval-status.approved | value in approval-status | "approved"
+approval-status.denied | value in approval-status | "denied"
+approval.by | property of approval: party | "approved by"
+approval.covers | property of approval: reference to any thing | "covers"
+approval.on | property of approval: date | "decided on"
+approval.status | property of approval: choice of approval-status | "status"
+approval.written | property of approval: boolean | "in writing"
+architectural-application | thing (request); request: flow application, governing date architectural-application.submitted-on, lot required | "application"
+architectural-application.decided-on | property of architectural-application: date | "decided on"
+architectural-application.decision | property of architectural-application: choice of decision-status | "decision"
+architectural-application.submitted-on | property of architectural-application: date | "submitted on"
+assessment | thing (request); request: flow enforcement, governing date assessment.due-on, lot required | "assessment"
+assessment.due-on | property of assessment: date | "due on"
+assessment.paid-on | property of assessment: date | "paid on"
+assessment.unpaid-balance | property of assessment: quantity in usd | "unpaid balance"
+board | thing (party) | "board"
+business-day | unit of business-time | "business days"
+calendar-day | unit of elapsed-time (1 base units) | "days", "calendar days" (alternative)
+committee | thing (party) | "architectural review committee", "ARC" (alternative)
+community | thing (object) | "community"
+community.annual-meeting | property of community: schedule | "annual meeting schedule"
+community.leased-lots | property of community: count | "leased lots"
+community.lot-count | property of community: count | "number of lots"
+community.total-voting-power | property of community: count | "total votes"
+compliance-period | thing (request); request: flow duty, governing date compliance-period.scheduled-on, lot none | "compliance period"
+compliance-period.completed-on | property of compliance-period: date | "completed on"
+compliance-period.scheduled-on | property of compliance-period: date | "scheduled on"
+decision-status | value set (complete) | "decision status"
+decision-status.approved | value in decision-status | "approved"
+foot | unit of length (12 base units) | "ft", "feet" (alternative), "foot" (alternative), "'" (alternative), "′" (alternative)
+guest | thing (party) | "guest"
+inch | unit of length (1 base units) | "in", "inch" (alternative), "inches" (alternative), """ (alternative), "″" (alternative)
+lease-registration | thing (request); request: flow filing, governing date lease-registration.received-on, lot required | "lease registration"
+lease-registration.received-on | property of lease-registration: date | "received on"
+lease-registration.term | property of lease-registration: quantity in month | "lease term"
+lot | thing (object) | "lot"
+meeting | thing (request); request: flow filing, governing date meeting.starts-at, lot none | "meeting"
+meeting.notice-sent-on | property of meeting: date | "notice sent on"
+meeting.starts-at | property of meeting: date-time | "starts at"
+meeting.voting-power-present | property of meeting: count | "votes present"
+members | thing (party) | "members"
+month | unit of calendar-period (1 base units) | "months"
+nomination | thing (request); request: flow filing, governing date nomination.filed-on, lot none | "board nomination"
+nomination.filed-on | property of nomination: date | "filed on"
+nomination.ownership-start | property of nomination: date | "owner since"
+occupant | thing (party) | "occupant"
+organization | thing (party) | "organization"
+owner | thing (party) | "owner"
+percent | unit of ratio (0.01 base units) | "%", "percent" (alternative)
+records-request | thing (request); request: flow filing, governing date records-request.received-on, lot none | "records request"
+records-request.produced-on | property of records-request: date | "produced on"
+records-request.received-on | property of records-request: date | "received on"
+tenant | thing (party) | "tenant"
+usd | unit of money (1 base units) | "$", "dollars" (alternative), "USD" (alternative)
+violation | thing (request); request: flow enforcement, governing date violation.observed-on, lot optional | "violation"
+violation.cured-on | property of violation: date | "cured on"
+violation.hearing-held-on | property of violation: date, absent unless stated | "hearing held on"
+violation.hearing-requested-on | property of violation: date, absent unless stated | "hearing requested on"
+violation.notice-delivered-on | property of violation: date | "notice delivered on"
+violation.observed-on | property of violation: date | "observed on"
+violation.occurrence | property of violation: count | "occurrence"
+vote | thing (event) | "vote"
+vote-subject | value set (open) | "vote subject"
+vote-subject.declaration-amendment | value in vote-subject | "amendment to the Declaration"
+vote.in-favor | property of vote: count | "votes in favor"
+vote.subject | property of vote: choice of vote-subject | "subject"
+work | thing (object) | "work"
+year | unit of calendar-period (12 base units) | "years"",
+  "draft": "{"clauses":{"deciders":[{"citations":[{"highlight":null,"provisionKey":"rules:1","region":null}],"party":"committee","requestType":"architectural-application"}],"precedence":{"citations":[{"highlight":null,"provisionKey":"declaration:4.1","region":null}],"order":[["declaration"],["rules"]]}},"notes":[],"provisions":[{"key":"declaration:4.1","noRule":null},{"key":"rules:1","noRule":null}],"questions":[],"referencedDocuments":[{"key":"by-laws","kind":"bylaws","title":"By-Laws"}],"rules":[{"appliesTo":"shed","appliesWhen":null,"authority":null,"bearer":"owner","beneficiary":null,"check":null,"citations":[{"highlight":null,"provisionKey":"declaration:4.1","region":null}],"cure":null,"decidedBy":null,"domain":"architectural","effectiveFrom":"2025-01-01","key":"declaration:4.1#sheds-allowed","kind":"norm","modality":"permission","noExceptions":null,"overrides":[],"recurs":null,"remedy":null,"requestTypes":["architectural-application"],"scope":null,"statement":"An {{owner}} may build a {{shed}}.","title":"Sheds allowed"},{"appliesTo":"shed","appliesWhen":null,"authority":null,"bearer":null,"beneficiary":null,"check":{"test":{"left":{"path":["shed.height"],"type":"ref"},"op":"<=","right":{"type":"quantity","unit":"foot","value":10},"type":"compare"},"type":"test"},"citations":[{"highlight":null,"provisionKey":"rules:1","region":null}],"cure":null,"decidedBy":null,"domain":"architectural","effectiveFrom":"2025-01-01","key":"rules:1#max-height","kind":"norm","modality":"requirement","noExceptions":null,"overrides":[],"recurs":null,"remedy":null,"requestTypes":["architectural-application"],"scope":null,"statement":"A {{shed}} is at most 10 feet tall.","title":"Shed height"}],"terms":[{"citations":[{"highlight":null,"provisionKey":"rules:1","region":null}],"context":null,"definition":"A small building for storage.","key":"shed","kind":"thing","labels":[{"citation":null,"plural":null,"role":"preferred","text":"shed"},{"citation":null,"plural":null,"role":"alternative","text":"storage shed"}],"nature":"object","organizationId":null,"request":null,"scopeNote":null}]}",
+  "problems": "- rules[1].appliesTo: rules:1#max-height: gazebo isn't a term [undefined-term]
+- (draft): Required [invalid_type]",
+  "terms": "shed | thing (object) | "shed" (plural "sheds")
+shed.height | property of shed: quantity in foot | "height"",
+}
+`;
+
+exports[`prompt variables > serializes a unit for hoa-provision-encoding 1`] = `
+{
+  "context": "none",
+  "coreTerms": "applicant | thing (party) | "applicant"
+approval | thing (event) | "approval"
+approval-status | value set (complete) | "approval status"
+approval-status.approved | value in approval-status | "approved"
+approval-status.denied | value in approval-status | "denied"
+approval.by | property of approval: party | "approved by"
+approval.covers | property of approval: reference to any thing | "covers"
+approval.on | property of approval: date | "decided on"
+approval.status | property of approval: choice of approval-status | "status"
+approval.written | property of approval: boolean | "in writing"
+architectural-application | thing (request); request: flow application, governing date architectural-application.submitted-on, lot required | "application"
+architectural-application.decided-on | property of architectural-application: date | "decided on"
+architectural-application.decision | property of architectural-application: choice of decision-status | "decision"
+architectural-application.submitted-on | property of architectural-application: date | "submitted on"
+assessment | thing (request); request: flow enforcement, governing date assessment.due-on, lot required | "assessment"
+assessment.due-on | property of assessment: date | "due on"
+assessment.paid-on | property of assessment: date | "paid on"
+assessment.unpaid-balance | property of assessment: quantity in usd | "unpaid balance"
+board | thing (party) | "board"
+business-day | unit of business-time | "business days"
+calendar-day | unit of elapsed-time (1 base units) | "days", "calendar days" (alternative)
+committee | thing (party) | "architectural review committee", "ARC" (alternative)
+community | thing (object) | "community"
+community.annual-meeting | property of community: schedule | "annual meeting schedule"
+community.leased-lots | property of community: count | "leased lots"
+community.lot-count | property of community: count | "number of lots"
+community.total-voting-power | property of community: count | "total votes"
+compliance-period | thing (request); request: flow duty, governing date compliance-period.scheduled-on, lot none | "compliance period"
+compliance-period.completed-on | property of compliance-period: date | "completed on"
+compliance-period.scheduled-on | property of compliance-period: date | "scheduled on"
+decision-status | value set (complete) | "decision status"
+decision-status.approved | value in decision-status | "approved"
+foot | unit of length (12 base units) | "ft", "feet" (alternative), "foot" (alternative), "'" (alternative), "′" (alternative)
+guest | thing (party) | "guest"
+inch | unit of length (1 base units) | "in", "inch" (alternative), "inches" (alternative), """ (alternative), "″" (alternative)
+lease-registration | thing (request); request: flow filing, governing date lease-registration.received-on, lot required | "lease registration"
+lease-registration.received-on | property of lease-registration: date | "received on"
+lease-registration.term | property of lease-registration: quantity in month | "lease term"
+lot | thing (object) | "lot"
+meeting | thing (request); request: flow filing, governing date meeting.starts-at, lot none | "meeting"
+meeting.notice-sent-on | property of meeting: date | "notice sent on"
+meeting.starts-at | property of meeting: date-time | "starts at"
+meeting.voting-power-present | property of meeting: count | "votes present"
+members | thing (party) | "members"
+month | unit of calendar-period (1 base units) | "months"
+nomination | thing (request); request: flow filing, governing date nomination.filed-on, lot none | "board nomination"
+nomination.filed-on | property of nomination: date | "filed on"
+nomination.ownership-start | property of nomination: date | "owner since"
+occupant | thing (party) | "occupant"
+organization | thing (party) | "organization"
+owner | thing (party) | "owner"
+percent | unit of ratio (0.01 base units) | "%", "percent" (alternative)
+records-request | thing (request); request: flow filing, governing date records-request.received-on, lot none | "records request"
+records-request.produced-on | property of records-request: date | "produced on"
+records-request.received-on | property of records-request: date | "received on"
+tenant | thing (party) | "tenant"
+usd | unit of money (1 base units) | "$", "dollars" (alternative), "USD" (alternative)
+violation | thing (request); request: flow enforcement, governing date violation.observed-on, lot optional | "violation"
+violation.cured-on | property of violation: date | "cured on"
+violation.hearing-held-on | property of violation: date, absent unless stated | "hearing held on"
+violation.hearing-requested-on | property of violation: date, absent unless stated | "hearing requested on"
+violation.notice-delivered-on | property of violation: date | "notice delivered on"
+violation.observed-on | property of violation: date | "observed on"
+violation.occurrence | property of violation: count | "occurrence"
+vote | thing (event) | "vote"
+vote-subject | value set (open) | "vote subject"
+vote-subject.declaration-amendment | value in vote-subject | "amendment to the Declaration"
+vote.in-favor | property of vote: count | "votes in favor"
+vote.subject | property of vote: choice of vote-subject | "subject"
+work | thing (object) | "work"
+year | unit of calendar-period (12 base units) | "years"",
+  "document": "rules (rules): Community Rules",
+  "provisions": "[rules:2] section 2
+Sheds must also look like the house:
+
+[rules:2(a)] point 2(a)
+No shed may be taller than ten feet.",
+  "references": "[rules:1]
+A shed may be at most ten feet tall.
+
+[declaration:4.1]
+Sheds are allowed on every Lot.",
+  "requestTypes": "architectural-application | thing (request); request: flow application, governing date architectural-application.submitted-on, lot required | "application"
+architectural-application.decided-on | property of architectural-application: date | "decided on"
+architectural-application.decision | property of architectural-application: choice of decision-status | "decision"
+architectural-application.submitted-on | property of architectural-application: date | "submitted on"
+assessment | thing (request); request: flow enforcement, governing date assessment.due-on, lot required | "assessment"
+assessment.due-on | property of assessment: date | "due on"
+assessment.paid-on | property of assessment: date | "paid on"
+assessment.unpaid-balance | property of assessment: quantity in usd | "unpaid balance"
+compliance-period | thing (request); request: flow duty, governing date compliance-period.scheduled-on, lot none | "compliance period"
+compliance-period.completed-on | property of compliance-period: date | "completed on"
+compliance-period.scheduled-on | property of compliance-period: date | "scheduled on"
+lease-registration | thing (request); request: flow filing, governing date lease-registration.received-on, lot required | "lease registration"
+lease-registration.received-on | property of lease-registration: date | "received on"
+lease-registration.term | property of lease-registration: quantity in month | "lease term"
+meeting | thing (request); request: flow filing, governing date meeting.starts-at, lot none | "meeting"
+meeting.notice-sent-on | property of meeting: date | "notice sent on"
+meeting.starts-at | property of meeting: date-time | "starts at"
+meeting.voting-power-present | property of meeting: count | "votes present"
+nomination | thing (request); request: flow filing, governing date nomination.filed-on, lot none | "board nomination"
+nomination.filed-on | property of nomination: date | "filed on"
+nomination.ownership-start | property of nomination: date | "owner since"
+records-request | thing (request); request: flow filing, governing date records-request.received-on, lot none | "records request"
+records-request.produced-on | property of records-request: date | "produced on"
+records-request.received-on | property of records-request: date | "received on"
+violation | thing (request); request: flow enforcement, governing date violation.observed-on, lot optional | "violation"
+violation.cured-on | property of violation: date | "cured on"
+violation.hearing-held-on | property of violation: date, absent unless stated | "hearing held on"
+violation.hearing-requested-on | property of violation: date, absent unless stated | "hearing requested on"
+violation.notice-delivered-on | property of violation: date | "notice delivered on"
+violation.observed-on | property of violation: date | "observed on"
+violation.occurrence | property of violation: count | "occurrence"",
+  "terms": "shed | thing (object) | "shed" (plural "sheds")
+shed.height | property of shed: quantity in foot | "height"",
+}
+`;
+
+exports[`prompt variables > serializes definitions and candidates for hoa-term-extraction 1`] = `
+{
+  "candidates": ""Outbuilding" (definition; defined in declaration:2.1; 1 use)
+  e.g. "Shed" or "Outbuilding": A building for storage.
+"Shed" (definition; defined in declaration:2.1; 1 use)
+  e.g. "Shed" or "Outbuilding": A building for storage.
+"Color Guide" (usage; 3 uses)
+  e.g. Owners pick paint colors from the Color Guide.
+  e.g. Owners pick roof colors from the Color Guide.
+  e.g. Owners pick trim colors from the Color Guide.",
+  "coreTerms": "applicant | thing (party) | "applicant"
+approval | thing (event) | "approval"
+approval-status | value set (complete) | "approval status"
+approval-status.approved | value in approval-status | "approved"
+approval-status.denied | value in approval-status | "denied"
+approval.by | property of approval: party | "approved by"
+approval.covers | property of approval: reference to any thing | "covers"
+approval.on | property of approval: date | "decided on"
+approval.status | property of approval: choice of approval-status | "status"
+approval.written | property of approval: boolean | "in writing"
+architectural-application | thing (request); request: flow application, governing date architectural-application.submitted-on, lot required | "application"
+architectural-application.decided-on | property of architectural-application: date | "decided on"
+architectural-application.decision | property of architectural-application: choice of decision-status | "decision"
+architectural-application.submitted-on | property of architectural-application: date | "submitted on"
+assessment | thing (request); request: flow enforcement, governing date assessment.due-on, lot required | "assessment"
+assessment.due-on | property of assessment: date | "due on"
+assessment.paid-on | property of assessment: date | "paid on"
+assessment.unpaid-balance | property of assessment: quantity in usd | "unpaid balance"
+board | thing (party) | "board"
+business-day | unit of business-time | "business days"
+calendar-day | unit of elapsed-time (1 base units) | "days", "calendar days" (alternative)
+committee | thing (party) | "architectural review committee", "ARC" (alternative)
+community | thing (object) | "community"
+community.annual-meeting | property of community: schedule | "annual meeting schedule"
+community.leased-lots | property of community: count | "leased lots"
+community.lot-count | property of community: count | "number of lots"
+community.total-voting-power | property of community: count | "total votes"
+compliance-period | thing (request); request: flow duty, governing date compliance-period.scheduled-on, lot none | "compliance period"
+compliance-period.completed-on | property of compliance-period: date | "completed on"
+compliance-period.scheduled-on | property of compliance-period: date | "scheduled on"
+decision-status | value set (complete) | "decision status"
+decision-status.approved | value in decision-status | "approved"
+foot | unit of length (12 base units) | "ft", "feet" (alternative), "foot" (alternative), "'" (alternative), "′" (alternative)
+guest | thing (party) | "guest"
+inch | unit of length (1 base units) | "in", "inch" (alternative), "inches" (alternative), """ (alternative), "″" (alternative)
+lease-registration | thing (request); request: flow filing, governing date lease-registration.received-on, lot required | "lease registration"
+lease-registration.received-on | property of lease-registration: date | "received on"
+lease-registration.term | property of lease-registration: quantity in month | "lease term"
+lot | thing (object) | "lot"
+meeting | thing (request); request: flow filing, governing date meeting.starts-at, lot none | "meeting"
+meeting.notice-sent-on | property of meeting: date | "notice sent on"
+meeting.starts-at | property of meeting: date-time | "starts at"
+meeting.voting-power-present | property of meeting: count | "votes present"
+members | thing (party) | "members"
+month | unit of calendar-period (1 base units) | "months"
+nomination | thing (request); request: flow filing, governing date nomination.filed-on, lot none | "board nomination"
+nomination.filed-on | property of nomination: date | "filed on"
+nomination.ownership-start | property of nomination: date | "owner since"
+occupant | thing (party) | "occupant"
+organization | thing (party) | "organization"
+owner | thing (party) | "owner"
+percent | unit of ratio (0.01 base units) | "%", "percent" (alternative)
+records-request | thing (request); request: flow filing, governing date records-request.received-on, lot none | "records request"
+records-request.produced-on | property of records-request: date | "produced on"
+records-request.received-on | property of records-request: date | "received on"
+tenant | thing (party) | "tenant"
+usd | unit of money (1 base units) | "$", "dollars" (alternative), "USD" (alternative)
+violation | thing (request); request: flow enforcement, governing date violation.observed-on, lot optional | "violation"
+violation.cured-on | property of violation: date | "cured on"
+violation.hearing-held-on | property of violation: date, absent unless stated | "hearing held on"
+violation.hearing-requested-on | property of violation: date, absent unless stated | "hearing requested on"
+violation.notice-delivered-on | property of violation: date | "notice delivered on"
+violation.observed-on | property of violation: date | "observed on"
+violation.occurrence | property of violation: count | "occurrence"
+vote | thing (event) | "vote"
+vote-subject | value set (open) | "vote subject"
+vote-subject.declaration-amendment | value in vote-subject | "amendment to the Declaration"
+vote.in-favor | property of vote: count | "votes in favor"
+vote.subject | property of vote: choice of vote-subject | "subject"
+work | thing (object) | "work"
+year | unit of calendar-period (12 base units) | "years"",
+  "definitions": "[declaration:2.1] definition 2.1
+"Shed" or "Outbuilding": A building for storage.",
+  "document": "declaration (declaration): Declaration",
+}
+`;
+
+exports[`prompt variables > serializes summaries, term pairs and documents for hoa-rulebook-consolidation 1`] = `
+{
+  "documents": "by-laws (bylaws): By-Laws (named, not uploaded)
+declaration (declaration): Declaration
+rules (rules): Community Rules",
+  "rules": "declaration:4.1#sheds-allowed | norm permission | architectural-application | shed | declaration:4.1 | An owner may build a shed.
+rules:1#max-height | norm requirement | architectural-application | shed | rules:1 | A shed is at most 10 feet tall.
+rules:1#max-height-2 | norm requirement | architectural-application | shed | rules:1 | A shed is at most 10 feet tall.
+rules:2(a)#max-height | norm requirement | architectural-application | shed | rules:2(a) | A shed is at most 10 feet tall.",
+  "termPairs": "shed "shed" ~ garden-shed "Sheds" (0.9)",
+}
+`;

@@ -25,6 +25,7 @@
     "check:types": "tsc --noEmit",
     "check:unused": "knip --directory ../.. --workspace apps/hoa",
     "ocr:fixture": "tsx --env-file=.env scripts/ocr-fixture.ts",
+    "structure:compare": "tsx scripts/compare-structure.ts",
     "docs:schema": "node scripts/build-schema-doc.ts",
     "lint": "oxlint --max-warnings=0",
     "test": "vitest run",

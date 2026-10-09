@@ -5,12 +5,12 @@ import { z } from "zod"
 import { coreTerms } from "@/schema/coreTerms"
 import { organizationTerms } from "@/schema/examples.test-data"
 
-// Fence or garage knowledge lives only in rulebook data: no string literal in the engine, review, pipeline or rulebook
-// code may be an organization term's key (a term with an organizationId in samples/ or the schema's examples). Core
-// keys are allowed, because portal code reads and writes core terms; a refinement keeps its core key.
+// Fence or garage knowledge lives only in rulebook data: no string literal in the engine, review, pipeline, rulebook,
+// encoding or text code may be an organization term's key (a term with an organizationId in samples/ or the schema's
+// examples). Core keys are allowed, because portal code reads and writes core terms; a refinement keeps its core key.
 
 const src = join(import.meta.dirname, "..")
-const guardedFolders = ["engine", "review", "pipeline", "rulebook"]
+const guardedFolders = ["engine", "review", "pipeline", "rulebook", "encoding", "text"]
 
 // The first build's files that phase 9 deletes (implementation-plan.md, 9.1), and verify.ts, whose catalog checks 9.1
 // deletes (guard it again then). Every other file is guarded, including each new one; tests aren't, since fixtures
@@ -69,7 +69,7 @@ describe("organization terms in code", () => {
     expect(keys).not.toContain("lot")
   })
 
-  it("finds none in the engine, review, pipeline or rulebook code", () => {
+  it("finds none in the engine, review, pipeline, rulebook, encoding or text code", () => {
     const found = guardedFiles().flatMap((file) =>
       stringLiterals(readFileSync(join(src, file), "utf8"))
         .filter((literal) => keys.has(literal))

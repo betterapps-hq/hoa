@@ -19,7 +19,7 @@ Work happens on the `feat/rules-schema` branch, committed locally at each milest
 | 1 Schema in the app | Done: `src/schema/` (types, Zod, drafts, core terms, validator, describe, statement links), 57 examples tested, the sample validates, guard test, `pnpm docs:schema` |
 | 2 Engine | Done: `src/engine/` (exact numbers, vocabulary, values, calendar, paths, operands, conditions, derived properties, checks, deadlines, overrides, evaluate, decide), the fence fixture and the sample's expected result, the garage enclosure and its variants; 2.15 sanctions deferred to violations |
 | 3 Storage | Done: additive migration 0001, provisions and rulebook content repositories, assemble and canonical hash, carry forward, `pnpm db:seed:sample`, `pnpm db:reset:rules` |
-| 4 Encoding pipeline | Not started |
+| 4 Encoding pipeline | In progress: pure modules done (`src/encoding`, `src/text`: structure, references, term candidates, plan, prompt variables, merge, consolidation, repair grouping); registry, model stages and Workflow next |
 | E1 Evaluation round: encoding | Not started |
 | 5 Rules UX | Not started |
 | 6 Review pipeline | Not started |
@@ -56,6 +56,11 @@ Work happens on the `feat/rules-schema` branch, committed locally at each milest
 | 2026-10-09 | The sample's `architectural-application.review-fee-paid-on` is unknown when unstated, not absent. | 4.2(d) lets the Reviewer require payment before review; payment is the Association's record, so a packet's silence doesn't show the fee unpaid. The expected results (fence: missing information unless the packet shows the fee paid; garage variant: request information) need it. |
 | 2026-10-09 | The fence expected result as the engine gives it, where the spec's table can't hold: 5.3 no vinyl is `not-applicable` on composite runs (the schema's example of a prohibition of the subject itself); K style, post color, gate color, gate height and the return run's setback are `missing-information` while unstated (unknown is committee only for a judgment), so the committee's list is harmony alone; a stated non-K style goes to the committee through the case-by-case clause rather than being advisory. The recommendation is unchanged. | Don't bend engine semantics to a table; application-review.md updated to match. |
 | 2026-10-09 | The fence fixture (`src/tests/fenceSchemaFixture.ts`) completes the examples: fence plus lattice applies only to runs with lattice (5.5.1(ii) speaks of the lattice component); the packet's documents are rules under 3.1.5 and 3.4.1 (photos a recommendation under 3.4.2); the portal supplies the submission date and the Reviewer's fee; the work is a new structure by the owner, and the two owners are entities who sign. | Each grounded in the guidelines' text; facts the packet doesn't hold come from the portal, as the schema's evaluation boundary says. |
+| 2026-10-09 | Structure on the sample Declaration: 535 of 537 golden keys (99.6%), text similarity 0.9875 (`pnpm structure:compare`). The parser was tuned looking at the whole document, so its test split isn't held out; evaluation round 1 measures it again. | Clears E1's structure bars. |
+| 2026-10-09 | Text matching is implemented in TypeScript (`src/text/match.ts`: Levenshtein ratio, partial and token-set ratios, RapidFuzz's WRatio semantics); fuzzy matches in running text need labels of 8 or more characters, and a changed word under 4 characters never matches. | No dependency until the text-analysis service; looser thresholds matched "wall" to "well" and "Class A" to "Class B". |
+| 2026-10-09 | Duplicate rule keys get `-2`, not `~2` (the schema's key pattern rejects `~`); encoding.md updated. | Keys must validate. |
+| 2026-10-09 | Structure rules: a paragraph after a list of clauses belongs to the list's parent, otherwise to the last item; counted paragraphs number from the provision's own text; an intro is a separate paragraph ending in a colon; wrap-ups only from text starting lowercase; pages up to the table of contents are dropped; headings Azure tags as page headers or numbers at a page top are restored. | Matches the golden encoding's conventions. |
+| 2026-10-09 | Consolidation candidate pairs use statement similarity, not embeddings; every term a unit returns becomes an organization term (no `proposedCore` from units yet). | YAGNI until evaluation shows a need. |
 
 ## Questions
 
@@ -64,6 +69,7 @@ Work happens on the `feat/rules-schema` branch, committed locally at each milest
 | 2026-10-09 | LexNLP is AGPL-3.0, with a commercial license available. Take the license, accept AGPL, or replace its extractors with our own? | Not used until E1.6; own grammars first. |
 | 2026-10-09 | Numbering test matrix (plan item 3 in the generalization review): write a few common numbering styles as parser tests now, or defer with the other generalization work? | Deferred with the corpus work. |
 | 2026-10-09 | When an interpretation question is answered, its rejected candidate rule leaves the rules file but the question still names it, so validation reports an undefined rule. Keep answered questions with only the kept rules, or keep rejected rules in the file marked rejected? | To decide in phase 5; leaning towards keeping the question with its answer and dropping rejected keys from its options. |
+| 2026-10-09 | `tiny-invariant` is recommended by docs/typescript.md but isn't a dependency of the app, so the engine throws `Error` where it would use `invariant`. Add it to the app, or drop it from the conventions? | Throwing `Error`. |
 
 ## Evaluation rounds
 
