@@ -9,11 +9,14 @@ applications against it. It's written for a product that many HOAs onboard to, s
 
 | Page | What it covers |
 | --- | --- |
-| [rules.md](rules.md) | The rule model: project-type catalog, components, typed checks, citations, rule keys, versioning |
+| [schema.md](schema.md) | First pass, for review: the rules schema: governing documents, each organization's terms, rules, checks and evaluation |
+| [schema-examples.md](schema-examples.md) | 57 checked examples of the schema, from fence colors to fine schedules and quorum |
+| [encoding.md](encoding.md) | Spec: turning governing documents into a rulebook in the schema, from provisions to a published rules file |
+| [application-review.md](application-review.md) | Spec: reviewing an application against the rules file: selection, facts, the engine, the recommendation |
+| [implementation-plan.md](implementation-plan.md) | The phased tasks that build the schema, both pipelines and their UX |
+| [implementation-log.md](implementation-log.md) | Progress, decisions, open questions and evaluation results while the plan is built |
 | [documents.md](documents.md) | What lives where, the records and D1 tables, storage layout, uploads, access, privacy and retention |
 | [ocr.md](ocr.md) | Turning every uploaded file into stored page records with Azure Document Intelligence Layout |
-| [extraction.md](extraction.md) | The rulebook build pipeline, from page records to a published rulebook |
-| [review.md](review.md) | The application review pipeline: facts, documents, evaluation, decision policy, feedback |
 | [evaluation.md](evaluation.md) | Datasets, scores, production evaluators and the prompt tuning loop in Langfuse |
 | [platform.md](platform.md) | Cloudflare services, limits, workflows, caching, errors, server functions, local development, CI/CD |
 

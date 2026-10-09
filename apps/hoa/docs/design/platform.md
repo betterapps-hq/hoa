@@ -65,11 +65,11 @@ ApplicationReview(applicationId)                  started by runReview
   decide ─> write ─> save-review
 ```
 
-Stage ids are defined in [ocr.md](ocr.md#where-it-runs), [extraction.md](extraction.md#stages) and
-[review.md](review.md#stages). Each workflow instance is one Langfuse session: the job id is the session id. A workflow
+Stage ids are defined in [ocr.md](ocr.md#where-it-runs), [encoding.md](encoding.md#stages) and
+[application-review.md](application-review.md#stages). Each workflow instance is one Langfuse session: the job id is the session id. A workflow
 reads `hoaId` from its job row, not from its parameters.
 
-Publishing isn't a workflow step. `publishRulebook` checks the publish gate ([extraction.md](extraction.md#9-publish))
+Publishing isn't a workflow step. `publishRulebook` checks the publish gate ([encoding.md](encoding.md#12-review-and-13-publish))
 and runs one D1 batch, so an administrator can take as long as they like to review a draft.
 
 ### Idempotency
@@ -111,9 +111,9 @@ step with a retryable error. Per-job outputs are written to
 
 - **Permanent errors fail fast.** Steps throw `NonRetryableError` for file validation failures, Azure 4xx responses
   other than 429, and unsupported content.
-- **Fan-outs don't fail the whole job.** Per-file OCR in a review, per-section extraction and per-rule qualitative
-  checks run under `Promise.allSettled`; a failed item is recorded in the job's `failures` and handled as
-  [extraction.md](extraction.md#4-extract) and [review.md](review.md#errors) describe. A job with failures ends as
+- **Fan-outs don't fail the whole job.** Per-file OCR in a review, per-unit encoding, per-group fact reading and
+  per-rule judgment checks run under `Promise.allSettled`; a failed item is recorded in the job's `failures` and handled as
+  [encoding.md](encoding.md#8-repair) and [application-review.md](application-review.md#stages) describe. A job with failures ends as
   `completed-with-errors`.
 - **Everything else fails the job.** The workflow body catches the error and, in a final step, sets the job to `failed`
   with `error: { stage, message, isRetryable }`, and updates its subject: a document or rulebook becomes `failed`, an

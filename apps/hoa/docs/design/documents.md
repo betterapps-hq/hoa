@@ -39,7 +39,8 @@ job) are one `batch()` call, which D1 runs atomically.
 ## Records
 
 The TypeScript shapes below are the domain types; repositories map them to the tables above. Rulebooks and rules are
-defined in [rules.md](rules.md), reviews in [review.md](review.md).
+defined in [schema.md](schema.md) and stored as [encoding.md](encoding.md#storage) describes; reviews in
+[application-review.md](application-review.md).
 
 ```ts
 type Hoa = { id: string; name: string; slug: string; settings: HoaSettings }
@@ -73,7 +74,7 @@ type GoverningDocument = {
 }
 ```
 
-Authority comes from `kind` (see [rules.md](rules.md#authority-and-conflicts)), not from a stored number. An upload
+Authority comes from `kind` and the organization's precedence clause (see [schema.md](schema.md#rank-and-conflicts)), not from a stored number. An upload
 starts a new lineage, or names an existing `lineageId` to become its next version; amendments name the lineage they
 amend.
 
@@ -118,7 +119,7 @@ type VisualDescription = {
 Governing documents only. Sections are written once per document version, by the first build that needs them, with
 deterministic ids, so later builds and published rules' `provenance.sectionId` always point at the same rows.
 Re-structuring a document is an explicit administrator action that replaces its sections in one batch. The structure
-stage ([extraction.md](extraction.md)) writes each section's text, with page markers, to R2.
+stage ([encoding.md](encoding.md#2-structure)) replaces sections with provisions.
 
 ```ts
 type Section = {
@@ -207,7 +208,7 @@ type Job = {
   kind: "document-ingest" | "rulebook-build" | "application-review"
   subjectId: string // document, rulebook or application id
   status: "running" | "completed" | "completed-with-errors" | "failed"
-  stage: string | null // a stage id from ocr.md, extraction.md or review.md
+  stage: string | null // a stage id from ocr.md, encoding.md or application-review.md
   done: number // set from a count of finished items, never incremented
   total: number
   promptVersions: Record<string, PromptVersion> // resolved once when the job starts

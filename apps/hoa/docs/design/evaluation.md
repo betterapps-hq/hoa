@@ -24,7 +24,7 @@ Two model stages have no dataset of their own and are measured through the stage
 
 The gold rulebook comes from the governing documents only: guidelines Article 5 and its exhibits, CC&R Article 4, and
 the HOA's blank application form and checklist (until the HOA provides a blank copy, the packet's form pages with every
-filled value removed). It follows the one-check-per-rule convention ([rules.md](rules.md#rule-shape)) and has about 45
+filled value removed). It follows the schema's one-requirement-per-rule convention ([schema.md](schema.md#4-rules)) and has about 45
 fence rules.
 
 Application variants start from a **complete, compliant baseline**: the redacted packet with a listed Trex color,
@@ -44,7 +44,7 @@ decision policy is reached:
 | Vinyl, with `curableOutcome: reject` | Reject |
 | Neighbor approval missing | Request information |
 | Height not given | Request information |
-| The sample packet as submitted | Request information ([review.md](review.md#expected-result-for-the-sample-application)) |
+| The sample packet as submitted | Request information ([application-review.md](application-review.md#expected-result-for-the-sample-application)) |
 
 The governing documents are shared with the HOA's members, but the sample application isn't: every dataset item uses
 the redacted copy, with the homeowners' details replaced.

@@ -25,7 +25,7 @@ DocumentIngest's stages, which are also the job's `stage` values (every step nam
 | `ocr` | `ocr:hash`, then per range `ocr:submit:{range}`, `ocr:poll:{range}`, `ocr:pages:{range}`, then `ocr:labels` |
 | `visuals` | `visuals:{figureId}` |
 
-ApplicationReview runs the same steps per file, with the file id in each name ([review.md](review.md#stages)).
+ApplicationReview runs the same steps per file, with the file id in each name ([application-review.md](application-review.md#stages)).
 
 ## Flow
 
@@ -91,7 +91,7 @@ text. On top of the text it provides exactly the structure the pipeline needs:
 | Layout output | Used for |
 | --- | --- |
 | Paragraph roles: `title`, `sectionHeading`, `pageHeader`, `pageFooter`, `pageNumber`, `footnote` | Section outline, printed page labels, removing running heads and watermarks |
-| `sections`, a hierarchy of sections and subsections | The structure stage of [extraction.md](extraction.md) |
+| `sections`, a hierarchy of sections and subsections | The structure stage of [encoding.md](encoding.md#2-structure) |
 | Tables, with merged cells, as HTML in the Markdown | Rules stated in tables (colors per manufacturer) |
 | Selection marks (☒ and ☐) | Checkboxes on application forms |
 | Figures, with their location, caption and a cropped image (`output=figures`) | Vision descriptions |
