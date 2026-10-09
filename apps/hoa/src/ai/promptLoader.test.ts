@@ -31,6 +31,12 @@ describe("createPromptLoader", () => {
     expect(template.compile({ name: "Sam" })).toBe("Hi Sam")
   })
 
+  it("reads a version's reasoning effort", async () => {
+    const manager = langfuse({ config: { model: "anthropic/claude-haiku-5.5", effort: "high" } })
+    const template = await createPromptLoader(manager, "production")(prompt)
+    expect(template.config).toEqual({ model: "anthropic/claude-haiku-5.5", effort: "high" })
+  })
+
   it("loads a pinned version, and ignores an unusable config", async () => {
     const manager = langfuse({ config: { model: 7 } })
     const template = await createPromptLoader(manager, "production")(prompt, { version: 7 })

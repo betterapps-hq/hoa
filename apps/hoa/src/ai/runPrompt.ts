@@ -2,7 +2,7 @@ import { propagateAttributes, startActiveObservation, type LangfuseSpan } from "
 import { isSpanContextValid } from "@opentelemetry/api"
 import { generateText, jsonSchema, tool, type LanguageModel, type ModelMessage, type ProviderMetadata } from "ai"
 import { z } from "zod"
-import type { PromptLoader } from "./promptLoader"
+import type { PromptConfig, PromptLoader } from "./promptLoader"
 import type { PromptDefinition, PromptVariables } from "./prompts"
 
 /** Builds a model by id. The prompt version's `config.model` picks the id, else the stage's default. */
@@ -270,12 +270,15 @@ async function sha256(parts: readonly (string | Uint8Array)[]) {
 function promptCacheKey(
   traceName: string,
   modelId: string,
+  effort: PromptConfig["effort"],
   compiled: string,
   attachments: readonly PromptAttachment[]
 ) {
   return sha256([
     traceName,
     modelId,
+    // Only when set, so answers cached at the model's default effort keep their keys.
+    ...(effort === undefined ? [] : [`effort:${effort}`]),
     compiled,
     ...attachments.map((attachment) => (attachment.type === "file" ? attachment.data : attachment.text))
   ])
@@ -292,6 +295,7 @@ async function runInSpan<T>(
   )
   const promptVersion = template.version
   const modelId = template.config.model ?? options.defaultModelId
+  const { effort } = template.config
   const isTraced = isSpanContextValid(span.otelSpan.spanContext())
   const traceId = isTraced ? span.traceId : undefined
   const attachments = options.attachments ?? []
@@ -303,10 +307,12 @@ async function runInSpan<T>(
         attachment.type === "file" ? attachment.filename : `${attachment.text.length} characters of text`
       )
     },
-    metadata: { promptName: template.name, promptVersion, modelId }
+    metadata: { promptName: template.name, promptVersion, modelId, effort: effort ?? "default" }
   })
 
-  const cacheKey = options.cache ? await promptCacheKey(options.traceName, modelId, compiled, attachments) : undefined
+  const cacheKey = options.cache
+    ? await promptCacheKey(options.traceName, modelId, effort, compiled, attachments)
+    : undefined
   if (options.cache && cacheKey) {
     const hit = await options.cache.get(cacheKey)
     if (hit !== undefined && hit !== null) {
@@ -323,6 +329,7 @@ async function runInSpan<T>(
     messages: [{ role: "user", content: [{ type: "text", text: compiled }, ...attachments.map(toContentPart)] }],
     providerOptions: {
       openrouter: {
+        ...(effort === undefined ? {} : { reasoning: { effort } }),
         ...(options.sessionId === undefined ? {} : { session_id: options.sessionId }),
         ...(isTraced
           ? {

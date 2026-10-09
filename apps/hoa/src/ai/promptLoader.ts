@@ -4,8 +4,12 @@ import type { PromptDefinition } from "./prompts"
 /** Which version of a prompt to load: the one a label points at, or a version a job pinned. */
 export type PromptSelector = { label: string } | { version: number }
 
-/** A prompt version's settings in Langfuse. `model` chooses the model for that version. */
-const promptConfigSchema = z.object({ model: z.string().min(1).optional() }).catch({})
+/**
+ * A prompt version's settings in Langfuse. `model` chooses the model for that version, and `effort` how much it
+ * reasons before answering (OpenRouter's `reasoning.effort`); without it the model's default applies.
+ */
+export const promptEffort = z.enum(["none", "minimal", "low", "medium", "high", "xhigh"])
+const promptConfigSchema = z.object({ model: z.string().min(1).optional(), effort: promptEffort.optional() }).catch({})
 export type PromptConfig = z.infer<typeof promptConfigSchema>
 
 export type PromptTemplate = {

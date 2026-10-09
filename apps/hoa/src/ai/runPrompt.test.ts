@@ -318,6 +318,25 @@ describe("model and version selection", () => {
     expect(createModelFor).toHaveBeenCalledWith("anthropic/claude-sonnet-5.5")
     expect(result).toMatchObject({ modelId: "anthropic/claude-sonnet-5.5", promptVersion: 9 })
   })
+
+  it("asks OpenRouter for the version's reasoning effort, and only then", async () => {
+    const run = async (config: { effort?: "high" }) => {
+      const model = createModel()
+      await runTextPrompt({
+        loadPrompt: async (prompt) => ({ name: prompt.name, version: 1, config, compile: () => "Reason" }),
+        createModel: () => model,
+        defaultModelId: "test-model",
+        prompt: prompts.modelCheck,
+        variables: {},
+        traceName: "model-check",
+        environment: "test"
+      })
+      return model.doGenerateCalls[0]?.providerOptions?.openrouter
+    }
+
+    expect(await run({ effort: "high" })).toMatchObject({ reasoning: { effort: "high" } })
+    expect(await run({})).not.toHaveProperty("reasoning")
+  })
 })
 
 describe("content cache", () => {

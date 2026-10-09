@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { parseArgs } from "node:util"
 import { createAiContext } from "../src/ai/aiContext.server.ts"
 import { applicationReviewPrompts, pipelinePrompts } from "../src/ai/pipelinePrompts.ts"
-import { resolvePromptVersions } from "../src/ai/promptLoader.ts"
+import { promptEffort, resolvePromptVersions, type PromptLoader } from "../src/ai/promptLoader.ts"
 import { runObjectPrompt, type PromptCache } from "../src/ai/runPrompt.ts"
 import { recordScores } from "../src/ai/scores.ts"
 import { applicationRequestType } from "../src/applications/application.ts"
@@ -33,7 +33,20 @@ import { fixtures, readJson, writeJson } from "./evalFiles.ts"
 // git-ignored .fixtures/eval/review/fence-application/ (its packet comes from `pnpm ocr:fixture --packet`). The rules
 // file is the committed sample Declaration plus the fence rules of src/tests/fenceSchemaFixture.ts, until the Design
 // Guidelines' encoding is committed (implementation-log.md).
-const { values } = parseArgs({ options: { case: { type: "string" }, sample: { type: "string" } } })
+// --config overrides prompt versions' model and effort for an experiment, without new Langfuse versions:
+//   --config "review=anthropic/claude-haiku-5.5@high,hoa-document-review=anthropic/claude-sonnet-5.5"
+// `review` names every review prompt (not the judge, so scores stay comparable); any other name is a Langfuse prompt.
+const { values } = parseArgs({
+  options: { case: { type: "string" }, sample: { type: "string" }, config: { type: "string" } }
+})
+const overrides = new Map(
+  (values.config?.split(",").filter(Boolean) ?? []).map((entry) => {
+    const [name = "", setting = ""] = entry.split("=")
+    const [model, effort] = setting.split("@")
+    return [name, { ...(model ? { model } : {}), ...(effort ? { effort: promptEffort.parse(effort) } : {}) }]
+  })
+)
+const reviewPromptNames = new Set<string>(Object.values(applicationReviewPrompts).map((prompt) => prompt.name))
 
 const reviewRuns = join(fixtures, "eval/review")
 const modelRetries = 3
@@ -53,6 +66,12 @@ if (cases.length === 0) {
 const ai = createAiContext()
 if (!ai.isConfigured) {
   throw new Error(`Missing settings: ${ai.missing.join(", ")}`)
+}
+const loadPrompt: PromptLoader = async (prompt, selector) => {
+  const template = await ai.loadPrompt(prompt, selector)
+  const override =
+    overrides.get(prompt.name) ?? (reviewPromptNames.has(prompt.name) ? overrides.get("review") : undefined)
+  return override ? { ...template, config: { ...template.config, ...override } } : template
 }
 const rulesFile = mergeRulesFiles(sampleRulesFile(), fenceRulesFile())
 const vocabulary = rulebookVocabulary(rulesFile)
@@ -85,8 +104,10 @@ function packetOf(item: ReviewCase) {
   )
 }
 
-const promptVersions = await resolvePromptVersions(ai.loadPrompt, applicationReviewPrompts)
-console.warn(`Run ${runId}: ${cases.map((item) => item.id).join(", ")}; prompts ${JSON.stringify(promptVersions)}`)
+const promptVersions = await resolvePromptVersions(loadPrompt, applicationReviewPrompts)
+console.warn(
+  `Run ${runId}: ${cases.map((item) => item.id).join(", ")}; prompts ${JSON.stringify(promptVersions)}; config ${values.config ?? "as labeled"}`
+)
 const reports: CaseReport[] = []
 let judgeCost = 0
 for (const item of cases) {
@@ -122,7 +143,7 @@ for (const item of cases) {
     packet,
     step,
     ai: {
-      loadPrompt: ai.loadPrompt,
+      loadPrompt,
       createModel: ai.createModel,
       modelId: ai.modelId,
       smallModelId: ai.smallModelId,
