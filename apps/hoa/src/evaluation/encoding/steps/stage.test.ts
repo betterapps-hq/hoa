@@ -4,8 +4,9 @@ import { kindName, type Outline } from "@/encoding/steps/outline"
 import { findingKeys } from "@/encoding/steps/ruleFinding"
 import { structureOf } from "@/encoding/steps/ruleStructuring"
 import { spendingLimit, type StepAi } from "@/encoding/steps/run"
+import { keySegment } from "@/encoding/steps/termKeys"
 import { coreTerms } from "@/schema/coreTerms"
-import type { TermContent } from "@/schema/zod"
+import { termDraft, type TermContent } from "@/schema/zod"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
 import { promptText, replyingModel, variableOf, variablesPromptLoader } from "@/tests/scriptedModel"
 import { buildDatasets, type DefinedTermsItem } from "./datasets"
@@ -86,12 +87,34 @@ const citationKeys = (term: TermContent, fallback: string, citable?: ReadonlySet
     .filter((key) => citable === undefined || citable.has(key))
   return keys.length > 0 ? keys : [fallback]
 }
-const lastSegment = (key: string, parent: string) => key.slice(parent.length + 1)
+const byKey = new Map<string, TermContent>([...coreTerms, ...terms].map((term) => [term.key, term]))
+const preferredOf = (term: TermContent) => labelsOf(term).preferred.text
+/**
+ * A golden term as a model names it in criteria, following the prompt's rule: a core key as given, else its preferred
+ * label lowercased and hyphenated, under its thing's or set's reference. The step's code must resolve it.
+ */
+function referenceOf(key: string): string {
+  const term = byKey.get(key)
+  if (!term || coreKeys.has(key)) {
+    return key
+  }
+  const own = keySegment(preferredOf(term))
+  if (term.kind === "property") {
+    return `${referenceOf(term.of)}.${own}`
+  }
+  return term.kind === "value" ? `${referenceOf(term.set)}.${own}` : own
+}
+/** A condition, value type or derivation with every golden term key in it written as the model's reference. */
+const asReferences = <V>(value: V): V =>
+  JSON.parse(
+    JSON.stringify(value, (_field, item: unknown) =>
+      typeof item === "string" && byKey.has(item) ? referenceOf(item) : item
+    )
+  )
 const property = (term: Extract<TermContent, { kind: "property" }>) => ({
-  of: term.of,
-  name: lastSegment(term.key, term.of),
+  of: referenceOf(term.of),
   ...labelsOf(term),
-  valueType: term.valueType,
+  valueType: asReferences(term.valueType),
   many: term.many,
   ifUnstated: term.ifUnstated,
   definition: term.definition
@@ -99,13 +122,7 @@ const property = (term: Extract<TermContent, { kind: "property" }>) => ({
 const valuesOf = (set: string, expected: readonly TermContent[]) =>
   expected.flatMap((term) =>
     term.kind === "value" && term.set === set
-      ? [
-          {
-            name: lastSegment(term.key, set),
-            ...labelsOf(term),
-            broader: term.broader.map((key) => lastSegment(key, set))
-          }
-        ]
+      ? [{ ...labelsOf(term), broader: term.broader.map((key) => preferredOf(byKey.get(key) ?? term)) }]
       : []
   )
 
@@ -119,7 +136,6 @@ function definedTermsAnswer(item: DefinedTermsItem) {
       term.kind === "thing" && own(term)
         ? [
             {
-              key: term.key,
               nature: term.nature,
               ...labelsOf(term),
               definition: term.definition,
@@ -132,11 +148,10 @@ function definedTermsAnswer(item: DefinedTermsItem) {
       term.kind === "category"
         ? [
             {
-              key: term.key,
-              of: term.of,
+              of: referenceOf(term.of),
               ...labelsOf(term),
               definition: term.definition,
-              criteria: term.criteria,
+              criteria: asReferences(term.criteria),
               citations: citationKeys(term, fallback, citable)
             }
           ]
@@ -148,12 +163,12 @@ function definedTermsAnswer(item: DefinedTermsItem) {
         const values =
           term.kind === "value-set" ? valuesOf(term.key, expected).map(({ broader: _broader, ...value }) => value) : []
         return term.kind === "value-set" && values.length > 0
-          ? [{ name: term.key, ...labelsOf(term), complete: term.complete, values }]
+          ? [{ ...labelsOf(term), complete: term.complete, values }]
           : []
       }),
       units: expected.flatMap((term) =>
         term.kind === "unit" && own(term)
-          ? [{ name: term.key, ...labelsOf(term), dimension: term.dimension, perBase: term.perBase }]
+          ? [{ ...labelsOf(term), dimension: term.dimension, perBase: term.perBase }]
           : []
       )
     },
@@ -303,6 +318,33 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
     slow
   )
 
+  it("B matches things and categories by labels and citations, not keys, and counts judged golden gaps", () => {
+    const item = datasets["defined-terms"].find((found) =>
+      found.expected.terms.some((term) => term.kind === "category")
+    )
+    expect(item).toBeDefined()
+    if (!item) {
+      return
+    }
+    const defining = definingProvisions(item.input.definitions, item.input.candidates)[0] ?? ""
+    const renamed = item.expected.terms.map((term) =>
+      term.kind === "thing" && !coreKeys.has(term.key) ? { ...term, key: `${term.key}-x` } : term
+    )
+    const extra = termDraft.parse({
+      key: "garden-plot",
+      kind: "thing",
+      nature: "object",
+      labels: [{ text: "Garden Plot", role: "preferred" }],
+      citations: [{ provisionKey: defining, highlight: null, region: null }]
+    })
+    const output = { terms: [...renamed, extra] }
+    const unjudged = scoreDefinedTerms(item, output)
+    expect(unjudged.metrics).toMatchObject({ "thing-recall": 1, "extra-things": 1, "golden-gaps": 0 })
+    expect(unjudged.notes.some((note) => note.startsWith('golden-gap candidate: thing "Garden Plot"'))).toBe(true)
+    const judged = scoreDefinedTerms(item, output, ["garden plots"])
+    expect(judged.metrics).toMatchObject({ "extra-things": 0, "golden-gaps": 1 })
+  })
+
   it("B stops before a call past its spending limit and keeps what ran", async () => {
     const items = [1, 2].flatMap((copy) =>
       datasets["defined-terms"].map((item) => ({ ...item, id: `${item.id}~${copy}` }))
@@ -357,7 +399,6 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
             term.kind === "thing"
               ? [
                   {
-                    key: term.key,
                     nature: term.nature === "request" ? "object" : term.nature,
                     ...labelsOf(term),
                     definition: term.definition,
@@ -370,11 +411,10 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
             term.kind === "category"
               ? [
                   {
-                    key: term.key,
-                    of: term.of,
+                    of: referenceOf(term.of),
                     ...labelsOf(term),
                     definition: term.definition,
-                    criteria: term.criteria,
+                    criteria: asReferences(term.criteria),
                     servesOutlines: serves(term.key)
                   }
                 ]
@@ -382,13 +422,13 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
           ),
           properties: expected.flatMap((term) =>
             term.kind === "property"
-              ? [{ ...property(term), derived: term.derived, servesOutlines: serves(term.key) }]
+              ? [{ ...property(term), derived: asReferences(term.derived), servesOutlines: serves(term.key) }]
               : []
           ),
           valueSets: expected.flatMap((set) => {
             const values = set.kind === "value-set" ? valuesOf(set.key, expected) : []
             return set.kind === "value-set" && values.length > 0
-              ? [{ name: set.key, ...labelsOf(set), complete: set.complete, values, servesOutlines: serves(set.key) }]
+              ? [{ ...labelsOf(set), complete: set.complete, values, servesOutlines: serves(set.key) }]
               : []
           }),
           addValues: [],
@@ -396,7 +436,6 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
             term.kind === "unit"
               ? [
                   {
-                    name: term.key,
                     ...labelsOf(term),
                     dimension: term.dimension,
                     perBase: term.perBase,
@@ -439,7 +478,7 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
           })),
           renames: item.expected.renames.map((rename) => ({
             id: idOf(rename.key, rename.origin),
-            name: `${rename.key.slice(rename.key.lastIndexOf(".") + 1)}-flag`,
+            label: `${rename.key.slice(rename.key.lastIndexOf(".") + 1)} flag`,
             why: "another value type"
           })),
           distinct: [],

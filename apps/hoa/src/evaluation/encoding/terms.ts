@@ -44,11 +44,15 @@ function labelScore(golden: TermContent, pipeline: TermContent) {
  * match), else the coding agent's pair, else the best label match; a pair and a label match must be of the same kind,
  * with a parent (a property's thing, a value's set) that is the golden parent's match. A parent that isn't among the
  * golden terms aligned (a thing the golden list only refers to) must be the same key. Core terms align with themselves.
+ * A golden term `pairedOnly` picks matches only through its pair (reserved first), never by key or label: a step that
+ * builds keys from labels pairs those terms by its own measure (B's labels and citations), so a key's spelling neither
+ * helps nor hurts them.
  */
 export function alignTerms(
   golden: readonly TermContent[],
   pipeline: readonly TermContent[],
-  paired: readonly TermPair[] = []
+  paired: readonly TermPair[] = [],
+  options: { pairedOnly?: (term: TermContent) => boolean } = {}
 ) {
   const pipelineByKey = new Map(pipeline.map((term) => [term.key, term]))
   const goldenKeys = new Set(golden.map((term) => term.key))
@@ -56,16 +60,27 @@ export function alignTerms(
   const matches = new Map<TermKey, TermMatch>()
   const taken = new Set<TermKey>()
   const aligned = (key: TermKey) => (isCoreKey(key) || !goldenKeys.has(key) ? key : matches.get(key)?.pipeline)
+  const pairedOnly = (term: TermContent) => !isCoreKey(term.key) && (options.pairedOnly?.(term) ?? false)
 
+  for (const term of golden.filter(pairedOnly)) {
+    const pick = pipelineByKey.get(pairedByGolden.get(term.key) ?? "")
+    if (pick && pick.kind === term.kind && !taken.has(pick.key)) {
+      matches.set(term.key, { golden: term.key, pipeline: pick.key, by: "agent", score: 1 })
+      taken.add(pick.key)
+    }
+  }
   for (const term of golden) {
+    if (pairedOnly(term)) {
+      continue
+    }
     const same = pipelineByKey.get(term.key)
-    if ((same && same.kind === term.kind) || (!same && isCoreKey(term.key))) {
+    if ((same && same.kind === term.kind && !taken.has(same.key)) || (!same && isCoreKey(term.key))) {
       matches.set(term.key, { golden: term.key, pipeline: term.key, by: "key", score: 1 })
       taken.add(term.key)
     }
   }
   for (const term of golden.toSorted((a, b) => order(a) - order(b))) {
-    if (matches.has(term.key)) {
+    if (matches.has(term.key) || pairedOnly(term)) {
       continue
     }
     const parent = parentOf(term)

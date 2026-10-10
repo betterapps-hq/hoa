@@ -9,14 +9,15 @@ import { matchLabel } from "@/text/match"
 import { labelForms } from "@/text/normalize"
 import { valueTypeText } from "../promptVariables"
 import { mergeLabels, uniqueCitations } from "../records"
-import { segment } from "./drafts"
 import type { stepPrompts } from "./prompts"
+import { keySegment } from "./termKeys"
 import { signatureOf } from "./vocabulary"
 
 // C-merge (hoa-vocabulary-merge, prompt drafts v2): code merges the groups' exact keys (same key, kind and value
 // type), then lists clusters as term lines: terms of one kind and scope whose labels match exactly or fuzzily, and
 // lines that share a key but differ in kind or value type. One call decides them from the lines alone: merges,
-// renames of collisions, and contexts for lookalikes. Code applies the answer and freezes the vocabulary. The same
+// renames of collisions (a new preferred label, which code builds the new key from), and contexts for lookalikes. Code
+// applies the answer and freezes the vocabulary. The same
 // step reconciles F's proposed terms against the frozen vocabulary.
 
 /** Where a term comes from: core, B's defined terms, the previous vocabulary, the frozen one, a C group or F. */
@@ -152,7 +153,8 @@ const lineId = z.string().regex(/^t\d+$/, "a line id like t4")
 /** C-merge's answer: one fixed format; code checks that every id is a line of the call. */
 export const vocabularyMergeAnswer = z.object({
   merges: z.array(z.object({ keep: lineId, merge: z.array(lineId).min(1), why: z.string().min(1) })),
-  renames: z.array(z.object({ id: lineId, name: segment, why: z.string().min(1) })),
+  /** A colliding line's new preferred label: code builds its new key from it. */
+  renames: z.array(z.object({ id: lineId, label: z.string().min(1), why: z.string().min(1) })),
   distinct: z.array(z.object({ terms: z.array(z.object({ id: lineId, context: z.string().min(1) })).min(2) })),
   notes: z.array(z.string())
 })
@@ -195,7 +197,8 @@ function mergeable(a: TermContent, b: TermContent, vocabulary: ReturnType<typeof
 /**
  * Applies C-merge's answer: a merge folds entries of one kind, scope and value type into the kept one (labels,
  * citations and outlines join; every reference to a merged key is rewritten, so values of a merged set move to the kept
- * set); a rename gives a colliding entry a new last key segment (references from the same origin follow); a distinct
+ * set); a rename gives a colliding entry a new preferred label (the old one kept as an alternative) and the key built
+ * from it, made unique with a numeric suffix (references from the same origin follow); a distinct
  * entry gets its context. Anything else (an unknown id, a merge across kinds or value types, a fixed term merged away
  * or renamed) is refused. Then exact keys merge again and the vocabulary is frozen.
  */
@@ -250,7 +253,7 @@ export function applyVocabularyMerge(input: {
     merges.push({ keep: kept.term.key, merge: found.map((entry) => entry.term.key) })
   }
   const renamedEntries: { key: TermKey; origin: TermOrigin; to: TermKey }[] = []
-  for (const { id, name } of input.answer.renames) {
+  for (const { id, label } of input.answer.renames) {
     const entry = at(id)
     if (!entry || removed.has(entry)) {
       refuse(id, `${id} isn't a line of the clusters`)
@@ -260,14 +263,30 @@ export function applyVocabularyMerge(input: {
       refuse(entry.term.key, `${entry.term.key} is ${entry.origin}, so it keeps its key`)
       continue
     }
+    const segment = keySegment(label)
+    if (segment === "") {
+      refuse(entry.term.key, `the new label "${label}" for ${entry.term.key} has no letter or digit to key it by`)
+      continue
+    }
     const parent = parentOf(entry.term)
-    const to = entry.term.kind === "property" || entry.term.kind === "value" ? `${parent}.${name}` : name
+    const base = entry.term.kind === "property" || entry.term.kind === "value" ? `${parent}.${segment}` : segment
+    const taken = new Set(entries.map((item) => item.term.key))
+    let to = base
+    for (let suffix = 2; taken.has(to); suffix += 1) {
+      to = `${base}-${suffix}`
+    }
     const from = entry.term.key
     renamedEntries.push({ key: from, origin: entry.origin, to })
     const renames = new Map([[from, to]])
+    const labels = [
+      { text: label, role: "preferred" as const, plural: null, citation: null },
+      ...entry.term.labels
+        .filter((item) => item.text !== label)
+        .map((item) => (item.role === "preferred" ? { ...item, role: "alternative" as const } : item))
+    ]
     entries = entries.map((item) => {
       if (item === entry) {
-        return { ...item, term: termDraft.parse({ ...item.term, key: to }) }
+        return { ...item, term: termDraft.parse({ ...item.term, key: to, labels }) }
       }
       return item.origin === entry.origin && item.term.key !== from
         ? { ...item, term: renamed(item.term, renames) }

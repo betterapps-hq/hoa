@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { labelForms, pluralOf } from "./normalize"
+import { labelForms, pluralOf, singularOf } from "./normalize"
 
 describe("pluralOf", () => {
   it.each([
@@ -11,6 +11,37 @@ describe("pluralOf", () => {
     ["day", "days"]
   ])("%s becomes %s", (singular, plural) => {
     expect(pluralOf(singular)).toBe(plural)
+  })
+})
+
+describe("singularOf", () => {
+  it.each([
+    ["runs", "run"],
+    ["fences", "fence"],
+    ["bushes", "bush"],
+    ["boxes", "box"],
+    ["classes", "class"],
+    ["churches", "church"],
+    ["properties", "property"],
+    ["days", "day"],
+    ["houses", "house"],
+    ["People", "person"],
+    ["criteria", "criterion"]
+  ])("%s becomes %s", (plural, singular) => {
+    expect(singularOf(plural)).toBe(singular)
+  })
+
+  it.each(["fence", "status", "analysis", "address", "gas", "HOAS", "series", "Bylaw"])(
+    "leaves %s as it is",
+    (word) => {
+      expect(singularOf(word)).toBe(word)
+    }
+  )
+
+  it("undoes pluralOf for regular nouns", () => {
+    for (const word of ["fence", "bush", "box", "property", "day", "lot", "church"]) {
+      expect(singularOf(pluralOf(word))).toBe(word)
+    }
   })
 })
 

@@ -1,6 +1,8 @@
 import { candidateTermPairs } from "@/encoding/consolidate"
+import { citableProvisions, definingProvisions } from "@/encoding/steps/definedTerms"
 import type { Outline } from "@/encoding/steps/outline"
 import { kindName } from "@/encoding/steps/outline"
+import { keySegment } from "@/encoding/steps/termKeys"
 import { coreTerms } from "@/schema/coreTerms"
 import type * as T from "@/schema/types"
 import type { JsonPath } from "@/schema/validate"
@@ -8,7 +10,7 @@ import type { RuleContent, TermContent } from "@/schema/zod"
 import { matchLabel } from "@/text/match"
 import { labelForms } from "@/text/normalize"
 import { checkAgreement } from "../checkAgreement"
-import { alignTerms, isCoreKey, type TermMatch } from "../terms"
+import { alignTerms, isCoreKey, type TermMatch, type TermPair } from "../terms"
 import type {
   ConsolidationItem,
   DefinedTermsItem,
@@ -38,13 +40,21 @@ export const noEquivalent = (why: string): ItemScore => ({ verdict: "no-equivale
 
 const share = (count: number, of: number) => (of === 0 ? null : count / of)
 
-/** Correct when every share is 1 and every count of faults 0; wrong when the primary share is 0; partly otherwise. */
-function verdictOf(metrics: Record<string, number | null>, primary: string, faults: readonly string[]): Verdict {
+/**
+ * Correct when every share is 1 and every count of faults 0; wrong when the primary share is 0; partly otherwise.
+ * `info` metrics (counts that are neither shares nor faults) don't count.
+ */
+function verdictOf(
+  metrics: Record<string, number | null>,
+  primary: string,
+  faults: readonly string[],
+  info: readonly string[] = []
+): Verdict {
   const primaryValue = metrics[primary]
   if (primaryValue === 0) {
     return "wrong"
   }
-  const shares = Object.entries(metrics).filter(([name]) => !faults.includes(name))
+  const shares = Object.entries(metrics).filter(([name]) => !faults.includes(name) && !info.includes(name))
   const perfect =
     shares.every(([, value]) => value === null || value === 1) && faults.every((name) => (metrics[name] ?? 0) === 0)
   return perfect ? "correct" : "partly"
@@ -69,12 +79,83 @@ function termLike(value: unknown): string[] {
 
 export type DefinedTermsOutput = { terms: TermContent[] }
 
-export function scoreDefinedTerms(item: DefinedTermsItem, output: DefinedTermsOutput | null): ItemScore {
+const preferredText = (term: TermContent) =>
+  (term.labels.find((label) => label.role === "preferred") ?? term.labels[0])?.text ?? term.key
+
+/** A term's preferred label as code keys it (lowercase, singular, hyphenated). */
+const preferredForm = (term: TermContent) => keySegment(preferredText(term))
+
+const citedIn = (term: TermContent) => new Set(term.citations.map((citation) => citation.provisionKey))
+const isDefinedThing = (term: TermContent) =>
+  (term.kind === "thing" || term.kind === "category") && !isCoreKey(term.key)
+
+/** The best label match between two terms' labels, either way round. */
+function labelScore(a: TermContent, b: TermContent) {
+  let best = 0
+  for (const left of a.labels) {
+    for (const right of b.labels) {
+      best = Math.max(best, matchLabel(left.text, right)?.score ?? 0, matchLabel(right.text, left)?.score ?? 0)
+    }
+  }
+  return best
+}
+
+/**
+ * Golden things and categories paired one to one with output terms of the same kind whose labels match (exactly or
+ * fuzzily) and whose citations share a provision: the best label match first, then the most shared citations. A golden
+ * term citing none of the provisions the step could cite (a thing a category is of, defined elsewhere) needs an exact
+ * label match instead. Keys play no part, so a key code built from a label is never penalized for its spelling.
+ */
+export function labelCitationPairs(
+  golden: readonly TermContent[],
+  output: readonly TermContent[],
+  citable: ReadonlySet<string>
+): TermPair[] {
+  const options = golden.filter(isDefinedThing).flatMap((left) =>
+    output.flatMap((right) => {
+      if (right.kind !== left.kind || !isDefinedThing(right)) {
+        return []
+      }
+      const cited = citedIn(right)
+      const shared = left.citations.filter((citation) => cited.has(citation.provisionKey)).length
+      const score = labelScore(left, right)
+      const uncitable = !left.citations.some((citation) => citable.has(citation.provisionKey))
+      return score > 0 && (shared > 0 || (uncitable && score === 1))
+        ? [{ golden: left.key, pipeline: right.key, score, shared }]
+        : []
+    })
+  )
+  const pairs: TermPair[] = []
+  const used = new Set<string>()
+  for (const option of options.toSorted((a, b) => b.score - a.score || b.shared - a.shared)) {
+    if (!used.has(`golden ${option.golden}`) && !used.has(`output ${option.pipeline}`)) {
+      pairs.push({ golden: option.golden, pipeline: option.pipeline })
+      used.add(`golden ${option.golden}`)
+      used.add(`output ${option.pipeline}`)
+    }
+  }
+  return pairs
+}
+
+/**
+ * B's scores. Things and categories match the golden by labels and citations (`labelCitationPairs`), the terms under
+ * them by label within their matched parent. A thing or category the golden lacks that cites a provision the step was
+ * given as defining is a golden-gap candidate for the coding agent; `confirmedGaps` (preferred labels the agent
+ * confirmed in the run's judgments.json) are counted as golden gaps rather than extra things.
+ */
+export function scoreDefinedTerms(
+  item: DefinedTermsItem,
+  output: DefinedTermsOutput | null,
+  confirmedGaps: readonly string[] = []
+): ItemScore {
   if (output === null) {
     return missing("no terms")
   }
   const expected = item.expected.terms
-  const matches = alignTerms(expected, output.terms)
+  const citable = new Set(citableProvisions(item.input.definitions, item.input.candidates))
+  const matches = alignTerms(expected, output.terms, labelCitationPairs(expected, output.terms, citable), {
+    pairedOnly: isDefinedThing
+  })
   const recall = (keep: (term: TermContent) => boolean) => {
     const wanted = expected.filter(keep)
     return share(
@@ -100,26 +181,71 @@ export function scoreDefinedTerms(item: DefinedTermsItem, output: DefinedTermsOu
       ? [...new Set(termLike(term.criteria))].filter((key) => !known.has(key)).map((key) => `${term.key} reads ${key}`)
       : []
   )
+  const defining = new Set(definingProvisions(item.input.definitions, item.input.candidates))
+  const confirmed = new Set(confirmedGaps.map((label) => keySegment(label)))
+  const unmatched = offered.filter((term) => !matched.has(term.key))
+  // A returned term the golden has under the other kind (a thing for a category, or the reverse): a kind miss, not a gap.
+  const otherKind = new Map(
+    unmatched.flatMap((term) => {
+      const cited = citedIn(term)
+      const golden = expected.find(
+        (other) =>
+          isDefinedThing(other) &&
+          other.kind !== term.kind &&
+          labelScore(other, term) > 0 &&
+          other.citations.some((citation) => cited.has(citation.provisionKey))
+      )
+      return golden ? [[term, golden] as const] : []
+    })
+  )
+  const gapCandidates = unmatched.filter(
+    (term) =>
+      !coreDuplicates.includes(term) &&
+      !otherKind.has(term) &&
+      term.citations.some((citation) => defining.has(citation.provisionKey))
+  )
+  const gaps = gapCandidates.filter((term) => confirmed.has(preferredForm(term)))
+  const extras = unmatched.filter((term) => !gaps.includes(term))
   const metrics = {
     "thing-recall": recall(isThing),
     "category-recall": recall((term) => term.kind === "category"),
     "refinement-recall": recall((term) => isCoreKey(term.key)),
     "criteria-property-recall": recall((term) => term.kind === "property"),
     "criteria-value-recall": recall((term) => term.kind === "value-set" || term.kind === "value"),
-    "extra-things": offered.filter((term) => !matched.has(term.key)).length,
+    "extra-things": extras.length,
+    "golden-gaps": gaps.length,
     "core-duplicates": coreDuplicates.length,
     "unresolved-criteria": unresolved.length
   }
+  const defined = (term: TermContent) =>
+    term.citations.filter((citation) => defining.has(citation.provisionKey)).map((citation) => citation.provisionKey)
   const notes = [
     ...expected
       .filter((term) => !output.terms.some((o) => o.key === matches.get(term.key)?.pipeline))
-      .map((term) => `missing ${term.kind} ${term.key}`),
-    ...offered.filter((term) => !matched.has(term.key)).map((term) => `not in the golden: ${term.kind} ${term.key}`),
+      .map((term) => `missing ${term.kind} ${term.key} "${preferredText(term)}"`),
+    ...extras.map((term) => {
+      const golden = otherKind.get(term)
+      return golden
+        ? `kind differs: ${term.kind} ${term.key} "${preferredText(term)}" is the golden ${golden.kind} ${golden.key}`
+        : `not in the golden: ${term.kind} ${term.key} "${preferredText(term)}"`
+    }),
+    ...gapCandidates
+      .filter((term) => !gaps.includes(term))
+      .map(
+        (term) =>
+          `golden-gap candidate: ${term.kind} "${preferredText(term)}" cites ${defined(term).join(", ")}; confirm it in judgments.json if that text defines it`
+      ),
+    ...gaps.map((term) => `golden gap (judged): ${term.kind} "${preferredText(term)}"`),
     ...coreDuplicates.map((term) => `${term.key} has a core term's label`),
     ...unresolved.map((text) => `criteria: ${text} (undeclared)`)
   ]
   return {
-    verdict: verdictOf(metrics, "thing-recall", ["extra-things", "core-duplicates", "unresolved-criteria"]),
+    verdict: verdictOf(
+      metrics,
+      "thing-recall",
+      ["extra-things", "core-duplicates", "unresolved-criteria"],
+      ["golden-gaps"]
+    ),
     metrics,
     notes
   }

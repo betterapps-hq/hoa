@@ -121,13 +121,12 @@ describe("B", () => {
   const answer = definedTermsAnswer.parse({
     things: [
       {
-        key: "garden-fixture",
         nature: "object",
         ...labels("Garden Fixture"),
         definition: "a fixture listed in 9",
         citations: ["rules:9/p2", "rules:9(1)"]
       },
-      { key: "rain-barrel", nature: "object", ...labels("Rain Barrel"), definition: null, citations: ["rules:4"] }
+      { nature: "object", ...labels("Rain Barrels"), definition: null, citations: ["rules:4"] }
     ],
     categories: [],
     criteriaTerms: { properties: [], valueSets: [], units: [] },
@@ -146,7 +145,8 @@ describe("B", () => {
   })
 
   it("checks drafted terms, which carry no organization, as the organization's, with every citable provision", () => {
-    const terms = definedTermsOf(answer)
+    const { terms } = definedTermsOf(answer)
+    expect(terms.map((term) => term.key)).toEqual(["garden-fixture", "rain-barrel", "committee"])
     expect(terms.every((term) => term.organizationId === null)).toBe(true)
     expect(checkDefinedTerms(terms, citableProvisions([{ key: "rules:1" }], candidates))).toEqual([])
     expect(
@@ -154,6 +154,93 @@ describe("B", () => {
         .filter((problem) => problem.recordKey === "rain-barrel")
         .map((p) => p.code)
     ).toEqual(["citation-not-given", "citation-not-found"])
+  })
+
+  it("builds keys from preferred labels, resolves `of` and criteria by label, and reports collisions", () => {
+    const built = definedTermsOf(
+      definedTermsAnswer.parse({
+        things: [
+          { nature: "party", ...labels("Senior Residents"), definition: null, citations: ["rules:1"] },
+          { nature: "object", ...labels("Senior Resident"), definition: null, citations: ["rules:1"] }
+        ],
+        categories: [
+          {
+            of: "Occupant",
+            ...labels("Long-Term Occupant"),
+            definition: null,
+            criteria: {
+              type: "all",
+              of: [
+                {
+                  type: "compare",
+                  left: { type: "ref", path: ["occupant.years-of-residence"] },
+                  op: ">=",
+                  right: { type: "number", value: 5 }
+                },
+                {
+                  type: "in",
+                  left: { type: "ref", path: ["occupants.tenure"] },
+                  values: [{ type: "value", term: "tenure-kinds.owned" }]
+                }
+              ]
+            },
+            citations: ["rules:1"]
+          }
+        ],
+        criteriaTerms: {
+          properties: [
+            {
+              of: "occupant",
+              ...labels("Years of Residence"),
+              valueType: { type: "count" },
+              many: false,
+              ifUnstated: "unknown",
+              definition: null
+            },
+            {
+              of: "Occupants",
+              ...labels("Tenure"),
+              valueType: { type: "choice", set: "tenure-kind" },
+              many: false,
+              ifUnstated: "unknown",
+              definition: null
+            },
+            {
+              of: "Unknown Thing",
+              ...labels("Size"),
+              valueType: { type: "count" },
+              many: false,
+              ifUnstated: "unknown",
+              definition: null
+            }
+          ],
+          valueSets: [{ ...labels("Tenure Kinds"), complete: false, values: [labels("Owned")] }],
+          units: []
+        },
+        refinements: [],
+        notes: []
+      })
+    )
+    expect(built.terms.map((term) => term.key)).toEqual([
+      "senior-resident",
+      "senior-resident-2",
+      "long-term-occupant",
+      "occupant.years-of-residence",
+      "occupant.tenure",
+      "tenure-kind",
+      "tenure-kind.owned"
+    ])
+    const category = built.terms.find((term) => term.key === "long-term-occupant")
+    expect(JSON.stringify(category)).toContain('"path":["occupant.tenure"]')
+    expect(JSON.stringify(category)).toContain('"term":"tenure-kind.owned"')
+    expect(built.terms.find((term) => term.key === "occupant.tenure")).toMatchObject({
+      valueType: { type: "choice", set: "tenure-kind" },
+      citations: [{ provisionKey: "rules:1" }]
+    })
+    expect(built.problems.map((problem) => `${problem.recordKey} ${problem.code}`)).toEqual([
+      "senior-resident-2 key-collision",
+      "Size unresolved-reference"
+    ])
   })
 
   it("shows each candidate's samples after their provision keys", () => {
@@ -267,7 +354,7 @@ describe("C", () => {
           ],
           serves: new Map([["shed.height", ["rules:1#height", "rules:9#other"]]]),
           outlines: [outline("rules:1#height"), outline("rules:2#color")],
-          unknown: ["gazebo"]
+          problems: [{ recordKey: "gazebo", code: "undefined-term", message: "unknown", path: [] }]
         }
       ],
       []
@@ -308,7 +395,7 @@ describe("C-merge", () => {
           { keep: id("group 1"), merge: [id("group 3")], why: "wrong" },
           { keep: "t99", merge: [id("group 2")], why: "no such line" }
         ],
-        renames: [{ id: id("group 3"), name: "has-height", why: "another value type" }],
+        renames: [{ id: id("group 3"), label: "Has Height", why: "another value type" }],
         distinct: [],
         notes: []
       }
@@ -317,6 +404,10 @@ describe("C-merge", () => {
     expect(applied.renames).toEqual([{ key: "shed.height", origin: "group 3", to: "shed.has-height" }])
     expect(applied.problems.map((problem) => problem.code)).toEqual(["invalid-merge", "invalid-merge"])
     expect(applied.terms.map((item) => item.key)).toEqual(["shed", "shed.has-height", "shed.height"])
+    expect(applied.terms.find((item) => item.key === "shed.has-height")?.labels.map((label) => label.role)).toEqual([
+      "preferred",
+      "alternative"
+    ])
     expect(applied.serves.get("shed.height")).toEqual(["a", "b", "c"])
   })
 })

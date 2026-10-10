@@ -1,8 +1,8 @@
 import { z } from "zod"
 import type { PromptVariables } from "@/ai/prompts"
 import { coreTerms } from "@/schema/coreTerms"
-import type { GoverningDocument, Provision, ProvisionKey } from "@/schema/types"
-import { condition, decimal, dimension, provisionKey, termDraft, termKey, type TermContent } from "@/schema/zod"
+import type { GoverningDocument, Provision, ProvisionKey, TermKey } from "@/schema/types"
+import { condition, decimal, dimension, provisionKey, termDraft, type TermContent } from "@/schema/zod"
 import type { TermCandidate } from "../definedTerms"
 import { candidateText, coreTermsText, documentLine, provisionBlock } from "../promptVariables"
 import { mergeLabels } from "../records"
@@ -12,44 +12,39 @@ import {
   coreKeys,
   keyEnum,
   keysIn,
+  labeledPropertyFields,
   labelsDraft,
   labelsOf,
-  newKey,
-  propertyFields,
   propertyTerm,
-  segment,
+  reference,
   thingNature,
-  valueSetTerms
+  valueSetTerm,
+  valueTerm
 } from "./drafts"
 import { none, type stepPrompts } from "./prompts"
+import { termKeyBuilder } from "./termKeys"
 
 // B. Defined terms (hoa-defined-terms, prompt drafts v2): the things, parties and categories a document defines, the
 // properties, value sets, values and units a category's own criteria read, and refinements of core terms. One call per
-// document, alongside E; a document without definitions runs on its capitalized-phrase candidates alone. Code converts
-// the answer to terms and checks them: keys unique, citations only to this call's provisions (the definitions, the
+// document, alongside E; a document without definitions runs on its capitalized-phrase candidates alone. The model
+// writes no term key: code builds each from the term's preferred label (termKeys.ts), resolves `of` and the criteria's
+// references by label or key, and checks the terms: citations only to this call's provisions (the definitions, the
 // provisions candidates are defined in, and a used candidate's sample provisions), criteria resolving.
 
 const citations = z.array(provisionKey).min(1)
 const definition = z.string().nullable()
 
-/** B's answer: one fixed format; code checks that citations name this call's definitions or candidates' provisions. */
+/** B's answer: one fixed format; code builds the keys and checks that citations name this call's provisions. */
 export const definedTermsAnswer = z.object({
-  things: z.array(z.object({ key: newKey, nature: thingNature, ...labelsDraft, definition, citations })),
-  categories: z.array(
-    z.object({ key: newKey, of: termKey, ...labelsDraft, definition, criteria: condition, citations })
-  ),
+  things: z.array(z.object({ nature: thingNature, ...labelsDraft, definition, citations })),
+  categories: z.array(z.object({ of: reference, ...labelsDraft, definition, criteria: condition, citations })),
   criteriaTerms: z.object({
-    properties: z.array(z.object(propertyFields)),
+    properties: z.array(z.object(labeledPropertyFields)),
     valueSets: z.array(
-      z.object({
-        name: segment,
-        ...labelsDraft,
-        complete: z.boolean(),
-        values: z.array(z.object({ name: segment, ...labelsDraft })).min(1)
-      })
+      z.object({ ...labelsDraft, complete: z.boolean(), values: z.array(z.object({ ...labelsDraft })).min(1) })
     ),
     /** A unit a criterion's quantity is in that isn't a core unit. */
-    units: z.array(z.object({ name: segment, ...labelsDraft, dimension, perBase: decimal.nullable() }))
+    units: z.array(z.object({ ...labelsDraft, dimension, perBase: decimal.nullable() }))
   }),
   refinements: z.array(z.object({ key: keyEnum(coreKeys), ...labelsDraft, definition, citations })),
   notes: z.array(z.string())
@@ -113,58 +108,117 @@ function refinement(item: DefinedTermsAnswer["refinements"][number]): TermConten
 }
 
 /**
- * The answer as terms: things, categories, refinements of core terms, and the criteria's properties and value sets,
- * each cited to the citations of the categories that read it.
+ * The answer as terms, with the problems building them: keys built from preferred labels (things, categories, value
+ * sets and units first, then values under their sets and properties under their things), `of` and the criteria's
+ * references resolved by label or key, and the criteria's properties and value sets cited to the citations of the
+ * categories that read them.
  */
-export function definedTermsOf(answer: DefinedTermsAnswer): TermContent[] {
-  const categories = answer.categories.map((category) =>
-    termDraft.parse({
-      key: category.key,
+export function definedTermsOf(answer: DefinedTermsAnswer): { terms: TermContent[]; problems: StepProblem[] } {
+  const keys = termKeyBuilder()
+  for (const item of answer.refinements) {
+    keys.addLabels(item.key, [item.preferred.text, ...item.alternatives])
+  }
+  const thingKeys = answer.things.map((thing) => keys.build(thing, null, "thing"))
+  const categoryKeys = answer.categories.map((category) => keys.build(category, null, "category"))
+  const setKeys = answer.criteriaTerms.valueSets.map((set) => keys.build(set, null, "value set"))
+  const unitKeys = answer.criteriaTerms.units.map((unit) => keys.build(unit, null, "unit"))
+  const valueKeys = answer.criteriaTerms.valueSets.map((set, index) => {
+    const setKey = setKeys[index] ?? null
+    return set.values.map((value) => (setKey === null ? null : keys.build(value, setKey, "value")))
+  })
+  const propertyKeys = answer.criteriaTerms.properties.map((property) => {
+    const of = keys.named(property.of, property.preferred.text, "of")
+    return of === null ? null : { of, key: keys.build(property, of, "property") }
+  })
+  const categories = answer.categories.flatMap((category, index) => {
+    const key = categoryKeys[index]
+    const of = key ? keys.named(category.of, key, "of") : null
+    if (!key || !of) {
+      return []
+    }
+    const criteria = keys.rewrite(category.criteria)
+    const term = termDraft.parse({
+      key,
       kind: "category",
-      of: category.of,
-      criteria: category.criteria,
+      of,
+      criteria,
       labels: labelsOf(category),
       definition: category.definition,
       citations: citationsOf(category.citations)
     })
-  )
-  const citedBy = (key: string) => [
+    return [{ term, criteria, citations: category.citations }]
+  })
+  const citedBy = (key: TermKey): ProvisionKey[] => [
     ...new Set(
-      answer.categories.flatMap((category) => {
-        const read = keysIn(category.criteria, new Set([key]))
-        const values = JSON.stringify(category.criteria).includes(`"${key}.`)
-        return read.size > 0 || values ? category.citations : []
+      categories.flatMap((category) => {
+        const read =
+          keysIn(category.criteria, new Set([key])).size > 0 || JSON.stringify(category.criteria).includes(`"${key}.`)
+        return read ? category.citations : []
       })
     )
   ]
-  return [
-    ...answer.things.map((thing) =>
-      termDraft.parse({
-        key: thing.key,
-        kind: "thing",
-        nature: thing.nature,
-        request: null,
-        labels: labelsOf(thing),
-        definition: thing.definition,
-        citations: citationsOf(thing.citations)
-      })
-    ),
-    ...categories,
-    ...answer.criteriaTerms.properties.map((property) =>
-      propertyTerm(property, citedBy(`${property.of}.${property.name}`))
-    ),
-    ...answer.criteriaTerms.valueSets.flatMap((set) => valueSetTerms(set, set.values, citedBy(set.name))),
-    ...answer.criteriaTerms.units.map((unit) =>
-      termDraft.parse({
-        key: unit.name,
-        kind: "unit",
-        dimension: unit.dimension,
-        perBase: unit.perBase,
-        labels: labelsOf(unit)
-      })
-    ),
+  const terms = [
+    ...answer.things.flatMap((thing, index) => {
+      const key = thingKeys[index]
+      return key
+        ? [
+            termDraft.parse({
+              key,
+              kind: "thing",
+              nature: thing.nature,
+              request: null,
+              labels: labelsOf(thing),
+              definition: thing.definition,
+              citations: citationsOf(thing.citations)
+            })
+          ]
+        : []
+    }),
+    ...categories.map((category) => category.term),
+    ...answer.criteriaTerms.properties.flatMap((property, index) => {
+      const built = propertyKeys[index]
+      return built?.key
+        ? [
+            propertyTerm(
+              { ...property, valueType: keys.rewrite(property.valueType) },
+              built.key,
+              built.of,
+              citedBy(built.key)
+            )
+          ]
+        : []
+    }),
+    ...answer.criteriaTerms.valueSets.flatMap((set, index) => {
+      const setKey = setKeys[index]
+      if (!setKey) {
+        return []
+      }
+      const cited = citedBy(setKey)
+      return [
+        valueSetTerm(set, setKey, cited),
+        ...set.values.flatMap((value, valueIndex) => {
+          const key = valueKeys[index]?.[valueIndex]
+          return key ? [valueTerm(value, key, setKey, [], cited)] : []
+        })
+      ]
+    }),
+    ...answer.criteriaTerms.units.flatMap((unit, index) => {
+      const key = unitKeys[index]
+      return key
+        ? [
+            termDraft.parse({
+              key,
+              kind: "unit",
+              dimension: unit.dimension,
+              perBase: unit.perBase,
+              labels: labelsOf(unit)
+            })
+          ]
+        : []
+    }),
     ...answer.refinements.flatMap(refinement)
   ]
+  return { terms, problems: keys.problems }
 }
 
 /** A provision named by its key alone, as the validator reads a citation (its label is the key's label part). */

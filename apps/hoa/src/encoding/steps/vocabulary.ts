@@ -10,25 +10,26 @@ import { mergeLabels } from "../records"
 import { recordProblems, repeatedKeys, type StepProblem } from "./check"
 import {
   addServes,
+  labeledPropertyFields,
   labelsDraft,
   labelsOf,
-  newKey,
-  propertyFields,
   propertyTerm,
-  segment,
+  reference,
   thingNature,
-  valueSetTerms,
-  valueTerms,
+  valueSetTerm,
+  valueTerm,
   type Serves
 } from "./drafts"
 import { kindName, vocabularyLine, type Outline } from "./outline"
 import { none, type stepPrompts } from "./prompts"
+import { termKeyBuilder } from "./termKeys"
 
 // C. The shared vocabulary (hoa-vocabulary-group, prompt drafts v2): one call per group of sections builds every
 // property, value set, value, unit and missing thing the group's outlines read, from E's outlines and reads and the
-// provisions they cite, and says for every term it adds or reuses which outlines it serves. Code composes the keys,
-// checks the group, and merges exact keys across groups; near-duplicates and collisions go to C-merge
-// (vocabularyMerge.ts), which freezes the vocabulary.
+// provisions they cite, and says for every term it adds or reuses which outlines it serves. The model writes no new
+// term key: code builds each from the term's preferred label (termKeys.ts) and resolves references by label or key,
+// checks the group, and merges exact keys across groups (one label, kind and scope give one key in every group);
+// near-duplicates and collisions go to C-merge (vocabularyMerge.ts), which freezes the vocabulary.
 
 /** Provision text a group of sections holds at most, in estimated tokens (the drafts' ~15k). */
 export const groupTokenBudget = 15_000
@@ -80,50 +81,56 @@ export function sharedVocabularyVariables(input: {
 }
 
 const serves = { servesOutlines: z.array(ruleKey).min(1) }
-const valueDraft = z.object({ name: segment, ...labelsDraft, broader: z.array(segment) })
+/** A value; `broader` names other values of its set by label. */
+const valueDraft = z.object({ ...labelsDraft, broader: z.array(reference) })
 
-/** C's answer: one fixed format; code checks that every outline served is one of the group's. */
+/** C's answer: one fixed format; code builds new keys and checks that every outline served is one of the group's. */
 export const sharedVocabularyAnswer = z.object({
+  /** Known terms (core, defined, previous) by their keys. */
   reused: z.array(z.object({ key: termKey, alternatives: z.array(z.string().min(1)), ...serves })),
-  things: z.array(
-    z.object({ key: newKey, nature: thingNature, ...labelsDraft, definition: z.string().nullable(), ...serves })
-  ),
+  things: z.array(z.object({ nature: thingNature, ...labelsDraft, definition: z.string().nullable(), ...serves })),
   categories: z.array(
-    z.object({
-      key: newKey,
-      of: termKey,
-      ...labelsDraft,
-      definition: z.string().nullable(),
-      criteria: condition,
-      ...serves
-    })
+    z.object({ of: reference, ...labelsDraft, definition: z.string().nullable(), criteria: condition, ...serves })
   ),
-  properties: z.array(z.object({ ...propertyFields, derived: z.array(derivation).nullable(), ...serves })),
+  properties: z.array(z.object({ ...labeledPropertyFields, derived: z.array(derivation).nullable(), ...serves })),
   valueSets: z.array(
-    z.object({ name: segment, ...labelsDraft, complete: z.boolean(), values: z.array(valueDraft).min(1), ...serves })
+    z.object({ ...labelsDraft, complete: z.boolean(), values: z.array(valueDraft).min(1), ...serves })
   ),
-  addValues: z.array(z.object({ set: termKey, values: z.array(valueDraft).min(1), ...serves })),
-  units: z.array(z.object({ name: segment, ...labelsDraft, dimension, perBase: decimal.nullable(), ...serves })),
+  /** Values added to a known set or one of this answer's, named by label or key. */
+  addValues: z.array(z.object({ set: reference, values: z.array(valueDraft).min(1), ...serves })),
+  units: z.array(z.object({ ...labelsDraft, dimension, perBase: decimal.nullable(), ...serves })),
   notes: z.array(z.string())
 })
 export type SharedVocabularyAnswer = z.output<typeof sharedVocabularyAnswer>
 
-/** One group's answer as terms (new ones, and known ones that gained wordings), with the outlines each serves. */
+type ValueDraft = z.output<typeof valueDraft>
+
+/**
+ * One group's answer as terms (new ones, and known ones that gained wordings), with the outlines each serves and the
+ * problems building them: new keys built from preferred labels (things, categories, value sets and units, then values
+ * and properties under them), references resolved by label or key, a reused key that isn't known reported.
+ */
 export function sharedVocabularyTerms(answer: SharedVocabularyAnswer, known: readonly TermContent[]) {
   const served: Serves = new Map()
   const knownByKey = new Map([...coreTerms, ...known].map((term) => [term.key, term as TermContent]))
+  const keys = termKeyBuilder(known)
   const terms: TermContent[] = []
   const add = (term: TermContent, outlines: readonly string[]) => {
     terms.push(term)
     addServes(served, term.key, outlines)
   }
-  const unknown: TermKey[] = []
   for (const item of answer.reused) {
     const term = knownByKey.get(item.key)
     if (!term) {
-      unknown.push(item.key)
+      keys.problems.push({
+        recordKey: item.key,
+        code: "undefined-term",
+        message: `${item.key} isn't a core, defined or previous term`,
+        path: ["reused"]
+      })
       continue
     }
+    keys.addLabels(item.key, item.alternatives)
     addServes(served, item.key, item.servesOutlines)
     if (item.alternatives.length > 0) {
       const refined = termDraft.parse(structuredClone(term))
@@ -134,51 +141,96 @@ export function sharedVocabularyTerms(answer: SharedVocabularyAnswer, known: rea
       terms.push(refined)
     }
   }
-  for (const thing of answer.things) {
-    const term = termDraft.parse({
-      key: thing.key,
-      kind: "thing",
-      nature: thing.nature,
-      request: null,
-      labels: labelsOf(thing),
-      definition: thing.definition
+  const thingKeys = answer.things.map((thing) => keys.build(thing, null, "thing"))
+  const categoryKeys = answer.categories.map((category) => keys.build(category, null, "category"))
+  const setKeys = answer.valueSets.map((set) => keys.build(set, null, "value set"))
+  const unitKeys = answer.units.map((unit) => keys.build(unit, null, "unit"))
+  const valuesOf = (setKey: TermKey | null, values: readonly ValueDraft[]) =>
+    values.map((value) => (setKey === null ? null : keys.build(value, setKey, "value")))
+  const valueKeys = answer.valueSets.map((set, index) => valuesOf(setKeys[index] ?? null, set.values))
+  const addedSets = answer.addValues.map((item) => keys.named(item.set, item.set, "set"))
+  const addedKeys = answer.addValues.map((item, index) => valuesOf(addedSets[index] ?? null, item.values))
+  const propertyKeys = answer.properties.map((property) => {
+    const of = keys.named(property.of, property.preferred.text, "of")
+    return of === null ? null : { of, key: keys.build(property, of, "property") }
+  })
+  /** A value's terms: its broader values are siblings named by label or key. */
+  const valueTerms = (setKey: TermKey, values: readonly ValueDraft[], built: readonly (TermKey | null)[]) =>
+    values.flatMap((value, index) => {
+      const key = built[index]
+      const broader = value.broader.flatMap((text) => {
+        const found = keys.named(`${setKey}.${text}`, key ?? setKey, "broader")
+        return found === null ? [] : [found]
+      })
+      return key ? [valueTerm(value, key, setKey, broader)] : []
     })
-    add(term, thing.servesOutlines)
-  }
-  for (const category of answer.categories) {
-    const term = termDraft.parse({
-      key: category.key,
-      kind: "category",
-      of: category.of,
-      criteria: category.criteria,
-      labels: labelsOf(category),
-      definition: category.definition
-    })
-    add(term, category.servesOutlines)
-  }
-  for (const property of answer.properties) {
-    add(propertyTerm(property), property.servesOutlines)
-  }
-  for (const set of answer.valueSets) {
-    valueSetTerms(set, set.values).forEach((term) => add(term, set.servesOutlines))
-  }
-  for (const item of answer.addValues) {
-    if (!knownByKey.has(item.set) && !answer.valueSets.some((set) => set.name === item.set)) {
-      unknown.push(item.set)
+  answer.things.forEach((thing, index) => {
+    const key = thingKeys[index]
+    if (key) {
+      const term = termDraft.parse({
+        key,
+        kind: "thing",
+        nature: thing.nature,
+        request: null,
+        labels: labelsOf(thing),
+        definition: thing.definition
+      })
+      add(term, thing.servesOutlines)
     }
-    valueTerms(item.set, item.values).forEach((term) => add(term, item.servesOutlines))
-  }
-  for (const unit of answer.units) {
-    const term = termDraft.parse({
-      key: unit.name,
-      kind: "unit",
-      dimension: unit.dimension,
-      perBase: unit.perBase,
-      labels: labelsOf(unit)
-    })
-    add(term, unit.servesOutlines)
-  }
-  return { terms, serves: served, unknown }
+  })
+  answer.categories.forEach((category, index) => {
+    const key = categoryKeys[index]
+    const of = key ? keys.named(category.of, key, "of") : null
+    if (key && of) {
+      const term = termDraft.parse({
+        key,
+        kind: "category",
+        of,
+        criteria: keys.rewrite(category.criteria),
+        labels: labelsOf(category),
+        definition: category.definition
+      })
+      add(term, category.servesOutlines)
+    }
+  })
+  answer.properties.forEach((property, index) => {
+    const built = propertyKeys[index]
+    if (built?.key) {
+      const draft = {
+        ...property,
+        valueType: keys.rewrite(property.valueType),
+        derived: keys.rewrite(property.derived)
+      }
+      add(propertyTerm(draft, built.key, built.of), property.servesOutlines)
+    }
+  })
+  answer.valueSets.forEach((set, index) => {
+    const setKey = setKeys[index]
+    if (setKey) {
+      add(valueSetTerm(set, setKey), set.servesOutlines)
+      valueTerms(setKey, set.values, valueKeys[index] ?? []).forEach((term) => add(term, set.servesOutlines))
+    }
+  })
+  answer.addValues.forEach((item, index) => {
+    const setKey = addedSets[index]
+    if (setKey) {
+      valueTerms(setKey, item.values, addedKeys[index] ?? []).forEach((term) => add(term, item.servesOutlines))
+    }
+  })
+  answer.units.forEach((unit, index) => {
+    const key = unitKeys[index]
+    if (key) {
+      const term = termDraft.parse({
+        key,
+        kind: "unit",
+        dimension: unit.dimension,
+        perBase: unit.perBase,
+        labels: labelsOf(unit)
+      })
+      add(term, unit.servesOutlines)
+    }
+  })
+  return { terms, serves: served, problems: keys.problems }
 }
 
 export type GroupVocabulary = {
@@ -187,8 +239,8 @@ export type GroupVocabulary = {
   serves: Serves
   /** The group's outlines, which servesOutlines must name and which must be served. */
   outlines: readonly Outline[]
-  /** Reused keys and sets that aren't known. */
-  unknown: readonly TermKey[]
+  /** What building the group's terms found: key collisions, unresolved references, reused keys that aren't known. */
+  problems: readonly StepProblem[]
 }
 
 /** A term's kind and value type: two terms with one key must agree on it to be one term. */
@@ -199,7 +251,7 @@ export const signatureOf = (term: TermContent) =>
 const readsFacts = (outline: Outline) => ["obligation", "recommendation", "requirement"].includes(kindName(outline))
 
 /**
- * C's check of one group (prompt drafts v2, the C check): keys compose and are unique, every reference resolves (core,
+ * C's check of one group (prompt drafts v2, the C check): keys build and are unique, every reference resolves (core,
  * defined, previous, this group or another group of the round), no key has two kinds or value types within the group,
  * every outline served is one of the group's, and every outline that reads facts is served.
  */
@@ -232,12 +284,8 @@ export function checkSharedVocabulary(groups: readonly GroupVocabulary[], known:
         message: `no term serves ${outline.key}`
       })
     }
-    for (const key of group.unknown) {
-      report(group.groupId, {
-        recordKey: key,
-        code: "undefined-term",
-        message: `${key} isn't a core, defined or previous term`
-      })
+    for (const { recordKey, code, message } of group.problems) {
+      report(group.groupId, { recordKey, code, message })
     }
     for (const key of repeatedKeys(group.terms.map((term) => term.key))) {
       const signatures = new Set(group.terms.filter((term) => term.key === key).map(signatureOf))

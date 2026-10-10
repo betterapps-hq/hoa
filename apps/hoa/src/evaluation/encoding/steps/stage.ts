@@ -9,7 +9,7 @@ import {
   definedTermsOf,
   definedTermsVariables
 } from "@/encoding/steps/definedTerms"
-import { propertyTerm } from "@/encoding/steps/drafts"
+import { proposedPropertyTerm } from "@/encoding/steps/drafts"
 import { resolveOutlines, type Outline } from "@/encoding/steps/outline"
 import {
   checkFinding,
@@ -68,7 +68,7 @@ import type {
 } from "./scores"
 
 // Runs one drafted step over dataset items (evaluation.md, Running one step), as the reordered pipeline would: each
-// item's input becomes the step's prompt variables, the answer goes through the step's code (keys composed, checks,
+// item's input becomes the step's prompt variables, the answer goes through the step's code (keys built, checks,
 // merges), a failing item is rerun once with its problems (B, E and C; F's retry is its own mode), and the output
 // takes the shape the item's expected output has, so the step's scores compare them. Every call is recorded; an answer
 // that fails Zod is kept with its issues and counted. `cacheStage` keeps repeats apart in the content cache.
@@ -221,8 +221,8 @@ export async function runDefinedTerms(
         }
         continue
       }
-      const terms = definedTermsOf(result.object)
-      const check = definedTermsProblems(item, terms)
+      const { terms, problems: built } = definedTermsOf(result.object)
+      const check = [...built, ...definedTermsProblems(item, terms)]
       outputs.set(item.id, { terms })
       if (check.length === 0 || attempt === (context.reruns ?? 0)) {
         problems.push(...check.map((problem) => ({ itemId: item.id, code: problem.code, message: problem.message })))
@@ -572,7 +572,7 @@ export async function runRuleStructuring(
     const first = await structureBatch(batch, context)
     calls.push(first.call)
     problems.push(...first.issues)
-    const proposed = (first.answer?.proposedTerms ?? []).map((term) => propertyTerm(term))
+    const proposed = (first.answer?.proposedTerms ?? []).map(proposedPropertyTerm)
     done.set(item.id, { batch, structured: first.structured, proposed })
   }
   const vocabularyOf = (entry: { batch: Batch; proposed: TermContent[] }) => [
@@ -607,7 +607,7 @@ export async function runRuleStructuring(
       problems.push(...retry.issues)
       const replaced = new Map(retry.structured.map((item) => [item.outline.key, item]))
       entry.structured = entry.structured.map((item) => replaced.get(item.outline.key) ?? item)
-      entry.proposed.push(...(retry.answer?.proposedTerms ?? []).map((term) => propertyTerm(term)))
+      entry.proposed.push(...(retry.answer?.proposedTerms ?? []).map(proposedPropertyTerm))
     }
   }
   const outputs = new Map<string, StructuringOutput | null>()
