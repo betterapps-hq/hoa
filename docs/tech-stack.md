@@ -54,6 +54,12 @@ The tools we reach for **first**. Prefer them before introducing an alternative 
 - ✅ **tiny-invariant** — runtime assertions.
 - ✅ **minisearch** — client-side search boxes: relevance ranking across words in paragraph text, with per-word typo and
   prefix matching; small, with no dependencies (Fuse.js is weaker on long text).
+- ✅ **@dnd-kit** (`core`, `sortable`, `utilities`) — reorderable lists: accessible sorting with keyboard and
+  screen-reader support built in; small and maintained.
+- ✅ **react-dropzone** — file drop zones: a headless `useDropzone` hook (styled with our components) that handles
+  multiple files, accepted types, size limits with rejection reasons, keyboard and click-to-browse.
+- ✅ **@tanstack/react-table** — data tables (shadcn's Data Table pattern, in `src/components/DataTable`): headless sorting,
+  pagination, column visibility and a global filter we feed from minisearch, so tables keep our markup and accessibility.
 - ✅ **react-error-boundary** — error boundaries.
 - ✅ **@tanstack/react-router** — type-safe, file-based routing through TanStack Start.
 - ◻️ **@mantine/hooks** — React hooks catalog.
@@ -68,6 +74,11 @@ The tools we reach for **first**. Prefer them before introducing an alternative 
   components with `pnpm dlx shadcn@latest add <name>` from `apps/hoa`, or through the shadcn MCP server. Use its
   CSS-variable tokens (`bg-card`, `text-muted-foreground`, ...) consistently.
 - ◻️ **recharts** — charts / data visualization.
+
+## Documents
+
+- ✅ **pdfjs-dist** — renders an uploaded PDF's pages in the document reader's original view, with its text layer for
+  selection; the standard browser PDF renderer, loaded only with that view.
 
 ## Markdown & rich text
 

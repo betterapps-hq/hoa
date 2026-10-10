@@ -35,7 +35,7 @@ describe("hoaRepository", () => {
       id: "first",
       name: "First",
       slug: "first",
-      settings: { curableOutcome: "reject", retentionDays: 365, draftRetentionDays: 30 }
+      settings: { curableOutcome: "reject", retentionDays: 365, draftRetentionDays: 30, unitSystem: "imperial" }
     })
     expect((await getHoa(database.db, "second"))?.settings.curableOutcome).toBe("approve-with-conditions")
     expect(await getHoa(database.db, "missing")).toBeNull()

@@ -12,8 +12,22 @@ export const layoutResultSchema = z.object({
   pages: z.array(
     z.object({
       pageNumber: z.number().int(),
+      /** The page's size in `unit`, which word polygons are measured in. */
+      width: z.number().optional(),
+      height: z.number().optional(),
+      unit: z.string().optional(),
       spans: z.array(spanSchema),
-      words: z.array(z.object({ content: z.string(), confidence: z.number(), span: spanSchema })).default([]),
+      words: z
+        .array(
+          z.object({
+            content: z.string(),
+            confidence: z.number(),
+            span: spanSchema,
+            /** The word's corners on the page, clockwise from top left: x1, y1, ... x4, y4. */
+            polygon: z.array(z.number()).optional()
+          })
+        )
+        .default([]),
       selectionMarks: z.array(z.object({ state: z.enum(["selected", "unselected"]), span: spanSchema })).default([])
     })
   ),

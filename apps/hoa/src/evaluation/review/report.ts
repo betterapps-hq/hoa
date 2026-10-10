@@ -1,8 +1,9 @@
 import type { ModelCall } from "@/jobs/steps"
 import type { ReviewScore, ReviewScores } from "./score"
 
-// The Markdown report of an evaluation round 2 run: the scores per case against the round's bars, the cost, and the
-// mismatches behind each score. It names rules, properties and entity ids, never packet text.
+// The Markdown report of an evaluation round 2 run: the scores code computes per case against the round's bars, the
+// cost, and the mismatches behind each score. The writer's faithfulness and clarity are judged by the coding agent from
+// each case's writer.md (writerComparison.ts). It names rules, properties and entity ids, never packet text.
 
 export type CaseReport = {
   id: string
@@ -14,7 +15,7 @@ export type CaseReport = {
   durationSeconds: number
 }
 
-/** The bars evaluation round 2 must clear (implementation-plan.md, Evaluation round 2). */
+/** The bars of evaluation round 2's scores that code computes (implementation-plan.md, Evaluation round 2). */
 export const bars: Record<keyof ReviewScores, number> = {
   entities: 1,
   facts: 0.9,
@@ -23,8 +24,7 @@ export const bars: Record<keyof ReviewScores, number> = {
   evidence: 0.95,
   findings: 0.95,
   recommendation: 1,
-  actionItems: 0.95,
-  writer: 0.9
+  actionItems: 0.95
 }
 
 const measures = Object.keys(bars).filter((key): key is keyof ReviewScores => key in bars)
@@ -80,7 +80,6 @@ export function reviewReport(
       ),
       ...list("Action items missing", mismatches.actionItems.missing, (entry) => entry),
       ...list("Action items extra", mismatches.actionItems.extra, (entry) => entry),
-      ...list("Writer", mismatches.writer, (entry) => entry),
       ...list("Failures", item.failures, (entry) => `${entry.stage} ${entry.itemId}: ${entry.message}`)
     ]
   })
@@ -90,6 +89,8 @@ export function reviewReport(
     `Prompts: ${Object.entries(promptVersions)
       .map(([name, version]) => `${name} v${version}`)
       .join(", ")}. Total cost $${sum(cases.map((item) => costOf(item.calls))).toFixed(4)}.`,
+    "",
+    "The writer's faithfulness and clarity are judged by the coding agent from each case's writer.md (evaluation.md, Judging by the coding agent).",
     "",
     header,
     `| --- | ${measures.map(() => "---").join(" | ")} | --- |`,

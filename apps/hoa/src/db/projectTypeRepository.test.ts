@@ -13,7 +13,7 @@ import {
 
 const hoaId = "demo-hoa"
 const now = "2026-10-09T00:00:00.000Z"
-const definition: ProjectTypeDefinition = { subjects: [], groups: [], documents: [] }
+const definition: ProjectTypeDefinition = { subjects: [], groups: [], documents: [], formDocuments: [], unasked: [] }
 
 describe("projectTypeRepository", () => {
   let database: TestDatabase
@@ -26,7 +26,7 @@ describe("projectTypeRepository", () => {
     await database.dispose()
   })
 
-  it("adds, lists by label, edits, retires and deletes an organization's project types", async () => {
+  it("adds, lists by label, edits, archives and deletes an organization's project types", async () => {
     const { db } = database
     const later = await insertProjectType(db, {
       hoaId,
@@ -55,8 +55,8 @@ describe("projectTypeRepository", () => {
     expect((await listProjectTypes(db, hoaId)).map((type) => type.label)).toEqual(["First", "Second"])
     expect(first.status).toBe("active")
 
-    await updateProjectType(db, hoaId, later.id, { label: "Renamed", status: "retired", updatedAt: now })
-    expect(await getProjectType(db, hoaId, later.id)).toMatchObject({ label: "Renamed", status: "retired" })
+    await updateProjectType(db, hoaId, later.id, { label: "Renamed", status: "archived", updatedAt: now })
+    expect(await getProjectType(db, hoaId, later.id)).toMatchObject({ label: "Renamed", status: "archived" })
     expect(await getProjectType(db, "other", later.id)).toBeNull()
 
     await deleteProjectType(db, hoaId, later.id)

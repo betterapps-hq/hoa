@@ -32,7 +32,7 @@ D1 tables, defined with Drizzle in `src/db/schema.ts` with migrations in `apps/h
 | `rulebook_terms` | Organization term, or proposed core term, in a rulebook | Primary key `(rulebook_id, term_key)`; `kind`, `review_status`, `content_hash`; the whole `Term` in `term_json` |
 | `rulebook_questions` | Interpretation or conflict question | Primary key `(rulebook_id, id)`; `question_json` and `answer_json` |
 | `rules` | Rule in a first-build rulebook | `UNIQUE(rulebook_id, rule_key)`; the first build's `Rule` in `rule_json`. Dropped at cutover |
-| `project_types` | An organization's project type | `status` active or retired; `rulebook_id` it was built against; the `ProjectTypeDefinition` (fields and documents) in `definition_json` |
+| `project_types` | An organization's project type | `status` active or archived; `rulebook_id` it was built against; the `ProjectTypeDefinition` (fields and documents) in `definition_json` |
 | `applications` | Application | `project_type_id` and the form's answers in `answers_json`; `project_type` and `project_kind` are the earlier builds' and dropped at cutover |
 | `application_files` | Uploaded or derived file | |
 | `application_pages` | Page of an application file | `(file_id, page_index)` and the page's `kind` from classification |

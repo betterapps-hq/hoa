@@ -1,0 +1,694 @@
+import { useForm } from "@tanstack/react-form"
+import { PlusIcon, TriangleAlertIcon, XIcon } from "lucide-react"
+import { useState } from "react"
+import { z } from "zod"
+import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet
+} from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
+import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from "@/components/ui/native-select"
+import { Textarea } from "@/components/ui/textarea"
+import { sentenceCase } from "@/lib/text"
+import type { Candidate } from "@/projectTypes/definition"
+import type { ProjectDocument, ProjectField, ProjectGroup } from "@/projectTypes/projectType"
+import { asSentence } from "@/projectTypes/wording"
+import type { CitedProvision } from "../../rulebook/citedProvision"
+import { CitationPicker } from "../../rulebook/RuleReference/CitationPicker"
+import { RuleReference, type ReferencedRule } from "../../rulebook/RuleReference/RuleReference"
+import type { QuestionInfo, VocabularyUnit } from "../projectTypes.functions"
+
+// Writing or editing one question (application-review.md, Project types). Every question has its wording, help,
+// whether it's required, and the passages it cites. A new question is the administrator's own, with the answer type
+// they choose, or linked to a detail the rules check, which the review then reads as a fact. A question bound to the
+// rules keeps the answer type the vocabulary gives it, and shows what it checks.
+
+export type QuestionDialogProps = {
+  /** The question to edit, with its section; null writes a new one. */
+  editing: { subject: string; field: ProjectField } | null
+  /** Where a new question can go. */
+  sections: readonly ProjectGroup[]
+  /** What the rules check that the form doesn't ask, to link a new question to. */
+  candidates: readonly Candidate[]
+  info: Readonly<Record<string, QuestionInfo>>
+  rules: ReadonlyMap<string, ReferencedRule & { statement: string }>
+  /** The passages questions cite that the rulebook has, by provision key. */
+  citations: Readonly<Record<string, CitedProvision>>
+  units: readonly VocabularyUnit[]
+  loadProvisions: () => Promise<CitedProvision[]>
+  /** A key for a new question of the administrator's own. */
+  newKey: (label: string) => string
+  isOpen: boolean
+  onOpenChange: (isOpen: boolean) => void
+  onSave: (subject: string, field: ProjectField) => void
+  /** A new question answered by a file is a document requirement: it goes to the documents instead. */
+  onAddDocument: (document: ProjectDocument) => void
+}
+
+const answerTypes = [
+  { value: "text", label: "Short text" },
+  { value: "long-text", label: "Long text" },
+  { value: "yes-no", label: "Yes or no" },
+  { value: "choice", label: "One choice" },
+  { value: "choices", label: "Several choices" },
+  { value: "number", label: "Amount" },
+  { value: "date", label: "Date" },
+  { value: "time", label: "Time of day" },
+  { value: "file", label: "File upload" }
+] as const
+type AnswerType = (typeof answerTypes)[number]["value"]
+const isAnswerType = (value: string): value is AnswerType => answerTypes.some((type) => type.value === value)
+
+const dimensionNames: Record<string, string> = {
+  length: "Length",
+  area: "Area",
+  volume: "Volume",
+  weight: "Weight",
+  speed: "Speed",
+  money: "Money",
+  ratio: "Percentage",
+  "elapsed-time": "Duration",
+  "calendar-period": "Calendar period",
+  "business-time": "Business days"
+}
+
+/** "Count" for a number with no unit. */
+const countUnit = "(count)"
+
+const candidateId = (candidate: Candidate) => `${candidate.subject} ${candidate.field.property}`
+
+const linesOf = (text: string) => [
+  ...new Set(
+    text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+  )
+]
+
+const slug = (text: string) =>
+  text
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-|-$/g, "") || "option"
+
+const valuesSchema = z.object({
+  label: z.string().trim().min(1, "Write the question.").max(200, "Keep the question under 200 characters."),
+  help: z.string().trim().max(300, "Keep the help under 300 characters."),
+  example: z.string().trim().max(80, "Keep the example under 80 characters."),
+  isRequired: z.boolean(),
+  subject: z.string(),
+  link: z.string(),
+  answerType: z.string(),
+  options: z.string(),
+  offered: z.array(z.string()),
+  unit: z.string(),
+  citations: z.array(z.string())
+})
+type Values = z.infer<typeof valuesSchema>
+
+/** What a custom question's form starts from. */
+function customValues(field: ProjectField | null) {
+  if (!field) {
+    return { answerType: "text", options: "", unit: countUnit }
+  }
+  const options = field.kind === "choice" || field.kind === "choices" ? field.options.map((option) => option.label) : []
+  return {
+    answerType: field.kind,
+    options: options.join("\n"),
+    unit: field.kind === "number" ? (field.unit?.key ?? countUnit) : countUnit
+  }
+}
+
+export function QuestionDialog({
+  editing,
+  sections,
+  candidates,
+  info,
+  rules,
+  citations,
+  units,
+  loadProvisions,
+  newKey,
+  isOpen,
+  onOpenChange,
+  onSave,
+  onAddDocument
+}: QuestionDialogProps) {
+  const [isUnlinked, setIsUnlinked] = useState(false)
+  const [provisions, setProvisions] = useState<CitedProvision[] | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const field = editing?.field ?? null
+  const isBound = field !== null && field.binding !== null && !isUnlinked
+  const custom = customValues(field)
+  const known = new Map([
+    ...Object.entries(citations),
+    ...(provisions ?? []).map((provision) => [provision.provisionKey, provision] as const)
+  ])
+  const ensureProvisions = async () => {
+    if (provisions || isLoading) {
+      return
+    }
+    setIsLoading(true)
+    try {
+      setProvisions(await loadProvisions())
+    } finally {
+      setIsLoading(false)
+    }
+  }
+  const defaultValues: Values = {
+    label: field?.label ?? "",
+    help: field?.help ?? "",
+    example: field?.example ?? "",
+    isRequired: field?.isRequired ?? true,
+    subject: editing?.subject ?? sections[0]?.subject ?? "work",
+    link: "",
+    answerType: custom.answerType,
+    options: custom.options,
+    offered: field?.kind === "choice" ? field.options.map((option) => option.value) : [],
+    unit: custom.unit,
+    citations: field?.citations ?? []
+  }
+  const form = useForm({
+    defaultValues,
+    validators: {
+      onSubmit: valuesSchema.superRefine((value, context) => {
+        const linked = candidates.find((candidate) => candidateId(candidate) === value.link)
+        if (isBound || linked) {
+          if (field?.kind === "choice" && value.offered.length === 0) {
+            context.addIssue({ code: "custom", path: ["offered"], message: "Offer at least one choice." })
+          }
+          return
+        }
+        if ((value.answerType === "choice" || value.answerType === "choices") && linesOf(value.options).length < 2) {
+          context.addIssue({ code: "custom", path: ["options"], message: "Write at least two choices, one per line." })
+        }
+      })
+    },
+    onSubmit: ({ value }) => {
+      const wording = {
+        label: value.label.trim(),
+        help: value.help.trim() || null,
+        example: value.example.trim() || null,
+        isRequired: value.isRequired,
+        citations: value.citations
+      }
+      const linked = candidates.find((candidate) => candidateId(candidate) === value.link)
+      if (field && isBound) {
+        onSave(
+          editing?.subject ?? value.subject,
+          field.kind === "choice"
+            ? { ...field, ...wording, options: field.options.filter((option) => value.offered.includes(option.value)) }
+            : { ...field, ...wording }
+        )
+      } else if (linked) {
+        onSave(linked.subject, { ...linked.field, ...wording })
+      } else if (!editing && value.answerType === "file") {
+        onAddDocument({
+          documentType: newKey(wording.label),
+          label: wording.label,
+          mustShow: wording.help ? [wording.help] : [],
+          ruleKeys: [],
+          isRequired: wording.isRequired,
+          citations: wording.citations,
+          accepts: null
+        })
+      } else if (field && isUnlinked && value.answerType === field.kind) {
+        onSave(editing?.subject ?? value.subject, { ...field, ...wording, binding: null })
+      } else {
+        onSave(editing?.subject ?? value.subject, customField(value, wording))
+      }
+      onOpenChange(false)
+    }
+  })
+
+  /** The administrator's own question from what they chose. */
+  function customField(
+    value: Values,
+    wording: Pick<ProjectField, "label" | "help" | "example" | "isRequired" | "citations">
+  ): ProjectField {
+    const base = {
+      ...wording,
+      property: field?.property ?? newKey(wording.label),
+      binding: null,
+      answeredBy: "applicant" as const
+    }
+    const type = isAnswerType(value.answerType) ? value.answerType : "text"
+    const options = () => {
+      const taken = new Set<string>()
+      return linesOf(value.options).map((label) => {
+        let key = slug(label)
+        for (let count = 2; taken.has(key); count += 1) {
+          key = `${slug(label)}-${count}`
+        }
+        taken.add(key)
+        return { value: key, label }
+      })
+    }
+    switch (type) {
+      case "number": {
+        const unit = units.find((item) => item.unit === value.unit)
+        if (!unit) {
+          return { ...base, kind: "number", unit: null, dimension: null, units: [] }
+        }
+        const same = units.filter((item) => item.dimension === unit.dimension && item.perBase !== null)
+        return {
+          ...base,
+          kind: "number",
+          unit: { key: unit.unit, label: unit.label },
+          dimension: unit.dimension,
+          units: [unit, ...same.filter((item) => item.unit !== unit.unit)].map((item) => ({
+            unit: item.unit,
+            labels: item.labels,
+            perBase: item.perBase
+          }))
+        }
+      }
+      case "choice":
+        return { ...base, kind: "choice", options: options(), allowsOther: false }
+      case "choices":
+        return { ...base, kind: "choices", options: options() }
+      case "file":
+        return { ...base, kind: "text" }
+      default:
+        return { ...base, kind: type }
+    }
+  }
+
+  const ruleList = (property: string) =>
+    (info[property]?.ruleKeys ?? []).flatMap((key) => {
+      const rule = rules.get(key)
+      return rule ? [rule] : []
+    })
+  const unitGroups = [...Map.groupBy(units, (unit) => unit.dimension)]
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
+        <form
+          noValidate
+          className="flex flex-col gap-6"
+          onSubmit={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            void form.handleSubmit()
+          }}
+        >
+          <DialogHeader>
+            <DialogTitle>{editing ? "Edit question" : "Write a question"}</DialogTitle>
+            <DialogDescription>Homeowners see the question and its help as you write them.</DialogDescription>
+          </DialogHeader>
+          <FieldGroup>
+            {editing ? null : (
+              <form.Field
+                name="link"
+                listeners={{
+                  onChange: ({ value }) => {
+                    const linked = candidates.find((candidate) => candidateId(candidate) === value)
+                    if (linked) {
+                      if (!form.getFieldValue("label").trim()) {
+                        form.setFieldValue("label", linked.field.label)
+                      }
+                      if (!form.getFieldValue("help").trim() && linked.field.help) {
+                        form.setFieldValue("help", linked.field.help)
+                      }
+                      form.setFieldValue("citations", [
+                        ...new Set([...form.getFieldValue("citations"), ...(linked.field.citations ?? [])])
+                      ])
+                    }
+                  }
+                }}
+              >
+                {(item) =>
+                  candidates.length > 0 ? (
+                    <Field>
+                      <FieldLabel htmlFor="question-link">What the rules check</FieldLabel>
+                      <NativeSelect
+                        id="question-link"
+                        className="w-full"
+                        value={item.state.value}
+                        onChange={(event) => item.handleChange(event.target.value)}
+                      >
+                        <NativeSelectOption value="">Nothing: my own question</NativeSelectOption>
+                        {[...Map.groupBy(candidates, (candidate) => candidate.section)].map(([section, members]) => (
+                          <NativeSelectOptGroup key={section} label={sentenceCase(section)}>
+                            {members.map((candidate) => (
+                              <NativeSelectOption key={candidateId(candidate)} value={candidateId(candidate)}>
+                                {candidate.field.label}
+                              </NativeSelectOption>
+                            ))}
+                          </NativeSelectOptGroup>
+                        ))}
+                      </NativeSelect>
+                      <FieldDescription>Linked, the review reads the answer as that detail.</FieldDescription>
+                    </Field>
+                  ) : null
+                }
+              </form.Field>
+            )}
+            <form.Field name="label">
+              {(item) => (
+                <Field data-invalid={item.state.meta.errors.length > 0}>
+                  <FieldLabel htmlFor="question-label">
+                    Question
+                    <span aria-hidden className="ml-0.5 text-destructive">
+                      *
+                    </span>
+                  </FieldLabel>
+                  <Input
+                    id="question-label"
+                    required
+                    value={item.state.value}
+                    onBlur={item.handleBlur}
+                    onChange={(event) => item.handleChange(event.target.value)}
+                    aria-invalid={item.state.meta.errors.length > 0}
+                  />
+                  <FieldError errors={item.state.meta.errors} />
+                </Field>
+              )}
+            </form.Field>
+            <form.Field name="help">
+              {(item) => (
+                <Field data-invalid={item.state.meta.errors.length > 0}>
+                  <FieldLabel htmlFor="question-help">Help</FieldLabel>
+                  <Textarea
+                    id="question-help"
+                    rows={2}
+                    value={item.state.value}
+                    onBlur={item.handleBlur}
+                    onChange={(event) => item.handleChange(event.target.value)}
+                    aria-invalid={item.state.meta.errors.length > 0}
+                  />
+                  <FieldDescription>
+                    A short line shows under the question; longer help, behind an info button.
+                  </FieldDescription>
+                  <FieldError errors={item.state.meta.errors} />
+                </Field>
+              )}
+            </form.Field>
+            <form.Subscribe selector={(state) => [state.values.link, state.values.answerType] as const}>
+              {([link, answerType]) => {
+                const isOwn = !isBound && link === ""
+                const showsSection = !editing && isOwn
+                const kind = isOwn
+                  ? answerType
+                  : (field?.kind ?? candidates.find((item) => candidateId(item) === link)?.field.kind)
+                return (
+                  <>
+                    {showsSection && sections.length > 1 ? (
+                      <form.Field name="subject">
+                        {(item) => (
+                          <Field>
+                            <FieldLabel htmlFor="question-section">Section</FieldLabel>
+                            <NativeSelect
+                              id="question-section"
+                              className="w-full"
+                              value={item.state.value}
+                              onChange={(event) => item.handleChange(event.target.value)}
+                            >
+                              {sections.map((section) => (
+                                <NativeSelectOption key={section.subject} value={section.subject}>
+                                  {sentenceCase(section.label)}
+                                </NativeSelectOption>
+                              ))}
+                            </NativeSelect>
+                          </Field>
+                        )}
+                      </form.Field>
+                    ) : null}
+                    {isOwn ? (
+                      <form.Field name="answerType">
+                        {(item) => (
+                          <Field>
+                            <FieldLabel htmlFor="question-answer-type">Answer</FieldLabel>
+                            <NativeSelect
+                              id="question-answer-type"
+                              className="w-full"
+                              value={item.state.value}
+                              onChange={(event) => item.handleChange(event.target.value)}
+                            >
+                              {answerTypes
+                                .filter((type) => type.value !== "file" || !editing)
+                                .map((type) => (
+                                  <NativeSelectOption key={type.value} value={type.value}>
+                                    {type.label}
+                                  </NativeSelectOption>
+                                ))}
+                            </NativeSelect>
+                            {item.state.value === "file" ? (
+                              <FieldDescription>It goes in the documents, with the other uploads.</FieldDescription>
+                            ) : null}
+                            {field &&
+                            item.state.value !== field.kind &&
+                            (field.kind === "choice" || field.kind === "choices" || field.kind === "number") ? (
+                              <FieldDescription>Changing the answer type clears its choices or unit.</FieldDescription>
+                            ) : null}
+                          </Field>
+                        )}
+                      </form.Field>
+                    ) : null}
+                    {field && isBound ? (
+                      <Field>
+                        <FieldDescription>
+                          Its answer type comes from what the rules check. To choose another, unlink it; the review then
+                          reads the answer as context.
+                        </FieldDescription>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="self-start"
+                          onClick={() => setIsUnlinked(true)}
+                        >
+                          Unlink from the rules
+                        </Button>
+                      </Field>
+                    ) : null}
+                    {isOwn && (answerType === "choice" || answerType === "choices") ? (
+                      <form.Field name="options">
+                        {(item) => (
+                          <Field data-invalid={item.state.meta.errors.length > 0}>
+                            <FieldLabel htmlFor="question-options">Choices</FieldLabel>
+                            <Textarea
+                              id="question-options"
+                              rows={4}
+                              placeholder={"One choice per line"}
+                              value={item.state.value}
+                              onBlur={item.handleBlur}
+                              onChange={(event) => item.handleChange(event.target.value)}
+                              aria-invalid={item.state.meta.errors.length > 0}
+                            />
+                            <FieldError errors={item.state.meta.errors} />
+                          </Field>
+                        )}
+                      </form.Field>
+                    ) : null}
+                    {isOwn && answerType === "number" ? (
+                      <form.Field name="unit">
+                        {(item) => (
+                          <Field>
+                            <FieldLabel htmlFor="question-unit">Unit</FieldLabel>
+                            <NativeSelect
+                              id="question-unit"
+                              className="w-full"
+                              value={item.state.value}
+                              onChange={(event) => item.handleChange(event.target.value)}
+                            >
+                              <NativeSelectOption value={countUnit}>None, a count</NativeSelectOption>
+                              {unitGroups.map(([dimension, members]) => (
+                                <NativeSelectOptGroup
+                                  key={dimension}
+                                  label={dimensionNames[dimension] ?? sentenceCase(dimension)}
+                                >
+                                  {members.map((unit) => (
+                                    <NativeSelectOption key={unit.unit} value={unit.unit}>
+                                      {sentenceCase(unit.label)}
+                                    </NativeSelectOption>
+                                  ))}
+                                </NativeSelectOptGroup>
+                              ))}
+                            </NativeSelect>
+                            <FieldDescription>
+                              Homeowners answer in boxes for its kind, such as feet and inches.
+                            </FieldDescription>
+                          </Field>
+                        )}
+                      </form.Field>
+                    ) : null}
+                    {kind === "text" || kind === "long-text" ? (
+                      <form.Field name="example">
+                        {(item) => (
+                          <Field data-invalid={item.state.meta.errors.length > 0}>
+                            <FieldLabel htmlFor="question-example">Example answer</FieldLabel>
+                            <Input
+                              id="question-example"
+                              value={item.state.value}
+                              onBlur={item.handleBlur}
+                              onChange={(event) => item.handleChange(event.target.value)}
+                              aria-invalid={item.state.meta.errors.length > 0}
+                            />
+                            <FieldDescription>Shown in the empty answer box.</FieldDescription>
+                            <FieldError errors={item.state.meta.errors} />
+                          </Field>
+                        )}
+                      </form.Field>
+                    ) : null}
+                  </>
+                )
+              }}
+            </form.Subscribe>
+            <form.Field name="isRequired">
+              {(item) => (
+                <Field orientation="horizontal">
+                  <Checkbox
+                    id="question-required"
+                    checked={item.state.value}
+                    onCheckedChange={(checked) => item.handleChange(checked)}
+                  />
+                  <FieldLabel htmlFor="question-required" className="font-normal">
+                    Homeowners must answer it
+                  </FieldLabel>
+                </Field>
+              )}
+            </form.Field>
+            {field?.kind === "choice" && isBound ? (
+              <form.Field name="offered">
+                {(item) => (
+                  <FieldSet data-invalid={item.state.meta.errors.length > 0}>
+                    <FieldLegend variant="label">Choices to offer</FieldLegend>
+                    <FieldDescription>
+                      From the rulebook&apos;s list.
+                      {field.allowsOther ? " Homeowners can also write their own." : null}
+                    </FieldDescription>
+                    <FieldGroup className="gap-2.5">
+                      {field.options.map((option) => {
+                        const id = `question-option-${option.value}`
+                        return (
+                          <Field key={option.value} orientation="horizontal">
+                            <Checkbox
+                              id={id}
+                              checked={item.state.value.includes(option.value)}
+                              onCheckedChange={(checked) =>
+                                item.handleChange(
+                                  field.options
+                                    .map((entry) => entry.value)
+                                    .filter((value) =>
+                                      value === option.value ? checked : item.state.value.includes(value)
+                                    )
+                                )
+                              }
+                            />
+                            <FieldLabel htmlFor={id} className="font-normal">
+                              {sentenceCase(option.label)}
+                            </FieldLabel>
+                          </Field>
+                        )
+                      })}
+                    </FieldGroup>
+                    <FieldError errors={item.state.meta.errors} />
+                  </FieldSet>
+                )}
+              </form.Field>
+            ) : null}
+            <form.Field name="citations">
+              {(item) => (
+                <FieldSet>
+                  <FieldLegend variant="label">Citations</FieldLegend>
+                  {item.state.value.length > 0 ? (
+                    <ul className="flex flex-wrap gap-2" aria-label="Linked citations">
+                      {item.state.value.map((key) => {
+                        const citation = known.get(key)
+                        const label = citation?.label ?? "Missing passage"
+                        return (
+                          <li
+                            key={key}
+                            className="flex items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-0.5 pl-2 text-sm"
+                          >
+                            {citation ? null : <TriangleAlertIcon className="size-3.5 text-destructive" aria-hidden />}
+                            <span title={citation?.heading ?? (citation ? undefined : "No longer in the rulebook")}>
+                              {label}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              aria-label={`Remove ${label}`}
+                              onClick={() => item.handleChange(item.state.value.filter((entry) => entry !== key))}
+                            >
+                              <XIcon />
+                            </Button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  ) : (
+                    <FieldDescription>None yet.</FieldDescription>
+                  )}
+                  <CitationPicker
+                    citations={(provisions ?? []).filter(
+                      (provision) => !item.state.value.includes(provision.provisionKey)
+                    )}
+                    isLoading={provisions === null}
+                    title="Add a citation"
+                    onChoose={(citation) => item.handleChange([...item.state.value, citation.provisionKey])}
+                    trigger={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="self-start"
+                        onClick={() => void ensureProvisions()}
+                      >
+                        <PlusIcon />
+                        Add citation
+                      </Button>
+                    }
+                  />
+                </FieldSet>
+              )}
+            </form.Field>
+          </FieldGroup>
+          {field && isBound && field.binding ? (
+            <section
+              className="flex flex-col gap-2 rounded-lg bg-muted/50 p-4 text-sm"
+              aria-labelledby="question-checks"
+            >
+              <h3 id="question-checks" className="font-medium">
+                What it checks
+              </h3>
+              {info[field.binding]?.meaning ? (
+                <p className="text-muted-foreground">{asSentence(info[field.binding]?.meaning ?? "")}</p>
+              ) : null}
+              <ul className="flex flex-col gap-1.5">
+                {ruleList(field.binding).map((rule) => (
+                  <li key={rule.key}>
+                    <RuleReference rule={rule} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <Button type="submit">{editing ? "Save" : "Add question"}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}

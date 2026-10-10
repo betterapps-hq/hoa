@@ -3,7 +3,7 @@ import { projectTypeSchema, type ProjectType } from "@/projectTypes/projectType"
 import type { Database } from "./database"
 import { applications, projectTypes } from "./schema"
 
-/** The organization's project types, by label; retired ones too, for the administrator. */
+/** The organization's project types, by label; archived ones too, for the administrator. */
 export async function listProjectTypes(db: Database, hoaId: string): Promise<ProjectType[]> {
   const rows = await db
     .select()
@@ -55,7 +55,7 @@ export async function updateProjectType(
     .where(and(eq(projectTypes.hoaId, hoaId), eq(projectTypes.id, id)))
 }
 
-/** How many applications chose the project type; one that any did can be retired but not deleted. */
+/** How many applications chose the project type; one that any did can be archived but not deleted. */
 export async function countApplicationsOfType(db: Database, hoaId: string, id: string) {
   const row = await db
     .select({ total: count() })

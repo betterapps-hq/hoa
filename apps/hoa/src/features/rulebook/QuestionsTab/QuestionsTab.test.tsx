@@ -23,7 +23,7 @@ describe("QuestionsTab", () => {
     expect(
       within(kept).getByRole("button", { name: "Declarant's Units exempt from the minimum lease term" })
     ).toBeInTheDocument()
-    expect(screen.getAllByRole("button", { name: "Declaration 3.1(c), paragraph 2" }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole("link", { name: "Declaration 3.1(c), paragraph 2" }).length).toBeGreaterThan(0)
   })
 
   it("answers a question with a reading and a note", async () => {

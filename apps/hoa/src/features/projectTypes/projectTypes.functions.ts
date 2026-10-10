@@ -14,10 +14,19 @@ import {
   updateProjectType as updateProjectTypeRecord
 } from "@/db/projectTypeRepository"
 import { getPublishedRulesFile } from "@/db/rulebookContentRepository"
-import { bindDefinition, buildDefinition, projectSubjects, type ProjectSubject } from "@/projectTypes/build"
+import {
+  bindDefinition,
+  buildDefinition,
+  projectSubjects,
+  propertyRules,
+  vocabularyUnits,
+  type ProjectSubject
+} from "@/projectTypes/build"
+import { allQuestions } from "@/projectTypes/definition"
 import {
   projectTypeDefinition,
   projectTypeDetails,
+  projectTypeStatuses,
   type ProjectType,
   type ProjectTypeDefinition
 } from "@/projectTypes/projectType"
@@ -28,9 +37,13 @@ import {
   suggestionAnswerSchema,
   type ProjectTypeSuggestion
 } from "@/projectTypes/suggest"
+import { definitionOf, rulebookVocabulary, scopeNoteOf } from "@/review/documentTypes"
 import { readRulesFile } from "@/rulebook/assemble"
+import type * as T from "@/schema/types"
 import { getRequestContext, requireAdministrator } from "@/session/requestContext.server"
 import { getBucket } from "@/storage/storage.server"
+import type { CitedProvision } from "../rulebook/citedProvision"
+import { citationIndex, citedProvision } from "../rulebook/rulebookRecords"
 import { projectRequirements, type RequirementGroup } from "./requirements"
 
 // Project types (application-review.md, Project types): the organization's own list, which homeowners pick from and
@@ -60,12 +73,59 @@ async function loadOwnType(hoaId: string, id: string) {
   return type
 }
 
+/** Why a form asks its questions: the passages they cite, and the titles of the rules that read each property. */
+export type QuestionReasons = {
+  citations: Record<string, CitedProvision>
+  /** Rule titles by property. */
+  rules: Record<string, string[]>
+}
+
+/** A project type as homeowners choose it, with why its questions are asked. */
+export type OfferedProjectType = ProjectType & { reasons: QuestionReasons }
+
 /** The project types homeowners can choose: the active ones. */
-export const listActiveProjectTypes = createServerFn({ method: "GET" }).handler(async (): Promise<ProjectType[]> => {
-  const context = await getRequestContext()
-  const types = await listProjectTypeRecords(getDb(), context.hoa.id)
-  return types.filter((type) => type.status === "active")
-})
+export const listActiveProjectTypes = createServerFn({ method: "GET" }).handler(
+  async (): Promise<OfferedProjectType[]> => {
+    const context = await getRequestContext()
+    const [types, published] = await Promise.all([
+      listProjectTypeRecords(getDb(), context.hoa.id),
+      publishedRulebook(context.hoa.id)
+    ])
+    return types
+      .filter((type) => type.status === "active")
+      .map((type) => {
+        const current = currentType(type, published)
+        return {
+          ...current,
+          reasons: published ? reasonsOf(published.rulesFile, current) : { citations: {}, rules: {} }
+        }
+      })
+  }
+)
+
+function reasonsOf(rulesFile: T.RulesFile, type: ProjectType): QuestionReasons {
+  const titles = new Map(rulesFile.rules.map((rule) => [rule.key, rule.title]))
+  const byProperty = propertyRules(rulesFile, applicationRequestType, type.definition.subjects, today())
+  return {
+    citations: citationsOf(rulesFile, citedKeys(type.definition)),
+    rules: Object.fromEntries(
+      Object.entries(byProperty).map(([property, keys]) => [property, keys.flatMap((key) => titles.get(key) ?? [])])
+    )
+  }
+}
+
+/**
+ * A type as its form reads now: bound again to the rules it was built against, so the questions carry what code
+ * derives from the vocabulary (units, code's wording for a bare label). A type built against an earlier rulebook stays
+ * as stored until the administrator updates it.
+ */
+function currentType(type: ProjectType, published: Awaited<ReturnType<typeof publishedRulebook>>): ProjectType {
+  if (!published || type.rulebookId !== published.id) {
+    return type
+  }
+  const built = buildDefinition(published.rulesFile, applicationRequestType, type.definition.subjects, today())
+  return { ...type, definition: bindDefinition(type.definition, built) }
+}
 
 export type ProjectTypeListItem = ProjectType & { applicationCount: number }
 
@@ -109,6 +169,43 @@ export type ProjectTypeView = {
   isOutdated: boolean
   /** Every question the rules about its subjects can ask, for adding back one the administrator removed. */
   available: ProjectTypeDefinition
+  /** What each question checks, by property key: the vocabulary's meaning and the rules that read it. */
+  questionInfo: Record<string, QuestionInfo>
+  /** The passages the questions cite, by provision key; a key missing here is a link the rulebook no longer has. */
+  citations: Record<string, CitedProvision>
+  /** The units the vocabulary has, for the administrator's own amount questions. */
+  units: VocabularyUnit[]
+}
+
+export type VocabularyUnit = ReturnType<typeof vocabularyUnits>[number]
+
+export type QuestionInfo = { meaning: string | null; ruleKeys: string[] }
+
+function questionInfoOf(rulesFile: T.RulesFile, subjects: readonly string[]): Record<string, QuestionInfo> {
+  const vocabulary = rulebookVocabulary(rulesFile)
+  return Object.fromEntries(
+    Object.entries(propertyRules(rulesFile, applicationRequestType, subjects, today())).map(([property, ruleKeys]) => [
+      property,
+      { meaning: definitionOf(vocabulary, property) ?? scopeNoteOf(vocabulary, property), ruleKeys }
+    ])
+  )
+}
+
+/** Every provision key a definition's questions cite, asked or kept aside. */
+const citedKeys = (definition: ProjectTypeDefinition) =>
+  new Set([
+    ...allQuestions(definition).flatMap((item) => item.field.citations ?? []),
+    ...definition.documents.flatMap((document) => document.citations)
+  ])
+
+/** The cited passages that exist in the rulebook's documents, as screens show them. */
+function citationsOf(rulesFile: T.RulesFile, keys: Iterable<string>): Record<string, CitedProvision> {
+  const index = citationIndex(rulesFile)
+  return Object.fromEntries(
+    [...keys]
+      .filter((key) => index.provisions.has(key))
+      .map((key) => [key, citedProvision(index, { provisionKey: key, highlight: null, region: null })])
+  )
 }
 
 export const getProjectTypeView = createServerFn({ method: "GET" })
@@ -122,8 +219,12 @@ export const getProjectTypeView = createServerFn({ method: "GET" })
       countApplicationsOfType(db, context.hoa.id, data.projectTypeId)
     ])
     const subjects = published ? projectSubjects(published.rulesFile, applicationRequestType) : []
+    const current = currentType(type, published)
+    const available = published
+      ? buildDefinition(published.rulesFile, applicationRequestType, type.definition.subjects, today())
+      : type.definition
     return {
-      projectType: type,
+      projectType: current,
       applicationCount,
       requirements: published
         ? projectRequirements(published.rulesFile, applicationRequestType, type.definition.subjects, today())
@@ -132,11 +233,27 @@ export const getProjectTypeView = createServerFn({ method: "GET" })
         (key) => subjects.find((subject) => subject.key === key)?.label ?? key
       ),
       isOutdated: published !== null && type.rulebookId !== published.id,
-      available: published
-        ? buildDefinition(published.rulesFile, applicationRequestType, type.definition.subjects, today())
-        : type.definition
+      available,
+      questionInfo: published ? questionInfoOf(published.rulesFile, type.definition.subjects) : {},
+      citations: published
+        ? citationsOf(published.rulesFile, [...citedKeys(current.definition), ...citedKeys(available)])
+        : {},
+      units: vocabularyUnits(published?.rulesFile ?? null)
     }
   })
+
+/** Every passage of the published rulebook's documents, for linking one to a question. */
+export const listCitableProvisions = createServerFn({ method: "GET" }).handler(async (): Promise<CitedProvision[]> => {
+  const context = await requireAdministrator()
+  const published = await publishedRulebook(context.hoa.id)
+  if (!published) {
+    return []
+  }
+  const index = citationIndex(published.rulesFile)
+  return published.rulesFile.provisions.map((provision) =>
+    citedProvision(index, { provisionKey: provision.key, highlight: null, region: null })
+  )
+})
 
 /**
  * Project types the governing documents suggest: the model reads the published rulebook and proposes types; code keeps
@@ -217,6 +334,13 @@ export const updateProjectType = createServerFn({ method: "POST" })
       requirePublished(context.hoa.id)
     ])
     const built = buildDefinition(published.rulesFile, applicationRequestType, type.definition.subjects, today())
+    // A newly linked passage must be in the documents; one a rebuild removed stays until the administrator fixes it.
+    const known = new Set([...citedKeys(type.definition), ...citedKeys(built)])
+    const index = citationIndex(published.rulesFile)
+    const unknown = [...citedKeys(data.definition)].filter((key) => !known.has(key) && !index.provisions.has(key))
+    if (unknown.length > 0) {
+      throw new Error("A linked passage isn't in the rulebook's documents. Choose it again.")
+    }
     await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
       label: data.label,
       description: data.description || null,
@@ -244,9 +368,9 @@ export const refreshProjectType = createServerFn({ method: "POST" })
     })
   })
 
-/** Retires a project type (hidden from new applications, kept for existing ones) or brings it back. */
+/** Archives a project type (hidden from new applications, kept for existing ones) or unarchives it. */
 export const setProjectTypeStatus = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({ id: z.string(), status: z.enum(["active", "retired"]) }).parse(data))
+  .validator((data: unknown) => z.object({ id: z.string(), status: z.enum(projectTypeStatuses) }).parse(data))
   .handler(async ({ data }) => {
     const context = await requireAdministrator()
     await loadOwnType(context.hoa.id, data.id)
@@ -256,7 +380,7 @@ export const setProjectTypeStatus = createServerFn({ method: "POST" })
     })
   })
 
-/** Deletes a project type no application uses; one in use can only be retired. */
+/** Deletes a project type no application uses; one in use can only be archived. */
 export const deleteProjectType = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ id: z.string() }).parse(data))
   .handler(async ({ data }) => {
@@ -264,7 +388,7 @@ export const deleteProjectType = createServerFn({ method: "POST" })
     const db = getDb()
     await loadOwnType(context.hoa.id, data.id)
     if ((await countApplicationsOfType(db, context.hoa.id, data.id)) > 0) {
-      throw new Error("Applications use this project type, so it can be retired but not deleted.")
+      throw new Error("Applications use this project type, so it can be archived but not deleted.")
     }
     await deleteProjectTypeRecord(db, context.hoa.id, data.id)
   })

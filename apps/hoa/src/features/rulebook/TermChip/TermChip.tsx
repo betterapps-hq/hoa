@@ -7,6 +7,7 @@ import {
   PopoverTitle,
   PopoverTrigger
 } from "@/components/ui/popover"
+import { sentenceCase } from "@/lib/text"
 import type { Vocabulary } from "@/schema/vocabulary"
 import { describeTermKind } from "./TermChip.utils"
 
@@ -14,12 +15,15 @@ export type TermChipProps = {
   termKey: string
   plural?: boolean
   vocabulary: Vocabulary
+  /** Shown on its own, as in a table cell, rather than inside a sentence: its first letter capitalized. */
+  isStandalone?: boolean
 }
 
 /** A term shown by its label; activating it shows its labels, definition and kind. */
-export function TermChip({ termKey, plural = false, vocabulary }: TermChipProps) {
+export function TermChip({ termKey, plural = false, vocabulary, isStandalone = false }: TermChipProps) {
   const term = vocabulary.get(termKey)
-  const label = vocabulary.label(termKey, plural)
+  const written = vocabulary.label(termKey, plural)
+  const label = isStandalone ? sentenceCase(written) : written
   if (!term) {
     return (
       <span className="text-destructive underline decoration-wavy underline-offset-4" title={`${termKey} isn't a term`}>
@@ -43,7 +47,7 @@ export function TermChip({ termKey, plural = false, vocabulary }: TermChipProps)
       />
       <PopoverContent className="w-80 max-w-[calc(100vw-2rem)]">
         <PopoverHeader>
-          <PopoverTitle>{preferred}</PopoverTitle>
+          <PopoverTitle>{sentenceCase(preferred)}</PopoverTitle>
           <PopoverDescription>{describeTermKind(term, vocabulary)}</PopoverDescription>
         </PopoverHeader>
         {term.definition ? <p>{term.definition}</p> : null}

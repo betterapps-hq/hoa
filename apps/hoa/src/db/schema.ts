@@ -217,7 +217,7 @@ export const projectTypes = sqliteTable(
     hoaId: text("hoa_id").notNull(),
     label: text("label").notNull(),
     description: text("description"),
-    // "active", or "retired": hidden from new applications, kept for the ones that use it.
+    // "active", or "archived": hidden from new applications, kept for the ones that use it.
     status: text("status").notNull(),
     rulebookId: text("rulebook_id"),
     definition: json<unknown>("definition_json").notNull(),

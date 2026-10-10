@@ -7,7 +7,11 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn<(message: string) => void>(), success: vi.fn<(message: string) => void>() }
 }))
 
-const termsShown = () => within(screen.getByRole("list", { name: "Terms" })).getAllByRole("listitem")
+/** The table's rows, its header row left out. */
+const termsShown = () =>
+  within(screen.getByRole("table", { name: "Terms" }))
+    .getAllByRole("row")
+    .slice(1)
 
 describe("VocabularyTab", () => {
   it("lists the terms to review with their kind, definition and where they're used", async () => {
@@ -30,7 +34,7 @@ describe("VocabularyTab", () => {
       await user.clear(box)
       await user.type(box, query)
       expect(screen.getByText(/^5 of 577 terms/)).toBeInTheDocument()
-      expect(within(termsShown()[0]!).getByRole("button", { name: "Approve leased premises" })).toBeInTheDocument()
+      expect(within(termsShown()[0]!).getByRole("button", { name: "Actions for Leased premises" })).toBeInTheDocument()
       expect(screen.getByText(/^A property of lease registration/)).toBeInTheDocument()
     }
   })
@@ -43,18 +47,32 @@ describe("VocabularyTab", () => {
     expect(screen.getByText("No terms match.")).toBeInTheDocument()
     await user.selectOptions(screen.getByRole("combobox", { name: "Kind" }), "property")
     await user.keyboard("{Escape}")
-    await user.click(screen.getByRole("button", { name: "Approve premises leased" }))
+    await user.click(screen.getByRole("button", { name: "Actions for Premises leased" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Approve" }))
     expect(actions?.review).toHaveBeenCalledWith(
       [{ type: "term", key: "lease-registration.premises" }],
       "approved",
       null
     )
-    await user.click(screen.getByRole("button", { name: "Reject premises leased" }))
+    await user.click(screen.getByRole("button", { name: "Actions for Premises leased" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Reject" }))
     expect(actions?.review).toHaveBeenCalledWith(
       [{ type: "term", key: "lease-registration.premises" }],
       "rejected",
       null
     )
+  })
+
+  it("sorts by how many rules use a term, most first", async () => {
+    const { user } = renderInWorkspace(<VocabularyTab />)
+    const usedBy = screen.getByRole("columnheader", { name: "Used by" })
+    await user.click(within(usedBy).getByRole("button", { name: "Used by" }))
+    expect(usedBy).toHaveAttribute("aria-sort", "descending")
+    const counts = termsShown().map((row) =>
+      Number.parseInt(within(row).queryByRole("button", { name: /: used by/ })?.textContent ?? "0", 10)
+    )
+    expect(counts).toEqual(counts.toSorted((a, b) => b - a))
+    expect(counts[0]).toBeGreaterThan(1)
   })
 
   it("approves every term shown", async () => {
@@ -76,6 +94,6 @@ describe("VocabularyTab", () => {
       records: { ...records, terms: records.terms.map((term) => ({ ...term, review: approvedReview })) }
     })
     expect(screen.queryByText("Approved")).not.toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: /^Approve/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^Actions for/ })).not.toBeInTheDocument()
   })
 })

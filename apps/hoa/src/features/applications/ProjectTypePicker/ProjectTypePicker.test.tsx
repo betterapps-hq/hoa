@@ -33,9 +33,9 @@ describe("ProjectTypePicker", () => {
       "false",
       "false"
     ])
-    expect(screen.getByRole("radio", { name: "Garden structure" })).toBeInTheDocument()
+    expect(screen.getByRole("radio", { name: /^Garden structure/ })).toBeInTheDocument()
     expect(screen.getByText("Building or changing a structure in the yard")).toBeInTheDocument()
-    expect(screen.getByRole("radio", { name: "Something else" })).toBeInTheDocument()
+    expect(screen.getByRole("radio", { name: /^Something else/ })).toBeInTheDocument()
     expect(screen.getByText("A project the list doesn't name.")).toBeInTheDocument()
   })
 
@@ -43,11 +43,11 @@ describe("ProjectTypePicker", () => {
     const user = userEvent.setup()
     const onChange = vi.fn<(value: string) => void>()
     render(<Picker onChange={onChange} errors={[]} />)
-    await user.click(screen.getByRole("radio", { name: "Garden structure" }))
+    await user.click(screen.getByRole("radio", { name: /^Garden structure/ }))
     expect(onChange).toHaveBeenLastCalledWith("type-1")
     await user.keyboard("{ArrowDown}")
     expect(onChange).toHaveBeenLastCalledWith("type-2")
-    await user.click(screen.getByRole("radio", { name: "Something else" }))
+    await user.click(screen.getByRole("radio", { name: /^Something else/ }))
     expect(onChange).toHaveBeenLastCalledWith(somethingElse)
   })
 

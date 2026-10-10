@@ -1,12 +1,14 @@
 import type * as T from "@/schema/types"
 import { type CheckAgreement, checkAgreement, type KeyTranslation, type Side } from "./checkAgreement"
-import { type EncodingJudgeAnswer, type JudgeGroup, judgeScores, type RulePair } from "./judge"
+import { type AgentPairs, pairRules, type RulePair } from "./pairs"
 import { compareProvisions, coverageScores } from "./provisions"
 import { type RunDraft, type RunInfo, runDocuments, runProvisions, validityScores } from "./run"
-import { alignTerms, isCoreKey, type TermMatch, type TermPair, termKeysIn, termRecall } from "./terms"
+import { alignTerms, isCoreKey, type TermMatch, termKeysIn, termRecall } from "./terms"
 
-// Evaluation round 1's scores for one run against the golden encoding, and the bars each must clear
-// (implementation-plan.md, Evaluation round 1).
+// Evaluation round 1's scores that code computes for one run against the golden encoding, and the bars each must clear
+// (implementation-plan.md, Evaluation round 1). Rule recall, rule precision and pairwise quality are judged by the
+// coding agent from the run's comparison files (compare.ts), not here; the pairs it records in pairs.json feed the
+// modality, check agreement and term recall scores.
 
 export type Bar = { name: string; label: string; min?: number; max?: number }
 
@@ -15,12 +17,9 @@ export const bars = [
   { name: "provision-text", label: "Provision text similarity", min: 0.97 },
   { name: "coverage", label: "Coverage: every provision cited or given a reason", min: 1 },
   { name: "no-rule-reasons", label: "No-rule reasons agreeing with the golden", min: 0.85 },
-  { name: "rule-recall", label: "Rule recall (judge pairs a pipeline rule)", min: 0.9 },
-  { name: "rule-precision", label: "Rule precision (judge finds it faithful)", min: 0.9 },
   { name: "modality", label: "Modality agreement on paired rules", min: 0.95 },
   { name: "check-agreement", label: "Check agreement on paired rules (engine)", min: 0.85 },
   { name: "term-recall", label: "Term recall", min: 0.85 },
-  { name: "pairwise", label: "Pairwise quality: better or equal", min: 0.8 },
   { name: "units-valid", label: "Units Zod-valid after repair", min: 1 },
   { name: "units-repaired", label: "Units needing repair", max: 0.15 }
 ] as const satisfies readonly Bar[]
@@ -49,9 +48,8 @@ export type ScoreInput = {
   report: RunInfo["report"]
   /** Whether a provision key belongs to the run's split. */
   inSplit: (key: T.ProvisionKey) => boolean
-  judged: readonly { group: JudgeGroup; answer: EncodingJudgeAnswer }[]
-  /** The term judge's pairs (termJudge.ts). */
-  termPairs: readonly TermPair[]
+  /** The coding agent's pairs from the run folder's pairs.json (pairs.ts); none before it has judged. */
+  pairs: AgentPairs
 }
 
 const mainCitation = (rule: T.Rule) => rule.citations[0]?.provisionKey ?? ""
@@ -76,28 +74,28 @@ export function splitTermKeys(golden: T.RulesFile, inSplit: (key: T.ProvisionKey
 }
 
 /** Every score of a run, the measures against their bars, and the details behind each miss. */
-export function scoreRun({ golden, draft, report, inSplit, judged, termPairs }: ScoreInput) {
+export function scoreRun({ golden, draft, report, inSplit, pairs }: ScoreInput) {
   const goldenProvisions = golden.provisions.filter((provision) => inSplit(provision.key))
   const ourProvisions = runProvisions(draft).filter((provision) => inSplit(provision.key))
   const structure = compareProvisions(goldenProvisions, ourProvisions)
   const coverage = coverageScores(goldenProvisions, ourProvisions, draft.coverage)
-  const judge = judgeScores(judged)
+  const rules = pairRules(splitRules(golden, inSplit), draft.rules, pairs.rules)
 
   const goldenTerms = goldenTermsOf(golden)
-  const matches = alignTerms(goldenTerms, draft.terms, termPairs)
+  const matches = alignTerms(goldenTerms, draft.terms, pairs.terms)
   const termKeys = [...splitTermKeys(golden, inSplit)].toSorted()
   const terms = {
     ...termRecall(termKeys, matches),
-    byJudge: termKeys.filter((key) => matches.get(key)?.by === "judge").length
+    byAgent: termKeys.filter((key) => matches.get(key)?.by === "agent").length
   }
 
-  const modalityMisses = judge.pairs.filter((pair) => modalityOf(pair.reference) !== modalityOf(pair.pipeline))
+  const modalityMisses = rules.pairs.filter((pair) => modalityOf(pair.reference) !== modalityOf(pair.pipeline))
   const keys = keyTranslation(matches)
   const sides = (pair: RulePair): { reference: Side; pipeline: Side } => ({
     reference: { rule: pair.reference, terms: goldenTerms, documents: golden.documents },
     pipeline: { rule: pair.pipeline, terms: draft.terms, documents: runDocuments(draft) }
   })
-  const checks = judge.pairs
+  const checks = rules.pairs
     .map((pair) => checkAgreement({ ...sides(pair), keys, settings: golden.settings }))
     .filter((result): result is CheckAgreement => result !== null)
   // Only pairs whose reads translate both ways compare checks; the others compare vocabularies (checkAgreement.ts).
@@ -113,12 +111,9 @@ export function scoreRun({ golden, draft, report, inSplit, judged, termPairs }: 
     "provision-text": structure.similarity,
     coverage: coverage.coverage,
     "no-rule-reasons": coverage.reasonAgreement,
-    "rule-recall": judge.recall,
-    "rule-precision": judge.precision,
-    modality: judge.pairs.length === 0 ? 1 : (judge.pairs.length - modalityMisses.length) / judge.pairs.length,
+    modality: rules.pairs.length === 0 ? 1 : (rules.pairs.length - modalityMisses.length) / rules.pairs.length,
     "check-agreement": checkShare,
     "term-recall": terms.recall,
-    pairwise: judge.pairwise,
     "units-valid": validity.validAfterRepair,
     "units-repaired": validity.repaired
   }
@@ -132,7 +127,12 @@ export function scoreRun({ golden, draft, report, inSplit, judged, termPairs }: 
     details: {
       structure: { missing: structure.missing, extra: structure.extra, matched: structure.matched.length },
       coverage,
-      judge,
+      rules: {
+        pairs: rules.pairs.map((pair) => ({ reference: pair.reference.key, pipeline: pair.pipeline.key, by: pair.by })),
+        unpairedReference: rules.unpairedReference,
+        unpairedPipeline: rules.unpairedPipeline,
+        counts: { reference: rules.pairs.length + rules.unpairedReference.length, pipeline: draft.rules.length }
+      },
       modalityMisses: modalityMisses.map((pair) => ({
         reference: pair.reference.key,
         pipeline: pair.pipeline.key,

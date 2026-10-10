@@ -1,7 +1,7 @@
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
-import type { ProjectTypeDefinition } from "@/projectTypes/projectType"
+import type { ProjectTypeDefinition, ProjectTypeStatus } from "@/projectTypes/projectType"
 import type { ProjectTypeSuggestion } from "@/projectTypes/suggest"
 import type { ProjectTypesOverview } from "../projectTypes.functions"
 import { ProjectTypesPage, type NewProjectType, type ProjectTypesPageProps } from "./ProjectTypesPage"
@@ -15,10 +15,34 @@ const definition: ProjectTypeDefinition = {
       itemLabel: "Structure",
       help: null,
       isRepeatable: true,
-      fields: [{ kind: "yes-no", property: "structure.roofed", label: "Roofed", help: null, isRequired: false }]
+      fields: [
+        {
+          kind: "yes-no",
+          property: "structure.roofed",
+          binding: "structure.roofed",
+          label: "Roofed",
+          help: null,
+          isRequired: false,
+          example: null,
+          answeredBy: "applicant",
+          citations: []
+        }
+      ]
     }
   ],
-  documents: [{ documentType: "site-plan", label: "Site plan", mustShow: [], ruleKeys: ["r1"], isRequired: true }]
+  documents: [
+    {
+      documentType: "site-plan",
+      label: "Site plan",
+      mustShow: [],
+      ruleKeys: ["r1"],
+      isRequired: true,
+      citations: [],
+      accepts: null
+    }
+  ],
+  formDocuments: [],
+  unasked: []
 }
 
 const overview: ProjectTypesOverview = {
@@ -56,6 +80,8 @@ function setup(overrides: Partial<ProjectTypesPageProps> = {}) {
     onCreate: vi.fn<(input: NewProjectType) => Promise<void>>(async () => undefined),
     onSuggest: vi.fn<() => Promise<ProjectTypeSuggestion[]>>(async () => [suggestion]),
     onOpen: vi.fn<(id: string) => void>(),
+    onSetStatus: vi.fn<(id: string, status: ProjectTypeStatus) => Promise<void>>(async () => undefined),
+    onDelete: vi.fn<(id: string) => Promise<void>>(async () => undefined),
     ...overrides
   }
   render(<ProjectTypesPage {...props} />)
@@ -65,10 +91,58 @@ function setup(overrides: Partial<ProjectTypesPageProps> = {}) {
 describe("ProjectTypesPage", () => {
   it("lists the organization's project types with what each asks, and opens one", async () => {
     const { props, user } = setup()
-    expect(screen.getByText("Garden structure")).toBeInTheDocument()
     expect(screen.getByText("1 question and 1 document")).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Open Garden structure" }))
+    await user.click(screen.getByRole("button", { name: "Garden structure" }))
     expect(props.onOpen).toHaveBeenCalledWith("type-1")
+  })
+
+  it("opens, archives and deletes a type from its menu, with the keyboard", async () => {
+    const { props, user } = setup()
+    const open = async (item: string) => {
+      screen.getByRole("button", { name: "Actions for Garden structure" }).focus()
+      await user.keyboard("{Enter}")
+      const found = await screen.findByRole("menuitem", { name: item })
+      found.focus()
+      await user.keyboard("{Enter}")
+    }
+    await open("Open")
+    expect(props.onOpen).toHaveBeenCalledWith("type-1")
+    await open("Archive")
+    await waitFor(() => expect(props.onSetStatus).toHaveBeenCalledWith("type-1", "archived"))
+    await open("Delete")
+    const dialog = await screen.findByRole("alertdialog", { name: "Delete Garden structure?" })
+    expect(props.onDelete).not.toHaveBeenCalled()
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }))
+    expect(props.onDelete).toHaveBeenCalledWith("type-1")
+  })
+
+  it("keeps an archived type that applications use, saying so, and offers to unarchive it", async () => {
+    const [type] = overview.projectTypes
+    const { props, user } = setup({
+      overview: { ...overview, projectTypes: [{ ...type!, status: "archived", applicationCount: 1 }] }
+    })
+    expect(screen.getByText("Archived")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Actions for Garden structure" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }))
+    const dialog = await screen.findByRole("alertdialog", { name: "Garden structure can't be deleted" })
+    expect(dialog).toHaveTextContent("1 application uses it, so it stays. It's already archived")
+    await user.click(within(dialog).getByRole("button", { name: "Close" }))
+    await user.click(screen.getByRole("button", { name: "Actions for Garden structure" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Unarchive" }))
+    await waitFor(() => expect(props.onSetStatus).toHaveBeenCalledWith("type-1", "active"))
+    expect(props.onDelete).not.toHaveBeenCalled()
+  })
+
+  it("says why an action didn't work", async () => {
+    const { user } = setup({
+      onDelete: vi.fn<(id: string) => Promise<void>>(async () => {
+        throw new Error("Only an administrator can do this.")
+      })
+    })
+    await user.click(screen.getByRole("button", { name: "Actions for Garden structure" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Delete" }))
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete" }))
+    expect(await screen.findByText("Only an administrator can do this.")).toBeInTheDocument()
   })
 
   it("adds a project type by hand from the keyboard, with what it covers", async () => {

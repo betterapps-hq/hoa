@@ -1,11 +1,11 @@
-import type { Search, SearchSetup } from "@/lib/search"
+import type { SearchSetup } from "@/lib/search"
 import { isBlocking } from "@/rulebook/review"
 import type * as T from "@/schema/types"
 import type { RulebookIssue } from "@/schema/validate"
 import { citationLabel } from "../rulebookRecords"
 
-// Filtering the rules list (encoding.md, UX, Rules): by review status, kind, domain and request type in the documents'
-// order, and by words, best match first.
+// Filtering the rules table (encoding.md, UX, Rules): by review status, kind, domain and request type, in the documents'
+// order. The table's search finds words among them, best match first.
 
 export type StatusFilter = T.Review["status"] | "all" | "problems"
 
@@ -35,12 +35,9 @@ export const ruleSearchSetup = (statementOf: (rule: T.Rule) => string): SearchSe
   }
 })
 
-export function filterRules(
-  rules: T.Rule[],
-  filters: RuleFilters,
-  { search, issues }: { search: Search<T.Rule>; issues: Map<string, RulebookIssue[]> }
-) {
-  const matches = rules
+/** The rules the filters beside the words keep, in the documents' order. */
+export function filterRules(rules: T.Rule[], filters: RuleFilters, issues: Map<string, RulebookIssue[]>) {
+  return rules
     .filter(
       (rule) =>
         (filters.domain === "all" || rule.domain === filters.domain) &&
@@ -52,7 +49,6 @@ export function filterRules(
             : rule.review.status === filters.status))
     )
     .toSorted((a, b) => a.key.localeCompare(b.key, "en", { numeric: true }))
-  return search.rank(matches, filters.query)
 }
 
 /** Every request type the rules run in. */

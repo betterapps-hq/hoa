@@ -7,9 +7,9 @@ import {
   PopoverTitle,
   PopoverTrigger
 } from "@/components/ui/popover"
+import { sentenceCase } from "@/lib/text"
 import { workType } from "@/review/subjects"
 import type { EvaluationRequest } from "@/schema/types"
-import { sentenceCase } from "../applicationDisplay"
 import { EvidenceList } from "../EvidenceList/EvidenceList"
 import { rootEntityIds, type ReviewContext } from "../reviewContext"
 
@@ -33,11 +33,11 @@ export function EntityHeader({ entity, context }: EntityHeaderProps) {
           />
         }
       >
-        {entity.label}
+        {sentenceCase(entity.label)}
       </PopoverTrigger>
       <PopoverContent className="w-80 max-w-[calc(100vw-2rem)]">
         <PopoverHeader>
-          <PopoverTitle>{entity.label}</PopoverTitle>
+          <PopoverTitle>{sentenceCase(entity.label)}</PopoverTitle>
           <PopoverDescription>{type}</PopoverDescription>
         </PopoverHeader>
         {evidence.length > 0 ? (

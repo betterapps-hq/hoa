@@ -161,7 +161,9 @@ export function checkSuggestions(
       documents: built.documents.map((document) => ({
         ...document,
         label: labels.get(document.documentType) || document.label
-      }))
+      })),
+      formDocuments: built.formDocuments,
+      unasked: []
     }
     if (definition.groups.length === 0 && definition.documents.length === 0) {
       return []

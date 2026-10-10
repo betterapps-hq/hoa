@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest"
 import { fenceRequest, fenceRulesFile } from "@/tests/fenceSchemaFixture"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
-import { documentAnswers, documentRequirements, documentResults, documentsAnswerSchema } from "./documents"
+import {
+  documentAnswers,
+  documentRequirements,
+  documentResults,
+  documentsAnswerSchema,
+  isGivenByForm,
+  withFormDocuments
+} from "./documents"
 import { documentTypes, rulebookVocabulary } from "./documentTypes"
 
 const rulesFile = fenceRulesFile()
@@ -79,5 +86,38 @@ describe("document requirements and results", () => {
     })
     const [result] = documentResults(planned, answer, new Set())
     expect(result?.statements.slice(0, 3).map((statement) => statement.confirmed)).toEqual([true, true, null])
+  })
+
+  it("takes what the application form gave as present, citing its answers, and leaves signatures to the uploads", () => {
+    const formKeys = [
+      "guidelines:3.1.5#application-form",
+      "guidelines:3.1.5#owner-signatures",
+      "guidelines:3.1.5#project-description"
+    ]
+    const formRules = rulesFile.rules.filter((rule) => formKeys.includes(rule.key))
+    const listed = documentRequirements(formRules, request.entities, rulebookVocabulary(rulesFile))
+    expect(listed.map((requirement) => [requirement.ruleKey, requirement.formKind])).toEqual([
+      ["guidelines:3.1.5#application-form", "application-form"],
+      ["guidelines:3.1.5#owner-signatures", null],
+      ["guidelines:3.1.5#project-description", "project-description"]
+    ])
+    const form = { hasAnswers: true, description: "Replace the back fence." }
+    const toRead = listed.filter((requirement) => !isGivenByForm(requirement, form))
+    expect(toRead.map((requirement) => requirement.ruleKey)).toEqual(["guidelines:3.1.5#owner-signatures"])
+    const read = documentResults(
+      toRead,
+      documentsAnswerSchema(toRead).parse({ documents: [] }),
+      new Set(["owner-1", "owner-2"])
+    )
+    const results = withFormDocuments(listed, read, form)
+    expect(results.map((result) => [result.ruleKey, result.present])).toEqual([
+      ["guidelines:3.1.5#application-form", true],
+      ["guidelines:3.1.5#owner-signatures", false],
+      ["guidelines:3.1.5#project-description", true]
+    ])
+    expect(results[0]?.evidence).toEqual([{ fileId: "form-answers", page: 1, quote: null, region: null }])
+    // Without the form's answers or a description, the reader decides from the uploads.
+    const empty = { hasAnswers: false, description: "  " }
+    expect(listed.filter((requirement) => isGivenByForm(requirement, empty))).toEqual([])
   })
 })

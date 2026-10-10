@@ -49,8 +49,7 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
   customers.
 - Rule extraction and consolidation run on `anthropic/claude-opus-5.5`, the review's document review and the project
   type suggestions on `anthropic/claude-sonnet-5.5` and the review's other stages on `anthropic/claude-haiku-5.5`, through their prompts'
-  `config.model`, as do the evaluation judges; a stage whose prompt names no model uses `OPENROUTER_MODEL` or
-  `OPENROUTER_SMALL_MODEL`.
+  `config.model`; a stage whose prompt names no model uses `OPENROUTER_MODEL` or `OPENROUTER_SMALL_MODEL`.
 - A prompt whose contract changes (new variables or output) gets a new name, so two contracts never share a label.
 
 ## Tracing and cost
@@ -78,6 +77,12 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
 
 Every model stage has a Langfuse dataset and runs an experiment when its prompt or model changes; the datasets, scores
 and production evaluators are listed in [design/evaluation.md](design/evaluation.md).
+
+Evaluation scores are code wherever code can compute them (exact matches, structural comparisons, coverage, counts, the
+engine's outcomes). Semantic judging of evaluation results, such as whether two rules state the same requirement or
+whether the writer's feedback is faithful, is done by the coding agent in its own session, reading the comparison files
+the evaluation scripts write ([design/evaluation.md](design/evaluation.md#judging-by-the-coding-agent)). There are no
+judge prompts and no judge calls through the app's OpenRouter key.
 
 When a feature needs a production evaluator:
 

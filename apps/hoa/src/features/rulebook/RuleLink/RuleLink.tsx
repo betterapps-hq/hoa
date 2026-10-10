@@ -1,3 +1,4 @@
+import { sentenceCase } from "@/lib/text"
 import type * as T from "@/schema/types"
 import { referencedRule } from "../rulebookRecords"
 import { RuleReference } from "../RuleReference/RuleReference"
@@ -22,7 +23,7 @@ export function RuleLink({ ruleKey }: RuleLinkProps) {
           className="min-w-0 rounded-sm text-left font-medium text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           onClick={() => openRule(rule.key)}
         >
-          {rule.title}
+          {sentenceCase(rule.title)}
         </button>
       }
     />

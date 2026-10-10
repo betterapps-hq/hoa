@@ -60,7 +60,7 @@ describe("ReviewMatrix", () => {
       "Fence application"
     ])
     const row = rowOf(colors)
-    expect(within(row).getByRole("button", { name: "Guidelines 5.4.2(i)" })).toBeInTheDocument()
+    expect(within(row).getByRole("link", { name: "Guidelines 5.4.2(i)" })).toBeInTheDocument()
     expect(within(row).getByRole("button", { name: `${colors}, Left side run: Not met` })).toBeInTheDocument()
     expect(within(row).getAllByText("Doesn't apply")).toHaveLength(3)
     expect(screen.getByRole("rowheader", { name: "Guidelines 5.4.2(iii)" })).toBeInTheDocument()

@@ -123,9 +123,9 @@ export function DocumentViewer({
         // The page scrolls with the keyboard too.
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
-        className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-muted/40 p-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:p-4"
+        className="min-h-0 flex-1 overflow-y-auto rounded-md border-t focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
       >
-        <div className="mx-auto min-h-full max-w-prose rounded-md border bg-background px-4 py-5 shadow-xs sm:px-8 sm:py-8">
+        <div className="min-h-full px-2 py-4">
           {isPending ? (
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <Spinner /> Loading the page
@@ -137,7 +137,7 @@ export function DocumentViewer({
             // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
             <div
               className={cn(
-                "document-page text-sm leading-relaxed break-words",
+                "document-page text-[0.9375rem] leading-7 break-words",
                 isChoosable && "[&_mark[data-highlight]]:cursor-pointer"
               )}
               onClick={(event) => {

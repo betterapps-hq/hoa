@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
+import { toast } from "sonner"
 import { ProjectTypePage } from "@/features/projectTypes/ProjectTypePage/ProjectTypePage"
 import {
   deleteProjectType,
   getProjectTypeView,
+  listCitableProvisions,
   refreshProjectType,
   setProjectTypeStatus,
   updateProjectType
@@ -25,7 +27,10 @@ function ProjectTypeRoute() {
       view={view}
       onSave={async (changes) => {
         await updateProjectType({ data: { id, ...changes } })
-        await router.invalidate()
+        // The editor keeps the questions as edited; only a new name or description needs the page reloaded.
+        if (changes.label !== view.projectType.label || changes.description !== (view.projectType.description ?? "")) {
+          await router.invalidate()
+        }
       }}
       onRefresh={async () => {
         await refreshProjectType({ data: { id } })
@@ -37,8 +42,10 @@ function ProjectTypeRoute() {
       }}
       onDelete={async () => {
         await deleteProjectType({ data: { id } })
+        toast(`Deleted ${view.projectType.label}`)
         await navigate({ to: "/project-types" })
       }}
+      loadProvisions={() => listCitableProvisions()}
     />
   )
 }

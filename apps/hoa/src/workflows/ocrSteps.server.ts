@@ -6,9 +6,10 @@ import { runObjectPrompt, type ModelFactory } from "@/ai/runPrompt"
 import { buildPages, computeDocumentLayout, mergeWordPages } from "@/ocr/buildPages"
 import { analyzeResultOf, layoutEngine, LayoutError, type LayoutClient } from "@/ocr/layoutClient"
 import { layoutResultSchema } from "@/ocr/layoutResult"
-import { pageSchema, type Page } from "@/ocr/page"
+import { pageSchema } from "@/ocr/page"
 import { visualDescriptionSchema, type StoredVisual } from "@/ocr/visualDescription"
 import { createObjectPromptCache, getJson, putJson, toBase64, toHex } from "@/storage/objects"
+import { loadPages } from "@/storage/pages"
 import type { Presigner } from "@/storage/presign"
 
 // The OCR steps shared by DocumentIngest and ApplicationReview (docs/design/ocr.md, "Flow"). Step names start with the
@@ -172,13 +173,6 @@ export async function runOcr(step: WorkflowStep, dependencies: OcrDependencies, 
   await dependencies.progress("visuals", 0, file.mediaType.startsWith("image/") ? 1 : figures.length)
   const figureFailures = await describeVisuals(step, dependencies, file, figures)
   return { sha256, pageCount, figureFailures }
-}
-
-export async function loadPages(bucket: R2Bucket, keys: Pick<OcrKeys, "page">, pageCount: number): Promise<Page[]> {
-  const pages = await Promise.all(
-    Array.from({ length: pageCount }, (_, index) => getJson(bucket, keys.page(index + 1), pageSchema))
-  )
-  return pages.filter((page): page is Page => page !== null)
 }
 
 async function describeImage(

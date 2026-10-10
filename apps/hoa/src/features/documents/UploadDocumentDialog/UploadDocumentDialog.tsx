@@ -2,6 +2,7 @@ import { useForm } from "@tanstack/react-form"
 import { useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
+import { FileDropzone } from "@/components/FileDropzone/FileDropzone"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -16,7 +17,7 @@ import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { governingDocumentKinds, type GoverningDocument } from "@/documents/governingDocument"
-import { acceptFor, validateUpload } from "@/storage/uploadRules"
+import { validateUpload } from "@/storage/uploadRules"
 import { documentKindLabels } from "../documentKinds"
 import type { DocumentDetails } from "../uploadDocument"
 
@@ -192,14 +193,16 @@ export function UploadDocumentDialog({ isOpen, onOpenChange, of, onUpload, onUpl
               {(field) => (
                 <Field data-invalid={field.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="upload-file">File</FieldLabel>
-                  <Input
+                  <FileDropzone
                     id="upload-file"
-                    type="file"
-                    accept={acceptFor.governing}
-                    onChange={(event) => field.handleChange(event.target.files?.[0] ?? null)}
-                    aria-invalid={field.state.meta.errors.length > 0}
+                    target="governing"
+                    multiple={false}
+                    value={field.state.value ? [{ file: field.state.value, kind: "" }] : []}
+                    onChange={(files) => field.handleChange(files[0]?.file ?? null)}
+                    isInvalid={field.state.meta.errors.length > 0}
+                    describedBy="upload-file-pages"
                   />
-                  <FieldDescription>PDF or Word, up to 50 MB and 300 pages.</FieldDescription>
+                  <FieldDescription id="upload-file-pages">Up to 300 pages.</FieldDescription>
                   <FieldError errors={field.state.meta.errors} />
                 </Field>
               )}

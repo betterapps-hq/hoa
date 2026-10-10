@@ -1,12 +1,14 @@
 import { useMediaQuery } from "@mantine/hooks"
-import { useState, type ReactNode } from "react"
+import { useState } from "react"
+import { DataTable } from "@/components/DataTable/DataTable"
+import { dataTableColumns } from "@/components/DataTable/DataTable.utils"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldLabel } from "@/components/ui/field"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { sentenceCase } from "@/lib/text"
 import type { Finding, Outcome } from "@/schema/types"
-import { cellLabels, findingLabels, outcomeOrder, sentenceCase } from "../applicationDisplay"
+import { cellLabels, findingLabels, outcomeOrder } from "../applicationDisplay"
 import { EntityHeader } from "../EntityHeader/EntityHeader"
 import { OutcomeChip } from "../OutcomeChip/OutcomeChip"
 import { entityLabel, type ReviewContext } from "../reviewContext"
@@ -17,6 +19,7 @@ import {
   outcomeCounts,
   reviewMatrix,
   type MatrixGroup,
+  type MatrixRow,
   type ReviewMatrixModel
 } from "./ReviewMatrix.utils"
 
@@ -111,27 +114,6 @@ export function ReviewMatrix({ context, onOpen }: ReviewMatrixProps) {
   )
 }
 
-type RuleGroupProps = { title: string; columnCount: number; children: ReactNode }
-
-/** A provision's rules under its label. */
-function RuleGroup({ title, columnCount, children }: RuleGroupProps) {
-  return (
-    <>
-      <TableRow className="hover:bg-transparent">
-        <TableHead
-          scope="rowgroup"
-          colSpan={columnCount + 1}
-          className="border-b bg-muted/50 text-xs font-semibold text-muted-foreground"
-        >
-          {/* The cell spans every column, so its label is what stays in view while the columns scroll. */}
-          <span className="sticky left-2 inline-block">{title}</span>
-        </TableHead>
-      </TableRow>
-      {children}
-    </>
-  )
-}
-
 type LayoutProps = {
   model: ReviewMatrixModel
   groups: MatrixGroup[]
@@ -153,7 +135,15 @@ function MatrixCards({ model, groups, context, onOpen }: LayoutProps) {
             <ul className="flex flex-col divide-y">
               {findings.map((finding) => (
                 <li key={finding.ruleKey} className="flex items-start justify-between gap-2 py-2 text-sm">
-                  <ReviewRuleReference ruleKey={finding.ruleKey} context={context} />
+                  <ReviewRuleReference
+                    ruleKey={finding.ruleKey}
+                    context={context}
+                    title={
+                      <span className="font-medium">
+                        {sentenceCase(context.rules.get(finding.ruleKey)?.title ?? finding.ruleKey)}
+                      </span>
+                    }
+                  />
                   <CellButton finding={finding} context={context} onOpen={onOpen} />
                 </li>
               ))}
@@ -170,49 +160,65 @@ function MatrixCards({ model, groups, context, onOpen }: LayoutProps) {
   )
 }
 
-/** The rule column stays put while the entity columns scroll. */
+/** A matrix row with the provision group it sits under. */
+type GroupedRow = MatrixRow & { group: MatrixGroup }
+
+/** The rule column stays put while the entity columns scroll; each provision's rules sit under its label. */
 function MatrixTable({ model, groups, context, onOpen }: LayoutProps) {
   return (
-    <Table className="border-separate border-spacing-0">
-      <caption className="sr-only">Rules against each part of the project</caption>
-      <TableHeader>
-        <TableRow className="hover:bg-transparent">
-          <TableHead className="sticky left-0 z-10 min-w-48 border-b bg-background sm:min-w-64">Rule</TableHead>
-          {model.columns.map((entity) => (
-            <TableHead key={entity.id} className="max-w-44 border-b align-bottom whitespace-normal">
-              <EntityHeader entity={entity} context={context} />
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {groups.map((group) => (
-          <RuleGroup key={group.provisionKey ?? "other"} title={group.title} columnCount={model.columns.length}>
-            {group.rows.map((row) => (
-              <TableRow key={row.ruleKey}>
-                <TableHead
-                  scope="row"
-                  className="sticky left-0 z-10 h-auto max-w-72 border-b bg-background py-2 align-top font-normal whitespace-normal"
-                >
-                  <ReviewRuleReference ruleKey={row.ruleKey} context={context} />
-                </TableHead>
-                {row.cells.map((cell) => (
-                  <TableCell key={cell.entity} className="border-b">
-                    {cell.finding ? (
-                      <CellButton finding={cell.finding} context={context} onOpen={onOpen} />
-                    ) : (
-                      <span className="px-1 text-xs text-muted-foreground">
-                        <span aria-hidden>n/a</span>
-                        <span className="sr-only">{findingLabels["not-applicable"]}</span>
-                      </span>
-                    )}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </RuleGroup>
-        ))}
-      </TableBody>
-    </Table>
+    <DataTable
+      data={groups.flatMap((group) => group.rows.map((row) => ({ ...row, group })))}
+      columns={matrixColumns({ model, context, onOpen })}
+      getRowId={(row) => row.ruleKey}
+      label="Rules against each part of the project"
+      noun="rules"
+      pageSize={null}
+      empty="Nothing matches."
+      groupOf={(row) => ({ key: row.group.provisionKey ?? "other", title: row.group.title })}
+    />
   )
+}
+
+const column = dataTableColumns<GroupedRow>()
+
+/** The rule, then a column per entity whose cells open their findings; nothing sorts, since the groups are the order. */
+function matrixColumns({ model, context, onOpen }: Omit<LayoutProps, "groups">) {
+  return column.columns([
+    column.accessor("title", {
+      id: "rule",
+      header: "Rule",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <ReviewRuleReference
+          ruleKey={row.original.ruleKey}
+          context={context}
+          title={<span className="font-medium">{sentenceCase(row.original.title)}</span>}
+        />
+      ),
+      meta: {
+        isRowHeader: true,
+        headerClassName: "sticky left-0 z-10 min-w-48 bg-background sm:min-w-64",
+        cellClassName: "sticky left-0 z-10 max-w-72 bg-background py-2"
+      }
+    }),
+    ...model.columns.map((entity, index) =>
+      column.display({
+        id: `entity:${entity.id}`,
+        header: () => <EntityHeader entity={entity} context={context} />,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const finding = row.original.cells[index]?.finding
+          return finding ? (
+            <CellButton finding={finding} context={context} onOpen={onOpen} />
+          ) : (
+            <span className="px-1 text-xs text-muted-foreground">
+              <span aria-hidden>n/a</span>
+              <span className="sr-only">{findingLabels["not-applicable"]}</span>
+            </span>
+          )
+        },
+        meta: { headerClassName: "max-w-44 align-bottom whitespace-normal", cellClassName: "py-2" }
+      })
+    )
+  ])
 }

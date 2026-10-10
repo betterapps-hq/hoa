@@ -93,6 +93,13 @@ const unit = (key: string, dimension: Dimension, perBase: string | null, ...name
   ...bookkeeping
 })
 
+/**
+ * The documents the portal's own application form provides: the form itself (its answers) and the project's
+ * description. An organization's document kind is one of them when it refines it: the same key, or a category of it.
+ */
+export const formDocumentKinds = ["application-form", "project-description"] as const
+export type FormDocumentKind = (typeof formDocumentKinds)[number]
+
 const date: ValueType = { type: "date" }
 const count: ValueType = { type: "count" }
 const choice = (set: string): ValueType => ({ type: "choice", set })
@@ -185,6 +192,8 @@ export const coreTerms: Term[] = [
   property("approval.on", date, "decided on"),
   property("approval.written", { type: "boolean" }, "in writing"),
   thing("work", "object", "work"),
+  thing("application-form", "document", "application form"),
+  thing("project-description", "document", "project description"),
   unit("inch", "length", "1", "in", "inch", "inches", '"', "″"),
   unit("foot", "length", "12", "ft", "feet", "foot", "'", "′"),
   unit("usd", "money", "1", "$", "dollars", "USD"),

@@ -1,21 +1,13 @@
+import { useWindowEvent } from "@mantine/hooks"
 import { useForm } from "@tanstack/react-form"
 import { Link } from "@tanstack/react-router"
-import { ArrowLeftIcon, XIcon } from "lucide-react"
-import { useState } from "react"
+import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, CircleCheckIcon } from "lucide-react"
+import { useRef, useState } from "react"
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   Dialog,
   DialogContent,
@@ -26,17 +18,20 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
-import { projectTypeDetails, type ProjectField, type ProjectTypeDefinition } from "@/projectTypes/projectType"
+import { CitationsOpenInSheet } from "@/features/documents/ReaderSheet/ReaderSheet"
+import { projectTypeDetails, type ProjectTypeDefinition, type ProjectTypeStatus } from "@/projectTypes/projectType"
+import type { CitedProvision } from "../../rulebook/citedProvision"
 import { RuleReference } from "../../rulebook/RuleReference/RuleReference"
+import { DocumentsCard } from "../DocumentsCard/DocumentsCard"
+import { ProjectTypeMenu } from "../ProjectTypeMenu/ProjectTypeMenu"
 import type { ProjectTypeView } from "../projectTypes.functions"
+import { QuestionsCard, type DefinitionUpdate } from "../QuestionsCard/QuestionsCard"
 
-// One project type (application-review.md, Project types): its name and description, the questions its form asks
-// (remove one, make it required, add one back), the documents the rules require, every requirement the rulebook
-// places on this kind of project, and retiring or deleting it.
+// One project type (application-review.md, Project types): its name and description, the questions its form asks and
+// the documents it lists, edited in place and saved as they change, every requirement the rulebook places on this kind
+// of project, and archiving or deleting it.
 
 export type ProjectTypeChanges = { label: string; description: string; definition: ProjectTypeDefinition }
 
@@ -44,30 +39,91 @@ export type ProjectTypePageProps = {
   view: ProjectTypeView
   onSave: (changes: ProjectTypeChanges) => Promise<void>
   onRefresh: () => Promise<void>
-  onSetStatus: (status: "active" | "retired") => Promise<void>
+  onSetStatus: (status: ProjectTypeStatus) => Promise<void>
   onDelete: () => Promise<void>
-}
-
-const kindText = (field: ProjectField) => {
-  switch (field.kind) {
-    case "number":
-      return field.unit ? `A number in ${field.unit.label}` : "A number"
-    case "choice": {
-      const choices = field.options.length === 1 ? "One choice" : `One of ${field.options.length} choices`
-      return field.allowsOther ? `${choices}, or another` : choices
-    }
-    case "yes-no":
-      return "Yes or no"
-    case "date":
-      return "A date"
-    case "long-text":
-      return "A description"
-    default:
-      return "Text"
-  }
+  /** Every passage of the rulebook's documents, for linking one to a question. */
+  loadProvisions: () => Promise<CitedProvision[]>
 }
 
 const messageOf = (caught: unknown, fallback: string) => (caught instanceof Error ? caught.message : fallback)
+
+type SaveState = "idle" | "saving" | "saved" | "failed"
+
+/**
+ * The definition as the administrator edits it, saved after every change: one save at a time, then the latest
+ * change, so the stored form always ends as the screen shows it.
+ */
+function useAutosave(initial: ProjectTypeDefinition, save: (definition: ProjectTypeDefinition) => Promise<void>) {
+  const [definition, setDefinition] = useState(initial)
+  const [state, setState] = useState<SaveState>("idle")
+  const latest = useRef(initial)
+  const queue = useRef<{ pending: ProjectTypeDefinition | null; isRunning: boolean }>({
+    pending: null,
+    isRunning: false
+  })
+  const flush = async () => {
+    if (queue.current.isRunning) {
+      return
+    }
+    queue.current.isRunning = true
+    setState("saving")
+    try {
+      for (let next = queue.current.pending; next !== null; next = queue.current.pending) {
+        queue.current.pending = null
+        await save(next)
+      }
+      setState("saved")
+    } catch {
+      setState("failed")
+    } finally {
+      queue.current.isRunning = false
+    }
+  }
+  const update: DefinitionUpdate = (change) => {
+    const next = change(latest.current)
+    latest.current = next
+    setDefinition(next)
+    queue.current.pending = next
+    void flush()
+  }
+  const retry = () => {
+    queue.current.pending = latest.current
+    void flush()
+  }
+  useWindowEvent("beforeunload", (event) => {
+    if (state === "saving" || state === "failed") {
+      event.preventDefault()
+    }
+  })
+  return { definition, latest, state, update, retry }
+}
+
+function SaveStatus({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
+  return (
+    <output className="flex items-center gap-1.5 text-sm text-muted-foreground">
+      {state === "saving" ? (
+        <>
+          <Spinner className="size-3.5" />
+          Saving
+        </>
+      ) : null}
+      {state === "saved" ? (
+        <>
+          <CheckIcon className="size-3.5" aria-hidden />
+          Saved
+        </>
+      ) : null}
+      {state === "failed" ? (
+        <>
+          <span className="text-destructive">Not saved</span>
+          <Button variant="link" size="sm" className="h-auto p-0 text-link" onClick={onRetry}>
+            Try again
+          </Button>
+        </>
+      ) : null}
+    </output>
+  )
+}
 
 type DetailsDialogProps = {
   label: string
@@ -96,6 +152,7 @@ function DetailsDialog({ label, description, isOpen, onOpenChange, onSave }: Det
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <form
+          noValidate
           className="flex flex-col gap-6"
           onSubmit={(event) => {
             event.preventDefault()
@@ -133,7 +190,7 @@ function DetailsDialog({ label, description, isOpen, onOpenChange, onSave }: Det
                     onChange={(event) => field.handleChange(event.target.value)}
                     aria-invalid={field.state.meta.errors.length > 0}
                   />
-                  <FieldDescription>The review reads it as a hint about what the application is for.</FieldDescription>
+                  <FieldDescription>One sentence on what it covers. The review reads it too.</FieldDescription>
                   <FieldError errors={field.state.meta.errors} />
                 </Field>
               )}
@@ -156,170 +213,16 @@ function DetailsDialog({ label, description, isOpen, onOpenChange, onSave }: Det
   )
 }
 
-type QuestionsProps = {
-  definition: ProjectTypeDefinition
-  available: ProjectTypeDefinition
-  onSave: (definition: ProjectTypeDefinition) => Promise<void>
-}
+type EditorProps = ProjectTypePageProps & { onReset: () => void }
 
-/** The form's questions, editable as a draft and saved together. */
-function Questions({ definition, available, onSave }: QuestionsProps) {
-  const [draft, setDraft] = useState(definition)
-  const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const isChanged = JSON.stringify(draft) !== JSON.stringify(definition)
-  const groups = available.groups.map((group) => ({
-    available: group,
-    current: draft.groups.find((item) => item.subject === group.subject) ?? { ...group, fields: [] }
-  }))
-  const setFields = (subject: string, fields: ProjectField[]) => {
-    const others = draft.groups.filter((group) => group.subject !== subject)
-    const base = available.groups.find((group) => group.subject === subject)
-    const current = draft.groups.find((group) => group.subject === subject) ?? base
-    const next = current && fields.length > 0 ? [{ ...current, fields }] : []
-    // Keep the rules' group order.
-    const order = available.groups.map((group) => group.subject)
-    setDraft({
-      ...draft,
-      groups: [...others, ...next].toSorted((a, b) => order.indexOf(a.subject) - order.indexOf(b.subject))
-    })
-  }
-  const save = async () => {
-    setIsSaving(true)
-    setError(null)
-    try {
-      await onSave(draft)
-    } catch (caught) {
-      setError(messageOf(caught, "The questions weren't saved."))
-    } finally {
-      setIsSaving(false)
-    }
-  }
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Questions</CardTitle>
-        <CardDescription>
-          What the form asks the homeowner. Each answers a detail the rules test, so the review reads it as stated.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-6">
-        {groups.map(({ available: group, current }) => {
-          const missing = group.fields.filter(
-            (field) => !current.fields.some((item) => item.property === field.property)
-          )
-          return (
-            <section key={group.subject} className="flex flex-col gap-3" aria-labelledby={`group-${group.subject}`}>
-              <h3 id={`group-${group.subject}`} className="text-sm font-medium">
-                {group.label}
-                {group.isRepeatable ? (
-                  <span className="font-normal text-muted-foreground"> (homeowners can add several)</span>
-                ) : null}
-              </h3>
-              {current.fields.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No questions.</p>
-              ) : (
-                <ItemGroup className="gap-2">
-                  {current.fields.map((field) => {
-                    const requiredId = `required-${group.subject}-${field.property}`
-                    return (
-                      <Item key={field.property} variant="outline" size="sm">
-                        <ItemContent>
-                          <ItemTitle>{field.label}</ItemTitle>
-                          <ItemDescription>{kindText(field)}</ItemDescription>
-                        </ItemContent>
-                        <ItemActions>
-                          <Field orientation="horizontal" className="w-auto">
-                            <Checkbox
-                              id={requiredId}
-                              checked={field.isRequired}
-                              onCheckedChange={(checked) =>
-                                setFields(
-                                  group.subject,
-                                  current.fields.map((item) =>
-                                    item.property === field.property ? { ...item, isRequired: checked } : item
-                                  )
-                                )
-                              }
-                            />
-                            <FieldLabel htmlFor={requiredId} className="font-normal">
-                              Required
-                            </FieldLabel>
-                          </Field>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={`Remove ${field.label}`}
-                            onClick={() =>
-                              setFields(
-                                group.subject,
-                                current.fields.filter((item) => item.property !== field.property)
-                              )
-                            }
-                          >
-                            <XIcon />
-                          </Button>
-                        </ItemActions>
-                      </Item>
-                    )
-                  })}
-                </ItemGroup>
-              )}
-              {missing.length > 0 ? (
-                <Field className="max-w-sm">
-                  <FieldLabel htmlFor={`add-${group.subject}`} className="sr-only">
-                    Add a question about {group.label.toLowerCase()}
-                  </FieldLabel>
-                  <NativeSelect
-                    id={`add-${group.subject}`}
-                    size="sm"
-                    value=""
-                    onChange={(event) => {
-                      const field = missing.find((item) => item.property === event.target.value)
-                      if (field) {
-                        setFields(group.subject, [...current.fields, field])
-                      }
-                    }}
-                  >
-                    <NativeSelectOption value="">Add a question</NativeSelectOption>
-                    {missing.map((field) => (
-                      <NativeSelectOption key={field.property} value={field.property}>
-                        {field.label}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
-                </Field>
-              ) : null}
-            </section>
-          )
-        })}
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      </CardContent>
-      {isChanged ? (
-        <CardFooter className="gap-2">
-          <Button onClick={() => void save()} disabled={isSaving}>
-            {isSaving ? <Spinner /> : null}
-            Save questions
-          </Button>
-          <Button variant="ghost" onClick={() => setDraft(definition)} disabled={isSaving}>
-            Discard changes
-          </Button>
-        </CardFooter>
-      ) : null}
-    </Card>
-  )
-}
-
-/** A project type's page for the administrator. */
-export function ProjectTypePage({ view, onSave, onRefresh, onSetStatus, onDelete }: ProjectTypePageProps) {
+function ProjectTypeEditor({ view, onSave, onRefresh, onSetStatus, onDelete, loadProvisions, onReset }: EditorProps) {
   const { projectType, applicationCount, requirements, subjectLabels, isOutdated } = view
   const [isEditing, setIsEditing] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
   const [isBusy, setIsBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const isRetired = projectType.status === "retired"
-  const retireAction = isRetired ? "Offer again" : "Retire"
-  const statusAction = applicationCount > 0 ? retireAction : "Delete"
+  const details = { label: projectType.label, description: projectType.description ?? "" }
+  const editor = useAutosave(projectType.definition, (definition) => onSave({ ...details, definition }))
+  const rules = new Map(requirements.flatMap((group) => group.rules).map((rule) => [rule.key, rule]))
   const act = async (action: () => Promise<void>, fallback: string) => {
     setIsBusy(true)
     setError(null)
@@ -331,7 +234,7 @@ export function ProjectTypePage({ view, onSave, onRefresh, onSetStatus, onDelete
       setIsBusy(false)
     }
   }
-  const details = { label: projectType.label, description: projectType.description ?? "" }
+  const ruleCount = requirements.reduce((total, group) => total + group.rules.length, 0)
   return (
     <div className="flex flex-col gap-4 px-4 lg:px-6">
       <Button
@@ -344,23 +247,32 @@ export function ProjectTypePage({ view, onSave, onRefresh, onSetStatus, onDelete
         <ArrowLeftIcon />
         Project types
       </Button>
-      <Card>
-        <CardHeader>
-          <CardTitle>
+      <header className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-xl font-semibold">{projectType.label}</h2>
-          </CardTitle>
-          <CardDescription className="flex flex-col gap-1">
-            {projectType.description ? <span>{projectType.description}</span> : <span>No description yet.</span>}
-            {subjectLabels.length > 0 ? <span>Covers {subjectLabels.join(", ")}.</span> : null}
-            {isRetired ? <span>Retired: hidden from new applications.</span> : null}
-          </CardDescription>
-          <CardAction>
-            <Button variant="outline" onClick={() => setIsEditing(true)}>
-              Edit
-            </Button>
-          </CardAction>
-        </CardHeader>
-      </Card>
+            {projectType.status === "archived" ? <Badge variant="outline">Archived</Badge> : null}
+          </div>
+          {projectType.description ? (
+            <p className="max-w-prose text-sm text-muted-foreground">{projectType.description}</p>
+          ) : null}
+          {subjectLabels.length > 0 ? (
+            <p className="text-sm text-muted-foreground">Covers {subjectLabels.join(", ")}.</p>
+          ) : null}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <SaveStatus state={editor.state} onRetry={editor.retry} />
+          <ProjectTypeMenu
+            label={projectType.label}
+            status={projectType.status}
+            applicationCount={applicationCount}
+            onEdit={() => setIsEditing(true)}
+            onSetStatus={onSetStatus}
+            onDelete={onDelete}
+            onError={setError}
+          />
+        </div>
+      </header>
       {isOutdated ? (
         <Alert>
           <AlertTitle>The rulebook changed</AlertTitle>
@@ -372,101 +284,92 @@ export function ProjectTypePage({ view, onSave, onRefresh, onSetStatus, onDelete
               size="sm"
               variant="outline"
               disabled={isBusy}
-              onClick={() => void act(onRefresh, "It wasn't updated.")}
+              onClick={() =>
+                void act(async () => {
+                  await onRefresh()
+                  onReset()
+                }, "It wasn't updated.")
+              }
             >
               Update
             </Button>
           </AlertAction>
         </Alert>
       ) : null}
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
-      <Questions
-        key={JSON.stringify(projectType.definition)}
-        definition={projectType.definition}
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+      <QuestionsCard
+        definition={editor.definition}
         available={view.available}
-        onSave={(definition) => onSave({ ...details, definition })}
+        info={view.questionInfo}
+        rules={rules}
+        citations={view.citations}
+        units={view.units}
+        loadProvisions={loadProvisions}
+        onUpdate={editor.update}
+      />
+      <DocumentsCard
+        definition={editor.definition}
+        available={view.available}
+        rules={rules}
+        citations={view.citations}
+        loadProvisions={loadProvisions}
+        onUpdate={editor.update}
       />
       <Card>
-        <CardHeader>
-          <CardTitle>Documents</CardTitle>
-          <CardDescription>What the rules ask the homeowner to include. They come from the rulebook.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {projectType.definition.documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">The rules ask for no documents.</p>
-          ) : (
-            <ItemGroup className="gap-2">
-              {projectType.definition.documents.map((document) => (
-                <Item key={document.documentType} variant="outline" size="sm">
-                  <ItemContent>
-                    <ItemTitle>{document.label}</ItemTitle>
-                    {document.mustShow.length > 0 ? (
-                      <ItemDescription className="line-clamp-none">
-                        Must show: {document.mustShow.join("; ")}.
-                      </ItemDescription>
-                    ) : null}
-                  </ItemContent>
-                </Item>
-              ))}
-            </ItemGroup>
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>Requirements</CardTitle>
-          <CardDescription>
-            Every rule the published rulebook applies to this kind of project, with where it comes from.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-6">
-          {requirements.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No published rules apply yet.</p>
-          ) : (
-            requirements.map((group) => (
-              <section key={group.id} className="flex flex-col gap-3" aria-labelledby={`requirements-${group.id}`}>
-                <h3 id={`requirements-${group.id}`} className="text-sm font-medium">
-                  {group.title}
-                </h3>
-                <ul className="flex flex-col gap-3">
-                  {group.rules.map((rule) => (
-                    <li key={rule.key} className="flex flex-col gap-1 text-sm">
-                      <RuleReference rule={rule} />
-                      <span className="text-muted-foreground">{rule.statement}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ))
-          )}
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>{statusAction}</CardTitle>
-          <CardDescription>
-            {applicationCount > 0
-              ? `${applicationCount} ${applicationCount === 1 ? "application uses" : "applications use"} this project type, so it can be retired but not deleted. Retired types are hidden from new applications.`
-              : "No application uses this project type yet."}
-          </CardDescription>
-          <CardAction>
-            {applicationCount > 0 ? (
-              <Button
-                variant="outline"
-                disabled={isBusy}
-                onClick={() =>
-                  void act(() => onSetStatus(isRetired ? "active" : "retired"), "The project type wasn't changed.")
-                }
-              >
-                {statusAction}
-              </Button>
-            ) : (
-              <Button variant="destructive" disabled={isBusy} onClick={() => setIsDeleting(true)}>
-                Delete
-              </Button>
-            )}
-          </CardAction>
-        </CardHeader>
+        <Collapsible>
+          <CardHeader>
+            <CardTitle>
+              <h3>
+                <CollapsibleTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      className="-ml-2.5 h-auto px-2.5 py-1 text-base font-semibold [&[data-panel-open]>svg]:rotate-180"
+                    />
+                  }
+                >
+                  All requirements
+                  <span className="font-normal text-muted-foreground">{ruleCount}</span>
+                  <ChevronDownIcon className="transition-transform" />
+                </CollapsibleTrigger>
+              </h3>
+            </CardTitle>
+            <CardDescription>Every rule the published rulebook applies to this kind of project.</CardDescription>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="flex flex-col gap-6 pt-4">
+              {requirements.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No published rules apply yet.</p>
+              ) : (
+                requirements.map((group) => (
+                  <section key={group.id} className="flex flex-col gap-3" aria-labelledby={`requirements-${group.id}`}>
+                    <h4 id={`requirements-${group.id}`} className="text-sm font-medium">
+                      {group.title}
+                    </h4>
+                    <ul className="flex flex-col gap-3">
+                      {group.rules.map((rule) => (
+                        <li key={rule.key} className="flex flex-col gap-1 text-sm">
+                          <RuleReference rule={rule} />
+                          <span className="text-muted-foreground">{rule.statement}</span>
+                          {rule.isMetByForm ? (
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <CircleCheckIcon aria-hidden className="size-3.5" />
+                              Met by the application form
+                            </span>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
       <DetailsDialog
         key={`${details.label}\n${details.description}`}
@@ -474,27 +377,25 @@ export function ProjectTypePage({ view, onSave, onRefresh, onSetStatus, onDelete
         description={projectType.description}
         isOpen={isEditing}
         onOpenChange={setIsEditing}
-        onSave={(changes) => onSave({ ...changes, definition: projectType.definition })}
+        onSave={(changes) => onSave({ ...changes, definition: editor.latest.current })}
       />
-      <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {projectType.label}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Homeowners won&apos;t be able to choose it. This can&apos;t be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => void act(onDelete, "The project type wasn't deleted.")}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
+  )
+}
+
+/** A project type's page for the administrator. */
+export function ProjectTypePage(props: ProjectTypePageProps) {
+  // The editor keeps the form as edited; a rebuild or rewording elsewhere starts it again from what's stored.
+  const [resets, setResets] = useState(0)
+  const { projectType } = props.view
+  // Citations open in a sheet over the editor, so its unsaved changes stay put.
+  return (
+    <CitationsOpenInSheet>
+      <ProjectTypeEditor
+        key={`${projectType.id} ${projectType.rulebookId} ${resets}`}
+        {...props}
+        onReset={() => setResets((count) => count + 1)}
+      />
+    </CitationsOpenInSheet>
   )
 }

@@ -1,4 +1,5 @@
 import { projectRules } from "@/projectTypes/build"
+import { formKindOf } from "@/review/documents"
 import { rulebookVocabulary } from "@/review/documentTypes"
 import { renderStatement } from "@/schema/statement"
 import type * as T from "@/schema/types"
@@ -18,8 +19,11 @@ export const requirementGroups = [
 ] as const
 export type RequirementGroupId = (typeof requirementGroups)[number]["id"]
 
-/** A rule as the requirements list shows it: its reference, and its statement in the organization's words. */
-export type RequirementRule = ReportRule
+/**
+ * A rule as the requirements list shows it: its reference, its statement in the organization's words, and whether the
+ * application form itself meets it (a document the form provides).
+ */
+export type RequirementRule = ReportRule & { isMetByForm: boolean }
 
 export type RequirementGroup = { id: RequirementGroupId; title: string; rules: RequirementRule[] }
 
@@ -69,7 +73,15 @@ export function projectRequirements(
   const selected = projectRules(rulesFile, requestType, subjects, on)
   const byKey = new Map(rulesFile.rules.map((rule) => [rule.key, rule]))
   const text = (statement: string) => renderStatement(statement, (key, plural) => vocabulary.label(key, plural))
-  const rules = reportRules(rulesFile, selected).map((rule) => ({ ...rule, statement: text(rule.statement) }))
+  const isMetByForm = (key: T.RuleKey) => {
+    const rule = byKey.get(key)
+    return rule?.kind === "norm" && rule.check?.type === "document" && formKindOf(rule.check, vocabulary) !== null
+  }
+  const rules = reportRules(rulesFile, selected).map((rule) => ({
+    ...rule,
+    statement: text(rule.statement),
+    isMetByForm: isMetByForm(rule.key)
+  }))
   return requirementGroups.flatMap((group) => {
     const members = rules.filter((rule) => {
       const found = byKey.get(rule.key)

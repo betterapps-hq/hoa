@@ -1,9 +1,9 @@
 import { exampleRulesFile } from "@/schema/exampleRulebook.test-data"
 import type { Rule, Term } from "@/schema/types"
 import { rule, term } from "@/schema/zod"
-import { type EncodingJudgeAnswer, judgeGroups } from "./judge"
+import type { AgentPairs } from "./pairs"
 import type { RunDraft, RunInfo } from "./run"
-import { scoreRun, splitRules } from "./score"
+import { scoreRun } from "./score"
 
 // The schema's examples as the golden side of the evaluation tests, and a pipeline side keyed differently: what a
 // second encoder of the same text might return.
@@ -34,18 +34,27 @@ function renameKeys(value: unknown, renames: Readonly<Record<string, string>>): 
   return value
 }
 
-const inSplit = (key: string) => key.startsWith("guidelines:5.5")
+export const inSplit = (key: string) => key.startsWith("guidelines:5.5")
+
+/** The coding agent's pairing of the example run: the renamed metal height rule. */
+export const examplePairs: AgentPairs = {
+  rules: [{ reference: "guidelines:5.5.2#metal-height", pipeline: "guidelines:5.5.2#metal-limit" }],
+  terms: []
+}
 
 /**
  * A run over the examples' section 5.5: the pipeline found every provision, kept one height rule as it was, gave the
- * metal height rule another modality and missed the rest; the judge said so. Two units, one repaired.
+ * metal height rule another key and another modality, and missed the rest. Two units, one repaired.
  */
-export function exampleRun() {
+export function exampleRun(pairs: AgentPairs = examplePairs) {
   const provisions = golden.provisions.filter((provision) => inSplit(provision.key))
   const metal = goldenRule("guidelines:5.5.2#metal-height")
   const pipelineRules = [
     goldenRule("guidelines:5.5.1(i)#max-height"),
-    metal.kind === "norm" ? { ...metal, modality: "prohibition" as const } : metal
+    {
+      ...(metal.kind === "norm" ? { ...metal, modality: "prohibition" as const } : metal),
+      key: "guidelines:5.5.2#metal-limit"
+    }
   ]
   const draft: RunDraft = {
     documents: [
@@ -63,37 +72,6 @@ export function exampleRun() {
     terms: golden.terms,
     questions: []
   }
-  const groups = judgeGroups(splitRules(golden, inSplit), pipelineRules)
-  const answers: Record<string, EncodingJudgeAnswer> = {
-    "guidelines:5.5.1(i)": {
-      pairs: [
-        { reference: "guidelines:5.5.1(i)#max-height", pipeline: "guidelines:5.5.1(i)#max-height", note: "" },
-        { reference: "guidelines:5.5.1(i)#max-height-all", pipeline: null, note: "the other reading" }
-      ],
-      pipelineRules: [{ key: "guidelines:5.5.1(i)#max-height", faithful: true, reason: "" }],
-      comparison: { verdict: "equal", reason: "" }
-    },
-    "guidelines:5.5.1(ii)": {
-      pairs: [{ reference: "guidelines:5.5.1(ii)#fence-and-lattice", pipeline: null, note: "not encoded" }],
-      pipelineRules: [],
-      comparison: { verdict: "worse", reason: "the lattice limit is missing" }
-    },
-    "guidelines:5.5.2": {
-      pairs: [
-        { reference: "guidelines:5.5.2#metal-height", pipeline: "guidelines:5.5.2#metal-height", note: "" },
-        { reference: "guidelines:5.5.2#variations", pipeline: null, note: "not encoded" }
-      ],
-      pipelineRules: [{ key: "guidelines:5.5.2#metal-height", faithful: false, reason: "a limit, not a ban" }],
-      comparison: { verdict: "equal", reason: "" }
-    }
-  }
-  const judged = groups.map((group) => {
-    const answer = answers[group.provisionKey]
-    if (!answer) {
-      throw new Error(`No answer for ${group.provisionKey}`)
-    }
-    return { group, answer }
-  })
   const unit = { provisions: 2, isValid: true, problems: 0 }
   const report: RunInfo["report"] = {
     units: [
@@ -104,7 +82,7 @@ export function exampleRun() {
     problemsBefore: 3,
     calls: []
   }
-  return scoreRun({ golden, draft, report, inSplit, judged, termPairs: [] })
+  return { draft, scores: scoreRun({ golden, draft, report, inSplit, pairs }) }
 }
 
 export const renamedTerms = (renames: Readonly<Record<string, string>>): Term[] =>

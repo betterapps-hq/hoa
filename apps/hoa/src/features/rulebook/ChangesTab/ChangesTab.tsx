@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from "react"
+import { clampPage, ListPager, pageOf } from "@/components/ListPager/ListPager"
+import { usePageSize } from "@/hooks/usePageSize"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import { approvalBlockers } from "@/rulebook/review"
 import type * as T from "@/schema/types"
-import { clampPage, ListPager, pageOf } from "../ListPager/ListPager"
 import { ReviewControls } from "../ReviewControls/ReviewControls"
 import type { RulebookView } from "../rulebook.functions"
 import { referencedRule } from "../rulebookRecords"
@@ -20,7 +21,7 @@ export type DraftChanges = {
 
 export type ChangesTabProps = { changes: DraftChanges }
 
-const pageSize = 20
+const defaultPageSize = 20
 
 /**
  * What the draft changes (encoding.md, UX, Draft review): its new, changed and removed rules and terms, each with its
@@ -92,6 +93,7 @@ function ChangeSection<I extends { key: string }>({
   children: (item: I) => ReactNode
 }) {
   const [page, setPage] = useState(0)
+  const { pageSize, choices, setPageSize } = usePageSize(`changes:${title}`, defaultPageSize)
   if (items.length === 0) {
     return null
   }
@@ -109,7 +111,18 @@ function ChangeSection<I extends { key: string }>({
           </li>
         ))}
       </ul>
-      <ListPager total={items.length} page={current} pageSize={pageSize} onPageChange={setPage} noun={noun} />
+      <ListPager
+        total={items.length}
+        page={current}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        noun={noun}
+        pageSizes={choices}
+        onPageSizeChange={(size, next) => {
+          setPageSize(size)
+          setPage(next)
+        }}
+      />
     </section>
   )
 }

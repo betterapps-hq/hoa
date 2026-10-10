@@ -3,6 +3,7 @@
 exports[`prompt variables > serializes a draft and its problems for hoa-encoding-repair 1`] = `
 {
   "coreTerms": "applicant | thing (party) | "applicant"
+application-form | thing (document) | "application form"
 approval | thing (event) | "approval"
 approval-status | value set (complete) | "approval status"
 approval-status.approved | value in approval-status | "approved"
@@ -54,6 +55,7 @@ occupant | thing (party) | "occupant"
 organization | thing (party) | "organization"
 owner | thing (party) | "owner"
 percent | unit of ratio (0.01 base units) | "%", "percent" (alternative)
+project-description | thing (document) | "project description"
 records-request | thing (request); request: flow filing, governing date records-request.received-on, lot none | "records request"
 records-request.produced-on | property of records-request: date | "produced on"
 records-request.received-on | property of records-request: date | "received on"
@@ -85,6 +87,7 @@ exports[`prompt variables > serializes a unit for hoa-provision-encoding 1`] = `
 {
   "context": "none",
   "coreTerms": "applicant | thing (party) | "applicant"
+application-form | thing (document) | "application form"
 approval | thing (event) | "approval"
 approval-status | value set (complete) | "approval status"
 approval-status.approved | value in approval-status | "approved"
@@ -136,6 +139,7 @@ occupant | thing (party) | "occupant"
 organization | thing (party) | "organization"
 owner | thing (party) | "owner"
 percent | unit of ratio (0.01 base units) | "%", "percent" (alternative)
+project-description | thing (document) | "project description"
 records-request | thing (request); request: flow filing, governing date records-request.received-on, lot none | "records request"
 records-request.produced-on | property of records-request: date | "produced on"
 records-request.received-on | property of records-request: date | "received on"
@@ -213,6 +217,7 @@ exports[`prompt variables > serializes definitions and candidates for hoa-term-e
   e.g. Owners pick roof colors from the Color Guide.
   e.g. Owners pick trim colors from the Color Guide.",
   "coreTerms": "applicant | thing (party) | "applicant"
+application-form | thing (document) | "application form"
 approval | thing (event) | "approval"
 approval-status | value set (complete) | "approval status"
 approval-status.approved | value in approval-status | "approved"
@@ -264,6 +269,7 @@ occupant | thing (party) | "occupant"
 organization | thing (party) | "organization"
 owner | thing (party) | "owner"
 percent | unit of ratio (0.01 base units) | "%", "percent" (alternative)
+project-description | thing (document) | "project description"
 records-request | thing (request); request: flow filing, governing date records-request.received-on, lot none | "records request"
 records-request.produced-on | property of records-request: date | "produced on"
 records-request.received-on | property of records-request: date | "received on"

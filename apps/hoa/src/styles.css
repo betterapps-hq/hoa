@@ -46,6 +46,38 @@
   .document-page figure {
     @apply rounded-md border border-dashed p-2 text-muted-foreground;
   }
+
+  /* A page's OCR Markdown in the document reader, when the document has no structure yet: the reader's type scale. */
+  .reader-markdown {
+    @apply flex flex-col gap-4;
+  }
+  .reader-markdown h1 {
+    @apply mt-6 text-xl font-semibold tracking-tight text-balance;
+  }
+  .reader-markdown h2 {
+    @apply mt-4 text-lg font-semibold text-balance;
+  }
+  .reader-markdown :is(h3, h4, h5, h6) {
+    @apply mt-2 font-semibold;
+  }
+  .reader-markdown :is(ul, ol) {
+    @apply flex flex-col gap-1.5 pl-6;
+  }
+  .reader-markdown ul {
+    @apply list-disc;
+  }
+  .reader-markdown ol {
+    @apply list-decimal;
+  }
+  .reader-markdown table {
+    @apply w-full border-collapse text-sm leading-normal;
+  }
+  .reader-markdown :is(th, td) {
+    @apply border px-2 py-1.5 text-left align-top;
+  }
+  .reader-markdown figure {
+    @apply border-l-2 pl-3 text-sm text-muted-foreground;
+  }
 }
 
 @theme inline {
@@ -236,4 +268,52 @@
       transparent 2px 6px
     );
   }
+}
+
+/*
+ * pdf.js's text layer over a page in the document reader's original view (from pdfjs-dist's pdf_viewer.css, only the
+ * rules the text layer needs): transparent text placed over the canvas, so the page's words can be selected and found.
+ */
+.textLayer {
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 0;
+}
+.textLayer :is(span, br) {
+  position: absolute;
+  color: transparent;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  user-select: text;
+}
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+  --font-height: 0;
+  --scale-x: 1;
+  --rotate: 0deg;
+  z-index: 1;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.textLayer .markedContent {
+  display: contents;
+}
+.textLayer ::selection {
+  background: color-mix(in srgb, AccentColor, transparent 60%);
+  color: transparent;
+}
+.textLayer br::selection {
+  background: transparent;
 }

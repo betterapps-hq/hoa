@@ -23,7 +23,8 @@ import type { PreviousReview } from "@/rulebook/carryForward"
 import { saveBuiltDraft } from "@/rulebook/saveDraft"
 import { governingKeys, hoaCacheKey, rulebookBuildKeys } from "@/storage/keys"
 import { createObjectPromptCache, getJson, putJson } from "@/storage/objects"
-import { loadPages, modelStep, storageStep } from "./ocrSteps.server"
+import { loadPages } from "@/storage/pages"
+import { modelStep, storageStep } from "./ocrSteps.server"
 import {
   abandonRulebookBuild,
   newBuildIds,

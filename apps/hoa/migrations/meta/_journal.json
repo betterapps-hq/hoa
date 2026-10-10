@@ -36,6 +36,13 @@
       "when": 1791588330869,
       "tag": "0004_project_types",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791596082981,
+      "tag": "0005_archive_project_types",
+      "breakpoints": true
     }
   ]
 }

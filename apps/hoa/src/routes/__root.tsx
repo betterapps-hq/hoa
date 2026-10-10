@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes"
 import { useState, type ReactNode } from "react"
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary"
 import { AppSidebar } from "@/components/app-sidebar"
+import { UnitSystemProvider } from "@/components/QuantityInput/QuantityInput"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
@@ -64,6 +65,8 @@ function RootLayout() {
           roleId={session.roleId}
           onRoleChange={async (roleId) => {
             await setDemoRole({ data: { roleId } })
+            // The current page may be one the new role can't open; the dashboard is open to every role.
+            await router.navigate({ to: "/" })
             await router.invalidate()
           }}
         >
@@ -76,7 +79,9 @@ function RootLayout() {
                   <div className="@container/main flex flex-1 flex-col gap-2">
                     <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
                       <ErrorBoundary FallbackComponent={AppError}>
-                        <Outlet />
+                        <UnitSystemProvider value={session.unitSystem}>
+                          <Outlet />
+                        </UnitSystemProvider>
                       </ErrorBoundary>
                     </div>
                   </div>

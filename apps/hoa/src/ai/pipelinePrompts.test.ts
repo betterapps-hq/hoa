@@ -23,13 +23,6 @@ describe("rulebook build prompts", () => {
     })
   })
 
-  it("include the encoding judge with the variables the evaluation fills in", () => {
-    expect(pipelinePrompts.encodingJudge).toEqual({
-      name: "hoa-eval-encoding-judge",
-      variables: ["provision", "referenceRules", "pipelineRules"]
-    })
-  })
-
   it("refuse a version whose text uses another variable or leaves one out", () => {
     const prompt = pipelinePrompts.encodingRepair
     expect(contractProblem(prompt, "{{draft}} {{problems}} {{terms}} {{coreTerms}}")).toBeNull()
@@ -51,13 +44,6 @@ describe("application review prompts", () => {
       "hoa-document-review": ["requirements", "parties", "pages"],
       "hoa-judgment-check": ["statement", "question", "subject", "facts", "evidencePages"],
       "hoa-review-summary": ["recommendation", "findings", "actionItems", "suggestions"]
-    })
-  })
-
-  it("include the writer's judge with the variables the evaluation fills in", () => {
-    expect(pipelinePrompts.reviewJudge).toEqual({
-      name: "hoa-eval-review-judge",
-      variables: ["recommendation", "findings", "actionItems", "suggestions", "writing"]
     })
   })
 })

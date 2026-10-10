@@ -101,10 +101,10 @@ describe("ReviewReport", () => {
     const { user } = setup()
     const changes = group("Change in your plans")
     const item = changes.getByRole("button", { name: /^Composite colors by manufacturer \(Left side run/ })
-    expect(changes.queryByRole("button", { name: "Guidelines 5.4.2(i)" })).not.toBeInTheDocument()
+    expect(changes.queryByRole("link", { name: "Guidelines 5.4.2(i)" })).not.toBeInTheDocument()
     await user.click(item)
     expect(item).toHaveAttribute("aria-expanded", "true")
-    expect(changes.getByRole("button", { name: "Guidelines 5.4.2(i)" })).toBeInTheDocument()
+    expect(changes.getByRole("link", { name: "Guidelines 5.4.2(i)" })).toBeInTheDocument()
     await user.click(changes.getByRole("button", { name: "What the review read for Right side run" }))
     const sheet = await screen.findByRole("dialog")
     expect(within(sheet).getByRole("heading", { name: colors })).toBeInTheDocument()
@@ -181,7 +181,7 @@ describe("ReviewReport", () => {
     expect(screen.getByText("Written as “River Birtch”")).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "The review's written summary" }))
     const feedback = screen.getByText(/Choose a listed color under/)
-    expect(within(feedback).getByRole("button", { name: "Guidelines 5.4.2(i)" })).toBeInTheDocument()
+    expect(within(feedback).getByRole("link", { name: "Guidelines 5.4.2(i)" })).toBeInTheDocument()
   })
 
   it("links from a finding in the matrix back to its next step, showing it if it was hidden", async () => {

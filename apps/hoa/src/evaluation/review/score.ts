@@ -6,10 +6,10 @@ import { verifyEvidence } from "@/review/verifyEvidence"
 import type * as T from "@/schema/types"
 import { similarity } from "@/text/match"
 import type { ExpectedReview } from "./cases"
-import { writerScore, type ReviewJudgeAnswer } from "./judge"
 
 // Evaluation round 2's scores (implementation-plan.md, E2): entities, facts, normalization, evidence, findings, the
-// recommendation and the action items, each from 0 to 1, with the mismatches behind them. The model names entities
+// recommendation and the action items, each from 0 to 1, with the mismatches behind them. The writer's faithfulness and
+// clarity are judged by the coding agent from each case's writer.md (writerComparison.ts). The model names entities
 // its own way, so expected entities are first aligned to the review's by type and label: ids only break ties, since
 // the model's run-1 needn't be the expected run-1. Within a type, the pairing has the most similar labels overall.
 
@@ -22,8 +22,6 @@ export type ReviewScores = {
   findings: number
   recommendation: number
   actionItems: number
-  /** The writer judge's score, when the run asked it. */
-  writer: number | null
 }
 
 const roots = new Set(["request", "lot", "community"])
@@ -117,7 +115,7 @@ export function scoreReview(
   result: Pick<ReviewResult, "request" | "findings" | "recommendation" | "normalizations" | "documents"> &
     Pick<ReviewResult, "changes" | "missingInformation" | "committeeDecisions">,
   expected: ExpectedReview,
-  context: { vocabulary: EngineVocabulary; pageText: PageTexts; judged?: ReviewJudgeAnswer }
+  context: { vocabulary: EngineVocabulary; pageText: PageTexts }
 ) {
   const { vocabulary } = context
   const alignment = alignEntities(expected.entities, result.request.entities)
@@ -235,8 +233,7 @@ export function scoreReview(
       Object.keys(expected.findings).length
     ),
     recommendation: result.recommendation === expected.recommendation ? 1 : 0,
-    actionItems: f1,
-    writer: context.judged ? writerScore(context.judged) : null
+    actionItems: f1
   }
   return {
     scores,
@@ -249,15 +246,7 @@ export function scoreReview(
       actionItems: {
         missing: [...wantedItems].filter((key) => !actualItems.has(key)),
         extra: [...actualItems].filter((key) => !wantedItems.has(key))
-      },
-      // The parts the judge faulted, without its reasons, which may quote the packet.
-      writer: (context.judged?.parts ?? []).flatMap((part) =>
-        part.faithful && part.clear
-          ? []
-          : [
-              `${part.part}: ${[part.faithful ? "" : "not faithful", part.clear ? "" : "not clear"].filter(Boolean).join(", ")}`
-            ]
-      )
+      }
     }
   }
 }

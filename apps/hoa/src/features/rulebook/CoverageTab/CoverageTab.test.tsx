@@ -145,7 +145,7 @@ describe("CoverageTab", () => {
     expect(screen.getByRole("button", { name: "Uncovered", pressed: true })).toBeInTheDocument()
     const [item] = within(screen.getByRole("list", { name: "Provisions" })).getAllByRole("listitem")
     expect(within(item!).getByText("No rule and no reason")).toBeInTheDocument()
-    expect(within(item!).getByRole("button", { name: "Declaration 3.1(a)" })).toBeInTheDocument()
+    expect(within(item!).getByRole("link", { name: "Declaration 3.1(a)" })).toBeInTheDocument()
     await user.click(within(item!).getByRole("button", { name: "Give a reason for having no rule" }))
     await user.selectOptions(within(item!).getByRole("combobox", { name: "Reason" }), "explanatory")
     await user.type(within(item!).getByRole("textbox", { name: "Note" }), "Describes the community.")

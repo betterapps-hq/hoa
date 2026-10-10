@@ -1,9 +1,10 @@
 import { useForm } from "@tanstack/react-form"
 import { FileIcon, Trash2Icon } from "lucide-react"
-import { useId, useRef, useState, type ReactNode } from "react"
+import { useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 import { decisionOutcomes } from "@/applications/application"
+import { FileDropzone } from "@/components/FileDropzone/FileDropzone"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -32,7 +33,6 @@ import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { hasOpenRequests, type Review } from "@/review/reviewModel"
 import { renderRuleMarkers } from "@/review/ruleMarkers"
-import { acceptFor } from "@/storage/uploadRules"
 import {
   fileStatusLabels,
   outcomeLabels,
@@ -46,7 +46,6 @@ import { createReviewContext, type ReviewAudience } from "../reviewContext"
 import { ReviewDetail } from "../ReviewDetail/ReviewDetail"
 import { ReviewReport } from "../ReviewReport/ReviewReport"
 import { countOf, suggestedDecisions } from "../ReviewVerdict/ReviewVerdict.utils"
-import { uploadProblem } from "../uploadApplicationFiles"
 
 export type ApplicationActions = {
   upload: (files: File[]) => Promise<void>
@@ -210,44 +209,25 @@ function DecisionForm({ review, ruleTitle, onDecide }: DecisionFormProps) {
   )
 }
 
-type AddFilesButtonProps = {
-  variant: "default" | "outline"
+type AddFilesProps = {
+  id: string
+  size?: "default" | "compact"
   disabled: boolean
   onAdd: (files: File[]) => void
 }
 
-/** Opens the file picker; the chosen files upload and the review runs again, unless one can't be read. */
-function AddFilesButton({ variant, disabled, onAdd }: AddFilesButtonProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [problem, setProblem] = useState<string | null>(null)
+/** Takes files by drop or browse; they upload and the review runs again. Files it can't take are named with why. */
+function AddFiles({ id, size = "default", disabled, onAdd }: AddFilesProps) {
   return (
-    <>
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        accept={acceptFor.application}
-        aria-label="Add files"
-        className="hidden"
-        onChange={(event) => {
-          const files = [...(event.target.files ?? [])]
-          event.target.value = ""
-          const found = uploadProblem(files)
-          setProblem(found)
-          if (!found && files.length > 0) {
-            onAdd(files)
-          }
-        }}
-      />
-      <Button variant={variant} disabled={disabled} onClick={() => inputRef.current?.click()}>
-        Add files
-      </Button>
-      {problem ? (
-        <p role="alert" className="basis-full text-sm text-destructive">
-          {problem}
-        </p>
-      ) : null}
-    </>
+    <FileDropzone
+      id={id}
+      target="application"
+      size={size}
+      disabled={disabled}
+      onFiles={onAdd}
+      prompt={size === "compact" ? "Add files" : undefined}
+      className="w-full"
+    />
   )
 }
 
@@ -397,23 +377,21 @@ export function ApplicationPage({
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           {canSubmit && !hasOpenRequests(review) ? (
-            <>
-              <Button disabled={isBusy} onClick={() => void submit(false)}>
-                Submit to the committee
-              </Button>
-              <AddFilesButton variant="outline" disabled={isBusy} onAdd={addFiles} />
-            </>
+            <Button disabled={isBusy} onClick={() => void submit(false)}>
+              Submit to the committee
+            </Button>
           ) : (
-            <>
-              <AddFilesButton variant="default" disabled={isBusy} onAdd={addFiles} />
-              {canSubmit ? (
-                <Button variant="outline" disabled={isBusy} onClick={() => setIsConfirming(true)}>
-                  Submit anyway
-                </Button>
-              ) : null}
-            </>
+            <AddFiles id="add-files" disabled={isBusy} onAdd={addFiles} />
           )}
+          {canSubmit && hasOpenRequests(review) ? (
+            <Button variant="outline" disabled={isBusy} onClick={() => setIsConfirming(true)}>
+              Submit anyway
+            </Button>
+          ) : null}
         </div>
+        {canSubmit && !hasOpenRequests(review) ? (
+          <AddFiles id="add-files" size="compact" disabled={isBusy} onAdd={addFiles} />
+        ) : null}
         <p className="max-w-prose text-sm text-muted-foreground">
           {hasOpenRequests(review)
             ? "Add pages that show what’s missing, and the review runs again on the whole packet."
@@ -512,7 +490,7 @@ export function ApplicationPage({
                 Run review
               </Button>
             ) : null}
-            <AddFilesButton variant={fileCount > 0 ? "outline" : "default"} disabled={isBusy} onAdd={addFiles} />
+            <AddFiles id="add-files" size={fileCount > 0 ? "compact" : "default"} disabled={isBusy} onAdd={addFiles} />
           </div>
         ) : null}
       </Stage>

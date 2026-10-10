@@ -86,7 +86,6 @@ export function RulebookPage(props: RulebookPageProps) {
       <StatusLine status={status} {...props} />
       <GoverningDocuments
         uploads={uploads}
-        source={source}
         jobs={props.jobs}
         loadJob={props.loadJob}
         onUpload={props.onUpload}

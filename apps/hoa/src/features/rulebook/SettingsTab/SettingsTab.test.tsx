@@ -21,7 +21,7 @@ describe("SettingsTab", () => {
     renderInWorkspace(<SettingsTab />, { actions: null })
     const precedence = card("Which document wins")
     expect(precedence).toHaveTextContent("1. statute, ordinance")
-    expect(within(precedence).getByRole("button", { name: "Declaration 1.3, paragraph 3" })).toBeInTheDocument()
+    expect(within(precedence).getByRole("link", { name: "Declaration 1.3, paragraph 3" })).toBeInTheDocument()
     expect(card("Who decides each request")).toHaveTextContent("The Reviewer decides applications.")
     expect(card("Days and time")).toHaveTextContent("Holidays follow the us-federal calendar")
     expect(screen.queryByRole("button", { name: /^Edit/ })).not.toBeInTheDocument()

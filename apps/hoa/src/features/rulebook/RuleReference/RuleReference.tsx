@@ -1,8 +1,9 @@
-import { useState, type ReactNode } from "react"
+import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
-import { CitationViewer, type CitedProvision } from "../CitationViewer/CitationViewer"
+import type { CitedProvision } from "../citedProvision"
 import { ProvisionReference } from "../ProvisionReference/ProvisionReference"
+import { CitationPicker } from "./CitationPicker"
 
 /** A rule as every screen names it: its title and its citations, the main one first. */
 export type ReferencedRule = { key: string; title: string; citations: CitedProvision[] }
@@ -17,31 +18,37 @@ export type RuleReferenceProps = {
 
 /**
  * A rule's title and its main citation's label (application-review.md, UX). The label shows the provision's text on
- * hover and focus and opens the document at it; "and N more" opens the citation viewer with every citation.
+ * hover and focus and opens the document at it; "and N more" opens a picker of every citation, each linking to the
+ * document reader at its passage.
  */
 export function RuleReference({ rule, source, title }: RuleReferenceProps) {
-  const [isAllOpen, setIsAllOpen] = useState(false)
   const [main, ...more] = rule.citations
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
       {title === undefined ? <span className="font-medium">{rule.title}</span> : title}
       {main ? (
-        <ProvisionReference citation={main} source={source} />
+        <ProvisionReference
+          citation={main}
+          source={source}
+          cites={rule.citations.map((citation) => citation.provisionKey)}
+        />
       ) : (
         <span className="text-muted-foreground">No citation</span>
       )}
       {more.length > 0 ? (
-        <>
-          <Button
-            variant="link"
-            className="h-auto p-0 text-sm text-link"
-            aria-label={`${rule.title}: all ${rule.citations.length} citations`}
-            onClick={() => setIsAllOpen(true)}
-          >
-            and {more.length} more
-          </Button>
-          <CitationViewer citations={rule.citations} source={source} isOpen={isAllOpen} onOpenChange={setIsAllOpen} />
-        </>
+        <CitationPicker
+          citations={rule.citations}
+          title={`${rule.title}: citations`}
+          trigger={
+            <Button
+              variant="link"
+              className="h-auto p-0 text-sm text-link"
+              aria-label={`${rule.title}: all ${rule.citations.length} citations`}
+            >
+              and {more.length} more
+            </Button>
+          }
+        />
       ) : null}
     </span>
   )

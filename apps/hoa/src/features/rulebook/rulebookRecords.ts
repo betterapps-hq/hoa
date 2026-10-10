@@ -2,7 +2,7 @@ import type { RulebookContent } from "@/db/rulebookContentRepository"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import type * as T from "@/schema/types"
 import type { Vocabulary } from "@/schema/vocabulary"
-import type { CitedProvision } from "./CitationViewer/CitationViewer"
+import type { CitedProvision } from "./citedProvision"
 import type { RulebookSources } from "./rulebook.functions"
 import type { ReferencedRule } from "./RuleReference/RuleReference"
 

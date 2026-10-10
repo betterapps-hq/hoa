@@ -3,21 +3,29 @@ import { exampleRun } from "./pair.test-data"
 import { bars, passes } from "./score"
 
 describe("scoreRun", () => {
-  const { measures, details } = exampleRun()
+  const { measures, details } = exampleRun().scores
   const value = (name: string) => measures.find((measure) => measure.name === name)?.value
 
-  it("scores every bar of evaluation round 1", () => {
+  it("scores every bar code computes", () => {
     expect(measures.map((measure) => measure.name)).toEqual(bars.map((bar) => bar.name))
     expect(value("provision-keys")).toBe(1)
     expect(value("provision-text")).toBe(1)
     expect(value("coverage")).toBe(1)
-    expect(value("rule-recall")).toBe(0.4)
-    expect(value("rule-precision")).toBe(0.5)
-    expect(value("pairwise")).toBeCloseTo(2 / 3)
     expect(value("modality")).toBe(0.5)
     expect(value("term-recall")).toBe(1)
     expect(value("units-valid")).toBe(1)
     expect(value("units-repaired")).toBe(0.5)
+  })
+
+  it("pairs rules by key, then by the coding agent's pairs", () => {
+    expect(details.rules.pairs).toEqual([
+      { reference: "guidelines:5.5.1(i)#max-height", pipeline: "guidelines:5.5.1(i)#max-height", by: "key" },
+      { reference: "guidelines:5.5.2#metal-height", pipeline: "guidelines:5.5.2#metal-limit", by: "agent" }
+    ])
+    expect(details.rules.unpairedPipeline).toEqual([])
+    expect(exampleRun({ rules: [], terms: [] }).scores.details.rules.unpairedPipeline).toEqual([
+      "guidelines:5.5.2#metal-limit"
+    ])
   })
 
   it("evaluates each paired rule pair with the engine", () => {
@@ -28,7 +36,7 @@ describe("scoreRun", () => {
   })
 
   it("keeps what's behind each miss", () => {
-    expect(details.judge.misses.map((miss) => miss.key)).toEqual([
+    expect(details.rules.unpairedReference).toEqual([
       "guidelines:5.5.1(i)#max-height-all",
       "guidelines:5.5.1(ii)#fence-and-lattice",
       "guidelines:5.5.2#variations"
@@ -36,7 +44,7 @@ describe("scoreRun", () => {
     expect(details.modalityMisses).toEqual([
       {
         reference: "guidelines:5.5.2#metal-height",
-        pipeline: "guidelines:5.5.2#metal-height",
+        pipeline: "guidelines:5.5.2#metal-limit",
         golden: "norm obligation",
         ours: "norm prohibition"
       }
@@ -46,7 +54,7 @@ describe("scoreRun", () => {
 
   it("marks a measure passed only within its bar", () => {
     const failed = measures.filter((measure) => !measure.passed).map((measure) => measure.name)
-    expect(failed).toEqual(["rule-recall", "rule-precision", "modality", "pairwise", "units-repaired"])
+    expect(failed).toEqual(["modality", "units-repaired"])
     expect(passes({ name: "x", label: "x", max: 0.15 }, 0.15)).toBe(true)
   })
 })

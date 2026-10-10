@@ -63,7 +63,7 @@ export function PublishedRulebook({ published, sources, uploads, source, loadJob
           </EmptyHeader>
         </Empty>
       )}
-      <GoverningDocuments uploads={ready} source={source} jobs={{}} loadJob={loadJob} onChanged={() => undefined} />
+      <GoverningDocuments uploads={ready} jobs={{}} loadJob={loadJob} onChanged={() => undefined} />
     </div>
   )
 }

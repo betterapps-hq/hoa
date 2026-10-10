@@ -9,7 +9,11 @@ vi.mock("sonner", () => ({
 
 const ageRule = "declaration:3.1(a)#age-55-occupant"
 
-const rulesShown = () => within(screen.getByRole("list", { name: "Rules" })).getAllByRole("listitem")
+/** The table's rows, its header row left out. */
+const rulesShown = () =>
+  within(screen.getByRole("table", { name: "Rules" }))
+    .getAllByRole("row")
+    .slice(1)
 
 describe("RuleTable", () => {
   it("lists the draft's rules to review a page at a time, with their statements in words", () => {
@@ -63,7 +67,8 @@ describe("RuleTable", () => {
     await user.type(screen.getByRole("searchbox", { name: "Search rules" }), "occupied unit someone")
     await user.click(screen.getByRole("button", { name: "Each occupied Unit has someone 55 or older" }))
     expect(openRule).toHaveBeenCalledWith(ageRule)
-    await user.click(screen.getByRole("button", { name: "Reject Each occupied Unit has someone 55 or older" }))
+    await user.click(screen.getByRole("button", { name: "Actions for Each occupied Unit has someone 55 or older" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Reject" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "rule", key: ageRule }], "rejected", null)
     await user.click(screen.getByRole("button", { name: "Approve the 1 rules shown" }))
     await user.click(await screen.findByRole("button", { name: "Approve them" }))
@@ -80,9 +85,26 @@ describe("RuleTable", () => {
     expect(screen.getByText("26 to 50 of 307")).toBeInTheDocument()
   })
 
+  it("shows the kind and area columns on request, and sorts by them", async () => {
+    const { user } = renderInWorkspace(<RuleTable />)
+    expect(screen.queryByRole("columnheader", { name: "Area" })).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Columns" }))
+    await user.click(await screen.findByRole("menuitemcheckbox", { name: "Area" }))
+    await user.keyboard("{Escape}")
+    const area = screen.getByRole("columnheader", { name: "Area" })
+    expect(area).toHaveAttribute("aria-sort", "none")
+    await user.click(within(area).getByRole("button", { name: "Area" }))
+    expect(area).toHaveAttribute("aria-sort", "ascending")
+    expect(within(rulesShown()[0]!).getByText("Architectural")).toBeInTheDocument()
+    await user.click(within(area).getByRole("button", { name: "Area" }))
+    expect(area).toHaveAttribute("aria-sort", "descending")
+    expect(within(rulesShown()[0]!).queryByText("Architectural")).not.toBeInTheDocument()
+  })
+
   it("is read-only for the published rulebook", () => {
     renderInWorkspace(<RuleTable />, { actions: null })
-    expect(screen.queryByRole("button", { name: /^Approve/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^Actions for/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole("columnheader", { name: "Review" })).not.toBeInTheDocument()
     expect(screen.queryByText("To review")).not.toBeInTheDocument()
   })
 })

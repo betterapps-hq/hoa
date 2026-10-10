@@ -80,6 +80,9 @@ needs a human discussion**, not a silent add.
 
 ## Product copy and UX acceptance
 
+- Follow [apps/hoa/docs/ux.md](../apps/hoa/docs/ux.md): quiet views with one primary action, required fields marked with
+  a red asterisk and optional ones unmarked, at most one help affordance per field, shared inputs for quantities, files,
+  tables, search and citations.
 - Never use a dot glyph, including `·` or `•`, as a visual separator. Use layout, separate text elements, or a clearly
   worded phrase instead.
 - Verify every new or changed UX feature in the integrated browser before considering it complete. Exercise the customer

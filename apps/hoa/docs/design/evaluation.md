@@ -19,9 +19,9 @@ Two model stages have no dataset of their own and are measured through the stage
 | `document-check` | One packet | Document statuses | Redacted sample packet and variants |
 | `qualitative-check` | One rule and component, with facts and evidence | Status | Hand-built cases |
 | `review-decision` | Facts, document statuses and a rulebook | Findings, recommendation and action items | Hand-built variants; code only, no model |
-| `review-writer` | Findings, recommendation and action items | None: scored by judges | Items from `review-decision` |
+| `review-writer` | Findings, recommendation and action items | None: judged by the coding agent ([below](#judging-by-the-coding-agent)) | Items from `review-decision` |
 | `rule-corrections` | An administrator's edit or rejection | The corrected rule | Production; reviewed before it's copied into `rule-extraction` |
-| `encoding-evaluation` | One split of the sample Declaration (`encoding-dev`, `encoding-test`) | The golden encoding, `samples/declaration/rules.json` | `pnpm eval:encoding:score`: one dataset run per evaluation run, a score per measure (evaluation round 1) |
+| `encoding-evaluation` | One split of the sample Declaration (`encoding-dev`, `encoding-test`) | The golden encoding, `samples/declaration/rules.json` | `pnpm eval:encoding:score <run> --record`: one dataset run per evaluation run, a score per measure code computes (evaluation round 1) |
 
 The gold rulebook comes from the governing documents only: guidelines Article 5 and its exhibits, CC&R Article 4, and
 the HOA's blank application form and checklist (until the HOA provides a blank copy, the packet's form pages with every
@@ -64,16 +64,57 @@ the redacted copy, with the homeowners' details replaced.
 | Document status accuracy | Status and problems equal gold | Documents |
 | Qualitative accuracy | Status equals gold | Qualitative checks |
 | Finding and recommendation accuracy | Equal gold (code) | Evaluate, decide |
-| Feedback faithfulness and clarity | Model judge `hoa-eval-review-judge` (one call per review in `pnpm eval:review`): the assessment, the feedback and each action item are faithful (every statement is backed by a finding or action item; nothing is invented) and clear (the homeowner can tell exactly what to change or provide); the score is the share of parts that are both | Write |
-| Encoding against the golden | Provision keys and text, coverage and no-rule reasons, term recall, validity and repair (code); rule recall, precision and pairwise quality (judge `hoa-eval-encoding-judge`, per provision); modality and check agreement on the pairs it finds (code, the engine on generated facts) | Rulebook build ([implementation-plan.md](implementation-plan.md#evaluation-round-1-encoding-quality)) |
+| Feedback faithfulness and clarity | The coding agent, from each case's `writer.md` ([below](#judging-by-the-coding-agent)): the assessment, the feedback and each action item are faithful (every statement is backed by a finding or action item; nothing is invented) and clear (the homeowner can tell exactly what to change or provide); the score is the share of parts that are both | Write |
+| Encoding against the golden | Code: provision keys and text, coverage and no-rule reasons, term recall, validity and repair, and modality and check agreement (the engine on generated facts) on rules paired by key or by the coding agent. The coding agent, from the run's `compare/` files: rule recall, precision and pairwise quality, per provision | Rulebook build ([implementation-plan.md](implementation-plan.md#evaluation-round-1-encoding-quality)) |
 
 Evaluate and decide are code, so `review-decision` also runs as ordinary unit tests; the Langfuse experiment tracks the
 pipeline end to end.
 
+## Judging by the coding agent
+
+Scores are code wherever code can compute them: exact matches, structural comparisons, coverage, counts and the
+engine's outcomes. What needs reading for meaning (whether two rules state the same requirement, whether a rule is
+faithful to its text, whether a summary is faithful and clear) is judged by the coding agent (Claude Code) in its own
+session, on the person's Claude subscription. There are no judge prompts in Langfuse and no judge calls through the
+app's OpenRouter key. Judging needs no approval: it calls no model through the app and writes nothing to Langfuse.
+
+The evaluation scripts write comparison files for it to the run folder under `.fixtures/eval/` (git-ignored, since they
+quote the documents and packets):
+
+- **Encoding.** `pnpm eval:encoding:score <run>` writes `report.md` and `scores.json` (the scores code computes) and
+  `compare/`: `README.md` indexes one file per provision that is the main citation of a rule on either side
+  (`compare/rules/<provision>.md`: the provision's text with its ancestors' lead-ins, the golden and pipeline rules side
+  by side as sentences and JSON, and what code found: pairs by key or from `pairs.json`, modality, the engine's check
+  agreement, the rules left unpaired), and `terms.md` lists the golden terms no key, label or pair matches with the
+  pipeline terms they may be. The script calls no model, and writes to Langfuse only with `--record`.
+- **Review.** `pnpm eval:review` writes, beside each case's `review.json` and `scores.json`, a `writer.md`: the case's
+  scores from code, what the writer read (the recommendation, the findings with their rules and provisions, the action
+  items as the writer phrased them, the suggestions) and what it wrote (the assessment and the feedback).
+
+The agent's loop:
+
+1. Read the run's index or each case's `writer.md`.
+2. **Encoding:** for each provision, pair every golden rule with the pipeline rule stating the same requirement, if
+   any (rule recall); say whether each pipeline rule is faithful to the text (rule precision); and say whether the
+   pipeline's encoding of the provision is better than, equal to or worse than the golden (pairwise quality). In
+   `terms.md`, pair the golden terms with the pipeline terms that mean the same.
+3. Record the pairs found by meaning in the run folder's `pairs.json`
+   (`{ "rules": [{ "reference": "<golden rule key>", "pipeline": "<pipeline rule key>" }], "terms": [{ "golden": "<key>", "pipeline": "<key>" }] }`,
+   either list optional), then rerun `pnpm eval:encoding:score <run>`: modality, check agreement and term recall now
+   cover those pairs, and `terms.md` offers the members of newly paired terms.
+4. **Review:** for the assessment, the feedback and each action item, say whether it's faithful and clear; the writer
+   score is the share of parts that are both.
+5. Write the judged scores, with the keys behind each miss and the reasons, to `judgment.md` in the run folder, and
+   record them with the code's scores in the implementation log. A judged score clears its bar the same way a code
+   score does.
+
+Where the pipeline and the golden disagree and the text supports the pipeline, the agent says so; a confirmed golden
+error is fixed in the sample with a cited reason, as any expected-data change.
+
 ## In production
 
 - **Citation validity** is computed in the Verify stage and sent to Langfuse as a score through the SDK, on every build.
-- **Feedback faithfulness** is an LLM-as-a-judge evaluator on observations, filtered to root observations whose trace
+- **Feedback faithfulness** (deferred until after the demo; implementation-plan.md, 8.8) is an LLM-as-a-judge evaluator on observations, filtered to root observations whose trace
   name is `review-writer`. The root observation's input holds the findings and action items, and its output holds the
   feedback. It's sampled to control cost. (Langfuse v4 retires trace-level evaluators on November 16, 2026, so none
   are used.)

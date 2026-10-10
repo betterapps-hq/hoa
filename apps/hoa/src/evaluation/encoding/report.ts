@@ -1,7 +1,8 @@
 import type { Measure, RunScores } from "./score"
 
-// A run's scores as Markdown (report.md in the run's folder): the bar table, then what's behind every miss, by key.
-// It holds the judge's reasons, which may quote the documents, so it stays in the git-ignored run folder.
+// A run's scores as Markdown (report.md in the run's folder): the bar table of the scores code computes, then what's
+// behind every miss, by key. Rule recall, rule precision and pairwise quality are the coding agent's, judged from the
+// comparison files in compare/ (compare.ts). It stays in the git-ignored run folder with them.
 
 const number = (value: number) => (Number.isInteger(value) ? String(value) : value.toFixed(3))
 
@@ -15,29 +16,28 @@ function barText(measure: Measure) {
 const section = (title: string, lines: readonly string[]) =>
   lines.length === 0 ? [] : [`## ${title} (${lines.length})`, "", ...lines, ""]
 
-const clip = (text: string, length = 300) => (text.length > length ? `${text.slice(0, length)}…` : text)
-
 export function scoreReport(input: {
   runId: string
   split: string
   promptVersions: Readonly<Record<string, number>>
-  judgeVersion: number
-  cost: { encoding: number; judge: number }
+  encodingCost: number
+  /** Whether the run folder had the coding agent's pairs.json. */
+  hasAgentPairs: boolean
   scores: RunScores
 }) {
   const { measures, details } = input.scores
-  const { judge, coverage, terms, validity, structure } = details
+  const { rules, coverage, terms, validity, structure } = details
+  const byKey = rules.pairs.filter((pair) => pair.by === "key").length
   const passed = measures.filter((measure) => measure.passed).length
   return [
     `# Encoding scores ${input.runId}`,
     "",
     `Split ${input.split}. Prompts: ${Object.entries(input.promptVersions)
       .map(([name, version]) => `${name} v${version}`)
-      .join(", ")}; judge hoa-eval-encoding-judge v${input.judgeVersion}.`,
-    `Cost: encoding $${input.cost.encoding.toFixed(2)}, judging $${input.cost.judge.toFixed(2)}.`,
-    `Counts: ${judge.counts.references} golden rules, ${judge.counts.judgedRules} pipeline rules judged, ${judge.counts.provisions} provisions judged, ${judge.pairs.length} pairs, ${details.checks.filter((check) => check.isComparable).length} of ${details.checks.length} pairs the engine evaluates comparable, ${terms.terms} golden terms (${terms.byJudge} matched by the term judge), ${validity.units} units.`,
+      .join(", ")}. Encoding cost $${input.encodingCost.toFixed(2)}.`,
+    `Counts: ${rules.counts.reference} golden rules, ${rules.counts.pipeline} pipeline rules, ${rules.pairs.length} pairs (${byKey} by key, ${rules.pairs.length - byKey} from pairs.json), ${details.checks.filter((check) => check.isComparable).length} of ${details.checks.length} pairs the engine evaluates comparable, ${terms.terms} golden terms (${terms.byAgent} matched from pairs.json), ${validity.units} units.`,
     "",
-    `${passed} of ${measures.length} bars cleared.`,
+    `${passed} of ${measures.length} bars computed by code cleared. Rule recall, rule precision and pairwise quality are judged by the coding agent from compare/${input.hasAgentPairs ? "" : "; no pairs.json yet, so modality and check agreement cover only rules paired by key"}.`,
     "",
     "| Measure | Value | Bar | Passed |",
     "| --- | --- | --- | --- |",
@@ -47,20 +47,12 @@ export function scoreReport(input: {
     ),
     "",
     ...section(
-      "Golden rules without a pipeline rule",
-      judge.misses.map((miss) => `- ${miss.key}: ${clip(miss.note)}`)
+      "Golden rules without a pair",
+      rules.unpairedReference.map((key) => `- ${key}`)
     ),
     ...section(
-      "Pipeline rules not faithful to the text",
-      judge.unfaithful.map((rule) => `- ${rule.key}: ${clip(rule.reason)}`)
-    ),
-    ...section(
-      "Pipeline rules the judge left out",
-      judge.unjudged.map((key) => `- ${key}`)
-    ),
-    ...section(
-      "Provisions encoded worse than the golden",
-      judge.worse.map((provision) => `- ${provision.provisionKey}: ${clip(provision.reason)}`)
+      "Pipeline rules without a pair",
+      rules.unpairedPipeline.map((key) => `- ${key}`)
     ),
     ...section(
       "Modality disagreements",

@@ -1,15 +1,16 @@
+import { compareCodeUnits } from "@/rulebook/canonical"
 import { coreTerms } from "@/schema/coreTerms"
 import type { TermKey } from "@/schema/types"
 import type { TermContent } from "@/schema/zod"
 import { matchLabel } from "@/text/match"
 
 // Term alignment (implementation-plan.md, Evaluation round 1): which pipeline term is each golden term, matched by key,
-// else by the term judge's pairing (termJudge.ts), else by label, and term recall. The check-agreement scorer translates
-// facts between the two vocabularies with the same alignment.
+// else by the coding agent's pairing (pairs.json in the run folder, pairs.ts), else by label, and term recall. The
+// check-agreement scorer translates facts between the two vocabularies with the same alignment.
 
-export type TermMatch = { golden: TermKey; pipeline: TermKey; by: "key" | "judge" | "label"; score: number }
+export type TermMatch = { golden: TermKey; pipeline: TermKey; by: "key" | "agent" | "label"; score: number }
 
-/** A golden term and the pipeline term the term judge found to mean the same. */
+/** A golden term and the pipeline term the coding agent found to mean the same. */
 export type TermPair = { golden: TermKey; pipeline: TermKey }
 
 const coreKeys = new Set(coreTerms.map((term) => term.key))
@@ -39,17 +40,17 @@ function labelScore(golden: TermContent, pipeline: TermContent) {
 }
 
 /**
- * Aligns golden terms with pipeline terms one to one: the same key and kind, else the term judge's pair, else the best
+ * Aligns golden terms with pipeline terms one to one: the same key and kind, else the coding agent's pair, else the best
  * label match; a pair and a label match must be of the same kind, with a parent (a property's thing, a value's set) that
  * is the golden parent's match. Core terms align with themselves.
  */
 export function alignTerms(
   golden: readonly TermContent[],
   pipeline: readonly TermContent[],
-  judged: readonly TermPair[] = []
+  paired: readonly TermPair[] = []
 ) {
   const pipelineByKey = new Map(pipeline.map((term) => [term.key, term]))
-  const judgedByGolden = new Map(judged.map((pair) => [pair.golden, pair.pipeline]))
+  const pairedByGolden = new Map(paired.map((pair) => [pair.golden, pair.pipeline]))
   const matches = new Map<TermKey, TermMatch>()
   const taken = new Set<TermKey>()
   const aligned = (key: TermKey) => (isCoreKey(key) ? key : matches.get(key)?.pipeline)
@@ -67,9 +68,9 @@ export function alignTerms(
       candidate.kind === term.kind &&
       !taken.has(candidate.key) &&
       (wantedParent === undefined || wantedParent === null || parentOf(candidate) === wantedParent)
-    const pick = pipelineByKey.get(judgedByGolden.get(term.key) ?? "")
+    const pick = pipelineByKey.get(pairedByGolden.get(term.key) ?? "")
     if (pick && fits(pick)) {
-      matches.set(term.key, { golden: term.key, pipeline: pick.key, by: "judge", score: 1 })
+      matches.set(term.key, { golden: term.key, pipeline: pick.key, by: "agent", score: 1 })
       taken.add(pick.key)
       continue
     }
@@ -89,6 +90,66 @@ export function alignTerms(
     }
   }
   return matches
+}
+
+/** Golden terms of one kind with no match, and the unmatched pipeline terms of that kind they may be. */
+export type UnmatchedTermGroup = {
+  kind: TermContent["kind"]
+  /** For properties, categories and values: the golden parent and the pipeline term it aligns with. */
+  parent: { golden: TermKey; pipeline: TermKey } | null
+  reference: TermContent[]
+  pipeline: TermContent[]
+}
+
+/**
+ * The terms left for the coding agent to pair by meaning: golden terms among `keys` (and their parents) that `matches`
+ * leaves without a match, grouped by kind and, for a property, category or value, by its aligned parent, each with the
+ * unmatched pipeline terms that could be it. A term whose parent has no match waits until the parent is paired; a group
+ * with no candidates is left out.
+ */
+export function unmatchedTermGroups(
+  golden: readonly TermContent[],
+  pipeline: readonly TermContent[],
+  matches: ReadonlyMap<TermKey, TermMatch>,
+  keys: ReadonlySet<TermKey>
+): UnmatchedTermGroup[] {
+  const goldenByKey = new Map(golden.map((term) => [term.key, term]))
+  const wanted = new Set([
+    ...keys,
+    ...[...keys].flatMap((key) => {
+      const term = goldenByKey.get(key)
+      const parent = term ? parentOf(term) : null
+      return parent === null ? [] : [parent]
+    })
+  ])
+  const taken = new Set([...matches.values()].map((match) => match.pipeline))
+  const aligned = (key: TermKey) => (isCoreKey(key) ? key : matches.get(key)?.pipeline)
+  const groups = new Map<string, UnmatchedTermGroup>()
+  for (const term of golden) {
+    if (!wanted.has(term.key) || matches.has(term.key)) {
+      continue
+    }
+    const parent = parentOf(term)
+    const alignedParent = parent === null ? null : aligned(parent)
+    if (alignedParent === undefined) {
+      continue
+    }
+    const id = `${term.kind}:${parent ?? ""}`
+    const group = groups.get(id) ?? {
+      kind: term.kind,
+      parent: parent !== null && alignedParent !== null ? { golden: parent, pipeline: alignedParent } : null,
+      reference: [],
+      pipeline: pipeline.filter(
+        (candidate) =>
+          candidate.kind === term.kind && !taken.has(candidate.key) && parentOf(candidate) === alignedParent
+      )
+    }
+    group.reference.push(term)
+    groups.set(id, group)
+  }
+  return [...groups.values()]
+    .filter((group) => group.pipeline.length > 0)
+    .toSorted((a, b) => compareCodeUnits(`${a.kind}:${a.parent?.golden ?? ""}`, `${b.kind}:${b.parent?.golden ?? ""}`))
 }
 
 /** The share of golden terms (core keys left out: every vocabulary has them) the alignment matched. */

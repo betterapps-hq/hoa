@@ -113,6 +113,15 @@ const committeeView: Partial<ApplicationView> = {
   canDecide: true
 }
 
+/** The drop zone's file input, which browsing and dropping both fill. */
+function addFilesInput() {
+  const input = document.getElementById("add-files")
+  if (!(input instanceof HTMLInputElement)) {
+    throw new Error("No drop zone")
+  }
+  return input
+}
+
 describe("ApplicationPage", () => {
   it("leads with the recommendation and next steps, and keeps the rest behind disclosure", () => {
     setup()
@@ -147,18 +156,19 @@ describe("ApplicationPage", () => {
 
   it("makes adding files the one primary action while information is missing, and reviews again", async () => {
     const { actions, user } = setup()
-    expect(screen.getByRole("button", { name: "Add files" })).toHaveClass("bg-primary")
+    expect(screen.getByRole("button", { name: "Add files" })).toHaveTextContent("Drag files here, or browse")
+    expect(screen.queryByRole("button", { name: "Submit to the committee" })).not.toBeInTheDocument()
     const pdf = new File(["%PDF"], "plan.pdf", { type: "application/pdf" })
-    await user.upload(screen.getByLabelText("Add files"), pdf)
-    expect(actions.upload).toHaveBeenCalledWith([pdf])
+    await user.upload(addFilesInput(), pdf)
+    await vi.waitFor(() => expect(actions.upload).toHaveBeenCalledWith([pdf]))
     await vi.waitFor(() => expect(actions.runReview).toHaveBeenCalled())
   })
 
   it("refuses a file type it can't read before uploading", async () => {
     const { actions } = setup()
     const user = userEvent.setup({ applyAccept: false })
-    await user.upload(screen.getByLabelText("Add files"), new File(["x"], "fence.heic", { type: "image/heic" }))
-    expect(screen.getByRole("alert")).toHaveTextContent(/Save photos as JPEG or PNG/)
+    await user.upload(addFilesInput(), new File(["x"], "fence.heic", { type: "image/heic" }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Save photos as JPEG or PNG/)
     expect(actions.upload).not.toHaveBeenCalled()
   })
 
@@ -176,7 +186,7 @@ describe("ApplicationPage", () => {
       review: { ...review, recommendation: "approve-with-conditions", missingInformation: [] }
     })
     expect(screen.getByRole("heading", { name: "Approvable with conditions" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Add files" })).not.toHaveClass("bg-primary")
+    expect(screen.getByRole("button", { name: "Add files" })).toHaveTextContent("Add files")
     expect(screen.getByRole("button", { name: "Submit to the committee" })).toHaveClass("bg-primary")
     await user.click(screen.getByRole("button", { name: "Submit to the committee" }))
     expect(actions.submit).toHaveBeenCalledWith(false)

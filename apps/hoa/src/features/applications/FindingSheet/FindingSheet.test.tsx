@@ -77,7 +77,7 @@ describe("FindingSheet", () => {
     expect(sheet.getByText("Left side run")).toBeInTheDocument()
     expect(sheet.getAllByText("Not met").length).toBeGreaterThan(0)
     expect(
-      within(sheet.getByRole("region", { name: "The rule" })).getByRole("button", { name: /^View in document/ })
+      within(sheet.getByRole("region", { name: "The rule" })).getByRole("link", { name: /^View in document/ })
     ).toBeInTheDocument()
     expect(sheet.getByRole("region", { name: "Why" })).toHaveTextContent(/\w/)
   })
@@ -173,7 +173,7 @@ describe("FindingSheet", () => {
     })
     const modifiers = within(sheet.getByRole("region", { name: "Rules that changed this finding" }))
     expect(modifiers.getByText("Left to the committee by")).toBeInTheDocument()
-    expect(modifiers.getByRole("button", { name: "Declaration 4.1, paragraph 1" })).toBeInTheDocument()
+    expect(modifiers.getByRole("link", { name: "Declaration 4.1, paragraph 1" })).toBeInTheDocument()
     const judgment = within(sheet.getByRole("region", { name: "Judgment" }))
     expect(judgment.getByText(/not enough of the neighboring homes/)).toBeInTheDocument()
     expect(judgment.getByText(/Unclear/)).toBeInTheDocument()

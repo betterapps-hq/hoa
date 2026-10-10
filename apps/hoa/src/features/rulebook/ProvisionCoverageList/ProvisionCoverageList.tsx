@@ -1,15 +1,15 @@
 import { SearchIcon } from "lucide-react"
 import { useState } from "react"
+import { clampPage, ListPager, pageOf } from "@/components/ListPager/ListPager"
 import { Input } from "@/components/ui/input"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { usePageSize } from "@/hooks/usePageSize"
 import { useSearch } from "@/hooks/useSearch"
 import { BulkApprove } from "../BulkApprove/BulkApprove"
-import { clampPage, ListPager, pageOf } from "../ListPager/ListPager"
 import { ProvisionCoverageCard } from "../ProvisionCoverageCard/ProvisionCoverageCard"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 import { filterProvisions, provisionSearchSetup, type CoverageFilter } from "./ProvisionCoverageList.utils"
 
-const pageSize = 25
 const filterChoices: { value: CoverageFilter; label: string }[] = [
   { value: "uncovered", label: "Uncovered" },
   { value: "to-review", label: "Reasons to review" },
@@ -34,6 +34,7 @@ export function ProvisionCoverageList({ initialFilter = null }: { initialFilter?
   })
   const [query, setQuery] = useState("")
   const [page, setPage] = useState(0)
+  const { pageSize, choices, setPageSize } = usePageSize("provisions", 25)
   const search = useSearch(records.provisions, provisionSearchSetup)
   const shown = filterProvisions(records.provisions, coverage.byProvision, filter, { query, search })
   const current = clampPage(shown.length, page, pageSize)
@@ -95,7 +96,18 @@ export function ProvisionCoverageList({ initialFilter = null }: { initialFilter?
           ))}
         </ul>
       )}
-      <ListPager total={shown.length} page={current} pageSize={pageSize} onPageChange={setPage} noun="provisions" />
+      <ListPager
+        total={shown.length}
+        page={current}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        noun="provisions"
+        pageSizes={choices}
+        onPageSizeChange={(size, next) => {
+          setPageSize(size)
+          setPage(next)
+        }}
+      />
     </div>
   )
 }

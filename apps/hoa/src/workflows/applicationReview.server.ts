@@ -34,8 +34,9 @@ import { loadPacket } from "@/review/storedPacket"
 import { readRulesFile } from "@/rulebook/assemble"
 import { applicationKeys, jobStepKey } from "@/storage/keys"
 import { createObjectPromptCache, getJson, putJson } from "@/storage/objects"
+import { loadPages } from "@/storage/pages"
 import { getPresigner } from "@/storage/storage.server"
-import { loadPages, modelStep, runOcr, storageStep } from "./ocrSteps.server"
+import { modelStep, runOcr, storageStep } from "./ocrSteps.server"
 
 export type ApplicationReviewParams = {
   hoaId: string

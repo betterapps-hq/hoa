@@ -290,7 +290,8 @@ type Term = {
 - **Core terms** (`organizationId: null`) ship with the portal and are the same for every organization. A term is core
   only if portal code reads or writes it: the parties (owner, tenant, guest, occupant, applicant, organization,
   members, board, committee), the community and its lots, the request types with the fields their features supply
-  (submitted on, notice delivered on, due on, total votes), and units.
+  (submitted on, notice delivered on, due on, total votes), the documents the portal's application form provides
+  (`application-form`, `project-description`), and units.
 - **Organization terms** are generated from one organization's documents and edited by its administrators: everything
   its documents define or regulate, such as fence runs, composite colors, Trex, return fences and commercial vehicles.
 - **Refining a core term.** An organization term with a core term's key replaces the core term's labels, definition,

@@ -538,8 +538,41 @@ export function referencesTo(provisions: readonly T.Provision[]) {
   return referencedBy
 }
 
+type Position = { fileId: string; page: number; start: number }
+
+/** Where a provision starts on its pages: its first anchor, or its earliest child's when it has none (a part's heading). */
+function positionOf(provision: T.Provision, children: Map<string | null, T.Provision[]>, depth = 0): Position | null {
+  const [anchor] = provision.anchors
+  if (anchor) {
+    return anchor
+  }
+  // Labels are unique within a document; the cap only stops a cycle an unvalidated draft might hold.
+  const found =
+    depth < 20 ? (children.get(provision.label) ?? []).map((child) => positionOf(child, children, depth + 1)) : []
+  return found.reduce<Position | null>(
+    (first, position) => (position && (!first || comesBefore(position, first)) ? position : first),
+    null
+  )
+}
+
 /**
- * A document's provisions parent before children, siblings in their stored order: the order they're read in, whatever
+ * Siblings in the order their pages hold them when they were all read from one upload, whatever order storage gives
+ * them; otherwise in their stored order.
+ */
+function inPageOrder(siblings: readonly T.Provision[], children: Map<string | null, T.Provision[]>) {
+  const positions = new Map(siblings.map((provision) => [provision, positionOf(provision, children)]))
+  const [first] = positions.values()
+  const isPlaced = [...positions.values()].every((position) => position && position.fileId === first?.fileId)
+  return isPlaced
+    ? siblings.toSorted((a, b) => {
+        const [x, y] = [positions.get(a), positions.get(b)]
+        return x && y ? x.page - y.page || x.start - y.start : 0
+      })
+    : siblings
+}
+
+/**
+ * A document's provisions parent before children, siblings in reading order: the order they're read in, whatever
  * order storage gives them. A provision whose parent isn't there starts a branch of its own.
  */
 function inReadingOrder(provisions: readonly T.Provision[]) {
@@ -549,7 +582,7 @@ function inReadingOrder(provisions: readonly T.Provision[]) {
   )
   const ordered: T.Provision[] = []
   const visit = (parent: string | null, depth: number) => {
-    for (const provision of children.get(parent) ?? []) {
+    for (const provision of inPageOrder(children.get(parent) ?? [], children)) {
       ordered.push(provision)
       // Labels are unique within a document; the cap only stops a cycle an unvalidated draft might hold.
       if (depth < 20) {
@@ -563,15 +596,18 @@ function inReadingOrder(provisions: readonly T.Provision[]) {
 
 /**
  * Places each outside passage after the provision whose first anchor comes last before it in its upload, or at the
- * start of the first anchored provision's document when none does.
+ * start of the first anchored provision's document when none does. Provisions are taken in page order.
  */
-function placeOutside(provisions: readonly T.Provision[], sourceText: readonly SourceText[]) {
+export function placeOutside(provisions: readonly T.Provision[], sourceText: readonly SourceText[]) {
   const after = new Map<T.ProvisionKey, OutsidePassage[]>()
   for (const source of sourceText) {
-    const anchored = provisions.flatMap((provision) => {
-      const anchor = provision.anchors.find((item) => item.fileId === source.fileId)
-      return anchor ? [{ provision, anchor }] : []
-    })
+    // In page order, whatever order storage gives the provisions.
+    const anchored = provisions
+      .flatMap((provision) => {
+        const anchor = provision.anchors.find((item) => item.fileId === source.fileId)
+        return anchor ? [{ provision, anchor }] : []
+      })
+      .toSorted((a, b) => a.anchor.page - b.anchor.page || a.anchor.start - b.anchor.start)
     const first = anchored[0]
     if (!first) {
       continue
@@ -584,6 +620,56 @@ function placeOutside(provisions: readonly T.Provision[], sourceText: readonly S
     }
   }
   return after
+}
+
+/**
+ * One passage of a document in reading order, before anything covers it: a provision's own words (its heading, text
+ * and intro), its wrap-up after its children, or page text outside any provision. Depth is how many ancestors it has.
+ */
+export type ReadingPassage =
+  | { type: "provision"; key: string; provision: T.Provision; part: "main" | "wrap-up"; depth: number }
+  | { type: "outside"; key: string; passage: OutsidePassage; depth: number }
+
+/**
+ * A document's text in reading order, grouped by top-level provision (an article, a part, an exhibit): each provision
+ * before its children and its wrap-up after them, with the page text outside any provision where `placeOutside` put it
+ * (placed over every document's provisions, since one upload can hold several documents).
+ */
+export function readingOrder(
+  provisions: readonly T.Provision[],
+  outsideAfter: ReadonlyMap<string, readonly OutsidePassage[]> = new Map()
+): { article: T.Provision; passages: ReadingPassage[] }[] {
+  const ordered = inReadingOrder(provisions)
+  const articles: { article: T.Provision; passages: ReadingPassage[] }[] = []
+  const stack: T.Provision[] = []
+  const push = (passage: ReadingPassage) => articles.at(-1)?.passages.push(passage)
+  const outside = (key: string, depth: number) => {
+    for (const passage of outsideAfter.get(key) ?? []) {
+      push({ type: "outside", key: `outside:${passage.fileId}:${passage.page}:${passage.start}`, passage, depth })
+    }
+  }
+  const close = () => {
+    const done = stack.pop()
+    if (done?.wrapUp) {
+      push({ type: "provision", key: `${done.key}/wrap-up`, provision: done, part: "wrap-up", depth: stack.length })
+    }
+  }
+  for (const provision of ordered) {
+    while (stack.length > 0 && stack.at(-1)?.label !== provision.parentLabel) {
+      close()
+    }
+    if (stack.length === 0) {
+      articles.push({ article: provision, passages: [] })
+    }
+    outside(`^${provision.key}`, stack.length)
+    push({ type: "provision", key: provision.key, provision, part: "main", depth: stack.length })
+    stack.push(provision)
+    outside(provision.key, stack.length)
+  }
+  while (stack.length > 0) {
+    close()
+  }
+  return articles
 }
 
 /**
@@ -608,76 +694,30 @@ export function coverageReport(
   }
   const byDocument = Map.groupBy(records.provisions, (provision) => documentKeyOf(provision.key))
   const documents = records.documents.flatMap((document): DocumentCoverage[] => {
-    const provisions = inReadingOrder(byDocument.get(document.key) ?? [])
+    const provisions = byDocument.get(document.key) ?? []
     if (provisions.length === 0) {
       return []
     }
-    const articles: ArticleCoverage[] = []
-    const stack: T.Provision[] = []
-    const push = (passage: CoveragePassage) => {
-      const article = articles.at(-1)
-      if (article) {
-        article.passages.push(passage)
-        article.totals[passage.kind] += passage.text.length
+    const covered = (passage: ReadingPassage): CoveragePassage => {
+      if (passage.type === "outside") {
+        return { ...passage, text: passage.passage.text, kind: "outside" }
       }
-    }
-    const outside = (key: string, depth: number) => {
-      for (const passage of outsideAfter.get(key) ?? []) {
-        push({
-          type: "outside",
-          key: `outside:${passage.fileId}:${passage.page}:${passage.start}`,
-          passage,
-          text: passage.text,
-          kind: "outside",
-          depth
-        })
-      }
-    }
-    const wrapUp = (provision: T.Provision) => {
-      if (provision.wrapUp) {
-        push({
-          type: "provision",
-          key: `${provision.key}/wrap-up`,
-          provision,
-          part: "wrap-up",
-          text: provision.wrapUp,
-          kind: coverageKindOf(provision, coverage.byProvision.get(provision.key)),
-          depth: stack.length,
-          marks: marksOf(provision, provision.wrapUp)
-        })
-      }
-    }
-    for (const provision of provisions) {
-      while (stack.length > 0 && stack.at(-1)?.label !== provision.parentLabel) {
-        const done = stack.pop()
-        if (done) {
-          wrapUp(done)
-        }
-      }
-      if (stack.length === 0) {
-        articles.push({ provision, totals: emptyTotals(), passages: [] })
-      }
-      outside(`^${provision.key}`, stack.length)
-      const text = mainText(provision)
-      push({
-        type: "provision",
-        key: provision.key,
-        provision,
-        part: "main",
+      const text = passage.part === "main" ? mainText(passage.provision) : (passage.provision.wrapUp ?? "")
+      return {
+        ...passage,
         text,
-        kind: coverageKindOf(provision, coverage.byProvision.get(provision.key)),
-        depth: stack.length,
-        marks: marksOf(provision, text)
-      })
-      stack.push(provision)
-      outside(provision.key, stack.length)
-    }
-    while (stack.length > 0) {
-      const done = stack.pop()
-      if (done) {
-        wrapUp(done)
+        kind: coverageKindOf(passage.provision, coverage.byProvision.get(passage.provision.key)),
+        marks: marksOf(passage.provision, text)
       }
     }
+    const articles = readingOrder(provisions, outsideAfter).map(({ article, passages }): ArticleCoverage => {
+      const totals = emptyTotals()
+      const shown = passages.map(covered)
+      for (const passage of shown) {
+        totals[passage.kind] += passage.text.length
+      }
+      return { provision: article, totals, passages: shown }
+    })
     const totals = emptyTotals()
     for (const article of articles) {
       addTotals(totals, article.totals)

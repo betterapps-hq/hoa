@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { createFileRoute, getRouteApi, useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 import {
   completeApplicationUpload,
@@ -23,8 +23,11 @@ export const Route = createFileRoute("/applications/")({
   component: ApplicationsRoute
 })
 
+const rootRoute = getRouteApi("__root__")
+
 function ApplicationsRoute() {
   const { applications, projectTypes } = Route.useLoaderData()
+  const session = rootRoute.useLoaderData()
   const navigate = useNavigate()
   const { role } = useRole()
   const open = (applicationId: string) =>
@@ -55,6 +58,7 @@ function ApplicationsRoute() {
         open(application.id)
       }}
       onOpen={open}
+      draftKey={`${session.hoaName}:${session.user.email}`}
     />
   )
 }

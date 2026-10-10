@@ -3,6 +3,7 @@ import { LayersIcon, SparklesIcon } from "lucide-react"
 import { useState } from "react"
 import { z } from "zod"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -29,8 +30,9 @@ import { Input } from "@/components/ui/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
-import type { ProjectTypeDefinition } from "@/projectTypes/projectType"
+import type { ProjectTypeDefinition, ProjectTypeStatus } from "@/projectTypes/projectType"
 import type { ProjectTypeSuggestion } from "@/projectTypes/suggest"
+import { ProjectTypeMenu } from "../ProjectTypeMenu/ProjectTypeMenu"
 import type { ProjectTypesOverview } from "../projectTypes.functions"
 
 // The administrator's project types (application-review.md, Project types): the organization's list, a dialog to add
@@ -48,6 +50,8 @@ export type ProjectTypesPageProps = {
   onCreate: (input: NewProjectType) => Promise<void>
   onSuggest: () => Promise<ProjectTypeSuggestion[]>
   onOpen: (projectTypeId: string) => void
+  onSetStatus: (projectTypeId: string, status: ProjectTypeStatus) => Promise<void>
+  onDelete: (projectTypeId: string) => Promise<void>
 }
 
 const newTypeSchema = z.object({
@@ -99,8 +103,8 @@ function AddProjectTypeDialog({ subjects, isOpen, onOpenChange, onCreate }: AddD
           <DialogHeader>
             <DialogTitle>Add a project type</DialogTitle>
             <DialogDescription>
-              Its form asks for every detail the rules test about what it covers, and lists the documents they require.
-              You can remove questions afterwards.
+              Its form starts with every detail the rules check about what it covers and the documents they require. You
+              can reorder, reword or remove them next.
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>
@@ -284,8 +288,16 @@ function Suggestions({ onCreate, onSuggest, isEnabled }: SuggestionsProps) {
 }
 
 /** The organization's project types, suggestions from its rulebook, and a way to add one by hand. */
-export function ProjectTypesPage({ overview, onCreate, onSuggest, onOpen }: ProjectTypesPageProps) {
+export function ProjectTypesPage({
+  overview,
+  onCreate,
+  onSuggest,
+  onOpen,
+  onSetStatus,
+  onDelete
+}: ProjectTypesPageProps) {
   const [isAdding, setIsAdding] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const { projectTypes, subjects, hasPublishedRulebook } = overview
   return (
     <div className="flex flex-col gap-4 px-4 lg:px-6">
@@ -308,7 +320,12 @@ export function ProjectTypesPage({ overview, onCreate, onSuggest, onOpen }: Proj
             </Button>
           </CardAction>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-3">
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
           {projectTypes.length === 0 ? (
             <Empty>
               <EmptyHeader>
@@ -324,23 +341,31 @@ export function ProjectTypesPage({ overview, onCreate, onSuggest, onOpen }: Proj
               {projectTypes.map((type) => (
                 <Item key={type.id} variant="outline">
                   <ItemContent>
-                    <ItemTitle>{type.label}</ItemTitle>
+                    <ItemTitle>
+                      <button
+                        type="button"
+                        className="rounded-sm text-left hover:underline focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+                        onClick={() => onOpen(type.id)}
+                      >
+                        {type.label}
+                      </button>
+                      {type.status === "archived" ? <Badge variant="outline">Archived</Badge> : null}
+                    </ItemTitle>
                     {type.description ? <ItemDescription>{type.description}</ItemDescription> : null}
                     <p className="text-sm text-muted-foreground">
-                      {type.status === "retired"
-                        ? "Retired: hidden from new applications"
-                        : definitionSummary(type.definition)}
+                      {type.status === "archived" ? "Hidden from new applications" : definitionSummary(type.definition)}
                     </p>
                   </ItemContent>
                   <ItemActions>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onOpen(type.id)}
-                      aria-label={`Open ${type.label}`}
-                    >
-                      Open
-                    </Button>
+                    <ProjectTypeMenu
+                      label={type.label}
+                      status={type.status}
+                      applicationCount={type.applicationCount}
+                      onOpen={() => onOpen(type.id)}
+                      onSetStatus={(status) => onSetStatus(type.id, status)}
+                      onDelete={() => onDelete(type.id)}
+                      onError={setError}
+                    />
                   </ItemActions>
                 </Item>
               ))}

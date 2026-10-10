@@ -5,7 +5,6 @@ import type { ReactNode } from "react"
 import { describe, expect, it, vi } from "vitest"
 import type { GoverningDocument } from "@/documents/governingDocument"
 import type { Job } from "@/jobs/job"
-import type { CitationSource } from "./DocumentViewer/DocumentViewer"
 import { GoverningDocuments, type GoverningDocumentsProps } from "./GoverningDocuments/GoverningDocuments"
 import { uploadDocument, type UploadApi } from "./uploadDocument"
 
@@ -95,17 +94,9 @@ function wrapper({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
 }
 
-const noPages: CitationSource = {
-  documents: [],
-  loadPage: async () => {
-    throw new Error("No pages in this test.")
-  }
-}
-
 describe("GoverningDocuments", () => {
   const props = {
     uploads: [] as GoverningDocument[],
-    source: noPages,
     jobs: {},
     loadJob: vi.fn<GoverningDocumentsProps["loadJob"]>(async () => job()),
     onChanged: vi.fn<() => void>()
@@ -214,7 +205,10 @@ describe("GoverningDocuments", () => {
   it("lets a member read and download the documents, without uploading", () => {
     render(<GoverningDocuments {...props} uploads={[document()]} />, { wrapper })
     expect(screen.getByRole("link", { name: "Download Residential design guidelines" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Read Residential design guidelines" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Read Residential design guidelines" })).toHaveAttribute(
+      "href",
+      "/documents/doc-1"
+    )
     expect(screen.queryByRole("button", { name: /Upload|New version/ })).not.toBeInTheDocument()
   })
 })

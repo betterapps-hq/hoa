@@ -11,7 +11,7 @@ import {
 } from "./keys"
 import { createObjectPromptCache, getJson, putJson, toHex, type ObjectBucket } from "./objects"
 import { createPresigner } from "./presign"
-import { validateUpload } from "./uploadRules"
+import { acceptedTypes, uploadHint, validateUpload } from "./uploadRules"
 
 const megabyte = 1024 * 1024
 
@@ -44,6 +44,18 @@ describe("validateUpload", () => {
     expect(validateUpload({ name: "empty.pdf", type: "application/pdf", size: 0 }, "application")).toMatchObject({
       message: "empty.pdf is empty."
     })
+  })
+})
+
+describe("acceptedTypes and uploadHint", () => {
+  it("say what each target takes, from the same rules validateUpload checks", () => {
+    expect(acceptedTypes("governing")).toEqual({
+      "application/pdf": [".pdf"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"]
+    })
+    expect(acceptedTypes("application")["image/png"]).toEqual([".png", ".jpg", ".jpeg"])
+    expect(uploadHint("governing")).toBe("PDF or Word up to 50 MB.")
+    expect(uploadHint("application")).toBe("PDF or Word up to 25 MB, JPEG or PNG up to 5 MB.")
   })
 })
 

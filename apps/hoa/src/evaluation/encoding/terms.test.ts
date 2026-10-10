@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { golden, goldenRule, relabeledManufacturer, renamedTerms } from "./pair.test-data"
-import { alignTerms, termKeysIn, termRecall } from "./terms"
+import { alignTerms, termKeysIn, termRecall, unmatchedTermGroups } from "./terms"
 
 describe("alignTerms", () => {
   it("matches the same key, else the same kind by label under an aligned parent", () => {
@@ -12,14 +12,14 @@ describe("alignTerms", () => {
     expect(matches.get("fence-location.front")).toMatchObject({ pipeline: "run-location.front", by: "label" })
   })
 
-  it("takes the term judge's pairs of the same kind under the aligned parent", () => {
+  it("takes the coding agent's pairs of the same kind under the aligned parent", () => {
     const pipeline = relabeledManufacturer()
     expect(alignTerms(golden.terms, pipeline).has("fence-run.manufacturer")).toBe(false)
     expect(
       alignTerms(golden.terms, pipeline, [{ golden: "fence-run.manufacturer", pipeline: "fence-run.brand" }]).get(
         "fence-run.manufacturer"
       )
-    ).toMatchObject({ pipeline: "fence-run.brand", by: "judge" })
+    ).toMatchObject({ pipeline: "fence-run.brand", by: "agent" })
     expect(
       alignTerms(golden.terms, pipeline, [{ golden: "fence-run.manufacturer", pipeline: "gate" }]).has(
         "fence-run.manufacturer"
@@ -33,6 +33,30 @@ describe("alignTerms", () => {
     expect(matches.has("fence-run.lattice-height")).toBe(false)
     const targets = [...matches.values()].map((match) => match.pipeline)
     expect(new Set(targets).size).toBe(targets.length)
+  })
+})
+
+describe("unmatchedTermGroups", () => {
+  const pipeline = relabeledManufacturer()
+  const matches = alignTerms(golden.terms, pipeline)
+  const keys = new Set(["fence-run.manufacturer"])
+
+  it("offers a property no key or label matches, among its aligned thing's unmatched properties", () => {
+    const groups = unmatchedTermGroups(golden.terms, pipeline, matches, keys)
+    expect(groups).toHaveLength(1)
+    expect(groups[0]).toMatchObject({ kind: "property", parent: { golden: "fence-run", pipeline: "fence-run" } })
+    expect(groups[0]?.reference.map((term) => term.key)).toEqual(["fence-run.manufacturer"])
+    expect(groups[0]?.pipeline.map((term) => term.key)).toEqual(["fence-run.brand"])
+  })
+
+  it("leaves out terms outside the split, paired terms and groups with no candidates", () => {
+    expect(unmatchedTermGroups(golden.terms, pipeline, matches, new Set(["gate"]))).toEqual([])
+    const paired = alignTerms(golden.terms, pipeline, [
+      { golden: "fence-run.manufacturer", pipeline: "fence-run.brand" }
+    ])
+    expect(unmatchedTermGroups(golden.terms, pipeline, paired, keys)).toEqual([])
+    const complete = alignTerms(golden.terms, golden.terms)
+    expect(unmatchedTermGroups(golden.terms, golden.terms, complete, keys)).toEqual([])
   })
 })
 

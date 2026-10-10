@@ -1,4 +1,6 @@
+import { ExternalLinkIcon } from "lucide-react"
 import type { ReactNode, Ref } from "react"
+import { citationHref, citedProvisionHref } from "@/features/documents/citationLink"
 import { cn } from "@/lib/utils"
 import type { CoveragePassage, OutsidePassage } from "@/rulebook/coverage"
 import type * as T from "@/schema/types"
@@ -40,6 +42,20 @@ export function PassageCoverage({ passage, referencedBy, headingRef }: PassageCo
           <Icon className={cn("size-4 shrink-0", style.iconColor)} aria-hidden />
           {coverageKindLabels[passage.kind]}
         </p>
+        <a
+          className="flex w-fit items-center gap-1 text-link underline-offset-4 hover:underline"
+          href={
+            passage.type === "provision"
+              ? citedProvisionHref({ provisionKey: passage.provision.key, anchors: passage.provision.anchors })
+              : citationHref(passage.passage.fileId)
+          }
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open in reader
+          <ExternalLinkIcon className="size-3.5" aria-hidden />
+          <span className="sr-only">, in a new tab</span>
+        </a>
       </div>
       {passage.type === "provision" ? (
         <ProvisionCoverage passage={passage} referencedBy={referencedBy} />

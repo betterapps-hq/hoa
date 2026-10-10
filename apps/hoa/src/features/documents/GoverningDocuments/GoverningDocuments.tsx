@@ -1,21 +1,19 @@
 import { BookOpenTextIcon, ChevronDownIcon, FileTextIcon, UploadIcon } from "lucide-react"
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import type { GoverningDocument } from "@/documents/governingDocument"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
+import { citationHref } from "../citationLink"
 import { DocumentFileLinks } from "../DocumentFileLinks/DocumentFileLinks"
 import { documentKindLabels, documentVersions } from "../documentKinds"
-import { DocumentSheet } from "../DocumentSheet/DocumentSheet"
-import type { CitationSource, ViewerDocument } from "../DocumentViewer/DocumentViewer"
+import { ReaderLink } from "../ReaderLink/ReaderLink"
 import type { DocumentDetails } from "../uploadDocument"
 import { UploadDocumentDialog } from "../UploadDocumentDialog/UploadDocumentDialog"
 
 export type GoverningDocumentsProps = {
   uploads: GoverningDocument[]
-  /** The documents' pages, for reading one here. */
-  source: CitationSource
   /** The running job for each document being read, by document id. */
   jobs: Record<string, string>
   loadJob: (jobId: string) => Promise<Job | null>
@@ -41,7 +39,6 @@ function dateText(value: string) {
  */
 export function GoverningDocuments({
   uploads,
-  source,
   jobs,
   loadJob,
   onUpload,
@@ -50,7 +47,6 @@ export function GoverningDocuments({
 }: GoverningDocumentsProps) {
   const [uploadFor, setUploadFor] = useState<GoverningDocument | null | undefined>(undefined)
   const [isAllShown, setIsAllShown] = useState(false)
-  const [reading, setReading] = useState<ViewerDocument | null>(null)
   const documents = documentVersions(uploads)
   const shown = isAllShown ? documents : documents.slice(0, initialCount)
 
@@ -98,11 +94,7 @@ export function GoverningDocuments({
                 jobId={jobs[latest.id]}
                 loadJob={loadJob}
                 onChanged={onChanged}
-                onRead={
-                  latest.status === "ready" && latest.pageCount
-                    ? () => setReading({ id: latest.id, title: latest.title, pageCount: latest.pageCount ?? 1 })
-                    : undefined
-                }
+                isReadable={latest.status === "ready" && Boolean(latest.pageCount)}
                 onNewVersion={onUpload ? () => setUploadFor(latest) : undefined}
               />
               {earlier.length > 0 ? <EarlierVersions versions={earlier} /> : null}
@@ -115,7 +107,6 @@ export function GoverningDocuments({
           Show all {documents.length} documents
         </Button>
       ) : null}
-      <DocumentSheet document={reading} source={source} onClose={() => setReading(null)} />
       {onUpload ? (
         <UploadDocumentDialog
           key={uploadFor?.id ?? "new"}
@@ -135,14 +126,15 @@ function DocumentRow({
   jobId,
   loadJob,
   onChanged,
-  onRead,
+  isReadable,
   onNewVersion
 }: {
   document: GoverningDocument
   jobId: string | undefined
   loadJob: GoverningDocumentsProps["loadJob"]
   onChanged: () => void
-  onRead?: () => void
+  /** Whether its pages were read, so it opens in the document reader. */
+  isReadable: boolean
   onNewVersion?: () => void
 }) {
   const details = [
@@ -172,12 +164,12 @@ function DocumentRow({
         ) : null}
       </div>
       <div className="-ml-2 flex shrink-0 flex-wrap items-center gap-1 @xl:ml-0">
-        {onRead ? (
-          <Button size="sm" variant="ghost" onClick={onRead}>
-            <BookOpenTextIcon />
+        {isReadable ? (
+          <ReaderLink href={citationHref(document.id)} className={buttonVariants({ size: "sm", variant: "ghost" })}>
+            <BookOpenTextIcon aria-hidden />
             Read
             <span className="sr-only"> {document.title}</span>
-          </Button>
+          </ReaderLink>
         ) : null}
         {document.status === "uploading" ? null : <DocumentFileLinks documentId={document.id} title={document.title} />}
         {onNewVersion ? (

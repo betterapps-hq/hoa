@@ -6,20 +6,32 @@ import type * as T from "@/schema/types"
 import type { AnswerValue, ProjectAnswers, ProjectField, ProjectGroup, ProjectTypeDefinition } from "./projectType"
 
 // The homeowner's answers to a project type's form (application-review.md, Project types): validated with a Zod
-// schema built from the definition, shown to the review's models as one more page of the packet, and, where a group
-// describes exactly one entity (the work), read as facts of the properties its fields bind to.
+// schema built from the definition, shown to the review's models (and the committee) as one more page of the packet,
+// every answer included, and, where a group describes exactly one entity (the work), the answers to bound questions
+// read as facts of their properties. The administrator's own questions are context only.
 
 /** The file id of the answers page in the packet. */
 export const answersFileId = "form-answers"
 
-const isBlank = (value: AnswerValue | undefined) => value === null || value === undefined || value === ""
+const isBlank = (value: AnswerValue | undefined) =>
+  value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)
 
-function fieldSchema(field: ProjectField) {
+/** The schema for one answer: its kind's value, and an answer when the question is required. */
+export function fieldSchema(field: ProjectField) {
   const required = (schema: z.ZodType<AnswerValue>) =>
-    field.isRequired ? schema.refine((value) => !isBlank(value), { message: `Answer "${field.label}".` }) : schema
+    field.isRequired ? schema.refine((value) => !isBlank(value), { message: "Answer this question." }) : schema
   switch (field.kind) {
     case "number":
-      return required(z.union([z.number().nonnegative(`"${field.label}" can't be negative.`), z.literal(""), z.null()]))
+      // A box the form couldn't read stays text, so it fails here with how to fix it.
+      return required(
+        z.union([z.number().nonnegative("Give an amount that isn't negative."), z.literal(""), z.null()], {
+          error: () => "Use numbers only, such as 6 or 5.5."
+        })
+      )
+    case "choices": {
+      const values = field.options.map((option) => option.value)
+      return required(z.union([z.array(z.enum(values)), z.null()]))
+    }
     case "yes-no":
       return required(z.union([z.boolean(), z.null()]))
     case "choice":
@@ -29,12 +41,18 @@ function fieldSchema(field: ProjectField) {
           : z.union([z.enum(field.options.map((option) => option.value)), z.literal(""), z.null()])
       )
     case "date":
-      return required(
-        z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, `Give "${field.label}" as a date.`), z.literal(""), z.null()])
-      )
+      return required(z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Give a date."), z.literal(""), z.null()]))
+    case "time":
+      return required(z.union([z.string().regex(/^\d{2}:\d{2}$/, "Give a time."), z.literal(""), z.null()]))
     default:
       return required(z.union([z.string().max(4000), z.null()]))
   }
+}
+
+/** What's wrong with one answer, in words; empty when it's fine. */
+export function answerErrors(field: ProjectField, value: AnswerValue | undefined): string[] {
+  const parsed = fieldSchema(field).safeParse(value ?? null)
+  return parsed.success ? [] : [...new Set(parsed.error.issues.map((issue) => issue.message))]
 }
 
 /** The Zod schema for a definition's answers: each group's items, each field's value. */
@@ -75,19 +93,27 @@ function answerText(field: ProjectField, value: AnswerValue): string | null {
   if (field.kind === "choice") {
     return field.options.find((option) => option.value === value)?.label ?? String(value)
   }
+  if (Array.isArray(value)) {
+    const labels = value.map((item) =>
+      field.kind === "choices" ? (field.options.find((option) => option.value === item)?.label ?? item) : item
+    )
+    return labels.join("; ")
+  }
   return String(value)
 }
 
 const itemName = (group: ProjectGroup, index: number) =>
   group.isRepeatable ? `${group.itemLabel} ${index + 1}` : group.itemLabel
 
-/** The answers as lines of text, "Label: answer", under each item's name. */
+/** The answers as lines of text, "Question? Answer" (or "Label: answer"), under each item's name. */
 export function answerLines(definition: ProjectTypeDefinition, answers: ProjectAnswers) {
   return definition.groups.flatMap((group) =>
     (answers[group.subject] ?? []).flatMap((item, index) => {
       const lines = group.fields.flatMap((field) => {
         const text = answerText(field, item[field.property] ?? null)
-        return text === null ? [] : [{ field, index, line: `${field.label}: ${text}` }]
+        return text === null
+          ? []
+          : [{ field, index, line: `${field.label}${/[?:]$/.test(field.label) ? "" : ":"} ${text}` }]
       })
       return lines.length > 0 ? [{ group, index, heading: itemName(group, index), lines }] : []
     })
@@ -162,11 +188,15 @@ export function answerReadings(
     if (section.group.isRepeatable || matching.length !== 1 || !entity) {
       return []
     }
-    return section.lines.map(({ field, line }) => {
+    // Only bound questions are facts; the administrator's own are context on the answers page.
+    return section.lines.flatMap(({ field, line }) => {
       const value = answers[section.group.subject]?.[section.index]?.[field.property] ?? null
+      if (field.binding === null || Array.isArray(value)) {
+        return []
+      }
       return {
         entity: entity.id,
-        property: field.property,
+        property: field.binding,
         state: "known" as const,
         stated: answerText(field, value),
         reading: field.kind === "number" && field.unit ? { value, unit: field.unit.key } : value,

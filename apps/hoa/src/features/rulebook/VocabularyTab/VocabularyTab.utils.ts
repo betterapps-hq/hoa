@@ -1,9 +1,9 @@
-import type { Search, SearchSetup } from "@/lib/search"
+import type { SearchSetup } from "@/lib/search"
 import { termKeysOf } from "@/rulebook/review"
 import type * as T from "@/schema/types"
 import type { Vocabulary } from "@/schema/vocabulary"
 
-// The vocabulary tab (encoding.md, UX, Vocabulary): where each term is used, filters by kind and status, and search.
+// The vocabulary tab (encoding.md, UX, Vocabulary): where each term is used, filters by kind and status, and the search the table finds words with.
 
 /** The rules that read each term, rejected rules left out. */
 export function termUsage(rules: T.Rule[]) {
@@ -32,14 +32,21 @@ export const termSearchSetup: SearchSetup<T.Term> = {
   }
 }
 
-/** The terms the filters keep, by label; with words, best match first. */
-export function filterTerms(terms: T.Term[], filters: TermFilters, vocabulary: Vocabulary, search: Search<T.Term>) {
-  const matches = terms
+/** A term as the table lists it: its label and the rules that read it. */
+export type TermRow = { term: T.Term; label: string; usedBy: T.RuleKey[] }
+
+/** The terms the filters beside the words keep, by label. */
+export function filterTerms(
+  terms: T.Term[],
+  filters: TermFilters,
+  { vocabulary, usage }: { vocabulary: Vocabulary; usage: Map<T.TermKey, T.RuleKey[]> }
+): TermRow[] {
+  return terms
     .filter(
       (term) =>
         (filters.kind === "all" || term.kind === filters.kind) &&
         (filters.status === "all" || term.review.status === filters.status)
     )
-    .toSorted((a, b) => vocabulary.label(a.key).localeCompare(vocabulary.label(b.key)) || a.key.localeCompare(b.key))
-  return search.rank(matches, filters.query)
+    .map((term) => ({ term, label: vocabulary.label(term.key), usedBy: usage.get(term.key) ?? [] }))
+    .toSorted((a, b) => a.label.localeCompare(b.label) || a.term.key.localeCompare(b.term.key))
 }

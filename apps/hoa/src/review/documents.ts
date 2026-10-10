@@ -2,6 +2,8 @@ import { z } from "zod"
 import type { DocumentReview } from "@/engine/context"
 import type { EngineVocabulary } from "@/engine/vocabulary"
 import { normalizeForMatching } from "@/ocr/page"
+import { answersFileId } from "@/projectTypes/answers"
+import { formDocumentKinds, type FormDocumentKind } from "@/schema/coreTerms"
 import { renderStatement } from "@/schema/statement"
 import type * as T from "@/schema/types"
 import { similarity } from "@/text/match"
@@ -11,7 +13,8 @@ import type { DocumentResult } from "./reviewModel"
 
 // Documents (application-review.md, Documents): every document check among the selected rules, per subject when the
 // check is; the document reader's answer becomes the request's documents (present, by type, with their signers) and
-// the statements the engine reads per rule and subject.
+// the statements the engine reads per rule and subject. A document the portal's application form provides (its answers,
+// the description) is present when the application has it, without asking the reader.
 
 export type Requirement = {
   id: string
@@ -25,6 +28,22 @@ export type Requirement = {
   /** The entity it's checked for: the request, or one subject. */
   entity: string
   isPerSubject: boolean
+  /** The application form's own document it asks for, when the form meets it; null when it's uploaded. */
+  formKind: FormDocumentKind | null
+}
+
+type DocumentCheck = Extract<T.Check, { type: "document" }>
+
+/**
+ * The application form's own document a check asks for, when the form meets it: the check's document is one the form
+ * provides, or the organization's refinement of one (the same key, or a category of it), and it needs no signature,
+ * which the form doesn't collect. Null when the homeowner uploads it.
+ */
+export function formKindOf(check: DocumentCheck, vocabulary: EngineVocabulary): FormDocumentKind | null {
+  if (check.signedBy.length > 0) {
+    return null
+  }
+  return formDocumentKinds.find((kind) => vocabulary.isKindOf(check.document, kind)) ?? null
 }
 
 type Entity = T.EvaluationRequest["entities"][number]
@@ -54,7 +73,8 @@ export function documentRequirements(
           mustState: check.mustState,
           signedBy: check.signedBy.map((party) => vocabulary.label(party)),
           entity: entity.id,
-          isPerSubject: check.per === "subject"
+          isPerSubject: check.per === "subject",
+          formKind: formKindOf(check, vocabulary)
         }))
     })
     .map((requirement, index) => ({ id: `d${index + 1}`, ...requirement }))
@@ -130,6 +150,54 @@ export function documentResults(
       signedBy: found?.present ? [...new Set(found.signers.filter((signer) => partyIds.has(signer)))] : [],
       evidence: found?.evidence.map(toEvidence) ?? []
     }
+  })
+}
+
+/** What the application form gave: whether it has the form's answers (the answers page), and the description. */
+export type FormContent = { hasAnswers: boolean; description: string | null }
+
+/** Whether the application form gave the document a requirement asks for. */
+export function isGivenByForm(requirement: Requirement, form: FormContent) {
+  switch (requirement.formKind) {
+    case "application-form":
+      return form.hasAnswers
+    case "project-description":
+      return Boolean(form.description?.trim())
+    default:
+      return false
+  }
+}
+
+/**
+ * The results with every requirement the form gives present: the form's answers page is its evidence, and the
+ * statements it must show are still the reader's. Others are the reader's results as they are.
+ */
+export function withFormDocuments(
+  requirements: readonly Requirement[],
+  results: readonly DocumentResult[],
+  form: FormContent
+): DocumentResult[] {
+  return requirements.flatMap((requirement) => {
+    const read = results.find(
+      (result) => result.ruleKey === requirement.ruleKey && result.entity === requirement.entity
+    )
+    if (!isGivenByForm(requirement, form)) {
+      return read ? [read] : []
+    }
+    const evidence =
+      requirement.formKind === "application-form" ? [{ fileId: answersFileId, page: 1, quote: null, region: null }] : []
+    return [
+      {
+        ruleKey: requirement.ruleKey,
+        entity: requirement.entity,
+        documentType: requirement.documentType,
+        present: true,
+        statements:
+          read?.statements ?? requirement.mustState.map((statement) => ({ statement, confirmed: null, quote: null })),
+        signedBy: [],
+        evidence: read?.evidence.length ? read.evidence : evidence
+      }
+    ]
   })
 }
 

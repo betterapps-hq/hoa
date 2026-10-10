@@ -14,13 +14,20 @@ import type { Answers, ConditionAnswer } from "@/engine/context"
 import { decide } from "@/engine/decide"
 import { evaluate } from "@/engine/evaluate"
 import { modelCall, modelCallOf, type ModelCall, type StepRunner } from "@/jobs/steps"
-import { answerReadings, withAnswersPage } from "@/projectTypes/answers"
+import { answerReadings, answersFileId, withAnswersPage } from "@/projectTypes/answers"
 import type { ProjectAnswers, ProjectTypeDefinition } from "@/projectTypes/projectType"
 import type * as T from "@/schema/types"
 import { evaluationRequest, fact, finding } from "@/schema/zod"
 import { candidateTypes, rootTypes } from "./candidates"
 import { correctionSchema } from "./corrections"
-import { documentAnswers, documentRequirements, documentResults, documentsAnswerSchema } from "./documents"
+import {
+  documentAnswers,
+  documentRequirements,
+  documentResults,
+  documentsAnswerSchema,
+  isGivenByForm,
+  withFormDocuments
+} from "./documents"
 import { documentTypes, rulebookVocabulary } from "./documentTypes"
 import { entityGroup, entityGroups, factPlan, planFacts, type EntityGroup } from "./factPlan"
 import { expandShared, factsAnswerSchema, type ConditionResponse, type FactsAnswer } from "./factSchema"
@@ -474,7 +481,8 @@ export async function reviewApplication(input: ReviewInput) {
   const documentTypeKeys = new Set(requirements.map((requirement) => requirement.documentType))
   // A page of a generic kind (a drawing, a photo) may be any of the required documents; only a page classified as
   // another of the rulebook's own types is left out.
-  const genericKinds = new Set(kinds.filter((kind) => !vocabulary.get(kind.key)).map((kind) => kind.key))
+  const ownKinds = new Set([...rulesFile.proposedCore, ...rulesFile.terms].map((term) => term.key))
+  const genericKinds = new Set(kinds.filter((kind) => !ownKinds.has(kind.key)).map((kind) => kind.key))
   const visualKinds = new Set([...genericKinds].filter((kind) => kind !== otherDocumentKind))
   const isRequiredPage = (page: PageRef) => {
     const type = pageTypes.get(page.fileId)?.[page.pageIndex - 1]
@@ -486,24 +494,36 @@ export async function reviewApplication(input: ReviewInput) {
   const hasRequiredPages = packet.files.some((file) =>
     file.pages.some((page) => isRequiredPage({ fileId: file.id, pageIndex: page.pageIndex }))
   )
+  // What the application form gave is present without asking the reader; only what it must show is still read.
+  const form = {
+    hasAnswers: packet.files.some((file) => file.id === answersFileId),
+    description: application.description
+  }
+  const toRead = requirements.filter(
+    (requirement) => !isGivenByForm(requirement, form) || requirement.mustState.length > 0
+  )
   const documents = await step(
     "documents",
     z.object({ results: z.array(documentResultSchema), call: modelCall.nullable() }),
     async () => {
-      if (requirements.length === 0) {
-        return { results: [], call: null }
+      if (toRead.length === 0) {
+        return { results: withFormDocuments(requirements, [], form), call: null }
       }
-      const schema = documentsAnswerSchema(requirements)
+      const schema = documentsAnswerSchema(toRead)
       const result = await run(pipelinePrompts.documentReview, "packet", {
         schema,
         variables: {
-          requirements: requirementsForPrompt(requirements, entities),
+          requirements: requirementsForPrompt(toRead, entities),
           parties: partiesForPrompt(parties, vocabulary),
           pages: hasRequiredPages ? pagesForPrompt(packet, pageTypes, isRequiredPage) : allPages
         }
       })
       return {
-        results: documentResults(requirements, result.answer, new Set(parties.map((party) => party.id))),
+        results: withFormDocuments(
+          requirements,
+          documentResults(toRead, result.answer, new Set(parties.map((party) => party.id))),
+          form
+        ),
         call: result.call
       }
     },

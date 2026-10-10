@@ -361,18 +361,11 @@ list is ordered by relevance; without, in its usual order. The other filters sti
   In either view an uncovered provision can be given a reason for having no rule. Coverage is computed in
   `src/rulebook/coverage.ts`, and the text outside provisions by `getSourceText`.
 
-**Citations open the document.** Every citation (`ProvisionReference` and `RuleReference`, so the application review's
-too) shows the provision's text on hover and focus, and opens `CitationViewer`: a side sheet, full width on a phone,
-with the governing document at the cited page and the provision highlighted from its anchors. A provision that spans
-pages lists them; a rule's "and N more" opens the same viewer with a picker over all its citations. The viewer's header
-has **Open the original** (the uploaded file at that page, in a new tab) and **Download**. Without the document's pages
-it shows the provision as stored.
-
-The viewer shows the page text read at upload (`getDocumentPage`), rendered from its Markdown, with highlights placed
-by character range. That's what the stored data supports exactly: page records hold the text the anchors index, and no
-page images are stored. The raw Layout responses keep word polygons, so the real page with highlight boxes is possible
-later by rendering the PDF; a PDF renderer would be a new library, which needs a discussion first. Until then, **Open
-the original** shows the real page.
+**Citations open the document reader.** Every citation (`ProvisionReference` and `RuleReference`, so the application
+review's too) shows the provision's text on hover and focus, and links to the reader at `/documents/$documentId`,
+opened at the provision with it highlighted and, for a rule, its other citations to step through. A rule's "and N more"
+opens a picker whose entries link there too. The reader shows the whole document in its structure, and the uploaded PDF
+beside it where the PDF and its OCR word boxes are kept; see [the reader](../reader.md).
 
 **Files.** `/files/governing/{documentId}` serves an upload's original file from R2 with its media type and original
 name (`?download` saves it). It looks the document up in the requester's organization only, so one organization can
@@ -463,9 +456,12 @@ items.
   Langfuse dataset `provision-encoding` from there.
 - **Scores per build**, sent to Langfuse on the build's trace: Zod-valid units, checker problems before and after
   repair, coverage, rules per kind, requirement and approval counts, text conditions, `SCHEMA GAP` notes.
-- **Experiment scores against gold:** rule recall and precision by provision (an LLM judge decides whether two rules
-  state the same requirement), modality agreement, check agreement on test cases (both rules evaluated on generated
-  facts by the engine: the strongest signal, since it compares meaning, not wording), and term recall.
+- **Experiment scores against gold:** in code, modality agreement, check agreement on test cases (both rules of a pair
+  evaluated on generated facts by the engine: the strongest signal, since it compares meaning, not wording) and term
+  recall; rule recall and precision by provision and pairwise quality are judged by the coding agent from the
+  comparison files `pnpm eval:encoding:score` writes, and the pairs it finds by meaning feed the code's scores
+  ([evaluation.md, Judging by the coding agent](evaluation.md#judging-by-the-coding-agent)). No judge prompt or model
+  call scores a build.
 - **Self-consistency, later:** encoding a unit twice and diffing the rule sets by provision flags units where the model
   is unsure; those go to the administrator first.
 

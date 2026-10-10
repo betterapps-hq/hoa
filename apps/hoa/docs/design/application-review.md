@@ -187,6 +187,13 @@ subject: present or not, each statement confirmed, contradicted, not applicable 
 the signers. A statement is contradicted only when the packet says its opposite; `not-applicable` is for a statement the
 rule qualifies ("as applicable", "if any") when the project has nothing it covers, and holds like a confirmed one.
 
+A check for a document the portal's application form provides (`formDocumentKinds` in `src/schema/coreTerms.ts`: the
+core `application-form` and `project-description`, or an organization's refinement of one: the same key, or a category
+of it) that needs no signature is present by code when the application has it: the application form when the form's
+answers page is in the packet (its evidence), the description when there is one. The reader isn't asked about it unless
+it lists statements the document must show. A check that must be signed still goes to the reader: the form collects no
+signatures.
+
 ### 11. Judgments
 
 One call per judgment check and subject, with `hoa-judgment-check`: the rule's statement and question, the subject,
@@ -533,32 +540,58 @@ carries no personal data.
 
 An organization's project types are its own data (D1 `project_types`), not a catalog in code: what a homeowner picks
 when starting an application, kept by the administrator on `/project-types`. Each has a label, a description, a
-status (`active`, or `retired`: hidden from new applications, kept for the ones that use it), the rulebook it was built
-against, and a **definition** (`src/projectTypes/projectType.ts`, Zod): the subjects it covers (things the
-application rules apply to), groups of fields (the work once; each subject repeatable, several runs or windows), and
-the documents its rules require. Every field binds to a property a selected rule tests and takes its kind from the
-vocabulary (text, long text, number with its unit, choice from the value set with "another" when the set is open,
-yes or no, date); every document comes from the document checks that require it, with what it must show.
+status (`active`, or `archived`: hidden from new applications, kept for the ones that use it), the rulebook it was built
+against, and a **definition** (`src/projectTypes/projectType.ts`, Zod): the subjects it covers, sections of questions
+(the project once; each subject repeatable, several runs or windows) in the order homeowners see them, the documents it
+asks for in checklist order, the documents the form itself provides (`formDocuments`), and the questions the rules can ask that the form leaves out (`unasked`, kept with their
+wording so adding one back keeps it).
 
-- **Built by code** (`src/projectTypes/build.ts`): the rules a project of these subjects selects (the review's own
-  selection), their fact plan, and their document checks. Adding a type by hand is a label, a description and the
-  subjects; the administrator then removes questions, marks them required or adds one back. `bindDefinition` checks
-  every saved definition against the rules again, so a field no rule tests can't be stored.
+- **Questions.** A question is bound (`binding`: the property a selected rule tests; its answer type comes from the
+  vocabulary: text, long text, an amount with its unit and dimension, a count, a choice from the value set with
+  "another" when the set is open, yes or no, a date, a time) or the administrator's own (`binding: null`, any answer
+  type they choose, including several choices). Each has its wording, help, an example for text, whether it's
+  required, and the passages it cites (`citations`: a bound question starts with its rules' provisions; then the list
+  is the administrator's). Bound answers about the project are facts (`answerReadings`); every answer, bound or not,
+  is on the packet's "Application form answers" page, which the review reads as context and the committee sees.
+- **Built by code** (`src/projectTypes/build.ts`): the rules a project of these subjects selects, their fact plan and
+  their document checks. Questions are worded by code (`fallbackQuestion`: "What is the fence run's height?", "What
+  kind of work is it?", "Is the project built to a pre-approved plan?") until the administrator rewords them. A
+  property no rule checks at application reads (only exemptions the association grants, or deadlines after approval,
+  read it; a prohibition with no check is decided by its condition, so what it reads is asked) is usually known by
+  the association: it's kept aside, offered under that heading in Add question. A label that starts with the
+  subject's name doesn't repeat it ("gate height" of a gate: "What is the gate's height?"). A document check the
+  application form meets (a core form document or a refinement of one, needing no signature) is a form document, never
+  an upload; an upload that must be signed says by whom ("Application form signed by every Owner").
+  `bindDefinition` checks every saved definition against the rules again: a bound question no rule asks and a rule
+  document no rule requires are dropped; the administrator's own questions and documents are kept as written. Every
+  newly linked citation must be a provision of the published rulebook; one a rebuild removes stays, flagged in the
+  editor.
+- **The editor** (`ProjectTypePage`): each question rendered exactly as homeowners see it (`QuestionField`, shared
+  with the homeowner form), one info button with its help and what it checks, its citations on a quiet line, a drag
+  handle (dnd-kit, keyboard sensor and announcements) and a menu (edit, required or optional, remove with undo).
+  Changes save as they're made. "Add question" suggests what the rules check and always lets the administrator write
+  their own (a "File upload" answer becomes a document requirement); "Add document" suggests what the rules require and
+  always lets them create their own (name, what it must show, required, accepted file formats, citations). A bound
+  question's answer type changes only after unlinking it, which makes it the administrator's own.
+- **The homeowner form**: the project type as cards, a description, the sections in order (amounts in the shared
+  quantity inputs by dimension, in the organization's unit system, `HoaSettings.unitSystem`), and one drop zone for
+  files, each file marked as one of the documents (guessed from its name only when clear) against a checklist that
+  names what's still missing. Each question's info button holds its help and, quietly, why it's asked: the rules that
+  read it and its citations, opening in the document reader in a new tab.
 - **Suggested by a model** (`hoa-project-type-suggestion`): it reads the published rulebook as it applies to
-  applications (subjects with their rules and tested details, the kinds of work, documents, project-wide rules) and
-  proposes types with a homeowner-facing description, the fields to ask and the rules they rest on. Code keeps only
-  subjects the rules apply to, fields those rules test, rule keys that exist, and every document the rules require
-  (`checkSuggestions`); the administrator adds or dismisses each.
-- **Requirements**: a type's page lists every rule the published rulebook applies to that kind of project, by code
-  (`projectRequirements`): what's allowed, limits, documents, who must approve, what the committee decides, and the
-  rest, each with its citation (`RuleReference`). It follows the rulebook, and a type built against an earlier one
-  offers to rebuild its form against the published rules, keeping the administrator's wording where a field still binds.
-- **Delete or retire**: a type no application uses can be deleted; one in use can only be retired.
+  applications and proposes types with a homeowner-facing description, the fields to ask and the rules they rest on.
+  Code keeps only subjects the rules apply to, fields those rules test, rule keys that exist, and every document the
+  rules require (`checkSuggestions`); the administrator adds or dismisses each. Rewording questions with a model is
+  deferred.
+- **Requirements**: a type's page lists every rule the published rulebook applies to that kind of project
+  (`projectRequirements`), behind a disclosure; a document rule the application form meets says so. A type built against an earlier rulebook offers to rebuild its form
+  against the published rules, keeping the administrator's wording where a question still binds.
+- **Delete or archive**: from the list's or the page's menu. A type no application uses can be deleted after a
+  confirmation naming it; for one in use, the confirmation offers archiving instead (hidden from new applications,
+  kept for the ones that use it). An archived type offers Unarchive.
 - **In the review**: the type's label and description go to subject identification as `projectKind`; the answers become
-  a page of the packet, so classification, identification, facts and the document review read and cite them; answers
-  about the work itself (a group with one entity) are also readings of their properties
-  (`answerReadings`), weighed like identification's. Repeated items are left to the models to match to the entities
-  they name.
+  a page of the packet, so classification, identification, facts and the document review read and cite them.
+  Repeated items are left to the models to match to the entities they name.
 
 Nothing here grows with customers: the code walks rules and vocabulary, one prompt serves every organization, and
 each organization's types live in its own rows.
@@ -616,11 +649,14 @@ work. So the entities stay `work-1` and `space-1`. Converting an attic instead
 | `document-review` | One packet and its document checks | Results per check and subject |
 | `judgment-check` | One rule, subject, facts and evidence | The answer |
 | `review-decision` | Facts, documents, judgments and a rules file | Findings, recommendation and action items (code only) |
-| `review-summary` | Findings and action items | None: scored by judges for faithfulness and clarity |
+| `review-summary` | Findings and action items | None: the coding agent judges faithfulness and clarity from each case's `writer.md` |
 
 Application variants start from the redacted compliant baseline, as [evaluation.md](evaluation.md) describes, and each
 changes one thing. Tuning and measurement use separate cases, and the fence is held out from prompt tuning
 ([evaluation.md, Tuning and measurement](evaluation.md#tuning-and-measurement)).
 
-Scores: entity accuracy (type and count), fact accuracy per property, normalization accuracy, evidence verification
-rate, finding outcome accuracy per rule and entity, recommendation accuracy, and the writer's faithfulness.
+Scores, in code: entity accuracy (type and count), fact accuracy per property, normalization accuracy, evidence
+verification rate, finding outcome accuracy per rule and entity, recommendation accuracy and action items. The writer's
+faithfulness and clarity are judged by the coding agent from the comparison file `pnpm eval:review` writes for each case
+([evaluation.md, Judging by the coding agent](evaluation.md#judging-by-the-coding-agent)); no judge prompt or model call
+scores them.

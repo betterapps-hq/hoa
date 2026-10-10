@@ -129,8 +129,14 @@ Exit: the pipeline's encoding of the sample Declaration matches the golden sampl
 quality, on articles it wasn't tuned on. Runs after phase 4, before the sample rulebook is published (5.14).
 
 The golden sample was itself made by model encoders, so it's a reference, not ground truth: where the pipeline and the
-golden disagree, the judge decides which reading the text supports, and a confirmed golden error is fixed in the sample
-and recorded.
+golden disagree, the coding agent judging the run decides which reading the text supports, and a confirmed golden error
+is fixed in the sample and recorded.
+
+**Who scores what.** Code computes every score it can (keys, text, coverage, reasons, modality, the engine's check
+agreement, term recall, validity, repair). Rule recall, rule precision and pairwise quality are judged by the coding
+agent in its own session from the comparison files `pnpm eval:encoding:score` writes, and the pairs it finds go back to
+the code's scores through the run's `pairs.json` ([evaluation.md, Judging by the coding agent](evaluation.md#judging-by-the-coding-agent)).
+There are no judge prompts and no judge calls through OpenRouter.
 
 **Split.** Tune on Articles 1 to 8 and Exhibit C (dev); measure on Articles 9 to 21 (test). The test articles are run
 only to measure, never to tune.
@@ -140,19 +146,19 @@ only to measure, never to tune.
 | Provision keys match the golden | at least 98% |
 | Provision text similarity | at least 0.97 on average |
 | Coverage: every provision cited or given a reason | 100%; reasons agreeing with the golden at least 85% |
-| Rule recall (a golden rule has a pipeline rule stating the same requirement, by LLM judge) | at least 90% |
-| Rule precision (pipeline rules the judge finds faithful to the text) | at least 90% |
-| Modality agreement on matched rules | at least 95% |
-| Check agreement on matched rules (both evaluated by the engine on generated facts) | at least 85% |
+| Rule recall (a golden rule has a pipeline rule stating the same requirement, judged by the coding agent) | at least 90% |
+| Rule precision (pipeline rules the coding agent finds faithful to the text) | at least 90% |
+| Modality agreement on paired rules (paired by key or by the coding agent) | at least 95% |
+| Check agreement on paired rules (both evaluated by the engine on generated facts) | at least 85% |
 | Term recall | at least 85% |
-| Pairwise quality (judge compares pipeline and golden per provision: better, equal or worse) | better or equal at least 80% |
+| Pairwise quality (the coding agent compares pipeline and golden per provision: better, equal or worse) | better or equal at least 80% |
 | Units Zod-valid after repair | 100%; at most 15% needing repair |
 
 | Id | Task | Done when |
 | --- | --- | --- |
 | E1.1 | OCR the sample Declaration once into page records, cached in the git-ignored `.fixtures/` (its cover and signature pages name individuals). | Page records load from the cache in scripts. |
 | E1.2 | `scripts/eval-encoding.ts`: run the encoding stages in process on a split (no Workflow), save the draft, and score it against the golden; results to a Langfuse experiment and a Markdown report. | One command gives the table above for a split. |
-| E1.3 | Scorers: key and text matching, coverage and reasons, rule pairing by provision with an LLM judge (same requirement; faithful to the text), modality, check agreement via the engine on facts generated from each rule's paths and values, term recall, pairwise judge. | Unit tests for the deterministic scorers; judge prompts in Langfuse. |
+| E1.3 | Scorers in code: key and text matching, coverage and reasons, rule pairing by key and from the coding agent's `pairs.json`, modality, check agreement via the engine on facts generated from each rule's paths and values, term recall; comparison files per provision and for unmatched terms, from which the coding agent judges rule recall, precision and pairwise quality. | Unit tests for the scorers and comparison files; no judge prompts. |
 | E1.4 | Baseline run on dev and test; record scores and the failure categories in the implementation log. | Logged. |
 | E1.5 | **Iterate on dev** until it clears every bar, then measure test once. Each round changes one thing and is logged with its scores: prompt text (development label), context assembly (vocabulary slice, references, intros), unit size, repair instructions, consolidation, and agentic patterns (a critic pass that checks a unit's rules against its provisions before verify; two encodings of a unit reconciled; a dedicated pass for checks the engine disagrees on). If test misses a bar, return to dev with the failure categories. | Test clears every bar; the winning prompt versions labeled `preview`. |
 | E1.6 | ~~Text-analysis service~~ **Replaced** by the audit (4.21 to 4.23), built after this round's baseline. | |
@@ -230,7 +236,7 @@ after phase 6, before the review UX is finished (phase 7).
 | Finding outcomes per rule and entity | at least 95% |
 | Recommendation | 100% of cases |
 | Action items: right rules and entities | at least 95% |
-| Writer faithfulness and clarity (LLM judge) | at least 0.9 |
+| Writer faithfulness and clarity (judged by the coding agent from each case's `writer.md`) | at least 0.9 |
 
 | Id | Task | Done when |
 | --- | --- | --- |
@@ -256,7 +262,7 @@ Exit: the homeowner and committee views show the new review in the browser. Depe
 | 7.9 | `ReviewMatrix` component: chips per outcome, fixed rule column with scrolling entity columns, "Only what needs attention" and outcome filters, card layout below 480 pixels. | Component test; browser check at desktop and phone widths, light and dark. |
 | 7.10 | Finding sheet from a cell: statement, provision text, reason, every input marked read from the packet (page, quote, thumbnail, confidence), matched (with fuzzy score), computed or not provided; judgment and document results. | Component test; browser check on the sample. |
 | 7.11 | Entity header detail (type, label, identifying evidence) and the homeowner and committee variations (action item links; discretion rule and judgment rationale). | Component test; browser check in both roles. |
-| 7.12 | **Project types as organization data** (application-review.md, Project types): D1 `project_types` (migration 0004, additive), definitions built from the rules, model suggestions checked by code, the requirements list, the administrator's `/project-types` pages (add, edit questions, retire, delete), the homeowner's form rendered from the definition, and the answers in the review. | Done: unit and component tests; browser check of adding a type and the homeowner's form. |
+| 7.12 | **Project types as organization data** (application-review.md, Project types): D1 `project_types` (migration 0004, additive), definitions built from the rules, model suggestions checked by code, the requirements list, the administrator's `/project-types` pages (add, edit questions, archive, delete), the homeowner's form rendered from the definition, and the answers in the review. | Done: unit and component tests; browser check of adding a type and the homeowner's form. |
 
 ## Phase 8: Datasets and evaluation
 
@@ -269,10 +275,10 @@ runs on the new prompts. Can start alongside phases 4 and 6.
 | 8.2 | `provision-encoding` dataset, loaded from `samples/declaration/` after review: one item per unit (input: the unit's prompt variables; expected: its draft). | Dataset in Langfuse; the loader script is committed. |
 | 8.3 | Fence gold encoding: guidelines Article 5 and its exhibits and Declaration Article 4, encoded by the pipeline and corrected by hand. | Dataset items; the fixture in 2.13 agrees. |
 | 8.4 | `term-extraction` dataset from the sample's Article 2 and the guidelines' definitions. | Dataset in Langfuse. |
-| 8.5 | Encoding experiment scorer: rule recall and precision by provision (LLM judge), modality agreement, engine-based check agreement on generated facts, term recall. | Experiment runs from a script. |
+| 8.5 | Encoding experiment scorer: modality agreement, engine-based check agreement on generated facts and term recall in code; rule recall and precision by provision judged by the coding agent from comparison files. | Experiment runs from a script. |
 | 8.6 | Redacted packet variants (evaluation.md's table) as `entity-facts`, `subject-identification`, `document-review` and `review-decision` items. | Datasets in Langfuse. |
 | 8.7 | Review scorers: entity accuracy, fact accuracy per property, normalization accuracy, evidence verification rate, finding accuracy, recommendation accuracy. | Experiment runs from a script. |
-| 8.8 | Production evaluators on root observations for `review-summary` (faithfulness, clarity) and `provision-encoding` (gap notes, problems). | Evaluators active. |
+| 8.8 | **Deferred until after the demo** (the person's decision, 2026-10-10): production evaluators on root observations for `review-summary` (faithfulness, clarity) and `provision-encoding` (gap notes, problems). They'd bill OpenRouter on every sampled trace, indefinitely. | Not started. |
 | 8.10 | Commit the sample Declaration's page text and PDF with the recording cover sheet and the signature and notary pages removed, reviewed by a person for names. | Under `samples/declaration/`; the review recorded in the samples README. |
 | 8.11 | Commit the Residential Design Guidelines (after the same review) and their pipeline encoding, corrected by hand. | Under `samples/design-guidelines/`. |
 | 8.12 | Commit a redacted copy of the sample fence application (homeowners' names, addresses, signatures and lot numbers replaced), reviewed by a person, and the packet variants built from it. | Under `samples/fence-application/`; the review recorded. |
