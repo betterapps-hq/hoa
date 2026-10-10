@@ -56,6 +56,7 @@ import {
 import { termDraft } from "../src/schema/zod.ts"
 import { encodingRuns, fileCache, fixtures, readJson, writeJson } from "./evalFiles.ts"
 import { defaultRetryQuota, defaultRuns, goldenContext, labeledRuns, pairs } from "./stepDatasets.ts"
+import { readFinder, withFinder } from "./stepFinder.ts"
 
 // Runs one encoding step alone (evaluation.md, Running one step), so a drafted prompt is tested on its own before it's
 // wired into the build, and a step of today's build can be replayed. A drafted step runs over its dataset's items
@@ -77,6 +78,8 @@ import { defaultRetryQuota, defaultRuns, goldenContext, labeledRuns, pairs } fro
 //   pnpm eval:step --rescore <step run id> [--items <id part>,...] [--golden <sample>]
 // --max-calls and --max-cost stop the run before a call past either limit (--call-estimate is the cost assumed for the
 // first call); what ran so far is still written.
+// --finder <file> gives B the provisions another finder picked (a JSON map of item id to provision keys), and
+// --expect all scores B against every term the golden defines in the document (stepFinder.ts), to compare finders.
 // --reruns reruns a failing item of B, E or C once with its problems (as the pipeline does); --retries runs F's retry
 // on the rules still failing, at most twice.
 // Steps: defined-terms, rule-finding, shared-vocabulary, vocabulary-merge, rule-structuring, rule-retry,
@@ -97,6 +100,8 @@ const { values } = parseArgs({
     "max-calls": { type: "string" },
     "max-cost": { type: "string" },
     "call-estimate": { type: "string", default: "0.5" },
+    finder: { type: "string" },
+    expect: { type: "string", default: "picked" },
     yes: { type: "boolean", default: false }
   }
 })
@@ -224,7 +229,14 @@ if (replay) {
 
 const goldenSet = goldenContext(values.golden)
 const { golden } = goldenSet
-const datasets = buildDatasets(goldenSet)
+const built = buildDatasets(goldenSet)
+const datasets = {
+  ...built,
+  "defined-terms": withFinder(built["defined-terms"], golden, {
+    finder: values.finder ? readFinder(values.finder) : null,
+    expectAll: values.expect === "all"
+  })
+}
 const oldRuns = labeledRuns(values.runs)
 const fromBuild =
   values.from && existsSync(join(encodingRuns, values.from)) ? readSavedRun(join(encodingRuns, values.from)) : null
