@@ -6,6 +6,7 @@ import {
   getDocumentPage,
   getJobStatus,
   listDocuments,
+  removeGoverningDocument,
   uploadDocumentFile
 } from "@/features/documents/documents.functions"
 import { uploadDocument } from "@/features/documents/uploadDocument"
@@ -142,6 +143,9 @@ function RulesRoute() {
             details
           )
         }
+        onRemoveDocument={async (documentId) => {
+          await removeGoverningDocument({ data: { documentId } })
+        }}
         onBuild={async () => {
           await startRulebookBuild()
         }}

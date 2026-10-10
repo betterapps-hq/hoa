@@ -23,6 +23,7 @@ import { getJson } from "@/storage/objects"
 import { loadPages } from "@/storage/pages"
 import { getBucket, getPresigner } from "@/storage/storage.server"
 import { validateUpload } from "@/storage/uploadRules"
+import { removeDocument } from "./removeDocument"
 
 // Governing documents: upload, OCR at upload, and job progress (docs/design/platform.md, "Server functions").
 
@@ -150,6 +151,13 @@ export const completeDocumentUpload = createServerFn({ method: "POST" })
       throw error
     }
     return { jobId: job.id }
+  })
+
+/** Removes a governing document, every version of it, from the documents builds read. Administrators only. */
+export const removeGoverningDocument = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ documentId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    await removeDocument(getDb(), await getRequestContext(), data.documentId, new Date().toISOString())
   })
 
 export const listDocuments = createServerFn({ method: "GET" }).handler(async () => {

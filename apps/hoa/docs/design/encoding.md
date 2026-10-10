@@ -63,10 +63,12 @@ As today: pin every prompt the build uses (`hoa-term-extraction`, `hoa-provision
 
 Everything later steps validate about the uploads themselves is checked first, in code (`src/encoding/sourceCheck.ts`):
 each upload's documents and edition (`governingDocument`, as merge and save-draft parse them: keys, kinds, dates, file
-hashes), its structure (`documentStructure`), and that no two uploads use the same document key. A problem fails the
-job at once, not retryable, with one plain sentence per problem naming the document and the field ("The document
-“Declaration” has a record the build can't save: edition.files[0].sha256 ..."), before any model call. The rule
-holds for every stage: a check that doesn't need a model's answer runs before the first model step.
+hashes), its structure (`documentStructure`), and that no two uploads use the same document key. Each problem is
+typed (`SourceProblem`: the upload, and `file-missing`, `file-invalid`, `structure-invalid` or `duplicate-key`, with
+the other upload's title for a duplicate), mapped generically from the schema's issues: one about the edition's files
+is about the file (missing when the value is empty), any other is the structure. A problem fails the job at once, not
+retryable, before any model call; the schema's path and message go to the log and the job's error record only. The
+rule holds for every stage: a check that doesn't need a model's answer runs before the first model step.
 
 ### 2. Structure
 
@@ -334,7 +336,12 @@ organization with 2 documents or 20, 50 rules or 2,000, sees the same page.
   (with its progress, below); a document is being read; the last build was stopped ("The last build was stopped.",
   with **Build a draft**, and **Review the earlier draft** when there is one); a draft is ready ("A new draft of the rulebook is ready to review.
   It was built after the Design Guidelines changed. It adds 5 rules, changes 12 rules and removes 2 rules." and
-  **Review changes**); the last build failed (**Try again**); the documents differ from the published rulebook's and
+  **Review changes**); the last build was refused by its check, checked again against the documents as they are now
+  (one plain sentence per document naming it and saying what to do, such as "“Declaration” has no file we can read, so
+  the rulebook can’t be built from it. Upload it again, or remove it.", with **Upload** and, per document, **Remove
+  document**, which confirms by name and takes every version of it out of the documents builds and the page read,
+  while what cites its pages still opens them); the last build failed (**Try again** only when the failure is
+  retryable); the documents differ from the published rulebook's and
   there's no draft (**Build a draft**); nothing is built yet (**Build the rulebook**).
 - **Governing documents:** each document's current version (kind, version, pages, date) with its earlier versions
   behind a disclosure. **Read** (the document viewer, page by page) shows on the row; **Download** (the original file)

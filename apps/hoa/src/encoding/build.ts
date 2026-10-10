@@ -41,7 +41,7 @@ import {
 import { structureDocument, type StructuredDocument } from "./provisions"
 import { analyzeReferences, citedProvisions } from "./references"
 import { groupByUnit, problemsToRepairAlone, verifyUnit, type UnitProblem } from "./repair"
-import { checkSources, SourcesRejectedError } from "./sourceCheck"
+import { checkSources, sourceProblemSchema, SourcesRejectedError } from "./sourceCheck"
 import {
   analysisOutput,
   consolidateOutput,
@@ -237,7 +237,7 @@ export async function buildRulebook(input: BuildInput) {
 
   // 1b. Check: what later steps validate about the uploads themselves, before any model call.
   await progress("check", 0, input.sources.length)
-  const sourceProblems = await step("check", z.array(z.string()), async () => checkSources(input.sources))
+  const sourceProblems = await step("check", z.array(sourceProblemSchema), async () => checkSources(input.sources))
   if (sourceProblems.length > 0) {
     throw new SourcesRejectedError(sourceProblems)
   }

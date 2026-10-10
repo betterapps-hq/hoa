@@ -222,9 +222,12 @@ describe("buildRulebook", () => {
     })
     const refused = buildRulebook(bad)
     await expect(refused).rejects.toBeInstanceOf(SourcesRejectedError)
-    await expect(refused).rejects.toThrow(
-      /The document “Declaration for Maple Hollow” has a record the build can't save: edition\.files\[0\]\.sha256/
-    )
+    await expect(refused).rejects.toMatchObject({
+      problems: expect.arrayContaining([
+        expect.objectContaining({ title: "Declaration for Maple Hollow", kind: "file-invalid" })
+      ])
+    })
+    await expect(refused).rejects.toThrow(/edition\.files\[0\]\.sha256/)
     expect(createModel).not.toHaveBeenCalled()
     expect(names).toEqual(["check"])
   })

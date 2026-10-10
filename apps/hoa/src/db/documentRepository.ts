@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, like, max, notInArray, or } from "drizzle-orm"
+import { and, asc, eq, inArray, isNotNull, isNull, like, max, notInArray, or } from "drizzle-orm"
 import { z } from "zod"
 import { documentStructure, type DocumentStructure } from "@/documents/documentStructure"
 import {
@@ -13,12 +13,14 @@ import { chunk, insertChunks, runBatch } from "./batching"
 import type { Database } from "./database"
 import { governingDocuments, provisions, sections } from "./schema"
 
+// Uploads: the rows with a file. Documents the rules name without a file are read as DocumentRecords below.
+const hasFile = isNotNull(governingDocuments.fileName)
+// A removed upload still opens by id, for what cites its pages, but lists, builds and duplicate checks leave it out.
+const isInUse = isNull(governingDocuments.removedAt)
+
 function toDocument(row: typeof governingDocuments.$inferSelect): GoverningDocument {
   return governingDocumentSchema.parse(row)
 }
-
-// Uploads: the rows with a file. Documents the rules name without a file are read as DocumentRecords below.
-const hasFile = isNotNull(governingDocuments.fileName)
 
 export type NewGoverningDocument = Pick<
   GoverningDocument,
@@ -74,7 +76,7 @@ export async function listGoverningDocuments(db: Database, hoaId: string) {
   const rows = await db
     .select()
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, hoaId), hasFile))
+    .where(and(eq(governingDocuments.hoaId, hoaId), hasFile, isInUse))
     .orderBy(asc(governingDocuments.uploadedAt))
   return rows.map(toDocument)
 }
@@ -84,8 +86,28 @@ export async function findDocumentByHash(db: Database, hoaId: string, sha256: st
   const rows = await db
     .select()
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.sha256, sha256)))
+    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.sha256, sha256), isInUse))
   return rows.map(toDocument).find((document) => document.id !== excludeId) ?? null
+}
+
+/**
+ * Removes an upload's document, every version of it, so builds and the documents list leave it out; false when it
+ * wasn't one in use. What cites its pages, such as the rulebook in force, still opens them.
+ */
+export async function removeGoverningDocument(db: Database, hoaId: string, id: string, now: string) {
+  const document = await db
+    .select({ lineageId: governingDocuments.lineageId })
+    .from(governingDocuments)
+    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id), hasFile, isInUse))
+    .get()
+  if (!document) {
+    return false
+  }
+  await db
+    .update(governingDocuments)
+    .set({ removedAt: now })
+    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.lineageId, document.lineageId), hasFile))
+  return true
 }
 
 export async function updateGoverningDocument(

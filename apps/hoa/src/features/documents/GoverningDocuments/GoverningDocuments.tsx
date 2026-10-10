@@ -22,6 +22,20 @@ export type GoverningDocumentsProps = {
   onChanged: () => void
   /** How many documents show before "Show all". */
   initialCount?: number
+  /** The upload dialog, when something else on the page opens it too. */
+  uploadDialog?: UploadDialog
+}
+
+export type UploadDialog = ReturnType<typeof useUploadDialog>
+
+/** The upload dialog's state, with a new key for each opening so it starts empty. */
+export function useUploadDialog() {
+  const [state, setState] = useState({ isOpen: false, key: 0 })
+  return {
+    ...state,
+    open: () => setState(({ key }) => ({ isOpen: true, key: key + 1 })),
+    setIsOpen: (isOpen: boolean) => setState((current) => ({ ...current, isOpen }))
+  }
 }
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
@@ -43,11 +57,11 @@ export function GoverningDocuments({
   loadJob,
   onUpload,
   onChanged,
-  initialCount = 6
+  initialCount = 6,
+  uploadDialog
 }: GoverningDocumentsProps) {
-  // The upload dialog, with a new key for each opening so it starts empty.
-  const [upload, setUpload] = useState({ isOpen: false, key: 0 })
-  const openUpload = () => setUpload(({ key }) => ({ isOpen: true, key: key + 1 }))
+  const ownUpload = useUploadDialog()
+  const upload = uploadDialog ?? ownUpload
   const [isAllShown, setIsAllShown] = useState(false)
   const documents = documentVersions(uploads)
   const shown = isAllShown ? documents : documents.slice(0, initialCount)
@@ -59,7 +73,7 @@ export function GoverningDocuments({
           Governing documents
         </h2>
         {onUpload && documents.length > 0 ? (
-          <Button size="sm" variant="outline" onClick={() => openUpload()}>
+          <Button size="sm" variant="outline" onClick={() => upload.open()}>
             <UploadIcon />
             Upload
           </Button>
@@ -80,7 +94,7 @@ export function GoverningDocuments({
           </EmptyHeader>
           {onUpload ? (
             <EmptyContent>
-              <Button onClick={() => openUpload()}>
+              <Button onClick={() => upload.open()}>
                 <UploadIcon />
                 Upload a document
               </Button>
@@ -112,7 +126,7 @@ export function GoverningDocuments({
         <UploadDocumentDialog
           key={upload.key}
           isOpen={upload.isOpen}
-          onOpenChange={(isOpen) => setUpload((current) => ({ ...current, isOpen }))}
+          onOpenChange={upload.setIsOpen}
           documents={documents.map(({ latest }) => latest)}
           onUpload={onUpload}
           onUploaded={onChanged}

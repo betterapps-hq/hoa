@@ -40,7 +40,10 @@ export const governingDocuments = sqliteTable(
     key: text("key"),
     document: json<unknown>("document_json"),
     // How a build structures the upload (documents/documentStructure.ts); null until an administrator sets it.
-    structure: json<unknown>("structure_json")
+    structure: json<unknown>("structure_json"),
+    // When an administrator removed the document: builds and the documents list leave it out, while what already
+    // cites its pages still opens them. Null for a document in use.
+    removedAt: text("removed_at")
   },
   (table) => [
     uniqueIndex("governing_documents_lineage_version").on(table.lineageId, table.version),

@@ -50,6 +50,13 @@
       "when": 1791603147020,
       "tag": "0006_job_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791604714520,
+      "tag": "0007_governing_document_removed",
+      "breakpoints": true
     }
   ]
 }

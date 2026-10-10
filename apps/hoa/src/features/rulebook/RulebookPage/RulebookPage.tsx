@@ -1,12 +1,28 @@
-import { DownloadIcon } from "lucide-react"
+import { DownloadIcon, UploadIcon } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import type { GoverningDocument } from "@/documents/governingDocument"
-import { GoverningDocuments } from "@/features/documents/GoverningDocuments/GoverningDocuments"
+import {
+  GoverningDocuments,
+  useUploadDialog,
+  type UploadDialog
+} from "@/features/documents/GoverningDocuments/GoverningDocuments"
 import type { DocumentDetails } from "@/features/documents/uploadDocument"
 import type { Job } from "@/jobs/job"
 import type { BuildResults } from "@/rulebook/buildResults.server"
+import type { RefusedDocument } from "@/rulebook/buildSources"
 import type { StopResult } from "@/workflows/rulebookTrigger.server"
 import { attempt } from "../attempt"
 import { BuildProgress } from "../BuildProgress/BuildProgress"
@@ -16,7 +32,7 @@ import type { RulebookSources, RulebookView } from "../rulebook.functions"
 import { recordsOf } from "../rulebookRecords"
 import { RulebookWorkspace } from "../RulebookWorkspace/RulebookWorkspace"
 import type { RulebookActions, RulebookSource } from "../useRulebookWorkspace"
-import { rulebookStatus, type RulebookStatus } from "./RulebookPage.utils"
+import { refusalSentence, rulebookStatus, type RulebookStatus } from "./RulebookPage.utils"
 
 export type RulebookPageProps = {
   draft: RulebookView
@@ -36,6 +52,8 @@ export type RulebookPageProps = {
   loadJob: (jobId: string) => Promise<Job | null>
   loadRulesFile: () => Promise<string>
   onUpload: (file: File, details: DocumentDetails) => Promise<unknown>
+  /** Removes a governing document, every version of it, from the documents builds read. */
+  onRemoveDocument: (documentId: string) => Promise<void>
   /** Builds a draft from the current documents, when one didn't start on its own or failed. */
   onBuild: () => Promise<void>
   /** Stops the running build. */
@@ -55,7 +73,7 @@ const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
  * draft; reviewing the draft is a focused mode that ends in publishing or discarding it.
  */
 export function RulebookPage(props: RulebookPageProps) {
-  const { draft, published, sources, uploads, source, actions, isReviewing, onReviewingChange } = props
+  const { draft, published, sources, source, actions, isReviewing, onReviewingChange } = props
   const draftRecords = draft.rulebook && draft.content ? recordsOf(sources, draft.content, "draft") : null
   const draftId = draft.rulebook?.id
 
@@ -87,11 +105,20 @@ export function RulebookPage(props: RulebookPageProps) {
     )
   }
 
+  return <RulebookOverview {...props} />
+}
+
+/** The rulebook page outside review: the status line, the documents and the rules in force. */
+function RulebookOverview(props: RulebookPageProps) {
+  const { draft, published, sources, uploads, source } = props
+  // The status line opens the documents' upload dialog too, when a document has to be uploaded again.
+  const uploadDialog = useUploadDialog()
   const status = rulebookStatus({ draft, published, uploads })
   return (
     <div className="flex flex-col gap-10">
-      <StatusLine status={status} {...props} />
+      <StatusLine status={status} uploadDialog={uploadDialog} {...props} />
       <GoverningDocuments
+        uploadDialog={uploadDialog}
         uploads={uploads}
         jobs={props.jobs}
         loadJob={props.loadJob}
@@ -103,7 +130,11 @@ export function RulebookPage(props: RulebookPageProps) {
   )
 }
 
-function StatusLine({ status, ...props }: { status: RulebookStatus } & RulebookPageProps) {
+function StatusLine({
+  status,
+  uploadDialog,
+  ...props
+}: { status: RulebookStatus; uploadDialog: UploadDialog } & RulebookPageProps) {
   const [isBusy, setIsBusy] = useState(false)
   const build = async () => {
     setIsBusy(true)
@@ -182,13 +213,33 @@ function StatusLine({ status, ...props }: { status: RulebookStatus } & RulebookP
           ) : null}
         </div>
       )
+    case "build-refused":
+      return line(
+        status.documents.length === 1
+          ? "The rulebook can’t be updated until one of your documents is fixed."
+          : "The rulebook can’t be updated until some of your documents are fixed.",
+        <ul className="flex flex-col gap-3">
+          {status.documents.map((document) => (
+            <li key={document.documentId} className="flex flex-col items-start gap-1.5">
+              <p>{refusalSentence(document)}</p>
+              <RemoveDocument document={document} onRemove={props.onRemoveDocument} onRemoved={props.onChanged} />
+            </li>
+          ))}
+        </ul>,
+        <Button className="w-fit" onClick={() => uploadDialog.open()}>
+          <UploadIcon />
+          Upload
+        </Button>
+      )
     case "build-failed":
       return line(
         "The last update of the rulebook didn’t finish.",
         <p className="line-clamp-3 break-words">{status.error}</p>,
-        <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-          Try again
-        </Button>
+        status.isRetryable ? (
+          <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
+            Try again
+          </Button>
+        ) : null
       )
     case "documents-changed":
       return line(
@@ -209,6 +260,65 @@ function StatusLine({ status, ...props }: { status: RulebookStatus } & RulebookP
     case "none":
       return null
   }
+}
+
+/** Removes a document the build refused, after a confirmation that names it. */
+function RemoveDocument({
+  document,
+  onRemove,
+  onRemoved
+}: {
+  document: RefusedDocument
+  onRemove: (documentId: string) => Promise<void>
+  onRemoved: () => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isRemoving, setIsRemoving] = useState(false)
+  const remove = async () => {
+    setIsRemoving(true)
+    const result = await attempt(async () => {
+      await onRemove(document.documentId)
+      return true
+    }, "The document wasn’t removed.")
+    setIsRemoving(false)
+    setIsOpen(false)
+    if (result) {
+      toast.success(`“${document.title}” was removed.`)
+      onRemoved()
+    }
+  }
+  return (
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialogTrigger
+        render={
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-fit"
+            disabled={isRemoving}
+            aria-label={`Remove document “${document.title}”`}
+          />
+        }
+      >
+        Remove document
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove “{document.title}”?</AlertDialogTitle>
+          <AlertDialogDescription>
+            It&rsquo;s taken off your governing documents, with any earlier versions, so the rulebook is no longer built
+            from it. The rulebook in force doesn&rsquo;t change until you publish a new one.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep it</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" disabled={isRemoving} onClick={() => void remove()}>
+            Remove document
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
 }
 
 function RulesInForce({

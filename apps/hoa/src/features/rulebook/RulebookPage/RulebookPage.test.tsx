@@ -55,6 +55,8 @@ const draft: RulebookView = {
   buildJobId: null,
   isBuilding: false,
   lastBuildError: null,
+  isLastBuildRetryable: true,
+  refusedDocuments: [],
   isLastBuildStopped: false,
   blockers: ["884 rules and terms still need review."],
   changes: {
@@ -113,6 +115,7 @@ function setup(overrides: Partial<RulebookPageProps> = {}) {
     loadJob: vi.fn<(jobId: string) => Promise<Job | null>>(async () => null),
     loadRulesFile: vi.fn<() => Promise<string>>(async () => '{"rules":[]}'),
     onUpload: vi.fn<RulebookPageProps["onUpload"]>(async () => undefined),
+    onRemoveDocument: vi.fn<RulebookPageProps["onRemoveDocument"]>(async () => undefined),
     onBuild: vi.fn<() => Promise<void>>(async () => undefined),
     onStop: vi.fn<RulebookPageProps["onStop"]>(async () => ({ status: "stopped" })),
     loadBuildResults: vi.fn<RulebookPageProps["loadBuildResults"]>(async () => ({
@@ -211,6 +214,54 @@ describe("RulebookPage", () => {
     expect(props.loadRulesFile).toHaveBeenCalled()
     expect(createObjectURL).toHaveBeenCalled()
     vi.unstubAllGlobals()
+  })
+
+  it("offers no try again for a failure that would fail the same way", () => {
+    setup({ draft: { ...noDraft, lastBuildError: "Missing settings.", isLastBuildRetryable: false } })
+    expect(screen.getByText("The last update of the rulebook didn’t finish.")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument()
+  })
+
+  it("says plainly which documents a refused build can't use, with upload and remove instead of try again", async () => {
+    const { props, user } = setup({
+      draft: {
+        ...noDraft,
+        refusedDocuments: [
+          { documentId: "doc-1", title: "Declaration (sample pages)", kind: "file-invalid" },
+          { documentId: "doc-2", title: "Declaration, restated", kind: "duplicate-key", otherTitle: "Declaration" }
+        ]
+      }
+    })
+    const status = screen.getByRole("region", { name: "Status" })
+    expect(
+      within(status).getByText("The rulebook can’t be updated until some of your documents are fixed.")
+    ).toBeInTheDocument()
+    expect(
+      within(status).getByText(
+        "“Declaration (sample pages)” has no file we can read, so the rulebook can’t be built from it. Upload it again, or remove it."
+      )
+    ).toBeInTheDocument()
+    expect(
+      within(status).getByText("“Declaration, restated” uses the same name as “Declaration”. Remove one of them.")
+    ).toBeInTheDocument()
+    expect(within(status).queryByRole("button", { name: "Try again" })).not.toBeInTheDocument()
+    expect(status).not.toHaveTextContent(/sha256|edition|pattern/)
+
+    await user.click(within(status).getByRole("button", { name: "Upload" }))
+    expect(await screen.findByRole("dialog")).toBeInTheDocument()
+    await user.keyboard("{Escape}")
+
+    // Removing asks first, naming the document; keeping it changes nothing.
+    await user.click(within(status).getByRole("button", { name: "Remove document “Declaration (sample pages)”" }))
+    const confirm = await screen.findByRole("alertdialog")
+    expect(within(confirm).getByText("Remove “Declaration (sample pages)”?")).toBeInTheDocument()
+    await user.click(within(confirm).getByRole("button", { name: "Keep it" }))
+    expect(props.onRemoveDocument).not.toHaveBeenCalled()
+
+    await user.click(within(status).getByRole("button", { name: "Remove document “Declaration (sample pages)”" }))
+    await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove document" }))
+    expect(props.onRemoveDocument).toHaveBeenCalledWith("doc-1")
+    expect(props.onChanged).toHaveBeenCalled()
   })
 
   it("stops a running build after a plain confirmation, and says when it had already finished", async () => {

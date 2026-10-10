@@ -14,8 +14,10 @@ import {
 import { getRulebookByStatus } from "@/db/rulebookRepository"
 import { readRulesFileJson } from "@/rulebook/assemble"
 import { loadBuildResults, type BuildResults } from "@/rulebook/buildResults.server"
+import { checkCurrentSources, isRefusedBuild, type RefusedDocument } from "@/rulebook/buildSources"
 import { rulebookChanges, type RulebookChanges } from "@/rulebook/changes"
 import { textOutsideProvisions, type SourceText } from "@/rulebook/coverage"
+import { currentDocumentIds } from "@/rulebook/currentDocuments"
 import { publishBlockers, publishDraft } from "@/rulebook/publish"
 import type { rulebookSchema } from "@/rules/rule"
 import type * as Rules from "@/schema/types"
@@ -43,8 +45,12 @@ export type RulebookView = {
   /** The latest build, so the page can follow one in progress. */
   buildJobId: string | null
   isBuilding: boolean
-  /** Why the latest build failed or skipped items, when it did. */
+  /** Why the latest build failed or skipped items, when it did; null when it was refused (see `refusedDocuments`). */
   lastBuildError: string | null
+  /** Whether building again can get past the latest build's failure, so the page offers to try again. */
+  isLastBuildRetryable: boolean
+  /** The documents the latest build refused before spending anything, while they still would be; empty otherwise. */
+  refusedDocuments: RefusedDocument[]
   /** Whether an administrator stopped the latest build. */
   isLastBuildStopped: boolean
   /** Why the draft can't be published yet. */
@@ -188,13 +194,22 @@ export const getRulebookView = createServerFn({ method: "GET" })
     const file = data.which === "published" ? await getPublishedRulesFile(db, hoaId) : null
     const review =
       rulebook && data.which === "draft" && content ? await draftReview(db, context.hoa, rulebook, content) : null
+    // A refused build is checked again against the documents as they are now, so removing or replacing the one at
+    // fault clears it at once.
+    const isRefused = isRefusedBuild(latestBuild)
+    const refusedDocuments =
+      isRefused && data.which === "draft"
+        ? await checkCurrentSources(db, hoaId, currentDocumentIds(await listGoverningDocuments(db, hoaId)))
+        : []
     return {
       rulebook,
       content,
       fileSha256: file?.rulebookId === rulebook?.id ? (file?.fileSha256 ?? null) : null,
       buildJobId: latestBuild?.id ?? null,
       isBuilding: building !== null,
-      lastBuildError: describeBuildProblem(latestBuild),
+      lastBuildError: isRefused ? null : describeBuildProblem(latestBuild),
+      isLastBuildRetryable: latestBuild?.status !== "failed" || (latestBuild.error?.isRetryable ?? true),
+      refusedDocuments,
       isLastBuildStopped: latestBuild?.status === "cancelled",
       blockers: review?.blockers ?? [],
       changes: review?.changes ?? null

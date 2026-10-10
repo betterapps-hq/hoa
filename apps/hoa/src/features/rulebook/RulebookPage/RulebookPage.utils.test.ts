@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import type { GoverningDocument } from "@/documents/governingDocument"
 import { sampleRecords } from "@/tests/rulebookWorkspace"
 import type { RulebookView } from "../rulebook.functions"
-import { changeSummary, rulebookStatus } from "./RulebookPage.utils"
+import { changeSummary, refusalSentence, rulebookStatus } from "./RulebookPage.utils"
 
 const upload = (id: string, overrides: Partial<GoverningDocument> = {}): GoverningDocument => ({
   id,
@@ -46,6 +46,8 @@ const view = (overrides: Partial<RulebookView> = {}): RulebookView => ({
   buildJobId: null,
   isBuilding: false,
   lastBuildError: null,
+  isLastBuildRetryable: true,
+  refusedDocuments: [],
   isLastBuildStopped: false,
   blockers: [],
   changes: null,
@@ -100,9 +102,41 @@ describe("rulebookStatus", () => {
     })
     expect(rulebookStatus({ draft: view(), published, uploads: [upload("a")] }).kind).toBe("none")
     expect(rulebookStatus({ draft: view(), published: view(), uploads: [upload("a")] }).kind).toBe("not-built")
-    expect(rulebookStatus({ draft: view({ lastBuildError: "Failed." }), published, uploads: [] }).kind).toBe(
-      "build-failed"
+    expect(rulebookStatus({ draft: view({ lastBuildError: "Failed." }), published, uploads: [] })).toEqual({
+      kind: "build-failed",
+      error: "Failed.",
+      isRetryable: true
+    })
+  })
+
+  it("says a refused build's documents ahead of the documents' changes", () => {
+    const refused = { documentId: "a", title: "Declaration", kind: "file-invalid" as const }
+    expect(
+      rulebookStatus({ draft: view({ refusedDocuments: [refused] }), published, uploads: [upload("a"), upload("b")] })
+    ).toEqual({ kind: "build-refused", documents: [refused] })
+  })
+})
+
+describe("refusalSentence", () => {
+  it("names the document and says what to do, without internal words", () => {
+    const refused = (kind: Parameters<typeof refusalSentence>[0]["kind"], otherTitle?: string) =>
+      refusalSentence({ documentId: "a", title: "Declaration (sample pages)", kind, otherTitle })
+    expect(refused("file-invalid")).toBe(
+      "“Declaration (sample pages)” has no file we can read, so the rulebook can’t be built from it. Upload it again, or remove it."
     )
+    expect(refused("file-missing")).toBe(
+      "“Declaration (sample pages)” has no file, so the rulebook can’t be built from it. Upload it again, or remove it."
+    )
+    expect(refused("structure-invalid")).toMatch(/^“Declaration \(sample pages\)” is split into parts/)
+    expect(refused("duplicate-key", "Declaration")).toBe(
+      "“Declaration (sample pages)” uses the same name as “Declaration”. Remove one of them."
+    )
+    expect(refused("duplicate-key")).toBe(
+      "“Declaration (sample pages)” uses the same name as another document. Remove one of them."
+    )
+    for (const kind of ["file-missing", "file-invalid", "structure-invalid", "duplicate-key"] as const) {
+      expect(refused(kind)).not.toMatch(/sha256|key|edition|schema|record/i)
+    }
   })
 })
 

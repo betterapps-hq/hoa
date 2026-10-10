@@ -1,4 +1,5 @@
 import type { GoverningDocument } from "@/documents/governingDocument"
+import type { RefusedDocument } from "@/rulebook/buildSources"
 import { currentDocumentIds, isSameDocumentSet } from "@/rulebook/currentDocuments"
 import type { RulebookView } from "../rulebook.functions"
 
@@ -9,7 +10,8 @@ export type RulebookStatus =
   | { kind: "building"; reading: string[] }
   | { kind: "reading"; reading: string[] }
   | { kind: "draft-ready"; isFirst: boolean; summary: string; builtFrom: string[] }
-  | { kind: "build-failed"; error: string }
+  | { kind: "build-failed"; error: string; isRetryable: boolean }
+  | { kind: "build-refused"; documents: RefusedDocument[] }
   | { kind: "build-stopped"; hasDraft: boolean }
   | { kind: "documents-changed"; version: number | null }
   | { kind: "not-built" }
@@ -29,6 +31,22 @@ export function changeSummary(changes: NonNullable<RulebookView["changes"]>) {
     return terms > 0 ? `changes ${counted(terms, "term", "terms")} and no rules` : null
   }
   return parts.length === 1 ? (parts[0] ?? null) : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`
+}
+
+/** What's wrong with a document the build refused, and what to do about it, in one sentence that names it. */
+export function refusalSentence({ title, kind, otherTitle }: RefusedDocument) {
+  switch (kind) {
+    case "file-missing":
+      return `“${title}” has no file, so the rulebook can’t be built from it. Upload it again, or remove it.`
+    case "file-invalid":
+      return `“${title}” has no file we can read, so the rulebook can’t be built from it. Upload it again, or remove it.`
+    case "structure-invalid":
+      return `“${title}” is split into parts in a way the rulebook can’t be built from. Upload it again, or remove it.`
+    case "duplicate-key":
+      return otherTitle === undefined
+        ? `“${title}” uses the same name as another document. Remove one of them.`
+        : `“${title}” uses the same name as “${otherTitle}”. Remove one of them.`
+  }
 }
 
 /** The page's state for an administrator, most pressing first. */
@@ -60,8 +78,11 @@ export function rulebookStatus({
       builtFrom: changes?.documents.added.map((document) => document.title) ?? []
     }
   }
+  if (draft.refusedDocuments.length > 0) {
+    return { kind: "build-refused", documents: draft.refusedDocuments }
+  }
   if (draft.lastBuildError) {
-    return { kind: "build-failed", error: draft.lastBuildError }
+    return { kind: "build-failed", error: draft.lastBuildError, isRetryable: draft.isLastBuildRetryable }
   }
   const current = currentDocumentIds(uploads)
   if (current.length === 0) {

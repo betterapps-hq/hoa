@@ -5,22 +5,16 @@ import { rulebookBuildPrompts } from "@/ai/pipelinePrompts"
 import { resolvePromptVersions } from "@/ai/promptLoader"
 import { recordScores } from "@/ai/scores"
 import { createDatabase, type Database } from "@/db/database"
-import {
-  getDocumentStructures,
-  getGoverningDocument,
-  listDocumentRecords,
-  listProvisions
-} from "@/db/documentRepository"
+import { listDocumentRecords, listProvisions } from "@/db/documentRepository"
 import { getJob, reportJobProgress, updateJob } from "@/db/jobRepository"
 import { getRulebookContent } from "@/db/rulebookContentRepository"
 import { failRulebook, getRulebook, getRulebookByStatus } from "@/db/rulebookRepository"
-import { defaultDocumentStructure, uploadEdition } from "@/documents/documentStructure"
 import { buildRulebook, buildStages, optionalBuildStages } from "@/encoding/build"
 import { buildScores } from "@/encoding/buildScores"
 import { SourcesRejectedError } from "@/encoding/sourceCheck"
 import { finishProgress, startProgress } from "@/jobs/progress"
 import type { StepRunner } from "@/jobs/steps"
-import { compareCodeUnits } from "@/rulebook/canonical"
+import { loadBuildSources } from "@/rulebook/buildSources"
 import type { PreviousReview } from "@/rulebook/carryForward"
 import { saveBuiltDraft } from "@/rulebook/saveDraft"
 import { governingKeys, hoaCacheKey, rulebookBuildKeys } from "@/storage/keys"
@@ -123,30 +117,11 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         if (rulebook?.status !== "building") {
           throw new NonRetryableError("The rulebook isn't being built.")
         }
-        const documents = await Promise.all(rulebook.sourceDocumentIds.map((id) => getGoverningDocument(db, hoaId, id)))
-        const structures = await getDocumentStructures(db, hoaId, rulebook.sourceDocumentIds)
-        const sources = documents.flatMap((document) =>
-          document?.status === "ready" && document.sha256 && document.pageCount
-            ? [
-                {
-                  documentId: document.id,
-                  title: document.title,
-                  uploadedBy: document.uploadedBy,
-                  structure: structures.get(document.id) ?? defaultDocumentStructure(document.kind),
-                  edition: uploadEdition({ ...document, sha256: document.sha256, pageCount: document.pageCount })
-                }
-              ]
-            : []
-        )
+        const sources = await loadBuildSources(db, hoaId, rulebook.sourceDocumentIds)
         if (sources.length === 0) {
           throw new NonRetryableError("None of the documents are ready.")
         }
-        // By document key, not upload id: a new version of one document then leaves the others' order, and so the
-        // merged vocabulary and every unit's cached context, as they were.
-        const ordered = sources.toSorted(
-          (a, b) => compareCodeUnits(a.structure.key, b.structure.key) || compareCodeUnits(a.documentId, b.documentId)
-        )
-        return { sources: ordered, startedAt: now() }
+        return { sources, startedAt: now() }
       })
 
       // Every step the build works through, up front, so the page shows the whole build and where it is.
@@ -241,6 +216,9 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         const job = await getJob(db, hoaId, jobId)
         if (job?.status === "cancelled") {
           return // Stopped by an administrator: it stays stopped, not failed.
+        }
+        if (error instanceof SourcesRejectedError) {
+          console.warn(`Rulebook build ${jobId} refused: ${error.message}`)
         }
         const failed = {
           stage: job?.stage ?? "build",
