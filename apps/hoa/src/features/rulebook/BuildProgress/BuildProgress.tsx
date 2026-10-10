@@ -21,14 +21,7 @@ import type { Job } from "@/jobs/job"
 import { cn } from "@/lib/utils"
 import type { BuildResults } from "@/rulebook/buildResults.server"
 import { BuildFeed } from "../BuildFeed/BuildFeed"
-import {
-  buildSteps,
-  elapsedText,
-  estimateBuild,
-  summaryText,
-  timeLeftText,
-  type BuildStep
-} from "./BuildProgress.utils"
+import { buildSteps, elapsedText, estimateBuild, summaryText, type BuildStep } from "./BuildProgress.utils"
 
 export type BuildProgressProps = {
   jobId: string
@@ -73,8 +66,8 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults,
     <div className="flex flex-col gap-3">
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-3">
-          <output className="flex items-center gap-2 text-sm">
-            {isRunning ? <Spinner aria-hidden /> : null}
+          <output className="flex items-start gap-2 text-sm">
+            {isRunning ? <Spinner aria-hidden className="mt-0.5 shrink-0" /> : null}
             <span>{job ? summaryText(steps, estimate?.remaining ?? null) : "Starting"}</span>
           </output>
           <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="group/steps -my-1 shrink-0" />}>
@@ -83,11 +76,7 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults,
           </CollapsibleTrigger>
         </div>
         <Progress value={Math.round((estimate?.fraction ?? 0) * 100)} aria-label="Build progress" />
-        {estimate ? (
-          <p className="text-sm text-muted-foreground">
-            {timeLeftText(estimate.remaining)}. {elapsedText(estimate.elapsed)}.
-          </p>
-        ) : null}
+        {estimate ? <p className="text-sm text-muted-foreground">{elapsedText(estimate.elapsed)}.</p> : null}
         <CollapsibleContent>
           <ol aria-label="Build steps" className="flex flex-col gap-2">
             {steps.map((step) => (
