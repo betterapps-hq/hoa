@@ -163,7 +163,7 @@ describe("CoverageTab", () => {
     expect(within(item!).getByText(/^No rule: /)).toBeInTheDocument()
     await user.click(within(item!).getByRole("button", { name: "Approve the reason" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "provision", key: expect.any(String) }], "approved", null)
-    await user.click(screen.getByRole("button", { name: "Approve the 281 reasons shown" }))
+    await user.click(screen.getByRole("button", { name: "Approve the 278 reasons shown" }))
     await user.click(await screen.findByRole("button", { name: "Approve them" }))
     expect(actions?.review).toHaveBeenLastCalledWith(
       expect.arrayContaining([expect.objectContaining({ type: "provision" })]),

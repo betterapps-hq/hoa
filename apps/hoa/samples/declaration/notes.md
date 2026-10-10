@@ -917,3 +917,30 @@ Judgment calls:
   application form takes the guidelines' name, the DRC Application packet.
 - SCHEMA GAP: 3.1.7's notification is the Association's document, but a document check reads the requester's files; it's
   encoded as a document check on the disapproval notice all the same.
+
+## Corrections from evaluation
+
+Golden errors confirmed while judging step runs against this encoding (evaluation.md, Judging by the coding agent),
+fixed with the reason the text gives.
+
+From the first run of the defined-terms step (`hoa-defined-terms` v1, run 2026-10-10T05-14-30-defined-terms):
+
+- CITED: class-b-member now cites 6.2(b), which defines the Class "B" Member ("shall be, collectively, Declarant and
+  Affiliates of Declarant"), instead of the Class "B" Control Period definition, which only names it.
+- CITED: authorized-builder now cites 10.3 ("Builders authorized by Declarant"), the only place the authorization
+  appears, instead of the Builder definition, which doesn't mention it.
+- CITED: common-area.limited adds 12.2/p1, where Limited Common Area is designated (in a Supplemental Declaration, the
+  deed or a Recorded plat).
+- CITED: terms whose scope notes named where they're defined but that cited nothing: plans cites 4.3(b) (plans and
+  specifications ("Plans")); qualifying-permanent-resident and residence cite 3.1(a)(i) (the "Qualifying Permanent
+  Resident", a "Residence"); easement-type.community-systems cites 10.7/p1 (collectively, the "Community Systems and
+  Services"); easement-type.private-roadway-utility cites 11.7/p1 (the "Private Roadway and Utility Easements").
+- ADDED: reserve-account (object), the separate bank accounts 8.3/p1 defines as the "Reserve Accounts".
+- ADDED: termination-of-mediation (document), the mediator's notice 14.4(b)(iv) defines as "Termination of Mediation".
+- ADDED: permitted-antenna, a category of exterior-item: the three antennas a(x)(1) to (3) list, which a(x)/p2 defines
+  collectively as "Permitted Antennas", read with the existing exterior-item.type, exterior-item.antenna-service and
+  exterior-item.size and the antenna-service values. The three permission rules keep their own conditions.
+- COVERAGE: 6.2(b), 10.7/p1 and 12.2/p1 lose their no-rule reasons, since a term now cites each (6.2(b)'s reason already
+  said its provision belonged in class-b-member's citations).
+- Not added: 14.4(a)'s "Parties" (Claimant and Respondent collectively); claimant and respondent are encoded, and no
+  rule needs the pair as a term.

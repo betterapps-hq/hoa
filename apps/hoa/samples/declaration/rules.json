@@ -3855,16 +3855,7 @@
       "intro": null,
       "text": "The Class \"B\" Member shall be, collectively, Declarant and Affiliates of Declarant. The Class \"B\" membership shall terminate upon the expiration of the Class \"B\" Control Period.",
       "wrapUp": null,
-      "noRule": {
-        "reason": "duplicate",
-        "note": "Defines the Class \"B\" Member, which vocab's class-b-member term holds; its end is community.class-b-control-period. The merge should add this provision to class-b-member's citations.",
-        "review": {
-          "status": "proposed",
-          "by": null,
-          "at": null,
-          "note": null
-        }
-      },
+      "noRule": null,
       "anchors": []
     },
     {
@@ -7636,16 +7627,7 @@
       "intro": null,
       "text": "Declarant reserves for itself, its Affiliates, successors, and assignees, the exclusive and perpetual right to provide and operate, or to permit others (including, without limitation, the Association) to provide and operate within the Residential Community such telecommunication systems (including, without limitation, cable television, community Intranet, Internet, and other systems for receiving, distributing, and transmitting electronic data, signals, and audio or visual communications), security monitoring systems and services, utilities, and similar systems and services, and related equipment and infrastructure, including, without limitation, conduits, wires, amplifiers, towers, antennae, and other apparatus and equipment for the operation or provision thereof (collectively, the \"Community Systems and Services\") as Declarant, in its discretion, deems appropriate. Such right shall include, without limitation, the right to select and contract with companies licensed to provide such services in the Redmond Ridge area, and to charge individual users a reasonable fee not to exceed the maximum allowable charge for such service, as from time to time is defined by the laws, rules, and regulations of the relevant government authority, if applicable. Declarant and its Affiliates may receive, and shall be entitled to retain, any rebate, credit, fee, or incentive relating to the installation, operation, or provision of any Community Systems and Services. Notwithstanding the above reservation of rights, Declarant's exclusive and perpetual rights do not supersede King County's authority to regulate the public rights of way, including King County's authority to grant cable television and telecommunications franchises, permits or licenses in the public rights of way.",
       "wrapUp": null,
-      "noRule": {
-        "reason": "not-evaluated",
-        "note": "The Declarant's exclusive right to provide Community Systems and Services and charge fees within the legal maximum; no request type evaluates a service provider's fees.",
-        "review": {
-          "status": "proposed",
-          "by": null,
-          "at": null,
-          "note": null
-        }
-      },
+      "noRule": null,
       "anchors": []
     },
     {
@@ -9020,16 +9002,7 @@
       "intro": null,
       "text": "Initially, any Limited Common Area shall be designated as such in a Supplemental Declaration, the deed conveying such area to the Association, or on a Recorded plat; provided, any such assignment shall not preclude Declarant from later assigning use of the same Limited Common Area to additional Units and/or Neighborhoods, so long as Declarant or any of its Affiliates own any of the property described on Exhibits \"A\" or \"B.\"",
       "wrapUp": null,
-      "noRule": {
-        "reason": "not-evaluated",
-        "note": "How Limited Common Area is first designated, and the Declarant's right to assign it to more Units; neither is a vote or other request the portal evaluates.",
-        "review": {
-          "status": "proposed",
-          "by": null,
-          "at": null,
-          "note": null
-        }
-      },
+      "noRule": null,
       "anchors": []
     },
     {
@@ -14745,7 +14718,7 @@
       "context": null,
       "citations": [
         {
-          "provisionKey": "declaration:article-2/builder",
+          "provisionKey": "declaration:10.3",
           "highlight": null,
           "region": null
         }
@@ -14993,7 +14966,7 @@
       "context": null,
       "citations": [
         {
-          "provisionKey": "declaration:article-2/class-b-control-period",
+          "provisionKey": "declaration:6.2(b)",
           "highlight": null,
           "region": null
         }
@@ -15405,6 +15378,11 @@
       "citations": [
         {
           "provisionKey": "declaration:article-2/limited-common-area",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:12.2/p1",
           "highlight": null,
           "region": null
         }
@@ -17620,7 +17598,13 @@
       "definition": "a permanent occupant who is 55 years of age or older",
       "scopeNote": "Defined in 3.1(a)(i).",
       "context": null,
-      "citations": [],
+      "citations": [
+        {
+          "provisionKey": "declaration:3.1(a)(i)",
+          "highlight": null,
+          "region": null
+        }
+      ],
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
@@ -17715,7 +17699,13 @@
       "definition": "a dwelling or residence within the Residential Community",
       "scopeNote": "Defined in 3.1(a)(i); it may include attached or detached garages and other structures ancillary to it.",
       "context": null,
-      "citations": [],
+      "citations": [
+        {
+          "provisionKey": "declaration:3.1(a)(i)",
+          "highlight": null,
+          "region": null
+        }
+      ],
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
@@ -21129,6 +21119,159 @@
       "issues": []
     },
     {
+      "key": "permitted-antenna",
+      "organizationId": "org-sample",
+      "kind": "category",
+      "of": "exterior-item",
+      "criteria": {
+        "type": "all",
+        "of": [
+          {
+            "type": "in",
+            "left": {
+              "type": "ref",
+              "path": ["exterior-item.type"]
+            },
+            "values": [
+              {
+                "type": "value",
+                "term": "exterior-item-type.satellite-dish"
+              },
+              {
+                "type": "value",
+                "term": "exterior-item-type.antenna"
+              }
+            ]
+          },
+          {
+            "type": "any",
+            "of": [
+              {
+                "type": "all",
+                "of": [
+                  {
+                    "type": "compare",
+                    "left": {
+                      "type": "ref",
+                      "path": ["exterior-item.antenna-service"]
+                    },
+                    "op": "=",
+                    "right": {
+                      "type": "value",
+                      "term": "antenna-service.direct-broadcast-satellite"
+                    }
+                  },
+                  {
+                    "type": "compare",
+                    "left": {
+                      "type": "ref",
+                      "path": ["exterior-item.size"]
+                    },
+                    "op": "<=",
+                    "right": {
+                      "type": "quantity",
+                      "value": 1,
+                      "unit": "meter"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "all",
+                "of": [
+                  {
+                    "type": "compare",
+                    "left": {
+                      "type": "ref",
+                      "path": ["exterior-item.antenna-service"]
+                    },
+                    "op": "=",
+                    "right": {
+                      "type": "value",
+                      "term": "antenna-service.multipoint-distribution"
+                    }
+                  },
+                  {
+                    "type": "compare",
+                    "left": {
+                      "type": "ref",
+                      "path": ["exterior-item.size"]
+                    },
+                    "op": "<=",
+                    "right": {
+                      "type": "quantity",
+                      "value": 1,
+                      "unit": "meter"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "compare",
+                "left": {
+                  "type": "ref",
+                  "path": ["exterior-item.antenna-service"]
+                },
+                "op": "=",
+                "right": {
+                  "type": "value",
+                  "term": "antenna-service.television-broadcast"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "labels": [
+        {
+          "text": "Permitted Antenna",
+          "role": "preferred",
+          "plural": "Permitted Antennas",
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-09T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "an antenna designed to receive direct broadcast satellite services or video programming via multipoint distribution services that is one meter or less in diameter or diagonal measurement, or an antenna designed to receive television broadcast signals",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "use-restrictions:a(x)/p2",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "use-restrictions:a(x)(1)",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "use-restrictions:a(x)(2)",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "use-restrictions:a(x)(3)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "exterior-item.size",
       "organizationId": "org-sample",
       "kind": "property",
@@ -22112,7 +22255,13 @@
       "scopeNote": "Site layout, structural design, elevations, materials and colors, landscaping, drainage, lighting and irrigation (4.3(b)).",
       "definition": null,
       "context": null,
-      "citations": [],
+      "citations": [
+        {
+          "provisionKey": "declaration:4.3(b)",
+          "highlight": null,
+          "region": null
+        }
+      ],
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
@@ -24206,7 +24355,13 @@
       "definition": null,
       "scopeNote": null,
       "context": null,
-      "citations": [],
+      "citations": [
+        {
+          "provisionKey": "declaration:10.7/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
@@ -24342,7 +24497,13 @@
       "definition": null,
       "scopeNote": null,
       "context": null,
-      "citations": [],
+      "citations": [
+        {
+          "provisionKey": "declaration:11.7/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
@@ -32254,6 +32415,46 @@
       "issues": []
     },
     {
+      "key": "reserve-account",
+      "organizationId": "org-sample",
+      "kind": "thing",
+      "nature": "object",
+      "request": null,
+      "labels": [
+        {
+          "text": "Reserve Account",
+          "role": "preferred",
+          "plural": "Reserve Accounts",
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-09T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "a separate bank account in which the Board deposits all amounts collected as reserves, held for the purposes they were collected for and not commingled with other Association funds",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:8.3/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "reserve-withdrawal.board-signatures",
       "organizationId": "org-sample",
       "kind": "property",
@@ -35499,6 +35700,56 @@
         }
       ],
       "definition": "the written settlement of a Claim through mediation, documented by the mediator and signed by the Parties",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:14.4(b)(iv)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "termination-of-mediation",
+      "organizationId": "org-sample",
+      "kind": "thing",
+      "nature": "document",
+      "request": null,
+      "labels": [
+        {
+          "text": "Termination of Mediation",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-09T12:00:00Z"
+          }
+        },
+        {
+          "text": "notice of termination of the mediation proceedings",
+          "role": "alternative",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-09T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "the mediator's notice that mediation of a Claim has ended without settlement, stating that the Parties are at an impasse and the date mediation was terminated",
       "scopeNote": null,
       "context": null,
       "citations": [
