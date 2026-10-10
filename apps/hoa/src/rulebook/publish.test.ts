@@ -102,6 +102,7 @@ describe("publishDraft", { timeout: 30_000 }, () => {
     expect(second.fileSha256).toBe(first.fileSha256)
     expect(await getPublishedRulesFile(db, hoaId)).toEqual({
       rulebookId: "second",
+      publishedAt: expect.any(String),
       fileKey: second.fileKey,
       fileSha256: second.fileSha256
     })

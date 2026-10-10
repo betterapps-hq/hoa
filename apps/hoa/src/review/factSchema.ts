@@ -31,6 +31,12 @@ export type FactAnswer = {
   reading: unknown
   evidence: ModelEvidence[]
   confidence: number
+  /**
+   * An application form answer that stands as written, never matched to the rulebook's values: a value of its own (one
+   * the administrator added to a question's choices), or a description (an "Other" answer) no rule can test, which
+   * stays uncertain with the homeowner's words. Models never give it.
+   */
+  asWritten?: "value" | "description"
 }
 
 export type ConditionResponse = {

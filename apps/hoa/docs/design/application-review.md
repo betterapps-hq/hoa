@@ -546,13 +546,22 @@ against, and a **definition** (`src/projectTypes/projectType.ts`, Zod): the subj
 asks for in checklist order, the documents the form itself provides (`formDocuments`), and the questions the rules can ask that the form leaves out (`unasked`, kept with their
 wording so adding one back keeps it).
 
-- **Questions.** A question is bound (`binding`: the property a selected rule tests; its answer type comes from the
-  vocabulary: text, long text, an amount with its unit and dimension, a count, a choice from the value set with
-  "another" when the set is open, yes or no, a date, a time) or the administrator's own (`binding: null`, any answer
-  type they choose, including several choices). Each has its wording, help, an example for text, whether it's
-  required, and the passages it cites (`citations`: a bound question starts with its rules' provisions; then the list
-  is the administrator's). Bound answers about the project are facts (`answerReadings`); every answer, bound or not,
-  is on the packet's "Application form answers" page, which the review reads as context and the committee sees.
+- **Questions.** Each has its wording, help, an answer type (text, long text, an amount with its unit and dimension, a
+  count, one choice, several choices, yes or no, a date, a time), an example for text, whether it's required, and the
+  passages it cites (`citations`). **A question's citations are what its answer is checked against.** Underneath, a
+  question is bound (`binding`: the property a rule tests, its answer type and values from the vocabulary) or not
+  (`binding: null`), and code alone decides which (`src/projectTypes/bind.ts`, `bindDefinition`, run on every change in
+  the editor and on every save): a question whose citations include a passage of the rules testing a detail its answer
+  type can give (the same kind; an amount of the same dimension; a choice naming at least one of the rulebook's values
+  by value or label, the rest becoming its own) is bound to that detail, the one closest to its wording when several
+  fit and never one another question answers; a bound question stays bound while its type fits and its citations keep
+  one of those passages (or are the rules' own); removing the last such citation or changing to a type that can't give
+  the detail unbinds it, and citing again or changing back binds it again. Bound answers about the project are facts
+  (`answerReadings`). Every answer is on the packet's "Application form answers" page with its question, its help and
+  the passages it cites by name, and the review selects the rules citing those passages whatever the request's
+  entities (`selectRules`, `cited`) and tells the facts stage which questions to read their details from
+  (`askedInForm` on the plan), so code verifies what it reads against the quoted answer. An answer nobody cites is
+  context the rules ignore and the committee sees; an answer the review can't read is context, never a failure.
 - **Built by code** (`src/projectTypes/build.ts`): the rules a project of these subjects selects, their fact plan and
   their document checks. Questions are worded by code (`fallbackQuestion`: "What is the fence run's height?", "What
   kind of work is it?", "Is the project built to a pre-approved plan?") until the administrator rewords them. A
@@ -562,17 +571,37 @@ wording so adding one back keeps it).
   subject's name doesn't repeat it ("gate height" of a gate: "What is the gate's height?"). A document check the
   application form meets (a core form document or a refinement of one, needing no signature) is a form document, never
   an upload; an upload that must be signed says by whom ("Application form signed by every Owner").
-  `bindDefinition` checks every saved definition against the rules again: a bound question no rule asks and a rule
-  document no rule requires are dropped; the administrator's own questions and documents are kept as written. Every
+  `bindDefinition` checks every saved definition against the rules again: a bound question whose detail no rule tests
+  any more and a rule document no rule requires are dropped; other questions and the administrator's own documents are
+  kept as written. Every
   newly linked citation must be a provision of the published rulebook; one a rebuild removes stays, flagged in the
   editor.
 - **The editor** (`ProjectTypePage`): each question rendered exactly as homeowners see it (`QuestionField`, shared
-  with the homeowner form), one info button with its help and what it checks, its citations on a quiet line, a drag
+  with the homeowner form), one info button for long help, its citations on a quiet line, a drag
   handle (dnd-kit, keyboard sensor and announcements) and a menu (edit, required or optional, remove with undo).
   Changes save as they're made. "Add question" suggests what the rules check and always lets the administrator write
   their own (a "File upload" answer becomes a document requirement); "Add document" suggests what the rules require and
-  always lets them create their own (name, what it must show, required, accepted file formats, citations). A bound
-  question's answer type changes only after unlinking it, which makes it the administrator's own.
+  always lets them create their own (name, what it must show, required, accepted file formats, citations). The edit
+  dialog is a plain form builder: nothing in it names bindings, links or how the review uses an answer, and the
+  answer type is a select of every type. Each citation in the edit dialogs is a link that opens the reader in the sheet
+  over the editor, beside its own remove button.
+- **Choices of a bound question.** The rules give the list, and the administrator shapes it like any other:
+  they show or hide each of the rulebook's values, add their own (`isAdded`; marked "Added" in the dialog only),
+  rename or remove those, reorder the whole list by its drag handles, and allow "Other", which gives homeowners a short
+  box to describe their answer (on by default when the rulebook's set is open). A rulebook can name only some values
+  and leave one implicit (front and sides, not the back): the administrator adds it. An added choice is stored with a
+  key made from its label when it's added (unique among the property's values, kept on rename); one whose label
+  repeats a rulebook value is refused ("show it instead"). Code never adds choices, and a rebuild keeps the added ones,
+  the order and the Other setting, dropping only rulebook values the rules no longer list.
+- **How added choices are evaluated.** The answers page shows an added choice by its label and an Other answer as
+  "Other: <the homeowner's words>". An added choice reaches the facts as a value of its own (`asWritten: "value"`,
+  normalized to `{ type: "value", term: null, text: label }`), never matched to the rulebook's values however close
+  its words, so the engine compares it with nothing: a rule limiting listed values (front or side) doesn't apply to
+  it, a rule permitting only listed values (wood, composite or metal) fails it, and `!=` holds. An Other answer
+  (`asWritten: "description"`) is no value a rule can test: its fact is `uncertain`, the words its only reading (a
+  text candidate). A finding the engine can't settle only because of such descriptions goes to the committee with the
+  words ("location described as “by the shed”") instead of asking the homeowner again; a finding met either way stays
+  met, and one that also lacks another detail still asks for it (`src/engine/unlistedValues.test.ts`).
 - **The homeowner form**: the project type as cards, a description, the sections in order (amounts in the shared
   quantity inputs by dimension, in the organization's unit system, `HoaSettings.unitSystem`), and one drop zone for
   files, each file marked as one of the documents (guessed from its name only when clear) against a checklist that
@@ -584,8 +613,23 @@ wording so adding one back keeps it).
   rules require (`checkSuggestions`); the administrator adds or dismisses each. Rewording questions with a model is
   deferred.
 - **Requirements**: a type's page lists every rule the published rulebook applies to that kind of project
-  (`projectRequirements`), behind a disclosure; a document rule the application form meets says so. A type built against an earlier rulebook offers to rebuild its form
-  against the published rules, keeping the administrator's wording where a question still binds.
+  (`projectRequirements`), behind a disclosure; a document rule the application form meets says so.
+- **Out of date**: a type records the rulebook it was built against (`rulebookId`). Published rulebooks never change,
+  so a type is out of date exactly when a newer rulebook is published. Code works out what that changes for the form,
+  with no model (`src/projectTypes/updates.ts`, `rulebookChanges`): the form the earlier rulebook builds against the
+  one the published rulebook builds, applied to the stored form. It finds questions the rules now ask or no longer
+  ask, answers and choice lists that changed, cited passages the rulebook no longer has, documents the rules now
+  require, no longer require or want to show more, and the administrator's edits that now conflict (an added choice
+  the rulebook now lists). The list of types says it in one quiet line ("Out of date with the rulebook published Oct
+  12"); the type's page shows a callout with a one-sentence summary and "Review updates", a dialog where each change is
+  accepted or the administrator's version kept ("Accept all" for the lot), then saved (`applyChanges`,
+  `applyProjectTypeUpdates`). Kept, a question stays as worded (its citations still decide what it's checked against),
+  a document becomes the administrator's own, a missing passage stays cited, and a new question or document stays out
+  of the form, offered by Add question or Add document. The administrator's own questions and documents, wording,
+  added choices, order, required flags and citations survive either way. Until then, edits are bound against the
+  rulebook the type was built with, homeowners apply with the saved form, and a cited passage the published rulebook
+  doesn't have is left out of their "Why we ask"; reviews of applications already submitted are untouched. The
+  committee's dashboard says how many active types need updating, with a link.
 - **Delete or archive**: from the list's or the page's menu. A type no application uses can be deleted after a
   confirmation naming it; for one in use, the confirmation offers archiving instead (hidden from new applications,
   kept for the ones that use it). An archived type offers Unarchive.

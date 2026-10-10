@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { normalizeForMatching } from "@/ocr/page"
+import { planFacts, type FactPlan } from "@/review/factPlan"
 import type { FactAnswer } from "@/review/factSchema"
 import type { Packet, PacketFile } from "@/review/packet"
 import type * as T from "@/schema/types"
@@ -91,7 +92,8 @@ function answerText(field: ProjectField, value: AnswerValue): string | null {
     return field.unit ? `${String(value)} ${field.unit.label}` : String(value)
   }
   if (field.kind === "choice") {
-    return field.options.find((option) => option.value === value)?.label ?? String(value)
+    const option = field.options.find((item) => item.value === value)
+    return option ? option.label : `Other: ${String(value)}`
   }
   if (Array.isArray(value)) {
     const labels = value.map((item) =>
@@ -121,12 +123,30 @@ export function answerLines(definition: ProjectTypeDefinition, answers: ProjectA
 }
 
 /**
+ * What the review needs to read an answer against the rules, under its line: the question's help, and the passages it
+ * cites, by name, so an answer no rule detail is tied to can still be read as what those passages state.
+ */
+function notesOf(field: ProjectField, citationLabel?: (provisionKey: string) => string | null) {
+  const cited = (field.citations ?? []).flatMap((key) => citationLabel?.(key) ?? [])
+  return [
+    ...(field.help ? [`  Help: ${field.help}`] : []),
+    ...(cited.length > 0 ? [`  Cites: ${cited.join("; ")}`] : [])
+  ]
+}
+
+/**
  * The answers as a page of the packet, so every stage reads them like the homeowner's other pages and cites them as
- * evidence: the project type, then each item's answers.
+ * evidence: the project type, then each item's answers, each with its question's help and cited passages.
  */
 export function withAnswersPage(
   packet: Packet,
-  input: { projectType: string | null; definition: ProjectTypeDefinition | null; answers: ProjectAnswers | null }
+  input: {
+    projectType: string | null
+    definition: ProjectTypeDefinition | null
+    answers: ProjectAnswers | null
+    /** A cited passage's name ("Design Guidelines 5.5.1(i)"); null for one the rulebook doesn't have. */
+    citationLabel?: (provisionKey: string) => string | null
+  }
 ): Packet {
   const sections = input.definition && input.answers ? answerLines(input.definition, input.answers) : []
   if (sections.length === 0) {
@@ -135,7 +155,10 @@ export function withAnswersPage(
   const text = [
     "ANSWERS GIVEN IN THE APPLICATION FORM",
     ...(input.projectType ? [`Project type: ${input.projectType}`] : []),
-    ...sections.flatMap((section) => [section.heading, ...section.lines.map((item) => item.line)])
+    ...sections.flatMap((section) => [
+      section.heading,
+      ...section.lines.flatMap((item) => [item.line, ...notesOf(item.field, input.citationLabel)])
+    ])
   ].join("\n")
   const file: PacketFile = {
     id: answersFileId,
@@ -194,15 +217,76 @@ export function answerReadings(
       if (field.binding === null || Array.isArray(value)) {
         return []
       }
-      return {
+      const answer: FactAnswer = {
         entity: entity.id,
         property: field.binding,
-        state: "known" as const,
+        state: "known",
         stated: answerText(field, value),
         reading: field.kind === "number" && field.unit ? { value, unit: field.unit.key } : value,
         evidence: [{ fileId: answersFileId, page: 1, quote: line }],
         confidence: 0.95
       }
+      if (field.kind !== "choice") {
+        return answer
+      }
+      // A value the administrator added is its own, never one of the rulebook's; an "Other" answer is the homeowner's
+      // description, which no rule can test.
+      const option = field.options.find((item) => item.value === value)
+      if (!option) {
+        return {
+          ...answer,
+          state: "uncertain" as const,
+          stated: String(value),
+          reading: null,
+          asWritten: "description" as const
+        }
+      }
+      return option.isAdded ? { ...answer, stated: option.label, reading: null, asWritten: "value" as const } : answer
     })
   })
+}
+
+/** The passages the form's questions cite, which the review selects the citing rules by. */
+export const citedProvisions = (definition: ProjectTypeDefinition | null): string[] => [
+  ...new Set(definition?.groups.flatMap((group) => group.fields.flatMap((field) => field.citations ?? [])) ?? [])
+]
+
+/**
+ * The fact plan with, on each property, the form's questions that cite passages of rules reading it but answer no rules'
+ * detail themselves: a question's citations are what its answer is checked against, so the facts stage reads the
+ * answer for the details those rules test, and code verifies what it reads against the quoted answer.
+ */
+export function withFormQuestions(
+  plan: FactPlan,
+  input: {
+    definition: ProjectTypeDefinition | null
+    rulesFile: T.RulesFile
+    selected: readonly T.RuleKey[]
+    requestType: T.TermKey
+  }
+): FactPlan {
+  const questions = (input.definition?.groups ?? []).flatMap((group) =>
+    group.fields.filter((field) => field.binding === null && (field.citations ?? []).length > 0)
+  )
+  if (questions.length === 0) {
+    return plan
+  }
+  const selected = new Set(input.selected)
+  const asked = new Map<string, string[]>()
+  for (const field of questions) {
+    const cites = new Set(field.citations ?? [])
+    const rules = input.rulesFile.rules
+      .filter((rule) => selected.has(rule.key) && rule.citations.some((citation) => cites.has(citation.provisionKey)))
+      .map((rule) => rule.key)
+    for (const property of planFacts(input.rulesFile, rules, input.requestType).properties) {
+      asked.set(property.key, [...new Set([...(asked.get(property.key) ?? []), field.label])])
+    }
+  }
+  return {
+    ...plan,
+    properties: plan.properties.map((property) => ({
+      ...property,
+      askedInForm: [...new Set([...property.askedInForm, ...(asked.get(property.key) ?? [])])]
+    }))
+  }
 }

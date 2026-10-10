@@ -57,6 +57,41 @@ function subjectsOf(context: Context, rulebook: Rulebook, rule: EvaluatedRule) {
     .map((entity) => entity.id)
 }
 
+/**
+ * The details a finding couldn't settle, when every one was described in words rather than given as a value (an
+ * uncertain fact whose only readings are text, such as a form's "Other" answer): "location described as “by the
+ * shed”". No rule can test a description and asking again gets the same words, so a person weighs it. Null when any
+ * unclear detail is simply unknown or unsure.
+ */
+function describedOnly(context: Context): string | null {
+  const unclear = context.reads.filter(
+    (read) => read.state !== "known" && read.state !== "absent" && read.state !== "derived"
+  )
+  const described = unclear.map((read) => {
+    const facts = context.facts(read.entity, read.property)
+    const words = facts.flatMap((fact) =>
+      fact.candidates.flatMap((candidate) => (candidate.type === "text" ? [candidate.value] : []))
+    )
+    // Text is a text property's value, however unsure; words are a description only of a property that takes values.
+    const isDescribed =
+      context.vocabulary.property(read.property)?.valueType.type !== "text" &&
+      facts.length > 0 &&
+      facts.every(
+        (fact) =>
+          fact.state === "uncertain" &&
+          fact.candidates.length > 0 &&
+          fact.candidates.every((candidate) => candidate.type === "text")
+      )
+    return isDescribed
+      ? `${context.vocabulary.label(read.property)} described as ${[...new Set(words)].map((text) => `“${text}”`).join(" and ")}`
+      : null
+  })
+  if (described.length === 0 || described.some((item) => item === null)) {
+    return null
+  }
+  return [...new Set(described)].join(", ")
+}
+
 function verdict(
   context: Context,
   rule: EvaluatedRule,
@@ -82,11 +117,14 @@ function verdict(
     .filter((read) => read.state !== "known" && read.state !== "absent" && read.state !== "derived")
     .map((read) => label(read.property))
   const needs = check.missing.length > 0 ? check.missing : [...new Set(unclear)]
+  const described = check.missing.length > 0 ? null : describedOnly(context)
   const missingInformation = (isMissingFromCheck: boolean) =>
-    verdictOf("missing-information", needs.length > 0 ? `Needs ${needs.join(", ")}.` : "Needs more information.", {
-      check,
-      isMissingFromCheck
-    })
+    described && !isMissingFromCheck
+      ? verdictOf("committee", `The ${label("committee")} decides: ${rule.title}, with ${described}.`, { check })
+      : verdictOf("missing-information", needs.length > 0 ? `Needs ${needs.join(", ")}.` : "Needs more information.", {
+          check,
+          isMissingFromCheck
+        })
 
   return match(check.status)
     .returnType<Verdict>()

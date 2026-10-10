@@ -14,7 +14,13 @@ import type { Answers, ConditionAnswer } from "@/engine/context"
 import { decide } from "@/engine/decide"
 import { evaluate } from "@/engine/evaluate"
 import { modelCall, modelCallOf, type ModelCall, type StepRunner } from "@/jobs/steps"
-import { answerReadings, answersFileId, withAnswersPage } from "@/projectTypes/answers"
+import {
+  answerReadings,
+  answersFileId,
+  citedProvisions,
+  withAnswersPage,
+  withFormQuestions
+} from "@/projectTypes/answers"
 import type { ProjectAnswers, ProjectTypeDefinition } from "@/projectTypes/projectType"
 import type * as T from "@/schema/types"
 import { evaluationRequest, fact, finding } from "@/schema/zod"
@@ -191,7 +197,12 @@ export async function reviewApplication(input: ReviewInput) {
   const packet = withAnswersPage(input.packet, {
     projectType: application.projectType?.label ?? null,
     definition: application.projectType?.definition ?? null,
-    answers: application.answers
+    answers: application.answers,
+    citationLabel: (key) => {
+      const provision = rulesFile.provisions.find((item) => item.key === key)
+      const document = rulesFile.documents.find((item) => key.startsWith(`${item.key}:`))
+      return provision && document ? `${document.title} ${provision.label}` : null
+    }
   })
   const progress = async (stage: ReviewStage, done: number, total: number) => input.progress?.(stage, done, total)
   const failures: ReviewFailure[] = []
@@ -335,7 +346,8 @@ export async function reviewApplication(input: ReviewInput) {
       type: requestType,
       governingDate: skeleton.governingDate,
       entityTypes: entities.map((entity) => entity.type),
-      lotRef: null
+      lotRef: null,
+      cited: citedProvisions(application.projectType?.definition ?? null)
     })
   }))
   const reviewedFile = selectedRulesFile(rulesFile, selected)
@@ -343,7 +355,12 @@ export async function reviewApplication(input: ReviewInput) {
   // 7. Plan: every property the selected rules read, split into entity groups.
   await progress("plan", 0, 1)
   const { plan, groups } = await step("plan", plannedOutput, async () => {
-    const factPlan = planFacts(rulesFile, selected, requestType)
+    const factPlan = withFormQuestions(planFacts(rulesFile, selected, requestType), {
+      definition: application.projectType?.definition ?? null,
+      rulesFile,
+      selected,
+      requestType
+    })
     return {
       plan: factPlan,
       groups: entityGroups(factPlan, entities, vocabulary, [...rootTypes(requestType), workType])

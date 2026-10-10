@@ -32,6 +32,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import type { ProjectTypeDefinition, ProjectTypeStatus } from "@/projectTypes/projectType"
 import type { ProjectTypeSuggestion } from "@/projectTypes/suggest"
+import { outdatedText } from "../outdated"
 import { ProjectTypeMenu } from "../ProjectTypeMenu/ProjectTypeMenu"
 import type { ProjectTypesOverview } from "../projectTypes.functions"
 
@@ -355,6 +356,9 @@ export function ProjectTypesPage({
                     <p className="text-sm text-muted-foreground">
                       {type.status === "archived" ? "Hidden from new applications" : definitionSummary(type.definition)}
                     </p>
+                    {type.outdatedSince !== null && type.status === "active" ? (
+                      <p className="text-sm text-muted-foreground">{outdatedText(type.outdatedSince)}</p>
+                    ) : null}
                   </ItemContent>
                   <ItemActions>
                     <ProjectTypeMenu

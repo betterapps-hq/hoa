@@ -33,7 +33,12 @@ const plannedProperty = z.object({
   /** Whether a value outside the listed ones is invalid. */
   isComplete: z.boolean().nullable(),
   ifUnstated: z.enum(["unknown", "absent"]),
-  many: z.boolean()
+  many: z.boolean(),
+  /**
+   * The application form's questions whose cited passages state rules that read it, when no question answers it as
+   * itself: an answer to one is where to read it.
+   */
+  askedInForm: z.array(z.string()).default([])
 })
 export type PlannedProperty = z.infer<typeof plannedProperty>
 
@@ -163,7 +168,8 @@ function planProperty(vocabulary: EngineVocabulary, terms: readonly T.Term[], ke
           : null,
       isComplete: set?.kind === "value-set" ? set.complete : null,
       ifUnstated: property.ifUnstated,
-      many: property.many
+      many: property.many,
+      askedInForm: []
     }
   ]
 }

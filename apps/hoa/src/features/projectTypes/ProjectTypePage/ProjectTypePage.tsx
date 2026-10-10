@@ -21,13 +21,17 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { CitationsOpenInSheet } from "@/features/documents/ReaderSheet/ReaderSheet"
+import { bindDefinition } from "@/projectTypes/bind"
 import { projectTypeDetails, type ProjectTypeDefinition, type ProjectTypeStatus } from "@/projectTypes/projectType"
+import { applyChanges } from "@/projectTypes/updates"
 import type { CitedProvision } from "../../rulebook/citedProvision"
 import { RuleReference } from "../../rulebook/RuleReference/RuleReference"
 import { DocumentsCard } from "../DocumentsCard/DocumentsCard"
+import { outdatedText } from "../outdated"
 import { ProjectTypeMenu } from "../ProjectTypeMenu/ProjectTypeMenu"
 import type { ProjectTypeView } from "../projectTypes.functions"
 import { QuestionsCard, type DefinitionUpdate } from "../QuestionsCard/QuestionsCard"
+import { changesSummary, UpdatesDialog } from "../UpdatesDialog/UpdatesDialog"
 
 // One project type (application-review.md, Project types): its name and description, the questions its form asks and
 // the documents it lists, edited in place and saved as they change, every requirement the rulebook places on this kind
@@ -38,7 +42,8 @@ export type ProjectTypeChanges = { label: string; description: string; definitio
 export type ProjectTypePageProps = {
   view: ProjectTypeView
   onSave: (changes: ProjectTypeChanges) => Promise<void>
-  onRefresh: () => Promise<void>
+  /** Brings the type up to date with the published rulebook with the reviewed form. */
+  onApplyUpdates: (definition: ProjectTypeDefinition) => Promise<void>
   onSetStatus: (status: ProjectTypeStatus) => Promise<void>
   onDelete: () => Promise<void>
   /** Every passage of the rulebook's documents, for linking one to a question. */
@@ -215,25 +220,25 @@ function DetailsDialog({ label, description, isOpen, onOpenChange, onSave }: Det
 
 type EditorProps = ProjectTypePageProps & { onReset: () => void }
 
-function ProjectTypeEditor({ view, onSave, onRefresh, onSetStatus, onDelete, loadProvisions, onReset }: EditorProps) {
-  const { projectType, applicationCount, requirements, subjectLabels, isOutdated } = view
+function ProjectTypeEditor({
+  view,
+  onSave,
+  onApplyUpdates,
+  onSetStatus,
+  onDelete,
+  loadProvisions,
+  onReset
+}: EditorProps) {
+  const { projectType, applicationCount, requirements, subjectLabels, isOutdated, updates } = view
+  const [isReviewing, setIsReviewing] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
-  const [isBusy, setIsBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const details = { label: projectType.label, description: projectType.description ?? "" }
   const editor = useAutosave(projectType.definition, (definition) => onSave({ ...details, definition }))
   const rules = new Map(requirements.flatMap((group) => group.rules).map((rule) => [rule.key, rule]))
-  const act = async (action: () => Promise<void>, fallback: string) => {
-    setIsBusy(true)
-    setError(null)
-    try {
-      await action()
-    } catch (caught) {
-      setError(messageOf(caught, fallback))
-    } finally {
-      setIsBusy(false)
-    }
-  }
+  // Each change is bound as saving binds it, so what a question answers follows its citations right away.
+  const update: DefinitionUpdate = (change) =>
+    editor.update((current) => bindDefinition(change(current), view.available))
   const ruleCount = requirements.reduce((total, group) => total + group.rules.length, 0)
   return (
     <div className="flex flex-col gap-4 px-4 lg:px-6">
@@ -273,28 +278,28 @@ function ProjectTypeEditor({ view, onSave, onRefresh, onSetStatus, onDelete, loa
           />
         </div>
       </header>
-      {isOutdated ? (
+      {isOutdated && updates ? (
         <Alert>
-          <AlertTitle>The rulebook changed</AlertTitle>
-          <AlertDescription>
-            This form was built against an earlier rulebook. Update it to ask what the published rules test.
-          </AlertDescription>
+          <AlertTitle>{outdatedText(updates.publishedAt)}</AlertTitle>
+          <AlertDescription>{changesSummary(updates.changes)}</AlertDescription>
           <AlertAction>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={isBusy}
-              onClick={() =>
-                void act(async () => {
-                  await onRefresh()
-                  onReset()
-                }, "It wasn't updated.")
-              }
-            >
-              Update
+            <Button size="sm" onClick={() => setIsReviewing(true)}>
+              Review updates
             </Button>
           </AlertAction>
         </Alert>
+      ) : null}
+      {isReviewing && updates ? (
+        <UpdatesDialog
+          changes={updates.changes}
+          title={outdatedText(updates.publishedAt)}
+          isOpen
+          onOpenChange={setIsReviewing}
+          onSave={async (accepted) => {
+            await onApplyUpdates(applyChanges(editor.latest.current, updates.latest, updates.changes, accepted))
+            onReset()
+          }}
+        />
       ) : null}
       {error ? (
         <p role="alert" className="text-sm text-destructive">
@@ -305,11 +310,10 @@ function ProjectTypeEditor({ view, onSave, onRefresh, onSetStatus, onDelete, loa
         definition={editor.definition}
         available={view.available}
         info={view.questionInfo}
-        rules={rules}
         citations={view.citations}
         units={view.units}
         loadProvisions={loadProvisions}
-        onUpdate={editor.update}
+        onUpdate={update}
       />
       <DocumentsCard
         definition={editor.definition}
@@ -317,7 +321,7 @@ function ProjectTypeEditor({ view, onSave, onRefresh, onSetStatus, onDelete, loa
         rules={rules}
         citations={view.citations}
         loadProvisions={loadProvisions}
-        onUpdate={editor.update}
+        onUpdate={update}
       />
       <Card>
         <Collapsible>

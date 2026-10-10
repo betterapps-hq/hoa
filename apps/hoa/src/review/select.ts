@@ -13,6 +13,11 @@ export type SelectionInput = {
   entityTypes: readonly T.TermKey[]
   /** The lot's id outside the file, for decision rules scoped to one lot. */
   lotRef: string | null
+  /**
+   * The passages the application form's questions cite: a question's citations are what its answer is checked
+   * against, so the rules that cite one are selected whatever the request's entities.
+   */
+  cited?: readonly T.ProvisionKey[]
 }
 
 export function selectRules(rulesFile: T.RulesFile, input: SelectionInput): T.RuleKey[] {
@@ -24,9 +29,14 @@ export function selectRules(rulesFile: T.RulesFile, input: SelectionInput): T.Ru
   const consideredKeys = new Set(considered.map((rule) => rule.key))
   const types = new Set(input.entityTypes.map((type) => vocabulary.thingOf(type)))
 
+  const cited = new Set(input.cited ?? [])
   const selected = new Set(
     considered
-      .filter((rule) => rule.appliesTo !== null && types.has(vocabulary.thingOf(rule.appliesTo)))
+      .filter(
+        (rule) =>
+          (rule.appliesTo !== null && types.has(vocabulary.thingOf(rule.appliesTo))) ||
+          rule.citations.some((citation) => cited.has(citation.provisionKey))
+      )
       .map((rule) => rule.key)
   )
   const queue = considered.filter((rule) => selected.has(rule.key))

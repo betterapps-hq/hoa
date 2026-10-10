@@ -13,9 +13,9 @@ import {
   listProjectTypes as listProjectTypeRecords,
   updateProjectType as updateProjectTypeRecord
 } from "@/db/projectTypeRepository"
-import { getPublishedRulesFile } from "@/db/rulebookContentRepository"
+import { getPublishedRulesFile, getRulesFileOf } from "@/db/rulebookContentRepository"
+import { bindDefinition } from "@/projectTypes/bind"
 import {
-  bindDefinition,
   buildDefinition,
   projectSubjects,
   propertyRules,
@@ -37,6 +37,7 @@ import {
   suggestionAnswerSchema,
   type ProjectTypeSuggestion
 } from "@/projectTypes/suggest"
+import { rulebookChanges, type RulebookChange } from "@/projectTypes/updates"
 import { definitionOf, rulebookVocabulary, scopeNoteOf } from "@/review/documentTypes"
 import { readRulesFile } from "@/rulebook/assemble"
 import type * as T from "@/schema/types"
@@ -51,10 +52,37 @@ import { projectRequirements, type RequirementGroup } from "./requirements"
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-/** The published rulebook's id and rules file; null before the organization publishes one. */
+/** The published rulebook's id, rules file and publish date; null before the organization publishes one. */
 async function publishedRulebook(hoaId: string) {
   const published = await getPublishedRulesFile(getDb(), hoaId)
-  return published ? { id: published.rulebookId, rulesFile: await readRulesFile(getBucket(), published) } : null
+  return published
+    ? {
+        id: published.rulebookId,
+        publishedAt: published.publishedAt,
+        rulesFile: await readRulesFile(getBucket(), published)
+      }
+    : null
+}
+
+type Published = Awaited<ReturnType<typeof publishedRulebook>>
+
+/** Whether a type was built against an earlier rulebook than the published one. */
+const isOutdatedType = (type: ProjectType, published: Published) =>
+  published !== null && type.rulebookId !== published.id
+
+/**
+ * The rules file a type's form is kept against: the rulebook it was built with while it's out of date (so editing it
+ * doesn't take the published rulebook's changes unreviewed), else the published one; null when there's neither.
+ */
+async function ownRulesFile(hoaId: string, type: ProjectType, published: Published) {
+  if (!isOutdatedType(type, published) || type.rulebookId === null) {
+    return published ? { id: published.id, rulesFile: published.rulesFile } : null
+  }
+  const file = await getRulesFileOf(getDb(), hoaId, type.rulebookId)
+  if (!file) {
+    return published ? { id: published.id, rulesFile: published.rulesFile } : null
+  }
+  return { id: type.rulebookId, rulesFile: await readRulesFile(getBucket(), file) }
 }
 
 async function requirePublished(hoaId: string) {
@@ -127,7 +155,11 @@ function currentType(type: ProjectType, published: Awaited<ReturnType<typeof pub
   return { ...type, definition: bindDefinition(type.definition, built) }
 }
 
-export type ProjectTypeListItem = ProjectType & { applicationCount: number }
+export type ProjectTypeListItem = ProjectType & {
+  applicationCount: number
+  /** When the rulebook it's out of date with was published; null while it's current. */
+  outdatedSince: string | null
+}
 
 export type ProjectTypesOverview = {
   projectTypes: ProjectTypeListItem[]
@@ -149,7 +181,8 @@ export const getProjectTypesOverview = createServerFn({ method: "GET" }).handler
       projectTypes: await Promise.all(
         types.map(async (type) => ({
           ...type,
-          applicationCount: await countApplicationsOfType(db, context.hoa.id, type.id)
+          applicationCount: await countApplicationsOfType(db, context.hoa.id, type.id),
+          outdatedSince: isOutdatedType(type, published) ? (published?.publishedAt ?? null) : null
         }))
       ),
       subjects: published ? projectSubjects(published.rulesFile, applicationRequestType) : [],
@@ -157,6 +190,21 @@ export const getProjectTypesOverview = createServerFn({ method: "GET" }).handler
     }
   }
 )
+
+/** How many active project types are out of date with the published rulebook, for the committee's dashboard. */
+export const countOutdatedProjectTypes = createServerFn({ method: "GET" }).handler(async (): Promise<number> => {
+  const context = await getRequestContext()
+  if (context.role !== "administrator") {
+    return 0
+  }
+  const [types, published] = await Promise.all([
+    listProjectTypeRecords(getDb(), context.hoa.id),
+    getPublishedRulesFile(getDb(), context.hoa.id)
+  ])
+  return published
+    ? types.filter((type) => type.status === "active" && type.rulebookId !== published.rulebookId).length
+    : 0
+})
 
 export type ProjectTypeView = {
   projectType: ProjectType
@@ -167,6 +215,11 @@ export type ProjectTypeView = {
   subjectLabels: string[]
   /** Whether it was built against an earlier rulebook than the published one. */
   isOutdated: boolean
+  /**
+   * While it's out of date: when the published rulebook was published, what changed for this form, and the form the
+   * published rulebook gives, which accepted changes come from.
+   */
+  updates: { publishedAt: string | null; changes: RulebookChange[]; latest: ProjectTypeDefinition } | null
   /** Every question the rules about its subjects can ask, for adding back one the administrator removed. */
   available: ProjectTypeDefinition
   /** What each question checks, by property key: the vocabulary's meaning and the rules that read it. */
@@ -220,9 +273,25 @@ export const getProjectTypeView = createServerFn({ method: "GET" })
     ])
     const subjects = published ? projectSubjects(published.rulesFile, applicationRequestType) : []
     const current = currentType(type, published)
-    const available = published
-      ? buildDefinition(published.rulesFile, applicationRequestType, type.definition.subjects, today())
-      : type.definition
+    const own = await ownRulesFile(context.hoa.id, type, published)
+    const buildFrom = (rulesFile: T.RulesFile) =>
+      buildDefinition(rulesFile, applicationRequestType, type.definition.subjects, today())
+    const available = own ? buildFrom(own.rulesFile) : type.definition
+    const isOutdated = isOutdatedType(type, published)
+    const latest = published && isOutdated ? buildFrom(published.rulesFile) : null
+    const updates =
+      published && latest
+        ? {
+            publishedAt: published.publishedAt,
+            latest,
+            changes: rulebookChanges(
+              type.definition,
+              own && own.id !== published.id ? available : null,
+              latest,
+              new Set(published.rulesFile.provisions.map((provision) => provision.key))
+            )
+          }
+        : null
     return {
       projectType: current,
       applicationCount,
@@ -232,11 +301,16 @@ export const getProjectTypeView = createServerFn({ method: "GET" })
       subjectLabels: type.definition.subjects.map(
         (key) => subjects.find((subject) => subject.key === key)?.label ?? key
       ),
-      isOutdated: published !== null && type.rulebookId !== published.id,
+      isOutdated,
+      updates,
       available,
       questionInfo: published ? questionInfoOf(published.rulesFile, type.definition.subjects) : {},
       citations: published
-        ? citationsOf(published.rulesFile, [...citedKeys(current.definition), ...citedKeys(available)])
+        ? citationsOf(published.rulesFile, [
+            ...citedKeys(current.definition),
+            ...citedKeys(available),
+            ...(latest ? citedKeys(latest) : [])
+          ])
         : {},
       units: vocabularyUnits(published?.rulesFile ?? null)
     }
@@ -322,7 +396,20 @@ export const createProjectType = createServerFn({ method: "POST" })
     })
   })
 
-/** Saves the label, description and form; the form is checked against the rules again. */
+/** A newly linked passage must be in the published rulebook's documents; one a rebuild removed stays until fixed. */
+function checkCitations(definition: ProjectTypeDefinition, before: ProjectTypeDefinition, rulesFile: T.RulesFile) {
+  const known = citedKeys(before)
+  const index = citationIndex(rulesFile)
+  const unknown = [...citedKeys(definition)].filter((key) => !known.has(key) && !index.provisions.has(key))
+  if (unknown.length > 0) {
+    throw new Error("A linked passage isn't in the rulebook's documents. Choose it again.")
+  }
+}
+
+/**
+ * Saves the label, description and form; the form is checked against the rules again: the rulebook it was built with
+ * while it's out of date, so an edit never takes the published rulebook's changes unreviewed.
+ */
 export const updateProjectType = createServerFn({ method: "POST" })
   .validator((data: unknown) =>
     projectTypeDetails.extend({ id: z.string(), definition: projectTypeDefinition }).parse(data)
@@ -333,26 +420,24 @@ export const updateProjectType = createServerFn({ method: "POST" })
       loadOwnType(context.hoa.id, data.id),
       requirePublished(context.hoa.id)
     ])
-    const built = buildDefinition(published.rulesFile, applicationRequestType, type.definition.subjects, today())
-    // A newly linked passage must be in the documents; one a rebuild removed stays until the administrator fixes it.
-    const known = new Set([...citedKeys(type.definition), ...citedKeys(built)])
-    const index = citationIndex(published.rulesFile)
-    const unknown = [...citedKeys(data.definition)].filter((key) => !known.has(key) && !index.provisions.has(key))
-    if (unknown.length > 0) {
-      throw new Error("A linked passage isn't in the rulebook's documents. Choose it again.")
-    }
+    const own = (await ownRulesFile(context.hoa.id, type, published)) ?? published
+    const built = buildDefinition(own.rulesFile, applicationRequestType, type.definition.subjects, today())
+    checkCitations(data.definition, type.definition, published.rulesFile)
     await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
       label: data.label,
       description: data.description || null,
       definition: bindDefinition(data.definition, built),
-      rulebookId: published.id,
+      rulebookId: own.id,
       updatedAt: new Date().toISOString()
     })
   })
 
-/** Rebuilds the form against the published rulebook, keeping the administrator's wording where a field still binds. */
-export const refreshProjectType = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({ id: z.string() }).parse(data))
+/**
+ * Brings a type up to date with the published rulebook: the form the administrator reviewed (each change accepted or
+ * their version kept, `applyChanges`), bound against the published rules.
+ */
+export const applyProjectTypeUpdates = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ id: z.string(), definition: projectTypeDefinition }).parse(data))
   .handler(async ({ data }) => {
     const context = await requireAdministrator()
     const [type, published] = await Promise.all([
@@ -360,9 +445,9 @@ export const refreshProjectType = createServerFn({ method: "POST" })
       requirePublished(context.hoa.id)
     ])
     const built = buildDefinition(published.rulesFile, applicationRequestType, type.definition.subjects, today())
-    const kept = bindDefinition(type.definition, built)
+    checkCitations(data.definition, type.definition, published.rulesFile)
     await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
-      definition: kept.groups.length > 0 ? kept : built,
+      definition: bindDefinition(data.definition, built),
       rulebookId: published.id,
       updatedAt: new Date().toISOString()
     })

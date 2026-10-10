@@ -53,8 +53,30 @@ const fieldKinds = z.discriminatedUnion("kind", [
   z.object({
     ...fieldBase,
     kind: z.literal("choice"),
-    options: choiceOptions,
-    /** Whether the homeowner may write a value the list doesn't name (the rulebook's set is open). */
+    /**
+     * In the order homeowners see them. A bound question's are the rulebook's values it offers and the
+     * administrator's own (`isAdded`).
+     */
+    options: z
+      .array(
+        z.object({
+          value: z.string(),
+          label: z.string().min(1),
+          /**
+           * The administrator's own value of a bound question's property, beside the rulebook's (the back, when the
+           * rules name only the front and sides). It reaches the review as a value of its own, never as one of the
+           * rulebook's. Its value is a key made from its label when it's added, kept when the label changes. Code
+           * never adds one.
+           */
+          isAdded: z.boolean().default(false)
+        })
+      )
+      .min(1),
+    /**
+     * Whether the homeowner may pick "Other" and describe the answer in words: on by default when the rulebook's set is
+     * open, then the administrator's choice. No rule can test a description, so the review holds the detail
+     * uncertain and the rules that read it go to the committee with the homeowner's words.
+     */
     allowsOther: z.boolean()
   }),
   /** Any number of the options; only the administrator's own questions ask this way. */

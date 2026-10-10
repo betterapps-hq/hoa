@@ -72,6 +72,7 @@ describe("seedRulebook", { timeout: 60_000 }, () => {
     expect(reassembled.json).toBe(seed.json)
     expect(await getPublishedRulesFile(db, organization.id)).toEqual({
       rulebookId: "sample-declaration",
+      publishedAt: expect.any(String),
       fileKey: "hoas/demo-hoa/rulebooks/sample-declaration/rules.json",
       fileSha256: seed.sha256
     })

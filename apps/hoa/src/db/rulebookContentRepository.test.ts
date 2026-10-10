@@ -6,6 +6,7 @@ import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
 import {
   discardDraftRulebook,
   getPublishedRulesFile,
+  getRulesFileOf,
   getRulebookContent,
   getRulebookRule,
   promoteToDraft,
@@ -153,6 +154,12 @@ describe("rulebookContentRepository", { timeout: 30_000 }, () => {
 
     const file = { fileKey: "hoas/demo-hoa/rulebooks/draft/rules.json", fileSha256: "f".repeat(64) }
     await recordRulebookFile(db, hoaId, "draft", file)
-    expect(await getPublishedRulesFile(db, hoaId)).toEqual({ rulebookId: "draft", ...file })
+    expect(await getPublishedRulesFile(db, hoaId)).toEqual({
+      rulebookId: "draft",
+      publishedAt: expect.any(String),
+      ...file
+    })
+    expect(await getRulesFileOf(db, hoaId, "draft")).toEqual(file)
+    expect(await getRulesFileOf(db, hoaId, "missing")).toBeNull()
   })
 })

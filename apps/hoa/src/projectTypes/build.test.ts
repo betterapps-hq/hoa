@@ -1,9 +1,11 @@
+import invariant from "tiny-invariant"
 import { describe, expect, it } from "vitest"
 import { mergeRulesFiles } from "@/evaluation/review/rulesFile"
 import { planFacts } from "@/review/factPlan"
 import { fenceRulesFile } from "@/tests/fenceSchemaFixture"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
-import { bindDefinition, buildDefinition, projectRules, projectSubjects, propertyRules } from "./build"
+import { bindDefinition } from "./bind"
+import { buildDefinition, projectRules, projectSubjects, propertyRules } from "./build"
 
 const rulesFile = mergeRulesFiles(sampleRulesFile(), fenceRulesFile())
 const requestType = "architectural-application"
@@ -233,6 +235,30 @@ describe("bindDefinition", () => {
     expect(bound.documents.map((document) => [document.documentType, document.isRequired])).toEqual(
       reversed.slice(0, -1).map((document) => [document.documentType, document.isRequired])
     )
+  })
+
+  it("keeps a choice's added values, their order among the rulebook's, and whether Other is offered", () => {
+    const choice = built.groups
+      .flatMap((item) => item.fields)
+      .find((field) => field.kind === "choice" && field.options.length > 1)
+    invariant(choice?.kind === "choice", "a choice question")
+    const choiceGroup = built.groups.find((item) => item.fields.includes(choice))!
+    const [firstValue, secondValue] = choice.options
+    const added = { value: "added-value", label: "Added value", isAdded: true }
+    const gone = { value: "no-longer-listed", label: "Gone", isAdded: false }
+    const edited = {
+      ...built,
+      groups: [
+        {
+          ...choiceGroup,
+          fields: [{ ...choice, options: [secondValue!, added, gone, firstValue!], allowsOther: !choice.allowsOther }]
+        }
+      ]
+    }
+    const bound = bindDefinition(edited, built).groups[0]!.fields[0]
+    expect(bound).toMatchObject({ options: [secondValue, added, firstValue], allowsOther: !choice.allowsOther })
+    // Built from the rules, a choice offers the rulebook's values only.
+    expect(choice.options.every((option) => !option.isAdded)).toBe(true)
   })
 
   it("reads a label that's only the detail's name as code's question", () => {

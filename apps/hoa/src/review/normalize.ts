@@ -252,6 +252,11 @@ function readValue(answer: FactAnswer, property: PlannedProperty, context: Norma
     case "quantity":
       return readQuantity(answer, property, context)
     case "choice":
+      // A value the administrator added to the form's choices is its own: never matched, however close, to the
+      // rulebook's, so a rule listing values doesn't take it for one of them.
+      if (answer.asWritten === "value") {
+        return { value: answer.stated ? { type: "value", term: null, text: answer.stated } : null, normalization: null }
+      }
       return readChoice(answer, property.values ?? [], property.isComplete === true)
     case "party":
       return readParty(answer, context.parties)
@@ -321,6 +326,13 @@ function toFact(answer: FactAnswer, property: PlannedProperty, context: Normaliz
   }
   if (answer.state === "absent") {
     const fact: T.Fact = { ...base, state: "absent", value: null, candidates: [] }
+    return { fact, normalization: null, correction: null }
+  }
+  // A description in the homeowner's words ("Other") is no value a rule can test: it stays uncertain, the words its
+  // only reading, so the rules that read it go to the committee with them.
+  if (answer.asWritten === "description") {
+    const words: T.FactValue[] = answer.stated ? [{ type: "text", value: answer.stated }] : []
+    const fact: T.Fact = { ...base, state: "uncertain", value: null, candidates: words }
     return { fact, normalization: null, correction: null }
   }
   const { value, candidates, normalization, check } = readValue(answer, property, context)

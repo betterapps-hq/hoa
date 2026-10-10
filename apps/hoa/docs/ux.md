@@ -24,6 +24,8 @@ feedback; follow them everywhere, and fix a violation when you touch the code ar
 - **Quantities use the shared quantity inputs**, chosen by the property's dimension (feet and inches, meters, area,
   duration, time, count, money), never free text a person has to format.
 - **Files use the shared drop zone** (react-dropzone), never a bare file input.
+- **Never expose internal concepts** (bindings, keys, kinds) in the UI; if an edit has a consequence, say it in plain
+  words at the moment it happens.
 - **Validate inline and kindly**: errors appear on submit or after a field is left, next to the field, saying how to fix
   it.
 

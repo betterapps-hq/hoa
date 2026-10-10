@@ -26,6 +26,8 @@ export type CommitteeDashboardProps = {
   summary: DashboardSummary
   /** The draft or build that will become the next rulebook. */
   nextRulebook: NextRulebook | null
+  /** How many active project types are out of date with the published rulebook. */
+  projectTypesToUpdate?: number
   /** The organization's applications. */
   applications: DashboardApplication[]
   /** The moment the data was read, which waiting times count to. */
@@ -38,7 +40,13 @@ const agoPhrase = (days: number) => (days === 0 ? "today" : `${daysText(days)} a
 const linkClass = "text-sm text-link underline-offset-4 hover:underline"
 
 /** The committee's dashboard: what waits for a decision or on a homeowner, the rulebook, and recent activity. */
-export function CommitteeDashboard({ summary, nextRulebook, applications, asOf }: CommitteeDashboardProps) {
+export function CommitteeDashboard({
+  summary,
+  nextRulebook,
+  applications,
+  projectTypesToUpdate = 0,
+  asOf
+}: CommitteeDashboardProps) {
   const toDecide = awaitingDecision(applications)
   const withHomeowners = awaitingHomeowner(applications)
   const activity = recentActivity(applications)
@@ -72,6 +80,13 @@ export function CommitteeDashboard({ summary, nextRulebook, applications, asOf }
           }
         >
           <NextRulebookNote nextRulebook={nextRulebook} />
+          {projectTypesToUpdate > 0 ? (
+            <Link to="/project-types" className={linkClass}>
+              {projectTypesToUpdate === 1
+                ? "1 project type needs updating"
+                : `${projectTypesToUpdate} project types need updating`}
+            </Link>
+          ) : null}
         </StatCard>
       </div>
 

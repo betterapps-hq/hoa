@@ -40,6 +40,21 @@ export type SortableListProps<Item> = {
 const instructions =
   "To move it, press Space or Enter, choose a place with the arrow keys, and press Space or Enter again to drop it. Press Escape to cancel."
 
+/** Lists mid-drag. Escape then cancels the drag, not a dialog around the list (`isSorting`). */
+const drags = { active: 0 }
+
+/**
+ * Whether a list is mid-drag, for a dialog to keep itself open on the Escape that cancels the drag. It stays true until
+ * the event that ended the drag has run its course, whichever listener sees it first.
+ */
+export const isSorting = () => drags.active > 0
+
+const dragEnded = () => {
+  setTimeout(() => {
+    drags.active = Math.max(0, drags.active - 1)
+  }, 0)
+}
+
 type SortableItemProps = { id: string; name: string; children: (handle: ReactNode) => ReactNode }
 
 function SortableItem({ id, name, children }: SortableItemProps) {
@@ -107,7 +122,12 @@ export function SortableList<Item>({
       sensors={sensors}
       collisionDetection={closestCenter}
       accessibility={{ announcements, screenReaderInstructions: { draggable: instructions } }}
+      onDragStart={() => {
+        drags.active += 1
+      }}
+      onDragCancel={dragEnded}
       onDragEnd={({ active, over }) => {
+        dragEnded()
         if (over && active.id !== over.id) {
           onMove(indexOf(active.id), indexOf(over.id))
         }

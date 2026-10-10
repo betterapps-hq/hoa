@@ -268,19 +268,34 @@ export async function recordRulebookFile(db: Database, hoaId: string, rulebookId
     .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId)))
 }
 
-/** The published rulebook's rules file, or null when none is published as a file. */
+/** The published rulebook's rules file and when it was published, or null when none is published as a file. */
 export async function getPublishedRulesFile(
   db: Database,
   hoaId: string
-): Promise<({ rulebookId: string } & RulesFileRef) | null> {
+): Promise<({ rulebookId: string; publishedAt: string | null } & RulesFileRef) | null> {
   const row = await db
-    .select({ rulebookId: rulebooks.id, fileKey: rulebooks.fileKey, fileSha256: rulebooks.fileSha256 })
+    .select({
+      rulebookId: rulebooks.id,
+      publishedAt: rulebooks.publishedAt,
+      fileKey: rulebooks.fileKey,
+      fileSha256: rulebooks.fileSha256
+    })
     .from(rulebooks)
     .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.status, "published")))
     .orderBy(desc(rulebooks.publishedAt))
     .limit(1)
     .get()
   return row?.fileKey && row.fileSha256
-    ? { rulebookId: row.rulebookId, fileKey: row.fileKey, fileSha256: row.fileSha256 }
+    ? { rulebookId: row.rulebookId, publishedAt: row.publishedAt, fileKey: row.fileKey, fileSha256: row.fileSha256 }
     : null
+}
+
+/** A rulebook's rules file, published now or earlier; null when it has none. */
+export async function getRulesFileOf(db: Database, hoaId: string, rulebookId: string): Promise<RulesFileRef | null> {
+  const row = await db
+    .select({ fileKey: rulebooks.fileKey, fileSha256: rulebooks.fileSha256 })
+    .from(rulebooks)
+    .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId)))
+    .get()
+  return row?.fileKey && row.fileSha256 ? { fileKey: row.fileKey, fileSha256: row.fileSha256 } : null
 }

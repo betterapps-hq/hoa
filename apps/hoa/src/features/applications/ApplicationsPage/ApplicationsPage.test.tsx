@@ -46,8 +46,8 @@ const material: ProjectField = {
   binding: "structure.material",
   label: "What is it made of?",
   options: [
-    { value: "material.wood", label: "wood" },
-    { value: "material.metal", label: "metal" }
+    { value: "material.wood", label: "wood", isAdded: false },
+    { value: "material.metal", label: "metal", isAdded: false }
   ],
   allowsOther: false
 }

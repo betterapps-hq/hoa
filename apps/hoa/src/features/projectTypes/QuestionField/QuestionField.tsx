@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useState } from "react"
 import { InfoTip } from "@/components/InfoTip/InfoTip"
 import { QuantityInput } from "@/components/QuantityInput/QuantityInput"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -27,11 +27,6 @@ export type QuestionFieldProps = {
   onChange: (value: AnswerValue) => void
   onBlur?: () => void
   errors: readonly string[]
-  /**
-   * The editor's explanation of what the question checks. It shares the question's one info button with long help,
-   * so a question never shows two.
-   */
-  explanation?: ReactNode
   /** Why the homeowner is asked: the rules that read the answer and the passages the question cites. */
   reasons?: { rules: readonly string[]; citations: readonly CitedProvision[] }
 }
@@ -57,7 +52,7 @@ const placeholderOf = (field: ProjectField) => {
   return example ? `e.g. ${example}` : undefined
 }
 
-/** A choice: radio buttons when there are few, a list when there are many; "Something else" when the set is open. */
+/** A choice: radio buttons when there are few, a list when there are many; "Other", described, when it's allowed. */
 function ChoiceInput({ field, id, value, onChange, onBlur, isInvalid, describedBy }: InputProps<"choice">) {
   const text = typeof value === "string" ? value : ""
   const isListed = field.options.some((option) => option.value === value)
@@ -68,8 +63,8 @@ function ChoiceInput({ field, id, value, onChange, onBlur, isInvalid, describedB
   }
   const other = isOther ? (
     <Input
-      aria-label={`${field.label} In your words`}
-      placeholder="In your words"
+      aria-label={`${field.label} Other, described`}
+      placeholder="Describe it"
       value={text}
       onBlur={onBlur}
       onChange={(event) => onChange(event.target.value || null)}
@@ -77,7 +72,7 @@ function ChoiceInput({ field, id, value, onChange, onBlur, isInvalid, describedB
   ) : null
   const selected = isOther ? otherChoice : text
   if (field.options.length <= fewChoices) {
-    const choices = [...field.options, ...(field.allowsOther ? [{ value: otherChoice, label: "Something else" }] : [])]
+    const choices = [...field.options, ...(field.allowsOther ? [{ value: otherChoice, label: "Other" }] : [])]
     return (
       <div className="flex flex-col gap-3">
         <RadioGroup
@@ -120,7 +115,7 @@ function ChoiceInput({ field, id, value, onChange, onBlur, isInvalid, describedB
             {sentenceCase(option.label)}
           </NativeSelectOption>
         ))}
-        {field.allowsOther ? <NativeSelectOption value={otherChoice}>Something else</NativeSelectOption> : null}
+        {field.allowsOther ? <NativeSelectOption value={otherChoice}>Other</NativeSelectOption> : null}
       </NativeSelect>
       {other}
     </div>
@@ -281,16 +276,7 @@ function WhyWeAsk({ rules, citations }: NonNullable<QuestionFieldProps["reasons"
   )
 }
 
-export function QuestionField({
-  field,
-  id,
-  value,
-  onChange,
-  onBlur,
-  errors,
-  explanation,
-  reasons
-}: QuestionFieldProps) {
+export function QuestionField({ field, id, value, onChange, onBlur, errors, reasons }: QuestionFieldProps) {
   const isInvalid = errors.length > 0
   const isShortHelp = field.help !== null && field.help.length <= shortHelp
   const help = field.help ? asSentence(field.help) : null
@@ -309,10 +295,9 @@ export function QuestionField({
             </span>
           ) : null}
         </FieldLabel>
-        {longHelp || explanation || hasReasons ? (
-          <InfoTip label={`About: ${field.label}`} icon={explanation || hasReasons ? "info" : "help"}>
+        {longHelp || hasReasons ? (
+          <InfoTip label={`About: ${field.label}`} icon={hasReasons ? "info" : "help"}>
             {longHelp}
-            {explanation}
             {reasons && hasReasons ? <WhyWeAsk rules={reasons.rules} citations={reasons.citations} /> : null}
           </InfoTip>
         ) : null}

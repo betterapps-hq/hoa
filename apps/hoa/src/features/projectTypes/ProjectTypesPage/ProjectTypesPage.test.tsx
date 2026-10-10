@@ -57,7 +57,8 @@ const overview: ProjectTypesOverview = {
       definition,
       createdAt: "2026-10-09T00:00:00.000Z",
       updatedAt: "2026-10-09T00:00:00.000Z",
-      applicationCount: 0
+      applicationCount: 0,
+      outdatedSince: null
     }
   ],
   subjects: [
@@ -94,6 +95,12 @@ describe("ProjectTypesPage", () => {
     expect(screen.getByText("1 question and 1 document")).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Garden structure" }))
     expect(props.onOpen).toHaveBeenCalledWith("type-1")
+  })
+
+  it("says, in one quiet line, when a type is out of date with the published rulebook", () => {
+    const [type] = overview.projectTypes
+    setup({ overview: { ...overview, projectTypes: [{ ...type!, outdatedSince: "2026-10-12T09:00:00.000Z" }] } })
+    expect(screen.getByText("Out of date with the rulebook published Oct 12")).toBeInTheDocument()
   })
 
   it("opens, archives and deletes a type from its menu, with the keyboard", async () => {

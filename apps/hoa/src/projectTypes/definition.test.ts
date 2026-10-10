@@ -4,11 +4,14 @@ import {
   addQuestion,
   candidateDocuments,
   candidateQuestions,
+  choiceErrors,
+  choiceRows,
   customKey,
   moveDocument,
   movedText,
   moveItem,
   moveQuestion,
+  offeredChoices,
   removeDocument,
   removeQuestion,
   sectionsOf,
@@ -147,5 +150,41 @@ describe("documents", () => {
     const added = addDocument(form, document("letter"), 0)
     expect(added.documents.map((item) => item.documentType)).toEqual(["letter", "plan", "photo"])
     expect(removeDocument(added, "plan").documents.map((item) => item.documentType)).toEqual(["letter", "photo"])
+  })
+})
+
+describe("a bound choice's list", () => {
+  const listed = [
+    { value: "place.a", label: "front", isAdded: false },
+    { value: "place.b", label: "side", isAdded: false }
+  ]
+  const row = (label: string, value = "") => ({ id: label, value, label, isAdded: true, isOffered: true })
+
+  it("lists what it offers in its order, then the rulebook's values it hides", () => {
+    const own = { value: "back", label: "Back", isAdded: true }
+    expect(choiceRows([own, listed[1]!], listed).map((item) => [item.label, item.isOffered])).toEqual([
+      ["Back", true],
+      ["side", true],
+      ["front", false]
+    ])
+  })
+
+  it("keys a new added choice from its label, unique among the values, and keeps a renamed one's key", () => {
+    const rows = [...choiceRows(listed, listed), row("Back", "back"), row("Back!"), row("  "), row("Place a")]
+    expect(offeredChoices(rows, listed)).toEqual([
+      ...listed,
+      { value: "back", label: "Back", isAdded: true },
+      { value: "back-2", label: "Back!", isAdded: true },
+      { value: "place-a", label: "Place a", isAdded: true }
+    ])
+  })
+
+  it("asks for at least one choice and never adds one the rulebook's list or the list already has", () => {
+    const hidden = choiceRows(listed, listed).map((item) => ({ ...item, isOffered: false }))
+    expect(choiceErrors(hidden, listed)).toEqual(["Offer at least one choice."])
+    expect(choiceErrors([...hidden, row("FRONT"), row("Back"), row("back ")], listed)).toEqual([
+      "The rulebook's list has “front”: show it instead of adding it.",
+      "“back” is on the list twice."
+    ])
   })
 })

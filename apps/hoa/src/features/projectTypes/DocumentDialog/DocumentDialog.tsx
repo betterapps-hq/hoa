@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form"
-import { PlusIcon, TriangleAlertIcon, XIcon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 import { useState } from "react"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
@@ -28,6 +28,7 @@ import { sentenceCase } from "@/lib/text"
 import { uploadFormats, type ProjectDocument } from "@/projectTypes/projectType"
 import type { CitedProvision } from "../../rulebook/citedProvision"
 import { CitationPicker } from "../../rulebook/RuleReference/CitationPicker"
+import { CitationChips } from "../CitationChips/CitationChips"
 
 // Writing or editing one document requirement (application-review.md, Project types): its name, whether it's
 // required and the file formats it takes. The administrator's own requirement also has what it must show and the
@@ -223,32 +224,11 @@ export function DocumentDialog({
                   <FieldSet>
                     <FieldLegend variant="label">Citations</FieldLegend>
                     {item.state.value.length > 0 ? (
-                      <ul className="flex flex-wrap gap-2" aria-label="Linked citations">
-                        {item.state.value.map((key) => {
-                          const citation = known.get(key)
-                          const label = citation?.label ?? "Missing passage"
-                          return (
-                            <li
-                              key={key}
-                              className="flex items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-0.5 pl-2 text-sm"
-                            >
-                              {citation ? null : (
-                                <TriangleAlertIcon className="size-3.5 text-destructive" aria-hidden />
-                              )}
-                              <span>{label}</span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon-xs"
-                                aria-label={`Remove ${label}`}
-                                onClick={() => item.handleChange(item.state.value.filter((entry) => entry !== key))}
-                              >
-                                <XIcon />
-                              </Button>
-                            </li>
-                          )
-                        })}
-                      </ul>
+                      <CitationChips
+                        keys={item.state.value}
+                        known={known}
+                        onRemove={(key) => item.handleChange(item.state.value.filter((entry) => entry !== key))}
+                      />
                     ) : (
                       <FieldDescription>None yet.</FieldDescription>
                     )}

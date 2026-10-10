@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form"
-import { PlusIcon, TriangleAlertIcon, XIcon } from "lucide-react"
+import { PlusIcon, XIcon } from "lucide-react"
 import { useState } from "react"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
@@ -26,28 +26,29 @@ import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOptGroup, NativeSelectOption } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import { sentenceCase } from "@/lib/text"
-import type { Candidate } from "@/projectTypes/definition"
+import { type ChoiceRow, choiceErrors, choiceRows, moveItem, offeredChoices } from "@/projectTypes/definition"
 import type { ProjectDocument, ProjectField, ProjectGroup } from "@/projectTypes/projectType"
-import { asSentence } from "@/projectTypes/wording"
 import type { CitedProvision } from "../../rulebook/citedProvision"
 import { CitationPicker } from "../../rulebook/RuleReference/CitationPicker"
-import { RuleReference, type ReferencedRule } from "../../rulebook/RuleReference/RuleReference"
-import type { QuestionInfo, VocabularyUnit } from "../projectTypes.functions"
+import { CitationChips } from "../CitationChips/CitationChips"
+import type { VocabularyUnit } from "../projectTypes.functions"
+import { isSorting, SortableList } from "../SortableList/SortableList"
 
-// Writing or editing one question (application-review.md, Project types). Every question has its wording, help,
-// whether it's required, and the passages it cites. A new question is the administrator's own, with the answer type
-// they choose, or linked to a detail the rules check, which the review then reads as a fact. A question bound to the
-// rules keeps the answer type the vocabulary gives it, and shows what it checks.
+// Writing or editing one question (application-review.md, Project types), like any form builder: its wording, help,
+// answer type, choices, whether it's required, and the passages it cites. Which detail of the rules a question answers
+// is code's to set and never shown: a question code built keeps it while its answer type stays, so its choices are the
+// rulebook's values, shown or hidden, beside the administrator's own and "Other"; another answer type quietly makes it
+// the administrator's own, which the review still reads on the answers page.
+
+type ChoiceOption = Extract<ProjectField, { kind: "choice" }>["options"][number]
 
 export type QuestionDialogProps = {
   /** The question to edit, with its section; null writes a new one. */
   editing: { subject: string; field: ProjectField } | null
+  /** The rulebook's values for the question being edited when it's a bound choice, offered or not. */
+  listed: readonly ChoiceOption[]
   /** Where a new question can go. */
   sections: readonly ProjectGroup[]
-  /** What the rules check that the form doesn't ask, to link a new question to. */
-  candidates: readonly Candidate[]
-  info: Readonly<Record<string, QuestionInfo>>
-  rules: ReadonlyMap<string, ReferencedRule & { statement: string }>
   /** The passages questions cite that the rulebook has, by provision key. */
   citations: Readonly<Record<string, CitedProvision>>
   units: readonly VocabularyUnit[]
@@ -91,8 +92,6 @@ const dimensionNames: Record<string, string> = {
 /** "Count" for a number with no unit. */
 const countUnit = "(count)"
 
-const candidateId = (candidate: Candidate) => `${candidate.subject} ${candidate.field.property}`
-
 const linesOf = (text: string) => [
   ...new Set(
     text
@@ -114,10 +113,12 @@ const valuesSchema = z.object({
   example: z.string().trim().max(80, "Keep the example under 80 characters."),
   isRequired: z.boolean(),
   subject: z.string(),
-  link: z.string(),
   answerType: z.string(),
   options: z.string(),
-  offered: z.array(z.string()),
+  choices: z.array(
+    z.object({ id: z.string(), value: z.string(), label: z.string(), isAdded: z.boolean(), isOffered: z.boolean() })
+  ),
+  allowsOther: z.boolean(),
   unit: z.string(),
   citations: z.array(z.string())
 })
@@ -138,10 +139,8 @@ function customValues(field: ProjectField | null) {
 
 export function QuestionDialog({
   editing,
+  listed,
   sections,
-  candidates,
-  info,
-  rules,
   citations,
   units,
   loadProvisions,
@@ -151,11 +150,11 @@ export function QuestionDialog({
   onSave,
   onAddDocument
 }: QuestionDialogProps) {
-  const [isUnlinked, setIsUnlinked] = useState(false)
   const [provisions, setProvisions] = useState<CitedProvision[] | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const field = editing?.field ?? null
-  const isBound = field !== null && field.binding !== null && !isUnlinked
+  /** Whether the question stays the rules' detail: it was, and its answer type stays. */
+  const staysBound = (answerType: string) => field !== null && field.binding !== null && answerType === field.kind
   const custom = customValues(field)
   const known = new Map([
     ...Object.entries(citations),
@@ -178,10 +177,10 @@ export function QuestionDialog({
     example: field?.example ?? "",
     isRequired: field?.isRequired ?? true,
     subject: editing?.subject ?? sections[0]?.subject ?? "work",
-    link: "",
     answerType: custom.answerType,
     options: custom.options,
-    offered: field?.kind === "choice" ? field.options.map((option) => option.value) : [],
+    choices: field?.kind === "choice" ? choiceRows(field.options, listed) : [],
+    allowsOther: field?.kind === "choice" ? field.allowsOther : false,
     unit: custom.unit,
     citations: field?.citations ?? []
   }
@@ -189,10 +188,11 @@ export function QuestionDialog({
     defaultValues,
     validators: {
       onSubmit: valuesSchema.superRefine((value, context) => {
-        const linked = candidates.find((candidate) => candidateId(candidate) === value.link)
-        if (isBound || linked) {
-          if (field?.kind === "choice" && value.offered.length === 0) {
-            context.addIssue({ code: "custom", path: ["offered"], message: "Offer at least one choice." })
+        if (staysBound(value.answerType)) {
+          if (field?.kind === "choice") {
+            for (const message of choiceErrors(value.choices, listed)) {
+              context.addIssue({ code: "custom", path: ["choices"], message })
+            }
           }
           return
         }
@@ -209,16 +209,18 @@ export function QuestionDialog({
         isRequired: value.isRequired,
         citations: value.citations
       }
-      const linked = candidates.find((candidate) => candidateId(candidate) === value.link)
-      if (field && isBound) {
+      if (field && staysBound(value.answerType)) {
         onSave(
           editing?.subject ?? value.subject,
           field.kind === "choice"
-            ? { ...field, ...wording, options: field.options.filter((option) => value.offered.includes(option.value)) }
+            ? {
+                ...field,
+                ...wording,
+                options: offeredChoices(value.choices, listed),
+                allowsOther: value.allowsOther
+              }
             : { ...field, ...wording }
         )
-      } else if (linked) {
-        onSave(linked.subject, { ...linked.field, ...wording })
       } else if (!editing && value.answerType === "file") {
         onAddDocument({
           documentType: newKey(wording.label),
@@ -229,8 +231,6 @@ export function QuestionDialog({
           citations: wording.citations,
           accepts: null
         })
-      } else if (field && isUnlinked && value.answerType === field.kind) {
-        onSave(editing?.subject ?? value.subject, { ...field, ...wording, binding: null })
       } else {
         onSave(editing?.subject ?? value.subject, customField(value, wording))
       }
@@ -258,7 +258,7 @@ export function QuestionDialog({
           key = `${slug(label)}-${count}`
         }
         taken.add(key)
-        return { value: key, label }
+        return { value: key, label, isAdded: false }
       })
     }
     switch (type) {
@@ -291,14 +291,19 @@ export function QuestionDialog({
     }
   }
 
-  const ruleList = (property: string) =>
-    (info[property]?.ruleKeys ?? []).flatMap((key) => {
-      const rule = rules.get(key)
-      return rule ? [rule] : []
-    })
   const unitGroups = [...Map.groupBy(units, (unit) => unit.dimension)]
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open, details) => {
+        // Escape while a choice is lifted only cancels the move.
+        if (!open && details.reason === "escape-key" && isSorting()) {
+          details.cancel()
+          return
+        }
+        onOpenChange(open)
+      }}
+    >
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-xl">
         <form
           noValidate
@@ -314,53 +319,6 @@ export function QuestionDialog({
             <DialogDescription>Homeowners see the question and its help as you write them.</DialogDescription>
           </DialogHeader>
           <FieldGroup>
-            {editing ? null : (
-              <form.Field
-                name="link"
-                listeners={{
-                  onChange: ({ value }) => {
-                    const linked = candidates.find((candidate) => candidateId(candidate) === value)
-                    if (linked) {
-                      if (!form.getFieldValue("label").trim()) {
-                        form.setFieldValue("label", linked.field.label)
-                      }
-                      if (!form.getFieldValue("help").trim() && linked.field.help) {
-                        form.setFieldValue("help", linked.field.help)
-                      }
-                      form.setFieldValue("citations", [
-                        ...new Set([...form.getFieldValue("citations"), ...(linked.field.citations ?? [])])
-                      ])
-                    }
-                  }
-                }}
-              >
-                {(item) =>
-                  candidates.length > 0 ? (
-                    <Field>
-                      <FieldLabel htmlFor="question-link">What the rules check</FieldLabel>
-                      <NativeSelect
-                        id="question-link"
-                        className="w-full"
-                        value={item.state.value}
-                        onChange={(event) => item.handleChange(event.target.value)}
-                      >
-                        <NativeSelectOption value="">Nothing: my own question</NativeSelectOption>
-                        {[...Map.groupBy(candidates, (candidate) => candidate.section)].map(([section, members]) => (
-                          <NativeSelectOptGroup key={section} label={sentenceCase(section)}>
-                            {members.map((candidate) => (
-                              <NativeSelectOption key={candidateId(candidate)} value={candidateId(candidate)}>
-                                {candidate.field.label}
-                              </NativeSelectOption>
-                            ))}
-                          </NativeSelectOptGroup>
-                        ))}
-                      </NativeSelect>
-                      <FieldDescription>Linked, the review reads the answer as that detail.</FieldDescription>
-                    </Field>
-                  ) : null
-                }
-              </form.Field>
-            )}
             <form.Field name="label">
               {(item) => (
                 <Field data-invalid={item.state.meta.errors.length > 0}>
@@ -401,16 +359,12 @@ export function QuestionDialog({
                 </Field>
               )}
             </form.Field>
-            <form.Subscribe selector={(state) => [state.values.link, state.values.answerType] as const}>
-              {([link, answerType]) => {
-                const isOwn = !isBound && link === ""
-                const showsSection = !editing && isOwn
-                const kind = isOwn
-                  ? answerType
-                  : (field?.kind ?? candidates.find((item) => candidateId(item) === link)?.field.kind)
+            <form.Subscribe selector={(state) => state.values.answerType}>
+              {(answerType) => {
+                const isOwn = !staysBound(answerType)
                 return (
                   <>
-                    {showsSection && sections.length > 1 ? (
+                    {!editing && sections.length > 1 ? (
                       <form.Field name="subject">
                         {(item) => (
                           <Field>
@@ -431,54 +385,35 @@ export function QuestionDialog({
                         )}
                       </form.Field>
                     ) : null}
-                    {isOwn ? (
-                      <form.Field name="answerType">
-                        {(item) => (
-                          <Field>
-                            <FieldLabel htmlFor="question-answer-type">Answer</FieldLabel>
-                            <NativeSelect
-                              id="question-answer-type"
-                              className="w-full"
-                              value={item.state.value}
-                              onChange={(event) => item.handleChange(event.target.value)}
-                            >
-                              {answerTypes
-                                .filter((type) => type.value !== "file" || !editing)
-                                .map((type) => (
-                                  <NativeSelectOption key={type.value} value={type.value}>
-                                    {type.label}
-                                  </NativeSelectOption>
-                                ))}
-                            </NativeSelect>
-                            {item.state.value === "file" ? (
-                              <FieldDescription>It goes in the documents, with the other uploads.</FieldDescription>
-                            ) : null}
-                            {field &&
-                            item.state.value !== field.kind &&
-                            (field.kind === "choice" || field.kind === "choices" || field.kind === "number") ? (
-                              <FieldDescription>Changing the answer type clears its choices or unit.</FieldDescription>
-                            ) : null}
-                          </Field>
-                        )}
-                      </form.Field>
-                    ) : null}
-                    {field && isBound ? (
-                      <Field>
-                        <FieldDescription>
-                          Its answer type comes from what the rules check. To choose another, unlink it; the review then
-                          reads the answer as context.
-                        </FieldDescription>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="self-start"
-                          onClick={() => setIsUnlinked(true)}
-                        >
-                          Unlink from the rules
-                        </Button>
-                      </Field>
-                    ) : null}
+                    <form.Field name="answerType">
+                      {(item) => (
+                        <Field>
+                          <FieldLabel htmlFor="question-answer-type">Answer</FieldLabel>
+                          <NativeSelect
+                            id="question-answer-type"
+                            className="w-full"
+                            value={item.state.value}
+                            onChange={(event) => item.handleChange(event.target.value)}
+                          >
+                            {answerTypes
+                              .filter((type) => type.value !== "file" || !editing)
+                              .map((type) => (
+                                <NativeSelectOption key={type.value} value={type.value}>
+                                  {type.label}
+                                </NativeSelectOption>
+                              ))}
+                          </NativeSelect>
+                          {item.state.value === "file" ? (
+                            <FieldDescription>It goes in the documents, with the other uploads.</FieldDescription>
+                          ) : null}
+                          {field &&
+                          item.state.value !== field.kind &&
+                          (field.kind === "choice" || field.kind === "choices" || field.kind === "number") ? (
+                            <FieldDescription>Changing the answer type clears its choices or unit.</FieldDescription>
+                          ) : null}
+                        </Field>
+                      )}
+                    </form.Field>
                     {isOwn && (answerType === "choice" || answerType === "choices") ? (
                       <form.Field name="options">
                         {(item) => (
@@ -530,7 +465,7 @@ export function QuestionDialog({
                         )}
                       </form.Field>
                     ) : null}
-                    {kind === "text" || kind === "long-text" ? (
+                    {answerType === "text" || answerType === "long-text" ? (
                       <form.Field name="example">
                         {(item) => (
                           <Field data-invalid={item.state.meta.errors.length > 0}>
@@ -566,76 +501,111 @@ export function QuestionDialog({
                 </Field>
               )}
             </form.Field>
-            {field?.kind === "choice" && isBound ? (
-              <form.Field name="offered">
-                {(item) => (
-                  <FieldSet data-invalid={item.state.meta.errors.length > 0}>
-                    <FieldLegend variant="label">Choices to offer</FieldLegend>
-                    <FieldDescription>
-                      From the rulebook&apos;s list.
-                      {field.allowsOther ? " Homeowners can also write their own." : null}
-                    </FieldDescription>
-                    <FieldGroup className="gap-2.5">
-                      {field.options.map((option) => {
-                        const id = `question-option-${option.value}`
+            <form.Subscribe selector={(state) => state.values.answerType}>
+              {(answerType) =>
+                field?.kind === "choice" && staysBound(answerType) ? (
+                  <>
+                    <form.Field name="choices">
+                      {(item) => {
+                        const rows = item.state.value
+                        const change = (id: string, patch: Partial<ChoiceRow>) =>
+                          item.handleChange(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)))
+                        const add = () => {
+                          const id = `new-${crypto.randomUUID()}`
+                          item.handleChange([...rows, { id, value: "", label: "", isAdded: true, isOffered: true }])
+                          setTimeout(() => document.getElementById(`question-choice-${id}`)?.focus(), 0)
+                        }
                         return (
-                          <Field key={option.value} orientation="horizontal">
-                            <Checkbox
-                              id={id}
-                              checked={item.state.value.includes(option.value)}
-                              onCheckedChange={(checked) =>
-                                item.handleChange(
-                                  field.options
-                                    .map((entry) => entry.value)
-                                    .filter((value) =>
-                                      value === option.value ? checked : item.state.value.includes(value)
-                                    )
+                          <FieldSet data-invalid={item.state.meta.errors.length > 0}>
+                            <FieldLegend variant="label">Choices</FieldLegend>
+                            <FieldDescription>The rulebook&apos;s list, and any you add.</FieldDescription>
+                            <SortableList
+                              items={rows}
+                              getId={(row) => row.id}
+                              getName={(row) => sentenceCase(row.label.trim() || "New choice")}
+                              label="Choices"
+                              className="gap-1"
+                              onMove={(from, to) => item.handleChange(moveItem(rows, from, to))}
+                              renderItem={(row, { index, handle }) => {
+                                const id = `question-choice-${row.id}`
+                                return (
+                                  <div className="flex min-h-8 items-center gap-2">
+                                    {handle}
+                                    {row.isAdded ? (
+                                      <>
+                                        <Input
+                                          id={id}
+                                          className="h-8 min-w-0 flex-1"
+                                          aria-label={`Choice ${index + 1}`}
+                                          placeholder="Name the choice"
+                                          value={row.label}
+                                          onBlur={item.handleBlur}
+                                          onChange={(event) => change(row.id, { label: event.target.value })}
+                                        />
+                                        <span className="shrink-0 text-xs text-muted-foreground">Added</span>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="icon-sm"
+                                          aria-label={`Remove ${row.label.trim() || `choice ${index + 1}`}`}
+                                          onClick={() => item.handleChange(rows.filter((entry) => entry.id !== row.id))}
+                                        >
+                                          <XIcon />
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <Field orientation="horizontal" className="flex-1">
+                                        <Checkbox
+                                          id={id}
+                                          checked={row.isOffered}
+                                          onCheckedChange={(checked) => change(row.id, { isOffered: checked })}
+                                        />
+                                        <FieldLabel htmlFor={id} className="font-normal">
+                                          {sentenceCase(row.label)}
+                                        </FieldLabel>
+                                      </Field>
+                                    )}
+                                  </div>
                                 )
-                              }
+                              }}
                             />
-                            <FieldLabel htmlFor={id} className="font-normal">
-                              {sentenceCase(option.label)}
-                            </FieldLabel>
-                          </Field>
+                            <Button type="button" variant="outline" size="sm" className="self-start" onClick={add}>
+                              <PlusIcon />
+                              Add a choice
+                            </Button>
+                            <FieldError errors={item.state.meta.errors} />
+                          </FieldSet>
                         )
-                      })}
-                    </FieldGroup>
-                    <FieldError errors={item.state.meta.errors} />
-                  </FieldSet>
-                )}
-              </form.Field>
-            ) : null}
+                      }}
+                    </form.Field>
+                    <form.Field name="allowsOther">
+                      {(item) => (
+                        <Field orientation="horizontal">
+                          <Checkbox
+                            id="question-allows-other"
+                            checked={item.state.value}
+                            onCheckedChange={(checked) => item.handleChange(checked)}
+                          />
+                          <FieldLabel htmlFor="question-allows-other" className="font-normal">
+                            Allow &ldquo;Other&rdquo;, with a box to describe it
+                          </FieldLabel>
+                        </Field>
+                      )}
+                    </form.Field>
+                  </>
+                ) : null
+              }
+            </form.Subscribe>
             <form.Field name="citations">
               {(item) => (
                 <FieldSet>
                   <FieldLegend variant="label">Citations</FieldLegend>
                   {item.state.value.length > 0 ? (
-                    <ul className="flex flex-wrap gap-2" aria-label="Linked citations">
-                      {item.state.value.map((key) => {
-                        const citation = known.get(key)
-                        const label = citation?.label ?? "Missing passage"
-                        return (
-                          <li
-                            key={key}
-                            className="flex items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-0.5 pl-2 text-sm"
-                          >
-                            {citation ? null : <TriangleAlertIcon className="size-3.5 text-destructive" aria-hidden />}
-                            <span title={citation?.heading ?? (citation ? undefined : "No longer in the rulebook")}>
-                              {label}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon-xs"
-                              aria-label={`Remove ${label}`}
-                              onClick={() => item.handleChange(item.state.value.filter((entry) => entry !== key))}
-                            >
-                              <XIcon />
-                            </Button>
-                          </li>
-                        )
-                      })}
-                    </ul>
+                    <CitationChips
+                      keys={item.state.value}
+                      known={known}
+                      onRemove={(key) => item.handleChange(item.state.value.filter((entry) => entry !== key))}
+                    />
                   ) : (
                     <FieldDescription>None yet.</FieldDescription>
                   )}
@@ -663,26 +633,6 @@ export function QuestionDialog({
               )}
             </form.Field>
           </FieldGroup>
-          {field && isBound && field.binding ? (
-            <section
-              className="flex flex-col gap-2 rounded-lg bg-muted/50 p-4 text-sm"
-              aria-labelledby="question-checks"
-            >
-              <h3 id="question-checks" className="font-medium">
-                What it checks
-              </h3>
-              {info[field.binding]?.meaning ? (
-                <p className="text-muted-foreground">{asSentence(info[field.binding]?.meaning ?? "")}</p>
-              ) : null}
-              <ul className="flex flex-col gap-1.5">
-                {ruleList(field.binding).map((rule) => (
-                  <li key={rule.key}>
-                    <RuleReference rule={rule} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
             <Button type="submit">{editing ? "Save" : "Add question"}</Button>

@@ -207,6 +207,71 @@ export const candidateDocuments = (definition: ProjectTypeDefinition, available:
     (document) => !definition.documents.some((item) => item.documentType === document.documentType)
   )
 
+type ChoiceOption = Extract<ProjectField, { kind: "choice" }>["options"][number]
+
+/**
+ * One line of a bound choice question's list as the administrator edits it: a value from the rulebook's list, shown
+ * or hidden, or one of their own (`isAdded`), whose value is empty until it's saved.
+ */
+export type ChoiceRow = { id: string; value: string; label: string; isAdded: boolean; isOffered: boolean }
+
+/** A bound choice's list to edit: what it offers, in its order, then the rulebook's values it hides. */
+export function choiceRows(options: readonly ChoiceOption[], listed: readonly ChoiceOption[]): ChoiceRow[] {
+  const offered = new Set(options.map((option) => option.value))
+  return [
+    ...options.map((option) => ({ ...option, id: option.value, isOffered: true })),
+    ...listed
+      .filter((option) => !offered.has(option.value))
+      .map((option) => ({ ...option, id: option.value, isAdded: false, isOffered: false }))
+  ]
+}
+
+const sameWords = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/** What's wrong with an edited list, in words: nothing offered, or an added choice that repeats another. */
+export function choiceErrors(rows: readonly ChoiceRow[], listed: readonly ChoiceOption[]): string[] {
+  const added = rows.filter((row) => row.isAdded && row.label.trim() !== "")
+  const errors = rows.some((row) => row.isOffered && row.label.trim() !== "") ? [] : ["Offer at least one choice."]
+  for (const [index, row] of added.entries()) {
+    const listedAs = listed.find((option) => sameWords(option.label, row.label))
+    if (listedAs) {
+      errors.push(`The rulebook's list has “${listedAs.label}”: show it instead of adding it.`)
+    } else if (added.slice(0, index).some((other) => sameWords(other.label, row.label))) {
+      errors.push(`“${row.label.trim()}” is on the list twice.`)
+    }
+  }
+  return errors
+}
+
+/**
+ * The options an edited list offers, in its order. An added choice keeps its value when renamed; a new one gets a key
+ * made from its label, unique among the property's values. A blank added choice is left out.
+ */
+export function offeredChoices(rows: readonly ChoiceRow[], listed: readonly ChoiceOption[]): ChoiceOption[] {
+  const taken = new Set([...listed.map((option) => option.value), ...rows.map((row) => row.value).filter(Boolean)])
+  return rows.flatMap((row) => {
+    const label = row.label.trim()
+    if (!row.isOffered || label === "") {
+      return []
+    }
+    if (!row.isAdded || row.value !== "") {
+      return [{ value: row.value, label, isAdded: row.isAdded }]
+    }
+    const slug =
+      label
+        .toLowerCase()
+        .replaceAll(/[^a-z0-9]+/g, "-")
+        .replaceAll(/^-|-$/g, "")
+        .slice(0, 40) || "choice"
+    let value = slug
+    for (let count = 2; taken.has(value); count += 1) {
+      value = `${slug}-${count}`
+    }
+    taken.add(value)
+    return [{ value, label, isAdded: true }]
+  })
+}
+
 /** What a screen reader hears after a move: "Moved “Height” to position 3 of 12." */
 export const movedText = (name: string, index: number, total: number) =>
   `Moved “${name}” to position ${index + 1} of ${total}.`

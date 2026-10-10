@@ -108,7 +108,8 @@ export function propertiesForPrompt(plan: FactPlan, keys: readonly T.TermKey[], 
             }
           : {}),
         silence: property.ifUnstated === "absent" ? "none" : "missing",
-        ...(property.many ? { many: true } : {})
+        ...(property.many ? { many: true } : {}),
+        ...(property.askedInForm.length > 0 ? { askedInForm: property.askedInForm } : {})
       }))
   )
 }

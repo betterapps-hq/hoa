@@ -45,8 +45,8 @@ const fields: ProjectField[] = [
     label: "What color is it?",
     help: "As the maker names it",
     options: [
-      { value: "color.grey", label: "grey" },
-      { value: "color.tan", label: "tan" }
+      { value: "color.grey", label: "grey", isAdded: false },
+      { value: "color.tan", label: "tan", isAdded: false }
     ],
     allowsOther: true
   },
@@ -58,7 +58,8 @@ const fields: ProjectField[] = [
     help: "The finish is what the surface is coated with once it's built, which the rules limit by material, so say what the maker calls it.",
     options: ["a", "b", "c", "d", "e", "f", "g"].map((value) => ({
       value: `finish.${value}`,
-      label: `finish ${value}`
+      label: `finish ${value}`,
+      isAdded: false
     })),
     allowsOther: false
   },
@@ -122,7 +123,7 @@ describe("ProjectForm", () => {
     expect(screen.getByRole("radiogroup", { name: "Is it lit at night?" })).toBeInTheDocument()
     expect(screen.getByLabelText("When will it be installed?")).toHaveAttribute("type", "date")
     expect(screen.getByRole("radio", { name: "Grey" })).toBeInTheDocument()
-    expect(screen.getByRole("radio", { name: "Something else" })).toBeInTheDocument()
+    expect(screen.getByRole("radio", { name: "Other" })).toBeInTheDocument()
     expect(screen.getByRole("combobox", { name: "What finish does it have?" })).toHaveTextContent("Finish a")
     expect(screen.getByRole("checkbox", { name: "Lights" })).toBeInTheDocument()
     expect(screen.getByText("As the maker names it.")).toBeInTheDocument()
@@ -153,8 +154,8 @@ describe("ProjectForm", () => {
     await user.click(screen.getByRole("button", { name: "One more" }))
     await user.click(screen.getByRole("button", { name: "One more" }))
     await user.click(screen.getByRole("checkbox", { name: "Planter" }))
-    await user.click(screen.getByRole("radio", { name: "Something else" }))
-    await user.type(screen.getByRole("textbox", { name: /In your words/ }), "Sage")
+    await user.click(screen.getByRole("radio", { name: "Other" }))
+    await user.type(screen.getByRole("textbox", { name: /Other, described/ }), "Sage")
     expect(onChange).toHaveBeenLastCalledWith({
       item: [
         expect.objectContaining({

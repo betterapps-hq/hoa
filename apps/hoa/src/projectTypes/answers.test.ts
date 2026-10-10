@@ -75,7 +75,7 @@ const definition: ProjectTypeDefinition = {
           example: null,
           answeredBy: "applicant",
           citations: [],
-          options: [{ value: "color.grey", label: "grey" }],
+          options: [{ value: "color.grey", label: "grey", isAdded: false }],
           allowsOther: false
         }
       ]
@@ -195,6 +195,41 @@ describe("answerReadings", () => {
         confidence: 0.95
       }
     ])
+  })
+
+  it("gives an added choice as a value of its own and an Other answer as the homeowner's description", () => {
+    const side = {
+      kind: "choice" as const,
+      property: "work.side",
+      binding: "work.side",
+      label: "Which side?",
+      help: null,
+      isRequired: false,
+      example: null,
+      answeredBy: "applicant" as const,
+      citations: [],
+      options: [
+        { value: "side.left", label: "left", isAdded: false },
+        { value: "rear", label: "Rear", isAdded: true }
+      ],
+      allowsOther: true
+    }
+    const form: ProjectTypeDefinition = {
+      ...definition,
+      groups: [{ ...definition.groups[0]!, fields: [side] }]
+    }
+    const read = (value: string) =>
+      answerReadings(form, { work: [{ "work.side": value }] }, [{ id: "work-1", type: "work" }], (key) => key)[0]
+    expect(read("side.left")).toMatchObject({ state: "known", stated: "left", reading: "side.left" })
+    expect(read("side.left")).not.toHaveProperty("asWritten")
+    expect(read("rear")).toMatchObject({ state: "known", stated: "Rear", reading: null, asWritten: "value" })
+    expect(read("By the shed")).toMatchObject({
+      state: "uncertain",
+      stated: "By the shed",
+      reading: null,
+      asWritten: "description",
+      evidence: [{ fileId: answersFileId, page: 1, quote: "Which side? Other: By the shed" }]
+    })
   })
 })
 

@@ -54,8 +54,8 @@ const color: ProjectField = {
   label: "What color is it?",
   citations: [colors.provisionKey, "guidelines:gone"],
   options: [
-    { value: "color.grey", label: "grey" },
-    { value: "color.tan", label: "tan" }
+    { value: "color.grey", label: "grey", isAdded: false },
+    { value: "color.tan", label: "tan", isAdded: false }
   ],
   allowsOther: false
 }
@@ -153,6 +153,7 @@ const view: ProjectTypeView = {
   ],
   subjectLabels: ["structure"],
   isOutdated: false,
+  updates: null,
   available,
   questionInfo: {
     "structure.height": { meaning: "From the ground to the highest point.", ruleKeys: ["r2"] },
@@ -169,7 +170,7 @@ function setup(overrides: Partial<ProjectTypePageProps> = {}) {
   const props: ProjectTypePageProps = {
     view,
     onSave: vi.fn<(changes: ProjectTypeChanges) => Promise<void>>(async () => undefined),
-    onRefresh: vi.fn<() => Promise<void>>(async () => undefined),
+    onApplyUpdates: vi.fn<(definition: ProjectTypeDefinition) => Promise<void>>(async () => undefined),
     onSetStatus: vi.fn<(status: ProjectTypeStatus) => Promise<void>>(async () => undefined),
     onDelete: vi.fn<() => Promise<void>>(async () => undefined),
     loadProvisions: vi.fn<() => Promise<CitedProvision[]>>(async () => [heightLimit, colors, roofs]),
@@ -193,8 +194,8 @@ const savedFields = (props: ProjectTypePageProps) =>
   savedDefinition(props)?.groups.flatMap((item) => item.fields.map((field) => field.property))
 
 describe("ProjectTypePage", () => {
-  it("renders each question as homeowners see it, with its citations and one info button for what it checks", async () => {
-    const { user } = setup()
+  it("renders each question as homeowners see it, with its citations and nothing about how the review uses it", () => {
+    setup()
     expect(screen.getByRole("heading", { name: "Garden structure" })).toBeInTheDocument()
     expect(screen.getByRole("textbox", { name: /How tall is it\?.*ft/ })).toBeInTheDocument()
     expect(screen.getByRole("radio", { name: "Grey" })).toBeInTheDocument()
@@ -204,10 +205,8 @@ describe("ProjectTypePage", () => {
       "aria-roledescription",
       "sortable"
     )
-    expect(screen.getAllByRole("button", { name: /^About: How tall is it\?/ })).toHaveLength(1)
-    screen.getByRole("button", { name: /^About: How tall is it\?/ }).focus()
-    await user.keyboard("{Enter}")
-    expect(await screen.findByText("From the ground to the highest point.")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^About: How tall is it\?/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/checks this answer|unlink|linked/i)).not.toBeInTheDocument()
   })
 
   it("flags a cited passage the rulebook no longer has", () => {
@@ -275,7 +274,7 @@ describe("ProjectTypePage", () => {
     })
   })
 
-  it("links a new question to what the rules check, taking its answer type and citations", async () => {
+  it("answers what a new question's citations state, silently, when its answer type fits", async () => {
     const { props, user } = setup()
     await user.click(screen.getByRole("button", { name: "Add question" }))
     await user.click(
@@ -284,11 +283,21 @@ describe("ProjectTypePage", () => {
       })
     )
     const dialog = await screen.findByRole("dialog", { name: "Write a question" })
-    await user.selectOptions(within(dialog).getByLabelText("What the rules check"), "structure structure.roofed")
-    expect(within(dialog).getByLabelText(/^Question/)).toHaveValue("Does it have a roof?")
-    expect(within(dialog).getByRole("list", { name: "Linked citations" })).toHaveTextContent("Guidelines 5.8")
+    expect(within(dialog).queryByText(/link|rules check/i)).not.toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText(/^Question/), "Is the structure covered?")
+    await user.selectOptions(within(dialog).getByLabelText("Section"), "structure")
+    await user.selectOptions(within(dialog).getByLabelText("Answer"), "yes-no")
+    await user.click(within(dialog).getByRole("button", { name: "Add citation" }))
+    await user.click(await screen.findByRole("button", { name: /^Guidelines 5\.8 Roofs/ }))
     await user.click(within(dialog).getByRole("button", { name: "Add question" }))
-    await waitFor(() => expect(savedFields(props)).toContain("structure.roofed"))
+    await waitFor(() =>
+      expect(savedDefinition(props)?.groups[0]!.fields.at(-1)).toMatchObject({
+        label: "Is the structure covered?",
+        binding: "structure.roofed",
+        kind: "yes-no",
+        citations: [roofs.provisionKey]
+      })
+    )
   })
 
   it("edits a question's wording and citations: removing one and linking another from the documents", async () => {
@@ -314,6 +323,54 @@ describe("ProjectTypePage", () => {
         label: "Which color?",
         citations: [colors.provisionKey, heightLimit.provisionKey],
         options: [{ value: "color.grey", label: "grey" }]
+      })
+    )
+  })
+
+  it("adds the administrator's own choices to a linked question beside the rulebook's, and allows Other", async () => {
+    const { props, user } = setup()
+    await chooseFromMenu(user, "Actions for What color is it?", "Edit")
+    let dialog = await screen.findByRole("dialog", { name: "Edit question" })
+    await user.click(within(dialog).getByRole("checkbox", { name: "Tan" }))
+    await user.click(within(dialog).getByRole("button", { name: "Add a choice" }))
+    const added = within(dialog).getByRole("textbox", { name: "Choice 3" })
+    expect(added).toHaveFocus()
+    await user.type(added, "grey")
+    await user.click(within(dialog).getByRole("button", { name: "Save" }))
+    expect(
+      await within(dialog).findByText("The rulebook's list has “grey”: show it instead of adding it.")
+    ).toBeInTheDocument()
+    await user.clear(added)
+    await user.type(added, "Sage green")
+    expect(within(dialog).getByText("Added")).toBeInTheDocument()
+    await user.click(within(dialog).getByRole("checkbox", { name: "Allow “Other”, with a box to describe it" }))
+    await user.click(within(dialog).getByRole("button", { name: "Save" }))
+    await waitFor(() =>
+      expect(savedDefinition(props)?.groups[0]!.fields[1]).toMatchObject({
+        binding: "structure.color",
+        options: [
+          { value: "color.grey", label: "grey", isAdded: false },
+          { value: "sage-green", label: "Sage green", isAdded: true }
+        ],
+        allowsOther: true
+      })
+    )
+    // Homeowners see the added choice and Other, with nothing marking it as added.
+    expect(screen.getByRole("radio", { name: "Sage green" })).toBeInTheDocument()
+    expect(screen.getByRole("radio", { name: "Other" })).toBeInTheDocument()
+    // A hidden rulebook value stays on the list to show again; a renamed added choice keeps its key.
+    await chooseFromMenu(user, "Actions for What color is it?", "Edit")
+    dialog = await screen.findByRole("dialog", { name: "Edit question" })
+    expect(within(dialog).getByRole("checkbox", { name: "Tan" })).not.toBeChecked()
+    const renamed = within(dialog).getByRole("textbox", { name: "Choice 2" })
+    await user.clear(renamed)
+    await user.type(renamed, "Sage")
+    await user.click(within(dialog).getByRole("button", { name: "Remove Sage" }))
+    expect(within(dialog).queryByRole("textbox", { name: "Choice 2" })).not.toBeInTheDocument()
+    await user.click(within(dialog).getByRole("button", { name: "Save" }))
+    await waitFor(() =>
+      expect(savedDefinition(props)?.groups[0]!.fields[1]).toMatchObject({
+        options: [{ value: "color.grey", label: "grey", isAdded: false }]
       })
     )
   })
@@ -380,12 +437,11 @@ describe("ProjectTypePage", () => {
     expect(savedFields(props)).toEqual(["structure.height", "structure.color"])
   })
 
-  it("changes a question's answer type after unlinking it from the rules", async () => {
+  it("changes a question's answer type like any other edit", async () => {
     const { props, user } = setup()
     await chooseFromMenu(user, "Actions for What color is it?", "Edit")
     const dialog = await screen.findByRole("dialog", { name: "Edit question" })
-    expect(within(dialog).queryByLabelText("Answer")).not.toBeInTheDocument()
-    await user.click(within(dialog).getByRole("button", { name: "Unlink from the rules" }))
+    expect(within(dialog).queryByRole("button", { name: /unlink/i })).not.toBeInTheDocument()
     await user.selectOptions(within(dialog).getByLabelText("Answer"), "text")
     expect(within(dialog).getByText("Changing the answer type clears its choices or unit.")).toBeInTheDocument()
     await user.click(within(dialog).getByRole("button", { name: "Save" }))
@@ -441,12 +497,57 @@ describe("ProjectTypePage", () => {
     expect(props.onDelete).not.toHaveBeenCalled()
   })
 
-  it("offers an update when the rulebook changed, and keeps every requirement behind a disclosure", async () => {
-    const { props, user } = setup({ view: { ...view, isOutdated: true } })
-    await user.click(screen.getByRole("button", { name: "Update" }))
-    expect(props.onRefresh).toHaveBeenCalled()
+  it("keeps every requirement behind a disclosure", async () => {
+    const { user } = setup()
     expect(screen.queryByText("Height limit")).not.toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: /^All requirements/ }))
     expect(screen.getByText("Height limit")).toBeInTheDocument()
+  })
+
+  it("says it's out of date with the rulebook, and saves the reviewed updates, each accepted or kept", async () => {
+    const tan = { value: "color.tan", label: "tan", isAdded: false }
+    const changedColor = { ...color, options: [tan] }
+    const latest: ProjectTypeDefinition = {
+      ...available,
+      groups: [{ ...group, fields: [height, changedColor, roofed] }]
+    }
+    const updates = {
+      publishedAt: "2026-10-12T09:00:00.000Z",
+      latest,
+      changes: [
+        {
+          id: "question-changed structure structure.color",
+          kind: "question-changed" as const,
+          label: "What color is it?",
+          detail: "The rulebook's list drops “grey”.",
+          subject: "structure",
+          key: "structure.color"
+        },
+        {
+          id: "question-new structure structure.roofed",
+          kind: "question-new" as const,
+          label: "Does it have a roof?",
+          detail: "The rules now ask this.",
+          subject: "structure",
+          key: "structure.roofed"
+        }
+      ]
+    }
+    const { props, user } = setup({ view: { ...view, isOutdated: true, updates } })
+    expect(screen.getByText("Out of date with the rulebook published Oct 12")).toBeInTheDocument()
+    expect(screen.getByText("2 questions changed.")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Review updates" }))
+    const dialog = await screen.findByRole("dialog", { name: "Review updates" })
+    expect(within(dialog).getByText("The rulebook's list drops “grey”.")).toBeInTheDocument()
+    await user.click(
+      within(within(dialog).getByRole("group", { name: "For Does it have a roof?" })).getByRole("button", {
+        name: "Keep mine"
+      })
+    )
+    await user.click(within(dialog).getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(props.onApplyUpdates).toHaveBeenCalled())
+    const saved = vi.mocked(props.onApplyUpdates).mock.lastCall?.[0]
+    expect(saved?.groups[0]?.fields.map((field) => field.property)).toEqual(["structure.height", "structure.color"])
+    expect(saved?.groups[0]?.fields[1]).toMatchObject({ binding: "structure.color", options: [tan] })
   })
 })

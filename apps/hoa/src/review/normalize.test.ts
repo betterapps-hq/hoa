@@ -69,6 +69,20 @@ describe("normalizeFacts", () => {
     expect(purple.facts[0]).toMatchObject({ value: { type: "value", term: null, text: "Purple" } })
   })
 
+  it("keeps a form's own value as itself and a form's description uncertain, never matching either to a value term", () => {
+    // The very words of a label, given as a value the administrator added, stay a value of their own.
+    const own = normalize(answer({ stated: "River Birch", asWritten: "value" }))
+    expect(own.facts[0]).toMatchObject({ state: "known", value: { type: "value", term: null, text: "River Birch" } })
+    expect(own.normalizations).toEqual([])
+    const description = normalize(answer({ state: "uncertain", stated: "River Birch", asWritten: "description" }))
+    expect(description.facts[0]).toMatchObject({
+      state: "uncertain",
+      value: null,
+      stated: "River Birch",
+      candidates: [{ type: "text", value: "River Birch" }]
+    })
+  })
+
   it("takes the model's reading of the words when no label matches them", () => {
     const { facts, normalizations } = normalize(
       answer({ stated: "the brown one", reading: "composite-color.river-birch" })

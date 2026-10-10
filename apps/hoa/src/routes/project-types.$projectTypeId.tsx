@@ -2,10 +2,10 @@ import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router"
 import { toast } from "sonner"
 import { ProjectTypePage } from "@/features/projectTypes/ProjectTypePage/ProjectTypePage"
 import {
+  applyProjectTypeUpdates,
   deleteProjectType,
   getProjectTypeView,
   listCitableProvisions,
-  refreshProjectType,
   setProjectTypeStatus,
   updateProjectType
 } from "@/features/projectTypes/projectTypes.functions"
@@ -32,8 +32,8 @@ function ProjectTypeRoute() {
           await router.invalidate()
         }
       }}
-      onRefresh={async () => {
-        await refreshProjectType({ data: { id } })
+      onApplyUpdates={async (definition) => {
+        await applyProjectTypeUpdates({ data: { id, definition } })
         await router.invalidate()
       }}
       onSetStatus={async (status) => {

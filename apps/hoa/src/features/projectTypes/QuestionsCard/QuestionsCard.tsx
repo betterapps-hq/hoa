@@ -9,6 +9,7 @@ import { sentenceCase } from "@/lib/text"
 import {
   addDocument,
   addQuestion,
+  allQuestions,
   candidateQuestions,
   customKey,
   moveQuestion,
@@ -19,7 +20,6 @@ import {
 import type { AnswerValue, ProjectField, ProjectGroup, ProjectTypeDefinition } from "@/projectTypes/projectType"
 import { asSentence } from "@/projectTypes/wording"
 import type { CitedProvision } from "../../rulebook/citedProvision"
-import type { ReferencedRule } from "../../rulebook/RuleReference/RuleReference"
 import { PickerDialog, type PickerOption } from "../PickerDialog/PickerDialog"
 import type { QuestionInfo, VocabularyUnit } from "../projectTypes.functions"
 import { QuestionDialog } from "../QuestionDialog/QuestionDialog"
@@ -34,14 +34,11 @@ import { SortableList } from "../SortableList/SortableList"
 
 export type DefinitionUpdate = (change: (current: ProjectTypeDefinition) => ProjectTypeDefinition) => void
 
-type ReportRule = ReferencedRule & { statement: string }
-
 export type QuestionsCardProps = {
   definition: ProjectTypeDefinition
   /** Every question the rules can ask, for suggesting. */
   available: ProjectTypeDefinition
   info: Readonly<Record<string, QuestionInfo>>
-  rules: ReadonlyMap<string, ReportRule>
   /** The passages questions cite that the rulebook has, by provision key. */
   citations: Readonly<Record<string, CitedProvision>>
   units: readonly VocabularyUnit[]
@@ -50,6 +47,14 @@ export type QuestionsCardProps = {
 }
 
 const asSentenceOrNull = (text: string | null | undefined) => (text ? asSentence(text) : null)
+
+/** The rulebook's values for a bound choice question, as the rules give them: every one, offered or not. */
+function listedValues(available: ProjectTypeDefinition, subject: string, binding: string | null) {
+  const field = allQuestions(available).find(
+    (item) => item.subject === subject && item.field.binding !== null && item.field.binding === binding
+  )?.field
+  return field?.kind === "choice" ? field.options : []
+}
 
 /** Focuses a row's menu button, or another control, once the change that moves it has rendered. */
 function focusSoon(find: () => HTMLElement | null | undefined) {
@@ -65,7 +70,6 @@ type QuestionRowProps = {
   group: ProjectGroup
   field: ProjectField
   handle: ReactNode
-  explanation: ReactNode
   citations: CitedProvision[]
   missing: number
   onEdit: () => void
@@ -73,31 +77,14 @@ type QuestionRowProps = {
   onRemove: () => void
 }
 
-function QuestionRow({
-  group,
-  field,
-  handle,
-  explanation,
-  citations,
-  missing,
-  onEdit,
-  onSetRequired,
-  onRemove
-}: QuestionRowProps) {
+function QuestionRow({ group, field, handle, citations, missing, onEdit, onSetRequired, onRemove }: QuestionRowProps) {
   const [preview, setPreview] = useState<AnswerValue>(null)
   const id = `preview-${group.subject}-${field.property}`.replaceAll(/[^\w-]/g, "-")
   return (
     <div className="flex items-start gap-1 rounded-lg border bg-card py-3 pr-2 pl-1 sm:gap-2 sm:py-4 sm:pr-3">
       {handle}
       <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
-        <QuestionField
-          field={field}
-          id={id}
-          value={preview}
-          onChange={setPreview}
-          errors={[]}
-          explanation={explanation}
-        />
+        <QuestionField field={field} id={id} value={preview} onChange={setPreview} errors={[]} />
         <RuleCitations citations={citations} missing={missing} />
       </div>
       <RowActions
@@ -118,7 +105,6 @@ export function QuestionsCard({
   definition,
   available,
   info,
-  rules,
   citations,
   units,
   loadProvisions,
@@ -126,13 +112,6 @@ export function QuestionsCard({
 }: QuestionsCardProps) {
   const [isPicking, setIsPicking] = useState(false)
   const [dialog, setDialog] = useState<{ subject: string; property: string } | "new" | null>(null)
-  const rulesOf = (binding: string | null) =>
-    binding === null
-      ? []
-      : (info[binding]?.ruleKeys ?? []).flatMap((key) => {
-          const rule = rules.get(key)
-          return rule ? [rule] : []
-        })
   const candidates = candidateQuestions(definition, available)
   const options: PickerOption[] = candidates.map((candidate) => ({
     id: `${candidate.subject} ${candidate.field.property}`,
@@ -154,29 +133,6 @@ export function QuestionsCard({
           ?.fields.find((field) => field.property === dialog.property)
       : undefined
 
-  const explanationOf = (field: ProjectField) => {
-    const meaning = field.binding ? info[field.binding]?.meaning : null
-    const checked = rulesOf(field.binding)
-    if (!meaning && checked.length === 0) {
-      return null
-    }
-    return (
-      <div className="flex flex-col gap-2">
-        <p className="font-medium">What it checks</p>
-        {meaning ? <p className="text-muted-foreground">{asSentence(meaning)}</p> : null}
-        {checked.length > 0 ? (
-          <ul className="flex flex-col gap-2">
-            {checked.map((rule) => (
-              <li key={rule.key} className="flex flex-col">
-                <span className="font-medium">{sentenceCase(rule.title)}</span>
-                <span className="text-muted-foreground">{rule.statement}</span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
-    )
-  }
   const remove = (group: ProjectGroup, field: ProjectField, index: number) => {
     onUpdate((current) => removeQuestion(current, group.subject, field.property))
     const next = group.fields[index + 1] ?? group.fields[index - 1]
@@ -255,7 +211,6 @@ export function QuestionsCard({
                     group={group}
                     field={field}
                     handle={handle}
-                    explanation={explanationOf(field)}
                     citations={keys.flatMap((key) => citations[key] ?? [])}
                     missing={keys.filter((key) => !citations[key]).length}
                     onEdit={() => setDialog({ subject: group.subject, property: field.property })}
@@ -288,10 +243,8 @@ export function QuestionsCard({
         <QuestionDialog
           key={dialog === "new" ? "new" : `${dialog.subject} ${dialog.property}`}
           editing={dialog !== "new" && editing ? { subject: dialog.subject, field: editing } : null}
+          listed={dialog !== "new" && editing ? listedValues(available, dialog.subject, editing.binding) : []}
           sections={sectionsOf(definition, available)}
-          candidates={candidates}
-          info={info}
-          rules={rules}
           citations={citations}
           units={units}
           loadProvisions={loadProvisions}

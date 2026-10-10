@@ -10,7 +10,7 @@ import { workType } from "@/review/subjects"
 import { coreTerms } from "@/schema/coreTerms"
 import type * as T from "@/schema/types"
 import type { UnitLabels } from "@/text/quantity"
-import { allQuestions, askApplicants, projectSection } from "./definition"
+import { askApplicants } from "./definition"
 import type { ProjectDocument, ProjectField, ProjectGroup, ProjectTypeDefinition } from "./projectType"
 import { fallbackQuestion } from "./wording"
 
@@ -156,7 +156,11 @@ function fieldOf(property: PlannedProperty, context: FieldContext): ProjectField
         ? {
             ...worded("choice"),
             kind: "choice",
-            options: property.values.map((value) => ({ value: value.key, label: value.labels[0] ?? value.key })),
+            options: property.values.map((value) => ({
+              value: value.key,
+              label: value.labels[0] ?? value.key,
+              isAdded: false
+            })),
             allowsOther: property.isComplete !== true
           }
         : { ...worded("text"), kind: "text" }
@@ -289,95 +293,4 @@ export function buildDefinition(
     ...documentsOf(rulesFile, new Set(selected), vocabulary),
     unasked: []
   })
-}
-
-/** "fence run" from "Fence run", "project" for the work: the subject as code's questions name it. */
-const sectionName = (group: ProjectGroup) =>
-  group.subject === workType ? "project" : group.itemLabel.charAt(0).toLowerCase() + group.itemLabel.slice(1)
-
-/**
- * A bound question as the administrator worded it, typed by the rules: its wording, example, citations, who answers
- * it and whether it's required are theirs; for a choice, so are the listed values to offer. A label that's only the
- * detail's name reads as code's question.
- */
-function boundField(field: ProjectField, bound: ProjectField, section: ProjectGroup): ProjectField {
-  const isName =
-    !field.label.endsWith("?") && fallbackQuestion(field.label, bound.kind, sectionName(section)) === bound.label
-  const wording = {
-    label: isName ? bound.label : field.label,
-    help: field.help,
-    example: field.example,
-    isRequired: field.isRequired,
-    answeredBy: bound.answeredBy,
-    citations: field.citations ?? bound.citations
-  }
-  if (bound.kind !== "choice" || field.kind !== "choice") {
-    return { ...bound, ...wording }
-  }
-  const offered = new Set(field.options.map((option) => option.value))
-  const options = bound.options.filter((option) => offered.has(option.value))
-  return { ...bound, ...wording, options: options.length > 0 ? options : bound.options }
-}
-
-/**
- * A definition checked against the full one the rules give for its subjects. A bound question must be one the rules
- * ask (its kind, unit and listed values come from the vocabulary; its wording, citations, which values to offer,
- * whether it's required and its place in the form are the administrator's); a bound question the rules don't ask is
- * dropped. The administrator's own questions are kept as they wrote them. Every document must be one the rules require
- * (what it must show and the rules come from the rules; its label, whether it's required and its place are the
- * administrator's). Every question the rules ask that the form doesn't is kept aside, with its wording where it had
- * one.
- */
-export function bindDefinition(definition: ProjectTypeDefinition, built: ProjectTypeDefinition): ProjectTypeDefinition {
-  const key = (subject: string, property: string) => `${subject} ${property}`
-  const asked = new Set<string>()
-  const groups = definition.groups.flatMap((group) => {
-    const rules = built.groups.find((item) => item.subject === group.subject)
-    const ruleQuestion = (property: string | null) =>
-      allQuestions(built).find((item) => item.subject === group.subject && item.field.property === property)?.field
-    // A section whose questions the rules ask are all aside keeps the administrator's own heading.
-    const section = rules ?? (group.subject === workType ? projectSection() : group)
-    const fields = group.fields.flatMap((field) => {
-      const id = key(group.subject, field.property)
-      if (asked.has(id)) {
-        return []
-      }
-      if (field.binding === null) {
-        asked.add(id)
-        return [field]
-      }
-      const bound = ruleQuestion(field.binding)
-      if (!bound) {
-        return []
-      }
-      asked.add(id)
-      return [boundField(field, bound, section)]
-    })
-    return fields.length > 0 ? [{ ...section, label: group.label, itemLabel: group.itemLabel, fields }] : []
-  })
-  const worded = new Map(allQuestions(definition).map((item) => [key(item.subject, item.field.property), item.field]))
-  const unasked = allQuestions(built).flatMap((item) => {
-    if (asked.has(key(item.subject, item.field.property))) {
-      return []
-    }
-    const own = worded.get(key(item.subject, item.field.property))
-    const section = built.groups.find((group) => group.subject === item.subject) ?? projectSection()
-    return [{ subject: item.subject, field: own ? boundField(own, item.field, section) : item.field }]
-  })
-  const documents = definition.documents.flatMap((document) => {
-    const bound = built.documents.find((item) => item.documentType === document.documentType)
-    if (bound) {
-      return [{ ...bound, label: document.label, isRequired: document.isRequired, accepts: document.accepts }]
-    }
-    // The administrator's own document requirement is kept as they wrote it.
-    return document.ruleKeys.length === 0 && document.documentType.startsWith("custom.") ? [document] : []
-  })
-  return {
-    subjects: built.subjects,
-    groups,
-    documents: [...new Map(documents.map((document) => [document.documentType, document])).values()],
-    // What the form provides follows the rules alone.
-    formDocuments: built.formDocuments,
-    unasked
-  }
 }

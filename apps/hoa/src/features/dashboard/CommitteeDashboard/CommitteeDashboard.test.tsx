@@ -120,6 +120,22 @@ describe("CommitteeDashboard", () => {
     expect(screen.getByRole("link", { name: "Review the draft" })).toHaveAttribute("href", "/rules")
   })
 
+  it("links to the project types that need updating for the published rulebook", () => {
+    render(
+      <CommitteeDashboard
+        summary={published}
+        nextRulebook={null}
+        applications={applications}
+        projectTypesToUpdate={2}
+        asOf={asOf}
+      />
+    )
+    expect(screen.getByRole("link", { name: "2 project types need updating" })).toHaveAttribute(
+      "href",
+      "/project-types"
+    )
+  })
+
   it("says a new draft is being built", () => {
     render(
       <CommitteeDashboard
