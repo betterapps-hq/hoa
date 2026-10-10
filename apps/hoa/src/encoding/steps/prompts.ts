@@ -9,9 +9,9 @@ import type { PromptDefinition } from "@/ai/prompts"
 // from these is refused when it loads (promptLoader.ts).
 
 export const stepPrompts = {
-  /** B. The things, parties and categories a document defines: hoa-term-extraction from its narrow version on. */
+  /** B. The things, parties and categories a document defines: hoa-defined-terms. */
   definedTerms: {
-    name: "hoa-term-extraction",
+    name: "hoa-defined-terms",
     variables: ["coreTerms", "document", "definitions", "candidates", "problems"],
     sharedVariables: ["coreTerms"],
     chat: true

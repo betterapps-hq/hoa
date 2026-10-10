@@ -23,7 +23,7 @@ import {
 } from "./drafts"
 import { none, type stepPrompts } from "./prompts"
 
-// B. Defined terms (hoa-term-extraction, prompt drafts v2): the things, parties and categories a document defines, the
+// B. Defined terms (hoa-defined-terms, prompt drafts v2): the things, parties and categories a document defines, the
 // properties, value sets and values a category's own criteria read, and refinements of core terms. One call per
 // document, alongside E; a document without definitions runs on its capitalized-phrase candidates alone. Code converts
 // the answer to terms and checks them: keys unique, citations only to this call's provisions, criteria resolving.
@@ -59,7 +59,7 @@ export const citableProvisions = (
   candidates: readonly { definedIn: string[] }[]
 ) => [...new Set([...definitions.map((provision) => provision.key), ...candidates.flatMap((item) => item.definedIn)])]
 
-/** hoa-term-extraction's variables for one document; `problems` lists failing terms on a rerun. */
+/** hoa-defined-terms's variables for one document; `problems` lists failing terms on a rerun. */
 export function definedTermsVariables(input: {
   document: Pick<GoverningDocument, "key" | "kind" | "title" | "edition">
   definitions: readonly Provision[]
