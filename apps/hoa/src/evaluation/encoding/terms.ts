@@ -40,9 +40,10 @@ function labelScore(golden: TermContent, pipeline: TermContent) {
 }
 
 /**
- * Aligns golden terms with pipeline terms one to one: the same key and kind, else the coding agent's pair, else the best
- * label match; a pair and a label match must be of the same kind, with a parent (a property's thing, a value's set) that
- * is the golden parent's match. Core terms align with themselves.
+ * Aligns golden terms with pipeline terms one to one: the same key and kind (every one reserved before any other
+ * match), else the coding agent's pair, else the best label match; a pair and a label match must be of the same kind,
+ * with a parent (a property's thing, a value's set) that is the golden parent's match. A parent that isn't among the
+ * golden terms aligned (a thing the golden list only refers to) must be the same key. Core terms align with themselves.
  */
 export function alignTerms(
   golden: readonly TermContent[],
@@ -50,16 +51,21 @@ export function alignTerms(
   paired: readonly TermPair[] = []
 ) {
   const pipelineByKey = new Map(pipeline.map((term) => [term.key, term]))
+  const goldenKeys = new Set(golden.map((term) => term.key))
   const pairedByGolden = new Map(paired.map((pair) => [pair.golden, pair.pipeline]))
   const matches = new Map<TermKey, TermMatch>()
   const taken = new Set<TermKey>()
-  const aligned = (key: TermKey) => (isCoreKey(key) ? key : matches.get(key)?.pipeline)
+  const aligned = (key: TermKey) => (isCoreKey(key) || !goldenKeys.has(key) ? key : matches.get(key)?.pipeline)
 
-  for (const term of golden.toSorted((a, b) => order(a) - order(b))) {
+  for (const term of golden) {
     const same = pipelineByKey.get(term.key)
     if ((same && same.kind === term.kind) || (!same && isCoreKey(term.key))) {
       matches.set(term.key, { golden: term.key, pipeline: term.key, by: "key", score: 1 })
       taken.add(term.key)
+    }
+  }
+  for (const term of golden.toSorted((a, b) => order(a) - order(b))) {
+    if (matches.has(term.key)) {
       continue
     }
     const parent = parentOf(term)
@@ -67,7 +73,8 @@ export function alignTerms(
     const fits = (candidate: TermContent) =>
       candidate.kind === term.kind &&
       !taken.has(candidate.key) &&
-      (wantedParent === undefined || wantedParent === null || parentOf(candidate) === wantedParent)
+      wantedParent !== undefined &&
+      (wantedParent === null || parentOf(candidate) === wantedParent)
     const pick = pipelineByKey.get(pairedByGolden.get(term.key) ?? "")
     if (pick && fits(pick)) {
       matches.set(term.key, { golden: term.key, pipeline: pick.key, by: "agent", score: 1 })

@@ -4,24 +4,34 @@ import { definedNames } from "./provisions"
 
 // Defined-term candidates for the vocabulary stage (encoding.md, Vocabulary): terms the documents define ("Unit"
 // means, "Unit": …, (the "Act")), and capitalized multi-word phrases used at least three times away from sentence
-// starts ("Common Area", "Class "B" Control Period"), each with its count and three sample sentences.
+// starts ("Common Area", "Class "B" Control Period"), each with its count and three sample sentences with the
+// provisions they come from. An inline definition that opens the paragraph after a list ("(collectively, the "X")")
+// names the list, so the list's items are among the provisions it's defined in.
+
+/** A sentence a candidate is used in, and the provision it's from. */
+export type CandidateSample = { provisionKey: ProvisionKey; text: string }
 
 export type TermCandidate = {
   phrase: string
   source: "definition" | "usage"
   count: number
   definedIn: ProvisionKey[]
-  samples: string[]
+  samples: CandidateSample[]
 }
 
 const minUses = 3
 const maxSamples = 3
 const maxSample = 240
 const joiners = new Set(["of", "and", "to", "for", "at", "on"])
+/** An inline definition: (the "Act"), (collectively, "Bound Parties"). */
+const inlineDefinition =
+  /\((?:the\s+|collectively,?\s+|individually,?\s+|each,?\s+|hereinafter\s+)?(?:a\s+|an\s+|the\s+)?["“]([A-Z][^"“”]{0,60}?)["”]\)/g
 const definitionPatterns = [
   /["“]([A-Z][^"“”]{0,60}?)[,.]?["”]\s*(?::|means\b|shall mean\b|shall refer to\b|refers to\b)/g,
-  /\((?:the\s+|collectively,?\s+|individually,?\s+|each,?\s+|hereinafter\s+)?(?:a\s+|an\s+|the\s+)?["“]([A-Z][^"“”]{0,60}?)["”]\)/g
+  inlineDefinition
 ]
+/** An inline definition opening a text, which names the list before it. */
+const openingDefinition = new RegExp(`^\\s*${inlineDefinition.source}`)
 
 const textOf = (provision: Provision) => [provision.intro, provision.text, provision.wrapUp].filter(Boolean).join("\n")
 
@@ -72,41 +82,84 @@ function capitalizedPhrases(sentence: string) {
   return phrases
 }
 
-function samplesOf(phrase: string, sentences: readonly string[]) {
+type Sentence = { provisionKey: ProvisionKey; text: string }
+
+function samplesOf(phrase: string, sentences: readonly Sentence[]): CandidateSample[] {
   return sentences
-    .filter((sentence) => sentence.includes(phrase))
+    .filter((sentence) => sentence.text.includes(phrase))
     .slice(0, maxSamples)
-    .map((sentence) => (sentence.length > maxSample ? `${sentence.slice(0, maxSample - 1)}…` : sentence))
+    .map(({ provisionKey, text }) => ({
+      provisionKey,
+      text: text.length > maxSample ? `${text.slice(0, maxSample - 1)}…` : text
+    }))
+}
+
+const isListItem = (provision: Provision) => provision.kind === "point"
+
+/**
+ * The list an inline definition at the very start of a text names: for the provision's text, the list items just
+ * before it under the same parent; for its wrap-up, its own items.
+ */
+function listNamed(provisions: readonly Provision[], index: number, part: "text" | "wrapUp") {
+  const provision = provisions[index]
+  if (!provision) {
+    return []
+  }
+  if (part === "wrapUp") {
+    return provisions.filter((item) => item.parentLabel === provision.label && isListItem(item))
+  }
+  const items: Provision[] = []
+  for (let before = index - 1; before >= 0; before -= 1) {
+    const item = provisions[before]
+    if (!item || item.parentLabel !== provision.parentLabel || !isListItem(item)) {
+      break
+    }
+    items.unshift(item)
+  }
+  return items
 }
 
 export function findTermCandidates(provisions: readonly Provision[]): TermCandidate[] {
-  const sentences = provisions.flatMap((provision) => sentencesOf(textOf(provision)))
+  const sentences = provisions.flatMap((provision) =>
+    sentencesOf(textOf(provision)).map((text) => ({ provisionKey: provision.key, text }))
+  )
   const definitions = new Map<string, Set<ProvisionKey>>()
-  const define = (phrase: string, key: ProvisionKey) =>
-    definitions.set(phrase, (definitions.get(phrase) ?? new Set()).add(key))
-  for (const provision of provisions) {
+  const define = (phrase: string, keys: readonly ProvisionKey[]) => {
+    const found = definitions.get(phrase) ?? new Set()
+    keys.forEach((key) => found.add(key))
+    definitions.set(phrase, found)
+  }
+  provisions.forEach((provision, index) => {
     const text = textOf(provision)
     const names = provision.kind === "definition" ? definedNames(text) : []
     for (const name of names) {
-      define(name.replace(/\([^)]*\)/g, "").trim(), provision.key)
+      define(name.replace(/\([^)]*\)/g, "").trim(), [provision.key])
     }
     for (const pattern of definitionPatterns) {
       for (const found of text.matchAll(pattern)) {
-        define((found[1] ?? "").trim(), provision.key)
+        define((found[1] ?? "").trim(), [provision.key])
       }
     }
-  }
+    // A defining parenthesis that opens the text or the wrap-up names the list before it.
+    for (const part of ["text", "wrapUp"] as const) {
+      const found = openingDefinition.exec(provision[part] ?? "")
+      if (found) {
+        define((found[1] ?? "").trim(), [...listNamed(provisions, index, part).map((item) => item.key), provision.key])
+      }
+    }
+  })
   const usage = new Map<string, number>()
-  for (const phrase of sentences.flatMap(capitalizedPhrases)) {
+  for (const phrase of sentences.flatMap((sentence) => capitalizedPhrases(sentence.text))) {
     usage.set(phrase, (usage.get(phrase) ?? 0) + 1)
   }
-  const countOf = (phrase: string) => sentences.filter((sentence) => sentence.includes(phrase)).length
+  const countOf = (phrase: string) => sentences.filter((sentence) => sentence.text.includes(phrase)).length
+  const order = new Map(provisions.map((provision, index) => [provision.key, index]))
   const defined = [...definitions]
     .map(([phrase, keys]): TermCandidate => ({
       phrase,
       source: "definition",
       count: countOf(phrase),
-      definedIn: [...keys],
+      definedIn: [...keys].toSorted((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0)),
       samples: samplesOf(phrase, sentences)
     }))
     .toSorted((a, b) => compareCodeUnits(a.phrase, b.phrase))

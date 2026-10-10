@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { termDraft } from "@/schema/zod"
 import { golden, goldenRule, relabeledManufacturer, renamedTerms } from "./pair.test-data"
 import { alignTerms, termKeysIn, termRecall, unmatchedTermGroups } from "./terms"
 
@@ -25,6 +26,39 @@ describe("alignTerms", () => {
         "fence-run.manufacturer"
       )
     ).toBe(false)
+  })
+
+  const draft = (key: string, label: string, of?: string) =>
+    termDraft.parse(
+      of === undefined
+        ? { key, kind: "thing", nature: "object", labels: [{ text: label, role: "preferred" }] }
+        : {
+            key,
+            kind: "property",
+            of,
+            valueType: { type: "boolean" },
+            ifUnstated: "unknown",
+            labels: [{ text: label, role: "preferred" }]
+          }
+    )
+
+  it("reserves every same-key match before matching labels", () => {
+    const reference = [draft("fence", "fence panel"), draft("fence-panel", "fence panel")]
+    const matches = alignTerms(reference, [draft("fence-panel", "fence panel")])
+    expect(matches.get("fence-panel")).toMatchObject({ pipeline: "fence-panel", by: "key" })
+    expect(matches.has("fence")).toBe(false)
+  })
+
+  it("matches a property only under its thing's match, or the same thing when the thing isn't being aligned", () => {
+    const reference = [
+      draft("gate", "garden gate"),
+      draft("gate.painted", "painted", "gate"),
+      draft("porch.painted", "painted", "porch")
+    ]
+    const pipeline = [draft("fence.painted", "painted", "fence"), draft("porch.coated", "painted", "porch")]
+    const matches = alignTerms(reference, pipeline)
+    expect(matches.has("gate.painted")).toBe(false)
+    expect(matches.get("porch.painted")).toMatchObject({ pipeline: "porch.coated", by: "label" })
   })
 
   it("matches each pipeline term once, and leaves a golden term without a match out", () => {

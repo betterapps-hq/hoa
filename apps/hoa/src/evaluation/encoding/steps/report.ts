@@ -119,6 +119,16 @@ export function stepSummary(step: string, items: readonly ItemResult[], runs: re
   ].join("\n")
 }
 
+/** The longest input a comparison file shows. */
+export const comparisonInputLimit = 200_000
+
+/** An item's input for its comparison file, cut at `limit` characters with the cut said, never silently. */
+export function clippedInput(text: string, limit = comparisonInputLimit) {
+  return text.length <= limit
+    ? text
+    : `${text.slice(0, limit)}\n[cut: ${text.length - limit} of ${text.length} characters not shown]`
+}
+
 /** A dataset item's comparison file: its input in brief, the expected output, and each run's output and score. */
 export function itemComparison(input: {
   id: string

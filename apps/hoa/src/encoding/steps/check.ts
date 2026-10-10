@@ -17,10 +17,16 @@ type CheckInput = {
   about?: ReadonlySet<string>
 }
 
-/** The validator's problems with a set of terms and rules, coverage aside. */
+/** The organization the checked records are validated as; drafts carry no organization yet. */
+const checkOrganization = "check"
+
+/**
+ * The validator's problems with a set of terms and rules, coverage aside. Every term is checked as the organization's
+ * (a draft has no organization yet, and a core term given here is a refinement of itself).
+ */
 export function recordProblems(input: CheckInput): StepProblem[] {
   const issues = validateRulebook({
-    organization: { id: "check" },
+    organization: { id: checkOrganization },
     documents: (input.documents ?? []).map((document) => ({
       key: document.key,
       kind: document.kind,
@@ -32,7 +38,7 @@ export function recordProblems(input: CheckInput): StepProblem[] {
       label: provision.label,
       noRule: null
     })),
-    terms: [...input.terms],
+    terms: input.terms.map((term) => ({ ...term, organizationId: checkOrganization })),
     proposedCore: [],
     rules: [...(input.rules ?? [])],
     settings: { clauses: {} },

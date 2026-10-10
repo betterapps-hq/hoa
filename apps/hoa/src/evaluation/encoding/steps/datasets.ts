@@ -2,6 +2,7 @@ import { candidateTermPairs } from "@/encoding/consolidate"
 import type { TermCandidate } from "@/encoding/definedTerms"
 import type { EncodingUnit } from "@/encoding/plan"
 import { crossReferenceLines } from "@/encoding/steps/consolidation"
+import { definingProvisions } from "@/encoding/steps/definedTerms"
 import { keysIn } from "@/encoding/steps/drafts"
 import type { Outline } from "@/encoding/steps/outline"
 import { structuringBatches } from "@/encoding/steps/ruleStructuring"
@@ -12,6 +13,7 @@ import { coreTerms } from "@/schema/coreTerms"
 import type * as T from "@/schema/types"
 import type { RuleContent, TermContent } from "@/schema/zod"
 import {
+  definedNamesOf,
   expectedDefinedTerms,
   expectedVocabulary,
   goldenDefinitions,
@@ -178,24 +180,24 @@ export function buildDatasets(context: GoldenContext) {
       (references.get(provision.key) ?? []).some((target) => section(target) !== section(provision.key))
     )
   const allDefinitions = golden.provisions.filter((provision) => provision.kind === "definition")
-  const definedTerms = expectedDefinedTerms(golden, new Set(allDefinitions.map((provision) => provision.key)))
 
   const documents = golden.documents.map((document) => documentLine(golden, document.key))
   // The request types and things the golden adds to the core, as a rebuild would know them from its last rulebook.
   const knownTerms = golden.proposedCore.map(termContent)
   // F gets the whole frozen vocabulary while it fits (prompt drafts v2, section 9): the golden's.
   const vocabulary = goldenTerms(golden)
-  // One item per document: a document without definitions runs on its candidates alone, and is expected to define
-  // the things only its own provisions cite.
+  // One item per document: a document without definitions runs on its candidates alone. Either way it's expected to
+  // define the terms its defining provisions (the same ones the step is given) define under a name it defines.
   const definedTermItems: DefinedTermsItem[] = goldenDocuments(golden).flatMap(({ key, provisions }) => {
     const { definitions, candidates } = goldenDefinitions(provisions)
-    const own = definitions.length > 0 ? definitions : provisions
+    const own = definingProvisions(definitions, candidates)
     const definedElsewhere = new Set(
       allDefinitions.filter((provision) => documentOf(provision.key) !== key).map((provision) => provision.key)
     )
-    const expected = expectedDefinedTerms(golden, new Set(own.map((provision) => provision.key))).filter(
-      (term) => !term.citations.some((citation) => definedElsewhere.has(citation.provisionKey))
-    )
+    const expected = expectedDefinedTerms(golden, {
+      provisions: new Set(own),
+      names: definedNamesOf(definitions, candidates)
+    }).filter((term) => !term.citations.some((citation) => definedElsewhere.has(citation.provisionKey)))
     if (definitions.length === 0 && expected.length === 0) {
       return []
     }
@@ -205,7 +207,7 @@ export function buildDatasets(context: GoldenContext) {
         step: "defined-terms",
         tags: {
           document: key,
-          split: splitOf(own[0]?.key ?? ""),
+          split: splitOf(own[0] ?? ""),
           topics: [],
           features: featuresOf({ rules: [], provisions: definitions, crossReference: false })
         },
@@ -214,6 +216,10 @@ export function buildDatasets(context: GoldenContext) {
       }
     ]
   })
+  // B's terms as C and E receive them: every document's.
+  const definedTerms = [
+    ...new Map(definedTermItems.flatMap((item) => item.expected.terms).map((term) => [term.key, term])).values()
+  ]
 
   const termCited = new Set(
     goldenTerms(golden).flatMap((term) => term.citations.map((citation) => citation.provisionKey))

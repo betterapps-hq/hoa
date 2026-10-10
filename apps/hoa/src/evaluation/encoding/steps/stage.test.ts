@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { citableProvisions, definingProvisions } from "@/encoding/steps/definedTerms"
 import { kindName, type Outline } from "@/encoding/steps/outline"
 import { findingKeys } from "@/encoding/steps/ruleFinding"
 import { structureOf } from "@/encoding/steps/ruleStructuring"
@@ -7,7 +8,7 @@ import { coreTerms } from "@/schema/coreTerms"
 import type { TermContent } from "@/schema/zod"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
 import { promptText, replyingModel, variableOf, variablesPromptLoader } from "@/tests/scriptedModel"
-import { buildDatasets } from "./datasets"
+import { buildDatasets, type DefinedTermsItem } from "./datasets"
 import { goldenReferences, goldenTerms } from "./golden"
 import {
   scoreConsolidation,
@@ -78,8 +79,13 @@ const labelsOf = (term: TermContent) => {
       .map((label) => label.text)
   }
 }
-const citationKeys = (term: TermContent, fallback: string) =>
-  term.citations.length > 0 ? term.citations.map((citation) => citation.provisionKey) : [fallback]
+/** A term's citations a step may give: those among `citable`, else `fallback`. */
+const citationKeys = (term: TermContent, fallback: string, citable?: ReadonlySet<string>) => {
+  const keys = term.citations
+    .map((citation) => citation.provisionKey)
+    .filter((key) => citable === undefined || citable.has(key))
+  return keys.length > 0 ? keys : [fallback]
+}
 const lastSegment = (key: string, parent: string) => key.slice(parent.length + 1)
 const property = (term: Extract<TermContent, { kind: "property" }>) => ({
   of: term.of,
@@ -103,7 +109,10 @@ const valuesOf = (set: string, expected: readonly TermContent[]) =>
       : []
   )
 
-function definedTermsAnswer(expected: readonly TermContent[], fallback: string) {
+function definedTermsAnswer(item: DefinedTermsItem) {
+  const expected = item.expected.terms
+  const citable = new Set(citableProvisions(item.input.definitions, item.input.candidates))
+  const fallback = definingProvisions(item.input.definitions, item.input.candidates)[0] ?? ""
   const own = (term: TermContent) => !coreKeys.has(term.key)
   return {
     things: expected.flatMap((term) =>
@@ -114,7 +123,7 @@ function definedTermsAnswer(expected: readonly TermContent[], fallback: string) 
               nature: term.nature,
               ...labelsOf(term),
               definition: term.definition,
-              citations: citationKeys(term, fallback)
+              citations: citationKeys(term, fallback, citable)
             }
           ]
         : []
@@ -128,7 +137,7 @@ function definedTermsAnswer(expected: readonly TermContent[], fallback: string) 
               ...labelsOf(term),
               definition: term.definition,
               criteria: term.criteria,
-              citations: citationKeys(term, fallback)
+              citations: citationKeys(term, fallback, citable)
             }
           ]
         : []
@@ -141,11 +150,23 @@ function definedTermsAnswer(expected: readonly TermContent[], fallback: string) 
         return term.kind === "value-set" && values.length > 0
           ? [{ name: term.key, ...labelsOf(term), complete: term.complete, values }]
           : []
-      })
+      }),
+      units: expected.flatMap((term) =>
+        term.kind === "unit" && own(term)
+          ? [{ name: term.key, ...labelsOf(term), dimension: term.dimension, perBase: term.perBase }]
+          : []
+      )
     },
     refinements: expected.flatMap((term) =>
       coreKeys.has(term.key)
-        ? [{ key: term.key, ...labelsOf(term), definition: term.definition, citations: citationKeys(term, fallback) }]
+        ? [
+            {
+              key: term.key,
+              ...labelsOf(term),
+              definition: term.definition,
+              citations: citationKeys(term, fallback, citable)
+            }
+          ]
         : []
     ),
     notes: []
@@ -269,21 +290,24 @@ const notes = (scores: readonly ItemScore[]) =>
 
 describe("drafted steps on their golden datasets, answered as the golden says", () => {
   it(
-    "B returns the defined terms",
+    "B returns the defined terms, which pass its check",
     async () => {
       const items = datasets["defined-terms"]
-      const answers = items.map((item) => definedTermsAnswer(item.expected.terms, item.input.definitions[0]?.key ?? ""))
+      const answers = items.map(definedTermsAnswer)
       const run = await runDefinedTerms(items, context(answers))
       const scores = items.map((item) => scoreDefinedTerms(item, run.outputs.get(item.id) ?? null))
       expect(notes(scores)).toEqual([])
+      expect(run.problems).toEqual([])
       expect(run.calls).toHaveLength(items.length)
     },
     slow
   )
 
   it("B stops before a call past its spending limit and keeps what ran", async () => {
-    const items = datasets["defined-terms"]
-    const answers = items.map((item) => definedTermsAnswer(item.expected.terms, item.input.definitions[0]?.key ?? ""))
+    const items = [1, 2].flatMap((copy) =>
+      datasets["defined-terms"].map((item) => ({ ...item, id: `${item.id}~${copy}` }))
+    )
+    const answers = items.map(definedTermsAnswer)
     const ai = { ...answering(answers), budget: spendingLimit(1, 1.5, 0.5) }
     const run = await runDefinedTerms(items, { ai, cacheStage: "test", reruns: 0 })
     expect(run.calls).toHaveLength(1)

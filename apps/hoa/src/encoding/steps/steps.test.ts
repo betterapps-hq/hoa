@@ -2,8 +2,16 @@ import { describe, expect, it } from "vitest"
 import type { z } from "zod"
 import { outputSchema } from "@/ai/runPrompt"
 import { termDraft, type TermContent } from "@/schema/zod"
+import type { TermCandidate } from "../definedTerms"
 import { consolidationAnswer, crossReferenceLines } from "./consolidation"
-import { definedTermsAnswer } from "./definedTerms"
+import {
+  checkDefinedTerms,
+  citableProvisions,
+  definedTermsAnswer,
+  definedTermsOf,
+  definedTermsVariables,
+  definingProvisions
+} from "./definedTerms"
 import { resolveOutlines, type Outline } from "./outline"
 import { checkFinding, findingKeys, ruleFindingAnswer, subjectKey } from "./ruleFinding"
 import { changedPaths, collateralChanges, outlineOfRecord, retryProblemsText } from "./ruleRetry"
@@ -98,6 +106,66 @@ describe("answer formats", () => {
   })
 })
 
+describe("B", () => {
+  const candidates: TermCandidate[] = [
+    { phrase: "Garden Fixtures", source: "definition", count: 2, definedIn: ["rules:9(1)", "rules:9/p2"], samples: [] },
+    {
+      phrase: "Rain Barrel",
+      source: "usage",
+      count: 3,
+      definedIn: [],
+      samples: [{ provisionKey: "rules:4", text: "A Rain Barrel is screened." }]
+    }
+  ]
+  const labels = (text: string) => ({ preferred: { text, plural: null }, alternatives: [] })
+  const answer = definedTermsAnswer.parse({
+    things: [
+      {
+        key: "garden-fixture",
+        nature: "object",
+        ...labels("Garden Fixture"),
+        definition: "a fixture listed in 9",
+        citations: ["rules:9/p2", "rules:9(1)"]
+      },
+      { key: "rain-barrel", nature: "object", ...labels("Rain Barrel"), definition: null, citations: ["rules:4"] }
+    ],
+    categories: [],
+    criteriaTerms: { properties: [], valueSets: [], units: [] },
+    refinements: [{ key: "committee", ...labels("Garden Committee"), definition: null, citations: ["rules:1"] }],
+    notes: []
+  })
+
+  it("may cite the definitions, the provisions candidates are defined in and a used candidate's samples", () => {
+    expect(definingProvisions([{ key: "rules:1" }], candidates)).toEqual(["rules:1", "rules:9(1)", "rules:9/p2"])
+    expect(citableProvisions([{ key: "rules:1" }], candidates)).toEqual([
+      "rules:1",
+      "rules:9(1)",
+      "rules:9/p2",
+      "rules:4"
+    ])
+  })
+
+  it("checks drafted terms, which carry no organization, as the organization's, with every citable provision", () => {
+    const terms = definedTermsOf(answer)
+    expect(terms.every((term) => term.organizationId === null)).toBe(true)
+    expect(checkDefinedTerms(terms, citableProvisions([{ key: "rules:1" }], candidates))).toEqual([])
+    expect(
+      checkDefinedTerms(terms, ["rules:1"])
+        .filter((problem) => problem.recordKey === "rain-barrel")
+        .map((p) => p.code)
+    ).toEqual(["citation-not-given", "citation-not-found"])
+  })
+
+  it("shows each candidate's samples after their provision keys", () => {
+    const variables = definedTermsVariables({
+      document: { key: "rules", kind: "rules", title: "Rules", edition: null },
+      definitions: [],
+      candidates
+    })
+    expect(variables.candidates).toContain("  e.g. [rules:4] A Rain Barrel is screened.")
+  })
+})
+
 describe("E", () => {
   it("resolves labels whole, never by a part of a longer label", () => {
     expect(subjectKey("storage sheds", [shed])).toBe("shed")
@@ -187,7 +255,7 @@ describe("E", () => {
 })
 
 describe("C", () => {
-  it("reports outlines no term serves, outlines that aren't the group's, and a key with two value types", () => {
+  it("reports outlines no term serves, outlines that aren't the group's, and a key with two value types, not drafts' missing organization", () => {
     const problems = checkSharedVocabulary(
       [
         {
@@ -205,7 +273,7 @@ describe("C", () => {
       []
     )
     expect(new Set((problems.get("g1") ?? []).map((problem) => problem.code))).toEqual(
-      new Set(["conflict", "invariant", "undefined-term", "unknown-outline", "unserved-outline"])
+      new Set(["conflict", "undefined-term", "unknown-outline", "unserved-outline"])
     )
   })
 })

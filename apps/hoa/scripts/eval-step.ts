@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { parseArgs } from "node:util"
+import { z } from "zod"
 import { createAiContext } from "../src/ai/aiContext.server.ts"
 import { findTermCandidates } from "../src/encoding/definedTerms.ts"
 import { crossReferenceLines } from "../src/encoding/steps/consolidation.ts"
@@ -11,7 +12,13 @@ import { buildDatasets, settingsFlags, type DatasetItem } from "../src/evaluatio
 import { retryDataset } from "../src/evaluation/encoding/steps/evaluate.ts"
 import { goldenOutlines, goldenSections, goldenTerms, sectionOf } from "../src/evaluation/encoding/steps/golden.ts"
 import { replayStage, replayStages, written } from "../src/evaluation/encoding/steps/replay.ts"
-import { itemComparison, itemResults, stepRunReport, type ItemResult } from "../src/evaluation/encoding/steps/report.ts"
+import {
+  clippedInput,
+  itemComparison,
+  itemResults,
+  stepRunReport,
+  type ItemResult
+} from "../src/evaluation/encoding/steps/report.ts"
 import { readSavedRun } from "../src/evaluation/encoding/steps/savedRun.ts"
 import {
   scoreConsolidation,
@@ -25,6 +32,7 @@ import {
   type ItemScore
 } from "../src/evaluation/encoding/steps/scores.ts"
 import {
+  definedTermsProblems,
   handoff as handoffSchema,
   runConsolidation,
   runDefinedTerms,
@@ -34,8 +42,11 @@ import {
   runSharedVocabulary,
   runVocabularyMerge,
   type Handoff,
+  type StepProblem,
   type StepRun
 } from "../src/evaluation/encoding/steps/stage.ts"
+import { readStepRun, stepItemFile, stepRunInfo } from "../src/evaluation/encoding/steps/stepRuns.ts"
+import { termDraft } from "../src/schema/zod.ts"
 import { encodingRuns, fileCache, fixtures, readJson, writeJson } from "./evalFiles.ts"
 import { defaultRetryQuota, defaultRuns, goldenContext, labeledRuns, pairs } from "./stepDatasets.ts"
 
@@ -47,10 +58,13 @@ import { defaultRetryQuota, defaultRuns, goldenContext, labeledRuns, pairs } fro
 // (vocabulary, encode, repair, consolidate) reads a build run's saved steps and checks that the content cache gives back
 // exactly what the run saved. Each run writes run.json, outputs/, handoff.json, report.md (calls, cost, time, cached
 // tokens, problems by class, scores beside the old runs') and compare/ to .fixtures/eval/steps/<run id>/.
+// --rescore <run under .fixtures/eval/steps> calls no model: it scores that run's saved outputs again, against the
+// dataset as it is now (rebuilt from the golden) and with the current scorers and checks, into a new run folder.
 //
 // Model calls cost money: without --yes this prints what it would run and stops. Usage, from apps/hoa:
 //   pnpm eval:step --stage <step> [--from <run>] [--items <id part>,...] [--prompts <name>=<version>,...]
 //     [--golden <sample>] [--max-calls <n>] [--max-cost <usd>] [--repeat <n>] [--reruns <0-1>] [--retries <0-2>] [--runs <label>=<run id>,...] [--yes]
+//   pnpm eval:step --rescore <step run id> [--items <id part>,...] [--golden <sample>]
 // --max-calls and --max-cost stop the run before a call past either limit (--call-estimate is the cost assumed for the
 // first call); what ran so far is still written.
 // --reruns reruns a failing item of B, E or C once with its problems (as the pipeline does); --retries runs F's retry
@@ -61,6 +75,7 @@ const { values } = parseArgs({
   options: {
     stage: { type: "string" },
     from: { type: "string" },
+    rescore: { type: "string" },
     items: { type: "string" },
     prompts: { type: "string" },
     repeat: { type: "string", default: "1" },
@@ -76,13 +91,20 @@ const { values } = parseArgs({
   }
 })
 
-const stage = values.stage ?? ""
 const stepsRoot = join(fixtures, "eval/steps")
-const runId = `${new Date().toISOString().replaceAll(":", "-").slice(0, 19)}-${stage}`
+/** The saved step run --rescore scores again: its folder and its run.json. */
+const rescored = values.rescore
+  ? {
+      folder: join(stepsRoot, values.rescore),
+      info: stepRunInfo.parse(readJson(join(stepsRoot, values.rescore, "run.json")))
+    }
+  : null
+const stage = rescored?.info.stage ?? values.stage ?? ""
+const runId = `${new Date().toISOString().replaceAll(":", "-").slice(0, 19)}-${stage}${rescored ? "-rescored" : ""}`
 const out = join(stepsRoot, runId)
-const fileName = (id: string) => id.replaceAll(/[:/\\#*?"<>|]/g, "~")
+const fileName = stepItemFile
 const wanted = (id: string) => !values.items || values.items.split(",").some((part) => id.includes(part))
-const repeats = Math.max(1, Number(values.repeat))
+const repeats = rescored?.info.repeats ?? Math.max(1, Number(values.repeat))
 
 const pinned = Object.fromEntries(
   pairs(values.prompts).map(([name, version]) => {
@@ -219,9 +241,37 @@ function oldResults(step: string): Map<string, Record<string, ItemScore>> {
   return new Map(items.map((item) => [item.id, item.results]))
 }
 
+/** A saved run's outputs, read back for --rescore; its problems found again by the step's check, where it has one. */
+function savedRuns<I extends DatasetItem<unknown, unknown>, O>(
+  items: readonly I[],
+  output: z.ZodType<O> | undefined,
+  recheck: ((item: I, output: O) => Omit<StepProblem, "itemId">[]) | undefined
+): StepRun<O>[] {
+  if (!rescored || !output) {
+    throw new Error(`--rescore reads a saved ${stage} run, which this script can't parse yet`)
+  }
+  const { runs } = readStepRun(
+    rescored.folder,
+    items.map((item) => item.id),
+    (value) => output.parse(value)
+  )
+  return runs.map((run, index) => ({
+    ...run,
+    problems: recheck
+      ? items.flatMap((item) => {
+          const found = run.outputs.get(item.id)
+          return found
+            ? recheck(item, found).map(({ code, message }) => ({ itemId: item.id, code, message }))
+            : run.problems.filter((problem) => problem.itemId === item.id && problem.code === "zod")
+        })
+      : run.problems,
+    calls: index === 0 ? run.calls : []
+  }))
+}
+
 /**
- * Runs a drafted step over its items `repeats` times (each repeat with its own content cache), scores every output
- * whose item has an expected output, and writes the run's folder.
+ * Runs a drafted step over its items `repeats` times (each repeat with its own content cache), or reads a saved run's
+ * outputs (--rescore), scores every output whose item has an expected output, and writes the run's folder.
  */
 async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
   items: readonly I[]
@@ -231,15 +281,28 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
   score: ((item: I, output: O | null) => ItemScore) | null
   previous: Handoff
   keysOf?: (output: O) => string[]
+  /** The output's shape, for reading it back (--rescore). */
+  output?: z.ZodType<O>
+  /** The step's check of one output, run again on a rescore. */
+  recheck?: (item: I, output: O) => Omit<StepProblem, "itemId">[]
 }) {
   const items = input.items.filter((item) => wanted(item.id))
-  confirm(input.calls === 0 ? items.length : input.calls, `${items.length} item(s) from ${input.source}`)
   const started = performance.now()
   const runs: StepRun<O>[] = []
-  for (let repeat = 1; repeat <= repeats; repeat += 1) {
-    runs.push(await input.run(items, repeat === 1 ? stage : `${stage}~${repeat}`))
+  if (rescored) {
+    console.warn(`${stage}: rescoring ${rescored.info.runId} from its saved outputs; no model is called.`)
+    runs.push(...savedRuns(items, input.output, input.recheck))
+  } else {
+    confirm(input.calls === 0 ? items.length : input.calls, `${items.length} item(s) from ${input.source}`)
+    for (let repeat = 1; repeat <= repeats; repeat += 1) {
+      runs.push(await input.run(items, repeat === 1 ? stage : `${stage}~${repeat}`))
+    }
   }
   await flush()
+  const source = rescored
+    ? `the saved outputs of ${rescored.info.runId} (${rescored.info.from}), rescored with no model call`
+    : input.source
+  const promptVersions = rescored?.info.promptVersions ?? pinned
   const old = oldResults(stage)
   const labels = runs.map((_run, index) => (repeats === 1 ? "this run" : `repeat ${index + 1}`))
   const oldLabels = [...new Set([...old.values()].flatMap((results) => Object.keys(results)))]
@@ -278,8 +341,8 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
   writeJson(join(out, "run.json"), {
     runId,
     stage,
-    from: input.source,
-    promptVersions: pinned,
+    from: source,
+    promptVersions,
     repeats,
     calls,
     problems
@@ -292,7 +355,7 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
       itemComparison({
         id: item.id,
         tags: item.tags,
-        inputText: written(item.input).slice(0, 20_000),
+        inputText: clippedInput(written(item.input)),
         expected: item.expected,
         outputs: runs.map((run, index) => ({
           run: labels[index] ?? "",
@@ -305,8 +368,8 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
   const report = stepRunReport({
     runId,
     stage,
-    source: input.source,
-    promptVersions: pinned,
+    source,
+    promptVersions,
     wallSeconds: (performance.now() - started) / 1000,
     calls,
     problems,
@@ -324,6 +387,8 @@ const reruns = Number(values.reruns)
 const definedTerms = fromStep?.definedTerms ?? datasets["shared-vocabulary"][0]?.input.definedTerms ?? []
 
 const termKeys = (output: { terms: readonly { key: string }[] }) => output.terms.map((term) => term.key)
+/** B's and C's output as their run folders hold it. */
+const termsOutput = z.object({ terms: z.array(termDraft) })
 const byId = <I extends { id: string }>(items: readonly I[]) => new Map(items.map((item) => [item.id, item]))
 
 switch (stage) {
@@ -350,7 +415,9 @@ switch (stage) {
       run: (selected, cacheStage) => runDefinedTerms(selected, { ai: stepAi(), cacheStage, reruns }),
       score: scoreDefinedTerms,
       previous: {},
-      keysOf: termKeys
+      keysOf: termKeys,
+      output: termsOutput,
+      recheck: (item, output) => definedTermsProblems(item, output.terms)
     })
     break
   }
@@ -420,7 +487,8 @@ switch (stage) {
       run: (selected, cacheStage) => runSharedVocabulary(selected, { ai: stepAi(), cacheStage, reruns }),
       score: scoreVocabulary,
       previous: fromStep ?? { outlines: goldenOutlines(golden, sections), settingsFlags: settingsFlags(golden) },
-      keysOf: termKeys
+      keysOf: termKeys,
+      output: termsOutput
     })
     break
   }

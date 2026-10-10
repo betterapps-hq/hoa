@@ -1,4 +1,4 @@
-import { findTermCandidates } from "@/encoding/definedTerms"
+import { findTermCandidates, type TermCandidate } from "@/encoding/definedTerms"
 import { planUnits, type EncodingUnit } from "@/encoding/plan"
 import { analyzeReferences, citedProvisions, type KnownDocument } from "@/encoding/references"
 import { keysIn } from "@/encoding/steps/drafts"
@@ -8,6 +8,7 @@ import { coreTerms } from "@/schema/coreTerms"
 import type * as T from "@/schema/types"
 import { createVocabulary } from "@/schema/vocabulary"
 import type { RuleContent, TermContent } from "@/schema/zod"
+import { labelForms } from "@/text/normalize"
 
 // Golden inputs (evaluation.md, Running one step): each step's input built from the golden encoding
 // (samples/*/rules.json), so a step can be measured against perfect upstream input. Its provisions are the structure,
@@ -113,34 +114,88 @@ export function goldenDefinitions(provisions: readonly T.Provision[]) {
   return { definitions, candidates: findTermCandidates(provisions) }
 }
 
+/** What a document defines terms with: the provisions that define them and the names they're defined under. */
+export type DefiningText = {
+  /** The definitions and the provisions candidates are defined in (`definingProvisions`). */
+  provisions: ReadonlySet<T.ProvisionKey>
+  /** The candidates' phrases and the definitions' headings. */
+  names: readonly string[]
+}
+
+/** The names a document's terms are defined under: its candidates' phrases and its definitions' headings. */
+export const definedNamesOf = (definitions: readonly T.Provision[], candidates: readonly TermCandidate[]) => [
+  ...candidates.map((candidate) => candidate.phrase),
+  ...definitions.flatMap((provision) => (provision.heading ? [provision.heading] : []))
+]
+
 /**
- * B's expected output for one document: the golden things (not request types), categories and refinements of core
- * terms that cite one of `provisions` (its definitions, or for a document without any its candidates' provisions),
- * and the properties, value sets and values those categories' criteria read.
+ * B's expected output for one document: the golden terms it defines, and the properties, value sets and values their
+ * criteria read. A term is defined there when it cites one of the defining provisions and one of its labels is a name
+ * the document defines (a term only mentioned in a definition isn't defined by it): a thing (not a request type), a
+ * category, a refinement of a core term, or a property or value (a defined type modeled as a value), with its set.
+ * The things those categories and properties are of, and their quantities' units, come too, so the answer's
+ * references resolve.
  */
-export function expectedDefinedTerms(golden: T.RulesFile, definitions: ReadonlySet<T.ProvisionKey>) {
+export function expectedDefinedTerms(golden: T.RulesFile, defining: DefiningText) {
   const terms = goldenTerms(golden)
-  const defines = (term: TermContent) => term.citations.some((citation) => definitions.has(citation.provisionKey))
-  const chosen = terms.filter(
+  const names = new Set(defining.names.flatMap((name) => labelForms({ text: name })))
+  const isNamed = (term: TermContent) => term.labels.some((label) => labelForms(label).some((form) => names.has(form)))
+  const defines = (term: TermContent) =>
+    term.citations.some((citation) => defining.provisions.has(citation.provisionKey)) && isNamed(term)
+  const defined = terms.filter(
     (term) =>
       defines(term) &&
-      ((term.kind === "thing" && term.nature !== "request") || term.kind === "category" || coreKeys.has(term.key))
+      ((term.kind === "thing" && term.nature !== "request") ||
+        term.kind === "category" ||
+        term.kind === "property" ||
+        term.kind === "value" ||
+        coreKeys.has(term.key))
   )
   const byKey = new Map(terms.map((term) => [term.key, term]))
-  const criteria = new Set(
-    chosen.flatMap((term) => (term.kind === "category" ? [...keysIn(term.criteria, new Set(byKey.keys()))] : []))
-  )
-  const properties = terms.filter((term) => term.kind === "property" && criteria.has(term.key))
+  // A term of a request type (a category of disputes, say) is left out: B declares no request types and isn't told the
+  // organization's, so it can't define one.
+  const ofRequest = (term: TermContent): boolean => {
+    const owner = term.kind === "category" || term.kind === "property" ? byKey.get(term.of) : undefined
+    return owner !== undefined && ((owner.kind === "thing" && owner.nature === "request") || ofRequest(owner))
+  }
+  const chosen = defined.filter((term) => !ofRequest(term))
+  const read = new Set([
+    ...chosen.flatMap((term) => (term.kind === "category" ? [...keysIn(term.criteria, new Set(byKey.keys()))] : [])),
+    ...chosen.map((term) => term.key)
+  ])
+  const properties = terms.filter((term) => term.kind === "property" && read.has(term.key))
   const sets = new Set([
     ...properties.flatMap((term) =>
       term.kind === "property" && term.valueType.type === "choice" ? [term.valueType.set] : []
     ),
-    ...terms.flatMap((term) => (term.kind === "value" && criteria.has(term.key) ? [term.set] : []))
+    ...terms.flatMap((term) => (term.kind === "value" && read.has(term.key) ? [term.set] : []))
   ])
-  const valueTerms = terms.filter(
-    (term) => (term.kind === "value-set" && sets.has(term.key)) || (term.kind === "value" && criteria.has(term.key))
+  const units = new Set(
+    properties.flatMap((term) =>
+      term.kind === "property" && term.valueType.type === "quantity" ? [term.valueType.unit] : []
+    )
   )
-  return [...new Map([...chosen, ...properties, ...valueTerms].map((term) => [term.key, term])).values()]
+  const valueTerms = terms.filter(
+    (term) =>
+      (term.kind === "value-set" && sets.has(term.key)) ||
+      (term.kind === "value" && read.has(term.key)) ||
+      (term.kind === "unit" && units.has(term.key))
+  )
+  // The things the categories and properties are of, so every reference resolves within the answer or the core.
+  const owners: TermContent[] = []
+  const pending = [...chosen, ...properties].flatMap((term) =>
+    term.kind === "category" || term.kind === "property" ? [term.of] : []
+  )
+  for (let key = pending.pop(); key !== undefined; key = pending.pop()) {
+    const owner = byKey.get(key)
+    if (owner && !coreKeys.has(key) && !owners.includes(owner)) {
+      owners.push(owner)
+      if (owner.kind === "category") {
+        pending.push(owner.of)
+      }
+    }
+  }
+  return [...new Map([...chosen, ...owners, ...properties, ...valueTerms].map((term) => [term.key, term])).values()]
 }
 
 /**

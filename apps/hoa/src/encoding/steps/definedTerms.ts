@@ -2,7 +2,7 @@ import { z } from "zod"
 import type { PromptVariables } from "@/ai/prompts"
 import { coreTerms } from "@/schema/coreTerms"
 import type { GoverningDocument, Provision, ProvisionKey } from "@/schema/types"
-import { condition, provisionKey, termDraft, termKey, type TermContent } from "@/schema/zod"
+import { condition, decimal, dimension, provisionKey, termDraft, termKey, type TermContent } from "@/schema/zod"
 import type { TermCandidate } from "../definedTerms"
 import { candidateText, coreTermsText, documentLine, provisionBlock } from "../promptVariables"
 import { mergeLabels } from "../records"
@@ -24,9 +24,10 @@ import {
 import { none, type stepPrompts } from "./prompts"
 
 // B. Defined terms (hoa-defined-terms, prompt drafts v2): the things, parties and categories a document defines, the
-// properties, value sets and values a category's own criteria read, and refinements of core terms. One call per
+// properties, value sets, values and units a category's own criteria read, and refinements of core terms. One call per
 // document, alongside E; a document without definitions runs on its capitalized-phrase candidates alone. Code converts
-// the answer to terms and checks them: keys unique, citations only to this call's provisions, criteria resolving.
+// the answer to terms and checks them: keys unique, citations only to this call's provisions (the definitions, the
+// provisions candidates are defined in, and a used candidate's sample provisions), criteria resolving.
 
 const citations = z.array(provisionKey).min(1)
 const definition = z.string().nullable()
@@ -46,18 +47,34 @@ export const definedTermsAnswer = z.object({
         complete: z.boolean(),
         values: z.array(z.object({ name: segment, ...labelsDraft })).min(1)
       })
-    )
+    ),
+    /** A unit a criterion's quantity is in that isn't a core unit. */
+    units: z.array(z.object({ name: segment, ...labelsDraft, dimension, perBase: decimal.nullable() }))
   }),
   refinements: z.array(z.object({ key: keyEnum(coreKeys), ...labelsDraft, definition, citations })),
   notes: z.array(z.string())
 })
 export type DefinedTermsAnswer = z.output<typeof definedTermsAnswer>
 
-/** The provisions an answer may cite: the definitions and every provision a candidate is defined in. */
-export const citableProvisions = (
-  definitions: readonly Provision[],
-  candidates: readonly { definedIn: string[] }[]
+/** The provisions that define terms: the definitions and every provision a candidate is defined in. */
+export const definingProvisions = (
+  definitions: readonly Pick<Provision, "key">[],
+  candidates: readonly Pick<TermCandidate, "definedIn">[]
 ) => [...new Set([...definitions.map((provision) => provision.key), ...candidates.flatMap((item) => item.definedIn)])]
+
+/**
+ * The provisions an answer may cite: the defining provisions, and for a candidate found only in use, the provisions
+ * its samples come from.
+ */
+export const citableProvisions = (
+  definitions: readonly Pick<Provision, "key">[],
+  candidates: readonly Pick<TermCandidate, "definedIn" | "source" | "samples">[]
+) => [
+  ...new Set([
+    ...definingProvisions(definitions, candidates),
+    ...candidates.flatMap((item) => (item.source === "usage" ? item.samples.map((sample) => sample.provisionKey) : []))
+  ])
+]
 
 /** hoa-defined-terms's variables for one document; `problems` lists failing terms on a rerun. */
 export function definedTermsVariables(input: {
@@ -70,7 +87,7 @@ export function definedTermsVariables(input: {
     coreTerms: coreTermsText(),
     document: documentLine(input.document),
     definitions: none(input.definitions.map(provisionBlock).join("\n\n")),
-    candidates: none(input.candidates.map(candidateText).join("\n")),
+    candidates: none(input.candidates.map((candidate) => candidateText(candidate, true)).join("\n")),
     problems: input.problems ?? "none"
   }
 }
@@ -137,16 +154,27 @@ export function definedTermsOf(answer: DefinedTermsAnswer): TermContent[] {
       propertyTerm(property, citedBy(`${property.of}.${property.name}`))
     ),
     ...answer.criteriaTerms.valueSets.flatMap((set) => valueSetTerms(set, set.values, citedBy(set.name))),
+    ...answer.criteriaTerms.units.map((unit) =>
+      termDraft.parse({
+        key: unit.name,
+        kind: "unit",
+        dimension: unit.dimension,
+        perBase: unit.perBase,
+        labels: labelsOf(unit)
+      })
+    ),
     ...answer.refinements.flatMap(refinement)
   ]
 }
 
-/** B's check: keys unique, every reference in the terms resolving, citations only to the provisions it was given. */
-export function checkDefinedTerms(
-  terms: readonly TermContent[],
-  provisions: readonly Provision[],
-  citable: readonly ProvisionKey[]
-): StepProblem[] {
+/** A provision named by its key alone, as the validator reads a citation (its label is the key's label part). */
+const citableProvision = (key: ProvisionKey) => ({ key, label: key.slice(key.indexOf(":") + 1) })
+
+/**
+ * B's check: keys unique, every reference in the terms resolving, citations only to the provisions it was given (the
+ * definitions and the candidates' provisions, `citableProvisions`).
+ */
+export function checkDefinedTerms(terms: readonly TermContent[], citable: readonly ProvisionKey[]): StepProblem[] {
   const allowed = new Set(citable)
   const stray = terms.flatMap((term) =>
     term.citations
@@ -165,5 +193,5 @@ export function checkDefinedTerms(
     path: ["key"]
   }))
   const unique = [...new Map(terms.map((term) => [term.key, term])).values()]
-  return [...stray, ...repeated, ...recordProblems({ terms: unique, provisions })]
+  return [...stray, ...repeated, ...recordProblems({ terms: unique, provisions: citable.map(citableProvision) })]
 }

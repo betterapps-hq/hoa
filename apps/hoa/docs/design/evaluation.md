@@ -125,7 +125,7 @@ judgment, cross-reference, amendment, text condition, no-rule reason).
 
 | Step | Item | Input | Expected |
 | --- | --- | --- | --- |
-| `defined-terms` | A document | Its definitions (none: candidates only) and candidates | Things, parties, categories, refinements and the terms criteria read |
+| `defined-terms` | A document | Its definitions (none: candidates only) and candidates | The golden terms citing a provision the step is given as defining (its definitions, the provisions candidates are defined in) under a name the document defines (a candidate's phrase or a definition's heading): things, parties, categories, refinements, defined types as values; with the terms criteria read and the things categories are of |
 | `rule-finding` | A section, planned from the golden | Its provisions, context and references, every definition | Each provision's outlines (with reads) or no-rule reason |
 | `shared-vocabulary` | A group of sections | The golden outlines with their reads, the defined terms | The terms those outlines read, with the outlines each serves |
 | `vocabulary-merge` | The synthetic set | Golden terms, planted duplicates (an alternative wording rekeyed), same-key value-type collisions | The merges, the renames, lookalikes kept apart |
@@ -177,7 +177,8 @@ person's approval.
 Options: `--items <id part>,...` keeps matching items; `--prompts <name>=<version>,...` pins versions no label points
 at (drafted prompts are loaded by version, labeled or not); `--repeat <n>` runs again with its own content cache per
 repeat for the noise band and key stability; `--reruns 0|1` reruns a failing B, E or C item once with its problems;
-`--retries 0-2` runs F's retry on the rules still failing. Each run writes `.fixtures/eval/steps/<run id>/`: `run.json`
+`--retries 0-2` runs F's retry on the rules still failing; `--rescore <step run>` calls no model and scores that run's saved
+outputs again against the dataset as it is now (B's check rerun too), into a new `<time>-<step>-rescored` folder. Each run writes `.fixtures/eval/steps/<run id>/`: `run.json`
 (calls with input, cached-input, cache-write and output tokens, cost and latency; problems), `outputs/`,
 `handoff.json`, `scores.json`, `report.md` (calls, cost, time, cached tokens, problems by class, the scores beside the
 dataset's v3 and v5 columns) and `compare/`.

@@ -165,9 +165,13 @@ export function encodingRepairVariables(
   }
 }
 
-export function candidateText(candidate: TermCandidate) {
+/**
+ * A candidate with its sample sentences; with `keys`, each sample starts with the key of the provision it's from
+ * (`e.g. [doc:4.1] …`), so a term found only in use can be cited. The build's hoa-term-extraction reads them without.
+ */
+export function candidateText(candidate: TermCandidate, keys = false) {
   const where = candidate.definedIn.length > 0 ? `defined in ${candidate.definedIn.join(", ")}; ` : ""
-  const samples = candidate.samples.map((sample) => `  e.g. ${sample}`)
+  const samples = candidate.samples.map((sample) => `  e.g. ${keys ? `[${sample.provisionKey}] ` : ""}${sample.text}`)
   const uses = `${candidate.count} use${candidate.count === 1 ? "" : "s"}`
   return [`"${candidate.phrase}" (${candidate.source}; ${where}${uses})`, ...samples].join("\n")
 }
@@ -181,7 +185,7 @@ export function termExtractionVariables(
   return {
     document: documentLine(document),
     definitions: definitions.map(provisionBlock).join("\n\n"),
-    candidates: candidates.map(candidateText).join("\n") || "none",
+    candidates: candidates.map((candidate) => candidateText(candidate)).join("\n") || "none",
     coreTerms: coreTermsText()
   }
 }

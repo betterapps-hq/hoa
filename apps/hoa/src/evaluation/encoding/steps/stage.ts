@@ -178,6 +178,10 @@ const problemsText = (problems: readonly { recordKey: string; code: string; mess
     )
     .join("\n")
 
+/** B's check of an item's terms, with the provisions the item gives it as citable. */
+export const definedTermsProblems = (item: DefinedTermsItem, terms: readonly TermContent[]) =>
+  checkDefinedTerms(terms, citableProvisions(item.input.definitions, item.input.candidates))
+
 export async function runDefinedTerms(
   items: readonly DefinedTermsItem[],
   context: Context
@@ -186,8 +190,6 @@ export async function runDefinedTerms(
   const calls: ModelCall[] = []
   const problems: StepProblem[] = []
   for (const item of items) {
-    const { definitions, candidates } = item.input
-    const citable = citableProvisions(definitions, candidates)
     let problemsBlock: string | undefined
     for (let attempt = 0; attempt <= (context.reruns ?? 0); attempt += 1) {
       const result = await stoppable(
@@ -220,7 +222,7 @@ export async function runDefinedTerms(
         continue
       }
       const terms = definedTermsOf(result.object)
-      const check = checkDefinedTerms(terms, definitions, citable)
+      const check = definedTermsProblems(item, terms)
       outputs.set(item.id, { terms })
       if (check.length === 0 || attempt === (context.reruns ?? 0)) {
         problems.push(...check.map((problem) => ({ itemId: item.id, code: problem.code, message: problem.message })))
