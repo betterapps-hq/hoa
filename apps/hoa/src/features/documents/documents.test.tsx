@@ -200,7 +200,7 @@ describe("GoverningDocuments", () => {
     })
   })
 
-  it("shows each document's current version with its earlier ones, Read beside it and the rest in its menu", async () => {
+  it("shows each document's current version with its earlier ones, each title opening the reader", async () => {
     const user = userEvent.setup()
     const uploads = [
       document(),
@@ -219,7 +219,7 @@ describe("GoverningDocuments", () => {
     expect(screen.getAllByRole("listitem")).toHaveLength(2)
     expect(screen.getByText(/version 2/)).toBeInTheDocument()
     expect(await screen.findByText("Describing drawings and photos: 3 of 12")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Read Bylaws of the association" })).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Bylaws of the association" })).toBeInTheDocument()
     // A new version goes through the one Upload, which asks what the file is; rows only read and download.
     expect(screen.queryByRole("button", { name: /New version|Actions/ })).not.toBeInTheDocument()
     expect(screen.getAllByRole("button", { name: "Upload" })).toHaveLength(1)
@@ -256,7 +256,7 @@ describe("GoverningDocuments", () => {
   it("lets a member read and download the documents, without uploading", () => {
     render(<GoverningDocuments {...props} uploads={[document()]} />, { wrapper })
     expect(screen.getByRole("link", { name: "Download Residential design guidelines" })).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Read Residential design guidelines" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Residential design guidelines" })).toHaveAttribute(
       "href",
       "/documents/doc-1"
     )

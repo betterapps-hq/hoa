@@ -1,12 +1,12 @@
-import { BookOpenTextIcon, ChevronDownIcon, FileTextIcon, UploadIcon } from "lucide-react"
+import { ChevronDownIcon, FileTextIcon, UploadIcon } from "lucide-react"
 import { useState } from "react"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import type { GoverningDocument } from "@/documents/governingDocument"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { citationHref } from "../citationLink"
-import { DocumentFileLinks } from "../DocumentFileLinks/DocumentFileLinks"
+import { DocumentDownload } from "../DocumentDownload/DocumentDownload"
 import { documentKindLabels, documentVersions } from "../documentKinds"
 import { ReaderLink } from "../ReaderLink/ReaderLink"
 import type { DocumentDetails } from "../uploadDocument"
@@ -145,9 +145,19 @@ function DocumentRow({
     dateText(document.uploadedAt) ? `added ${dateText(document.uploadedAt)}` : null
   ].filter((item) => item !== null)
   return (
-    <div className="flex flex-col gap-2 @xl:flex-row @xl:items-start @xl:justify-between">
+    <div className="flex items-start justify-between gap-2">
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="font-medium">{document.title}</span>
+        {/* The title opens the document in the reader once its pages were read. */}
+        {isReadable ? (
+          <ReaderLink
+            href={citationHref(document.id)}
+            className="w-fit font-medium underline-offset-4 hover:underline focus-visible:underline"
+          >
+            {document.title}
+          </ReaderLink>
+        ) : (
+          <span className="font-medium">{document.title}</span>
+        )}
         <span className="text-sm text-muted-foreground">{details.join(", ")}</span>
         {document.status === "processing" && jobId ? (
           <JobProgress jobId={jobId} loadJob={loadJob} onFinished={onChanged} />
@@ -164,16 +174,7 @@ function DocumentRow({
           </span>
         ) : null}
       </div>
-      <div className="-ml-2 flex shrink-0 flex-wrap items-center gap-1 @xl:ml-0">
-        {isReadable ? (
-          <ReaderLink href={citationHref(document.id)} className={buttonVariants({ size: "sm", variant: "ghost" })}>
-            <BookOpenTextIcon aria-hidden />
-            Read
-            <span className="sr-only"> {document.title}</span>
-          </ReaderLink>
-        ) : null}
-        {isDownloadable ? <DocumentFileLinks documentId={document.id} title={document.title} /> : null}
-      </div>
+      {isDownloadable ? <DocumentDownload documentId={document.id} title={document.title} /> : null}
     </div>
   )
 }
@@ -201,7 +202,7 @@ function EarlierVersions({ versions }: { versions: GoverningDocument[] }) {
                 {dateText(version.uploadedAt) ? `, added ${dateText(version.uploadedAt)}` : ""}
               </span>
               {version.status === "uploading" ? null : (
-                <DocumentFileLinks documentId={version.id} title={`${version.title}, version ${version.version}`} />
+                <DocumentDownload documentId={version.id} title={`${version.title}, version ${version.version}`} />
               )}
             </li>
           ))}
