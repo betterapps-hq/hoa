@@ -6166,16 +6166,7 @@
       "intro": null,
       "text": "If established by Declarant or the Association for activities within Trilogy at Redmond Ridge, the Association may fund the minimum organizational expenses relating to any such entity and may contribute additional money, real or personal property, or services to such entities. Such expenses and any such contributions shall be a Common Expense, provided, the Association may share in such expenses with other property owners within or in the vicinity of Trilogy at Redmond Ridge under a Covenant to Share Costs. For the purposes of this Section, a \"tax-exempt organization\" shall mean an entity which is exempt from federal income taxes under the Internal Revenue Code (\"Code\"), such as, but not limited to, entities which are exempt from federal income taxes under Sections 501(c)(3) or 501(c)(4), as the Code may be amended from time to time.",
       "wrapUp": null,
-      "noRule": {
-        "reason": "not-evaluated",
-        "note": "A power to fund tax-exempt organizations as a Common Expense, and a definition used only here.",
-        "review": {
-          "status": "proposed",
-          "by": null,
-          "at": null,
-          "note": null
-        }
-      },
+      "noRule": null,
       "anchors": []
     },
     {
@@ -51243,6 +51234,142 @@
           "region": null
         }
       ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "termination-of-negotiation",
+      "organizationId": "org-sample",
+      "kind": "thing",
+      "nature": "event",
+      "request": null,
+      "labels": [
+        {
+          "text": "Termination of Negotiations",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-09T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "the Parties' failure to resolve a Claim within 30 days of the Notice, or another period they agree, after which the Claimant may submit the Claim to mediation",
+      "scopeNote": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:14.4(b)(ii)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "context": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "person.federal-income-tax-exempt",
+      "organizationId": "org-sample",
+      "kind": "property",
+      "of": "person",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null,
+      "labels": [
+        {
+          "text": "exempt from federal income taxes",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-09T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:7.13/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "context": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "tax-exempt-organization",
+      "organizationId": "org-sample",
+      "kind": "category",
+      "of": "person",
+      "criteria": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["person.federal-income-tax-exempt"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "labels": [
+        {
+          "text": "tax-exempt organization",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-09T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "an entity exempt from federal income taxes under the Internal Revenue Code, such as one exempt under Section 501(c)(3) or 501(c)(4)",
+      "scopeNote": "Defined for Section 7.13 only.",
+      "citations": [
+        {
+          "provisionKey": "declaration:7.13/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "context": null,
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"

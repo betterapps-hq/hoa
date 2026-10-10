@@ -944,3 +944,15 @@ From the first run of the defined-terms step (`hoa-defined-terms` v1, run 2026-1
   said its provision belonged in class-b-member's citations).
 - Not added: 14.4(a)'s "Parties" (Claimant and Respondent collectively); claimant and respondent are encoded, and no
   rule needs the pair as a term.
+
+From the defined-terms step run with every defining provision given in full (prompt draft 3, run
+2026-10-10T09-00-37-defined-terms):
+
+- ADDED: termination-of-negotiation (event), the point 14.4(b)(ii) defines as "Termination of Negotiations", alongside
+  the existing termination-of-mediation.
+- ADDED: tax-exempt-organization, a category of person over the new boolean person.federal-income-tax-exempt, which
+  7.13/p2 defines for that Section ("shall mean an entity which is exempt from federal income taxes").
+- COVERAGE: 7.13/p2 loses its no-rule reason, since a term now cites it.
+- Not changed: residence (3.1(a)(i)) and association-maintained-landscaping (7.2(c)) are encoded and cited; the step
+  isn't expected to return them only because the candidate finder misses their phrasing ("referred to individually as
+  a", "collectively referred to ... as the").
