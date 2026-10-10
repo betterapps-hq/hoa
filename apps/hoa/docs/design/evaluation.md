@@ -148,7 +148,7 @@ agent to judge what code can't (faithfulness, whether two terms or rules mean th
 
 | Step | Metrics |
 | --- | --- |
-| B | Recall of golden things and parties, categories, refinements and criteria properties (by key, label or alignment); extra things |
+| B | Recall of golden things and parties, categories, refinements and criteria properties: things and categories matched by labels and overlapping citations (never by key, since code builds keys from labels), the terms under them by label within their matched parent; extra things; golden gaps (below); core duplicates; undeclared criteria |
 | E | Coverage (a reason, an outline citing it, or covered outside the section); rule recall and precision (pairs by key, then kind, per provision); kind, bearer, subject (a label counts when it is the golden term's), request-type and no-rule-reason agreement |
 | C | Recall of properties, value sets and values, things and categories; duplicates (two terms sharing a label in one scope) |
 | C-merge | Merge recall and precision; collisions renamed; lookalikes merged |
@@ -176,12 +176,19 @@ person's approval.
 
 Options: `--items <id part>,...` keeps matching items; `--prompts <name>=<version>,...` pins versions no label points
 at (drafted prompts are loaded by version, labeled or not); `--repeat <n>` runs again with its own content cache per
-repeat for the noise band and key stability; `--reruns 0|1` reruns a failing B, E or C item once with its problems;
+repeat to show run-to-run noise (each metric's mean with its min and max across repeats, per item in `scores.json` and over the items in `report.md`, so a version comparison can tell a change from noise); `--reruns 0|1` reruns a failing B, E or C item once with its problems;
 `--retries 0-2` runs F's retry on the rules still failing; `--rescore <step run>` calls no model and scores that run's saved
-outputs again against the dataset as it is now (B's check rerun too), into a new `<time>-<step>-rescored` folder. Each run writes `.fixtures/eval/steps/<run id>/`: `run.json`
+outputs again against the dataset as it is now (B's check rerun too), into a new `<time>-<step>-rescored` folder, applying and copying the run's `judgments.json`. Each run writes `.fixtures/eval/steps/<run id>/`: `run.json`
 (calls with input, cached-input, cache-write and output tokens, cost and latency; problems), `outputs/`,
 `handoff.json`, `scores.json`, `report.md` (calls, cost, time, cached tokens, problems by class, the scores beside the
 dataset's v3 and v5 columns) and `compare/`.
+
+**B's golden gaps.** A thing or category B returns that the golden lacks, citing a provision B was given as defining,
+is a golden-gap candidate: its comparison file lists it. The coding agent reads the text and records its verdict in the
+run folder's `judgments.json`
+(`{ "goldenGaps": [{ "item": "<item id>", "label": "<preferred label>", "confirmed": true, "why": "<reason>" }] }`), then
+rescores the run: `golden-gaps` counts the confirmed ones (0 until judged), and they no longer count as extra things. A
+confirmed gap is also a golden error to fix with a cited reason, as any expected-data change.
 
 ## In production
 

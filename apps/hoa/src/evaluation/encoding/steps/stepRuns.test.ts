@@ -3,8 +3,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterAll, describe, expect, it } from "vitest"
 import { z } from "zod"
-import { clippedInput } from "./report"
-import { readStepRun, stepItemFile } from "./stepRuns"
+import { clippedInput, repeatSpread, spreadText } from "./report"
+import { confirmedGaps, readJudgments, readStepRun, stepItemFile } from "./stepRuns"
 
 // A step run's folder read back for --rescore, and what its comparison files show of an item's input.
 
@@ -63,5 +63,24 @@ describe("clippedInput", () => {
   it("shows an input whole, or says where it was cut", () => {
     expect(clippedInput("short", 10)).toBe("short")
     expect(clippedInput("a".repeat(25), 10)).toBe(`${"a".repeat(10)}\n[cut: 15 of 25 characters not shown]`)
+  })
+})
+
+describe("repeats and judgments", () => {
+  it("gives each metric's mean, min and max across repeats, leaving out repeats that didn't measure it", () => {
+    const spreads = repeatSpread([{ recall: 0.5, extra: 2 }, { recall: 0.25, extra: null }, { recall: 0.75 }])
+    expect(spreads).toEqual({ extra: { mean: 2, min: 2, max: 2 }, recall: { mean: 0.5, min: 0.25, max: 0.75 } })
+    expect(spreadText(spreads.recall ?? { mean: 0, min: 0, max: 0 })).toBe("0.500 (0.250–0.750)")
+  })
+
+  it("reads the golden gaps the coding agent confirmed, and none when a run has no judgments", () => {
+    expect(readJudgments(folder)).toEqual({ goldenGaps: [] })
+    write("judgments.json", {
+      goldenGaps: [
+        { item: "defined-terms:rules", label: "Garden Plot", confirmed: true, why: "1.4 defines it" },
+        { item: "defined-terms:rules", label: "Gate", confirmed: false, why: "only used" }
+      ]
+    })
+    expect(confirmedGaps(readJudgments(folder), "defined-terms:rules")).toEqual(["Garden Plot"])
   })
 })

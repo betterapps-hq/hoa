@@ -55,3 +55,25 @@ export function readStepRun<Output>(
   })
   return { info, runs }
 }
+
+/**
+ * The coding agent's judgments of a step run (judgments.json in its folder, evaluation.md, Running one step): for B,
+ * the golden-gap candidates it read, each confirmed when the step's citable text genuinely defines the term the golden
+ * lacks. A rescore reads the judgments of the run it rescores and copies them to the new folder.
+ */
+export const stepJudgments = z.object({
+  goldenGaps: z
+    .array(z.object({ item: z.string(), label: z.string().min(1), confirmed: z.boolean(), why: z.string() }))
+    .default([])
+})
+export type StepJudgments = z.output<typeof stepJudgments>
+
+/** A run folder's judgments; none when it has no judgments.json. */
+export function readJudgments(folder: string): StepJudgments {
+  const path = join(folder, "judgments.json")
+  return stepJudgments.parse(existsSync(path) ? readJson(path) : {})
+}
+
+/** The preferred labels of the golden gaps confirmed for one item. */
+export const confirmedGaps = (judgments: StepJudgments, itemId: string) =>
+  judgments.goldenGaps.filter((gap) => gap.item === itemId && gap.confirmed).map((gap) => gap.label)

@@ -7,7 +7,18 @@ import type { ItemScore, Verdict } from "./scores"
 // each old run's (or a new step run's) accuracy per metric and per slice, and the items every run got wrong, which are
 // the most useful test items. The comparison files hold what code can't judge, for the coding agent.
 
-export type ItemResult = { id: string; tags: Tags; results: Record<string, ItemScore> }
+/** A metric across a step run's repeats: its mean, min and max (null where no repeat measured it). */
+export type Spread = { mean: number; min: number; max: number }
+
+export type ItemResult = {
+  id: string
+  tags: Tags
+  /** Each metric across the repeats, when a step ran more than once: the run-to-run noise. */
+  repeats?: Record<string, Spread>
+  results: Record<string, ItemScore>
+}
+
+const spread = z.object({ mean: z.number(), min: z.number(), max: z.number() })
 
 /** Item results as results.json stores them. */
 export const itemResults = z.array(
@@ -19,6 +30,7 @@ export const itemResults = z.array(
       topics: z.array(z.string()),
       features: z.array(z.string())
     }),
+    repeats: z.record(z.string(), spread).optional(),
     results: z.record(
       z.string(),
       z.object({
@@ -65,6 +77,31 @@ export function accuracy(items: readonly ItemResult[], run: string) {
     metrics: Object.fromEntries(metricNames.map((name) => [name, mean(scores.map((score) => score.metrics[name]))]))
   }
 }
+
+/** Each metric's mean, min and max over several runs' values (a run that didn't measure it left out). */
+export function repeatSpread(runs: readonly Record<string, number | null | undefined>[]): Record<string, Spread> {
+  const names = [...new Set(runs.flatMap((metrics) => Object.keys(metrics)))].toSorted(compareCodeUnits)
+  return Object.fromEntries(
+    names.flatMap((name) => {
+      const values = runs.map((metrics) => metrics[name]).filter((value): value is number => typeof value === "number")
+      return values.length === 0
+        ? []
+        : [
+            [
+              name,
+              {
+                mean: values.reduce((sum, value) => sum + value, 0) / values.length,
+                min: Math.min(...values),
+                max: Math.max(...values)
+              }
+            ]
+          ]
+    })
+  )
+}
+
+/** A spread as text: "0.480 (0.470–0.490)". */
+export const spreadText = (value: Spread) => `${number(value.mean)} (${number(value.min)}–${number(value.max)})`
 
 /** One step's summary as Markdown. */
 export function stepSummary(step: string, items: readonly ItemResult[], runs: readonly string[]) {
@@ -201,6 +238,19 @@ export function callFigures(calls: readonly CallLike[]) {
   }
 }
 
+/** Each metric's mean over items, as its mean with the min and max across the repeats (run-to-run noise). */
+function repeatsSection(items: readonly ItemResult[], repeats: readonly string[]) {
+  if (repeats.length < 2) {
+    return []
+  }
+  const spreads = repeatSpread(repeats.map((run) => accuracy(items, run).metrics))
+  return [
+    `## Metrics across ${repeats.length} repeats (mean over items; mean, min–max across repeats)`,
+    "",
+    ...Object.entries(spreads).map(([name, value]) => `- ${name} ${spreadText(value)}`)
+  ]
+}
+
 /** One step run's report: what ran, its calls, its problems by class, and its scores beside the old runs'. */
 export function stepRunReport(input: {
   runId: string
@@ -213,6 +263,8 @@ export function stepRunReport(input: {
   /** This run's item results (each repeat a column), and the dataset's old-run results when there are any. */
   items: readonly ItemResult[]
   runs: readonly string[]
+  /** The columns that are repeats of this run: each metric's mean over items is shown with its spread across them. */
+  repeats?: readonly string[]
   extra: readonly string[]
 }) {
   const figures = callFigures(input.calls)
@@ -238,6 +290,7 @@ export function stepRunReport(input: {
       : [...classes].toSorted(([a], [b]) => compareCodeUnits(a, b)).map(([code, count]) => `- ${code}: ${count}`)),
     "",
     ...input.extra,
+    ...repeatsSection(input.items, input.repeats ?? []),
     "",
     stepSummary(input.stage, input.items, input.runs).replace(
       /^# Dataset .*\n/,

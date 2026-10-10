@@ -16,6 +16,7 @@ import {
   clippedInput,
   itemComparison,
   itemResults,
+  repeatSpread,
   stepRunReport,
   type ItemResult
 } from "../src/evaluation/encoding/steps/report.ts"
@@ -45,7 +46,13 @@ import {
   type StepProblem,
   type StepRun
 } from "../src/evaluation/encoding/steps/stage.ts"
-import { readStepRun, stepItemFile, stepRunInfo } from "../src/evaluation/encoding/steps/stepRuns.ts"
+import {
+  confirmedGaps,
+  readJudgments,
+  readStepRun,
+  stepItemFile,
+  stepRunInfo
+} from "../src/evaluation/encoding/steps/stepRuns.ts"
 import { termDraft } from "../src/schema/zod.ts"
 import { encodingRuns, fileCache, fixtures, readJson, writeJson } from "./evalFiles.ts"
 import { defaultRetryQuota, defaultRuns, goldenContext, labeledRuns, pairs } from "./stepDatasets.ts"
@@ -59,7 +66,10 @@ import { defaultRetryQuota, defaultRuns, goldenContext, labeledRuns, pairs } fro
 // exactly what the run saved. Each run writes run.json, outputs/, handoff.json, report.md (calls, cost, time, cached
 // tokens, problems by class, scores beside the old runs') and compare/ to .fixtures/eval/steps/<run id>/.
 // --rescore <run under .fixtures/eval/steps> calls no model: it scores that run's saved outputs again, against the
-// dataset as it is now (rebuilt from the golden) and with the current scorers and checks, into a new run folder.
+// dataset as it is now (rebuilt from the golden) and with the current scorers and checks, into a new run folder, with
+// the coding agent's judgments.json from that run (B's confirmed golden gaps) applied and copied along.
+// Repeats (--repeat) only show run-to-run noise: each metric is reported as its mean with the min and max across
+// repeats, per item in scores.json and over the items in report.md.
 //
 // Model calls cost money: without --yes this prints what it would run and stops. Usage, from apps/hoa:
 //   pnpm eval:step --stage <step> [--from <run>] [--items <id part>,...] [--prompts <name>=<version>,...]
@@ -105,6 +115,8 @@ const out = join(stepsRoot, runId)
 const fileName = stepItemFile
 const wanted = (id: string) => !values.items || values.items.split(",").some((part) => id.includes(part))
 const repeats = rescored?.info.repeats ?? Math.max(1, Number(values.repeat))
+/** The coding agent's judgments of the rescored run; none for a new run. */
+const judgments = readJudgments(rescored?.folder ?? out)
 
 const pinned = Object.fromEntries(
   pairs(values.prompts).map(([name, version]) => {
@@ -280,7 +292,6 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
   run: (items: readonly I[], cacheStage: string) => Promise<StepRun<O>>
   score: ((item: I, output: O | null) => ItemScore) | null
   previous: Handoff
-  keysOf?: (output: O) => string[]
   /** The output's shape, for reading it back (--rescore). */
   output?: z.ZodType<O>
   /** The step's check of one output, run again on a rescore. */
@@ -309,6 +320,11 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
   const results: ItemResult[] = items.map((item) => ({
     id: item.id,
     tags: item.tags,
+    ...(input.score && runs.length > 1
+      ? {
+          repeats: repeatSpread(runs.map((run) => input.score?.(item, run.outputs.get(item.id) ?? null).metrics ?? {}))
+        }
+      : {}),
     results: {
       ...Object.fromEntries(
         runs.flatMap((run, index) =>
@@ -318,20 +334,12 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
       ...old.get(item.id)
     }
   }))
-  // Key stability across repeats: the share of items whose outputs name the same keys in every repeat.
-  const stability =
-    input.keysOf && runs.length > 1
-      ? items.filter((item) => {
-          const keys = runs.map((run) => {
-            const output = run.outputs.get(item.id)
-            return output ? (input.keysOf?.(output) ?? []).toSorted().join() : ""
-          })
-          return keys.every((key) => key === keys[0])
-        }).length / Math.max(1, items.length)
-      : null
   const calls = runs.flatMap((run) => run.calls)
   const problems = runs.flatMap((run) => run.problems)
   mkdirSync(join(out, "compare"), { recursive: true })
+  if (judgments.goldenGaps.length > 0) {
+    writeJson(join(out, "judgments.json"), judgments)
+  }
   runs.forEach((run, index) => {
     for (const item of items) {
       writeJson(join(out, "outputs", `${index + 1}`, `${fileName(item.id)}.json`), run.outputs.get(item.id) ?? null)
@@ -375,7 +383,8 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
     problems,
     items: results,
     runs: input.score ? [...labels, ...oldLabels] : oldLabels,
-    extra: stability === null ? [] : [`Key stability across repeats: ${stability.toFixed(3)} of items.`]
+    repeats: input.score && runs.length > 1 ? labels : [],
+    extra: []
   })
   writeFileSync(join(out, "report.md"), report)
   console.warn(report)
@@ -386,7 +395,6 @@ const reruns = Number(values.reruns)
 /** B's terms for E's label resolution and C's input: from the step run handed on, else the golden's. */
 const definedTerms = fromStep?.definedTerms ?? datasets["shared-vocabulary"][0]?.input.definedTerms ?? []
 
-const termKeys = (output: { terms: readonly { key: string }[] }) => output.terms.map((term) => term.key)
 /** B's and C's output as their run folders hold it. */
 const termsOutput = z.object({ terms: z.array(termDraft) })
 const byId = <I extends { id: string }>(items: readonly I[]) => new Map(items.map((item) => [item.id, item]))
@@ -413,9 +421,8 @@ switch (stage) {
       calls: 0,
       source: fromBuild ? `build run ${fromBuild.runId}` : "the golden dataset",
       run: (selected, cacheStage) => runDefinedTerms(selected, { ai: stepAi(), cacheStage, reruns }),
-      score: scoreDefinedTerms,
+      score: (item, output) => scoreDefinedTerms(item, output, confirmedGaps(judgments, item.id)),
       previous: {},
-      keysOf: termKeys,
       output: termsOutput,
       recheck: (item, output) => definedTermsProblems(item, output.terms)
     })
@@ -449,8 +456,7 @@ switch (stage) {
           provisions: fromBuild?.provisions ?? goldenProvisions
         }),
       score: (item, output) => scoreFinding(item, output, termAlignment(allGoldenTerms, allGoldenTerms)),
-      previous: fromStep ?? {},
-      keysOf: (output) => output.provisions.flatMap((entry) => entry.outlines.map((outline) => outline.key))
+      previous: fromStep ?? {}
     })
     break
   }
@@ -487,7 +493,6 @@ switch (stage) {
       run: (selected, cacheStage) => runSharedVocabulary(selected, { ai: stepAi(), cacheStage, reruns }),
       score: scoreVocabulary,
       previous: fromStep ?? { outlines: goldenOutlines(golden, sections), settingsFlags: settingsFlags(golden) },
-      keysOf: termKeys,
       output: termsOutput
     })
     break
