@@ -1,7 +1,7 @@
 import { match } from "ts-pattern"
 import type { ApplicationStatus } from "@/applications/application"
 import { outcomeLabels, recommendationLabels, statusLabels } from "@/features/applications/applicationDisplay"
-import type { CommitteeMeeting, DashboardApplication } from "./dashboardData"
+import type { ActivityEvent, DashboardApplication } from "./dashboardData"
 
 // Labels, groupings and date phrasing for the dashboards. Dates format in UTC so the server's render and the
 // browser's agree.
@@ -10,23 +10,10 @@ const day = 24 * 60 * 60 * 1000
 const hour = 60 * 60 * 1000
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
-const weekdayFormat = new Intl.DateTimeFormat("en-US", {
-  weekday: "long",
-  month: "short",
-  day: "numeric",
-  timeZone: "UTC"
-})
-const timeFormat = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: "UTC" })
 const relativeFormat = new Intl.RelativeTimeFormat("en-US", { numeric: "auto" })
 
 /** "Oct 7". */
 export const dateText = (at: string) => dateFormat.format(new Date(at))
-
-/** "Tuesday, Oct 14". */
-export const weekdayText = (at: string) => weekdayFormat.format(new Date(at))
-
-/** "7:00 PM". */
-export const timeText = (at: string) => timeFormat.format(new Date(at))
 
 /** Midnight UTC on the moment's day. */
 const dayOf = (at: string) => Math.floor(Date.parse(at) / day)
@@ -56,33 +43,50 @@ export const projectLabel = (application: DashboardApplication) => application.p
 
 /** Where the application stands: its decision once decided, otherwise its status. */
 export const standingText = (application: DashboardApplication) =>
-  application.decision ? outcomeLabels[application.decision.outcome] : statusLabels[application.status]
+  application.decision && application.status === "decided"
+    ? outcomeLabels[application.decision.outcome]
+    : statusLabels[application.status]
+
+/** The latest review's recommendation. */
+const latestRecommendation = (application: DashboardApplication) => application.reviews[0]?.recommendation ?? null
+
+/** "Review: approve with conditions", as the committee reads it. */
+const reviewText = (recommendation: DashboardApplication["reviews"][number]["recommendation"]) =>
+  `Review: ${recommendationLabels[recommendation].toLowerCase()}`
 
 /** The latest review's recommendation, as the committee reads it. */
-export const recommendationText = (application: DashboardApplication) =>
-  application.recommendation
-    ? `Review: ${recommendationLabels[application.recommendation].toLowerCase()}`
-    : "Not reviewed"
+export const recommendationText = (application: DashboardApplication) => {
+  const recommendation = latestRecommendation(application)
+  return recommendation ? reviewText(recommendation) : "Not reviewed"
+}
+
+/** "Add the 2 things the review asks for": what the latest review's missing information asks of the homeowner. */
+const addMissing = (count: number) => `Add the ${count === 1 ? "one thing" : `${count} things`} the review asks for`
 
 /** What the homeowner does next, or what happens next for them. */
-export function nextStepText(application: DashboardApplication, meeting: CommitteeMeeting | null) {
-  return match(application)
-    .with({ status: "draft" }, () => "Add your plans and run the review.")
-    .with({ status: "reviewing" }, () => "The review is running. It takes a few minutes.")
+export function nextStepText(application: DashboardApplication) {
+  const missing = application.missingInformation.length
+  return match(application.status)
+    .with("draft", () => "Add your plans and run the review.")
+    .with("reviewing", () => "The review is running. It takes a few minutes.")
+    .with("reviewed", () =>
+      match({ missing, recommendation: latestRecommendation(application) })
+        .when(
+          ({ missing: count }) => count > 0,
+          () => `${addMissing(missing)}, then submit it to the committee.`
+        )
+        .with({ recommendation: "approve" }, () => "The review found no problems. Submit it to the committee.")
+        .otherwise(() => "Check what the review found, then submit it to the committee.")
+    )
+    .with("submitted", () => "With the committee for a decision.")
     .with(
-      { status: "reviewed", recommendation: "approve" },
-      () => "The review found no problems. Submit it to the committee."
+      "information-requested",
+      () =>
+        application.decision?.note ??
+        (missing > 0 ? `${addMissing(missing)}, then submit it again.` : "The committee needs more information.")
     )
-    .with({ status: "reviewed" }, () => "Check what the review found, then submit it to the committee.")
-    .with({ status: "submitted" }, () =>
-      meeting ? `On the agenda for ${weekdayText(meeting.startsAt)}.` : "With the committee for a decision."
-    )
-    .with(
-      { status: "information-requested" },
-      ({ informationRequest }) => informationRequest?.text ?? "The committee needs more information."
-    )
-    .with({ status: "decided" }, ({ decision }) =>
-      match(decision?.outcome)
+    .with("decided", () =>
+      match(application.decision?.outcome)
         .with(
           "approved-with-conditions",
           "approved-in-part",
@@ -92,6 +96,20 @@ export function nextStepText(application: DashboardApplication, meeting: Committ
         .with("disapproved", () => "Read the committee's reasons. You can apply again with changes.")
         .otherwise(() => "Read the committee's decision.")
     )
+    .exhaustive()
+}
+
+/** "Submitted Oct 7.", "Asked 2 days ago.": the date that goes with where the application stands. */
+export function standingDateText(application: DashboardApplication, asOf: string) {
+  const reviewed = application.reviews[0]?.createdAt
+  return match(application.status)
+    .with("reviewed", () => (reviewed ? `Reviewed ${dateText(reviewed)}.` : null))
+    .with("submitted", () => (application.submittedAt ? `Submitted ${dateText(application.submittedAt)}.` : null))
+    .with("information-requested", () =>
+      application.decision ? `Asked ${agoText(application.decision.decidedAt, asOf)}.` : null
+    )
+    .with("decided", () => (application.decision ? `Decided ${dateText(application.decision.decidedAt)}.` : null))
+    .with("draft", "reviewing", () => `Started ${dateText(application.createdAt)}.`)
     .exhaustive()
 }
 
@@ -109,22 +127,56 @@ export function groupForHomeowner(applications: readonly DashboardApplication[])
   })
 }
 
-const byTime =
-  (time: (application: DashboardApplication) => string) => (a: DashboardApplication, b: DashboardApplication) =>
-    Date.parse(time(a)) - Date.parse(time(b))
+/** When the application started waiting where it is now. */
+export const waitingSince = (application: DashboardApplication) =>
+  match(application.status)
+    .with("information-requested", () => application.decision?.decidedAt ?? application.updatedAt)
+    .with("submitted", () => application.submittedAt ?? application.updatedAt)
+    .otherwise(() => application.updatedAt)
+
+const longestWaitingFirst = (a: DashboardApplication, b: DashboardApplication) =>
+  Date.parse(waitingSince(a)) - Date.parse(waitingSince(b))
 
 /** Submitted applications waiting for the committee's decision, longest-waiting first. */
 export const awaitingDecision = (applications: readonly DashboardApplication[]) =>
-  applications
-    .filter((application) => application.status === "submitted")
-    .toSorted(byTime((application) => application.submittedAt ?? application.updatedAt))
+  applications.filter((application) => application.status === "submitted").toSorted(longestWaitingFirst)
 
 /** Applications waiting on the homeowner's answer, longest-waiting first. */
 export const awaitingHomeowner = (applications: readonly DashboardApplication[]) =>
-  applications
-    .filter((application) => application.status === "information-requested")
-    .toSorted(byTime((application) => application.informationRequest?.requestedAt ?? application.updatedAt))
+  applications.filter((application) => application.status === "information-requested").toSorted(longestWaitingFirst)
 
-/** When the application started waiting where it is now. */
-export const waitingSince = (application: DashboardApplication) =>
-  application.informationRequest?.requestedAt ?? application.submittedAt ?? application.updatedAt
+/** The latest things that happened to the applications: started, reviewed, submitted, decided; newest first. */
+export function recentActivity(applications: readonly DashboardApplication[], limit = 6): ActivityEvent[] {
+  return applications
+    .flatMap((application): ActivityEvent[] => [
+      { id: `${application.id}:created`, application, at: application.createdAt, summary: "Started" },
+      ...application.reviews.map((review) => ({
+        id: `${application.id}:review:${review.createdAt}`,
+        application,
+        at: review.createdAt,
+        summary: reviewText(review.recommendation)
+      })),
+      ...(application.submittedAt
+        ? [
+            {
+              id: `${application.id}:submitted`,
+              application,
+              at: application.submittedAt,
+              summary: "Submitted to the committee"
+            }
+          ]
+        : []),
+      ...(application.decision
+        ? [
+            {
+              id: `${application.id}:decided`,
+              application,
+              at: application.decision.decidedAt,
+              summary: `Committee: ${outcomeLabels[application.decision.outcome].toLowerCase()}`
+            }
+          ]
+        : [])
+    ])
+    .toSorted((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .slice(0, limit)
+}

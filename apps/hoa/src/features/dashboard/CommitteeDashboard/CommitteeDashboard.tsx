@@ -7,7 +7,7 @@ import { sentenceCase } from "@/features/applications/applicationDisplay"
 import type { DashboardSummary } from "@/features/rulebook/rulebook.functions"
 import { cn } from "@/lib/utils"
 import type { NextRulebook } from "../dashboard.functions"
-import type { CommitteeDashboardData, CommitteeMeeting, DashboardApplication } from "../dashboardData"
+import type { DashboardApplication } from "../dashboardData"
 import {
   agoText,
   awaitingDecision,
@@ -16,10 +16,9 @@ import {
   daysBetween,
   daysText,
   projectLabel,
+  recentActivity,
   recommendationText,
-  timeText,
-  waitingSince,
-  weekdayText
+  waitingSince
 } from "../dashboardDisplay"
 
 export type CommitteeDashboardProps = {
@@ -27,7 +26,8 @@ export type CommitteeDashboardProps = {
   summary: DashboardSummary
   /** The draft or build that will become the next rulebook. */
   nextRulebook: NextRulebook | null
-  data: CommitteeDashboardData
+  /** The organization's applications. */
+  applications: DashboardApplication[]
   /** The moment the data was read, which waiting times count to. */
   asOf: string
 }
@@ -37,13 +37,12 @@ const agoPhrase = (days: number) => (days === 0 ? "today" : `${daysText(days)} a
 
 const linkClass = "text-sm text-link underline-offset-4 hover:underline"
 
-/** The committee's dashboard: what waits for a decision or on a homeowner, the rulebook, meetings and activity. */
-export function CommitteeDashboard({ summary, nextRulebook, data, asOf }: CommitteeDashboardProps) {
-  const toDecide = awaitingDecision(data.applications)
-  const withHomeowners = awaitingHomeowner(data.applications)
+/** The committee's dashboard: what waits for a decision or on a homeowner, the rulebook, and recent activity. */
+export function CommitteeDashboard({ summary, nextRulebook, applications, asOf }: CommitteeDashboardProps) {
+  const toDecide = awaitingDecision(applications)
+  const withHomeowners = awaitingHomeowner(applications)
+  const activity = recentActivity(applications)
   const waited = (application: DashboardApplication) => daysBetween(waitingSince(application), asOf)
-  const meetingFor = (application: DashboardApplication) =>
-    data.meetings.find((meeting) => meeting.id === application.meetingId) ?? null
 
   return (
     <div className="flex flex-col gap-4 px-4 lg:px-6 @4xl/main:gap-6">
@@ -96,18 +95,15 @@ export function CommitteeDashboard({ summary, nextRulebook, data, asOf }: Commit
                 <TabsTrigger value="homeowners">With homeowners</TabsTrigger>
               </TabsList>
               <TabsContent value="decide" className="pt-2">
-                <QueueList empty="No applications are waiting for a decision.">
-                  {toDecide.map((application) => {
-                    const meeting = meetingFor(application)
-                    return (
-                      <QueueItem
-                        key={application.id}
-                        application={application}
-                        waited={waited(application)}
-                        detail={`${recommendationText(application)}.${meeting ? ` On the ${dateText(meeting.startsAt)} agenda.` : ""}`}
-                      />
-                    )
-                  })}
+                <QueueList empty="Nothing waiting for a decision.">
+                  {toDecide.map((application) => (
+                    <QueueItem
+                      key={application.id}
+                      application={application}
+                      waited={waited(application)}
+                      detail={`${recommendationText(application)}.`}
+                    />
+                  ))}
                 </QueueList>
               </TabsContent>
               <TabsContent value="homeowners" className="pt-2">
@@ -117,7 +113,7 @@ export function CommitteeDashboard({ summary, nextRulebook, data, asOf }: Commit
                       key={application.id}
                       application={application}
                       waited={waited(application)}
-                      detail={application.informationRequest?.text ?? "The committee asked for more information."}
+                      detail={application.decision?.note ?? "The committee asked for more information."}
                     />
                   ))}
                 </QueueList>
@@ -126,46 +122,37 @@ export function CommitteeDashboard({ summary, nextRulebook, data, asOf }: Commit
           </CardContent>
         </Card>
 
-        <div className="flex flex-col gap-4 @4xl/main:gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>Upcoming meetings</h2>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="gap-5">
-              {data.meetings.length === 0 ? <p className="text-muted-foreground">No meetings are scheduled.</p> : null}
-              {data.meetings.map((meeting) => (
-                <MeetingSummary
-                  key={meeting.id}
-                  meeting={meeting}
-                  agenda={data.applications.filter(
-                    (application) => application.meetingId === meeting.id && application.status === "submitted"
-                  )}
-                />
-              ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <h2>Recent activity</h2>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {data.activity.length === 0 ? <p className="text-muted-foreground">Nothing has happened yet.</p> : null}
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>Recent activity</h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {activity.length === 0 ? (
+              <p className="text-muted-foreground">Nothing has happened yet.</p>
+            ) : (
               <ul className="flex flex-col gap-3">
-                {data.activity.map((event) => (
-                  <li key={event.id} className="flex flex-col gap-0.5">
+                {activity.map((event) => (
+                  <li key={event.id} className="flex min-w-0 flex-col gap-0.5">
+                    <Link
+                      to="/applications/$applicationId"
+                      params={{ applicationId: event.application.id }}
+                      className="font-medium underline-offset-4 hover:underline"
+                    >
+                      {projectLabel(event.application)}
+                    </Link>
+                    {event.application.description ? (
+                      <span className="truncate text-muted-foreground">{event.application.description}</span>
+                    ) : null}
                     <span>{event.summary}</span>
                     <span className="text-muted-foreground">{sentenceCase(agoText(event.at, asOf))}</span>
                   </li>
                 ))}
               </ul>
-            </CardContent>
-          </Card>
-        </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
@@ -226,46 +213,23 @@ type QueueItemProps = { application: DashboardApplication; waited: number; detai
 
 function QueueItem({ application, waited, detail }: QueueItemProps) {
   return (
-    <Item render={<li />} variant="outline" size="sm">
-      <ItemContent>
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-          <ItemTitle>{application.applicant.name}</ItemTitle>
-          <span className="text-sm text-muted-foreground tabular-nums">
-            {waited === 0 ? "Since today" : `Waiting ${daysText(waited)}`}
-          </span>
-        </div>
-        <ItemDescription>
-          {projectLabel(application)} at {application.applicant.address}
-        </ItemDescription>
-        <p className="text-sm text-muted-foreground">{detail}</p>
-      </ItemContent>
-    </Item>
-  )
-}
-
-type MeetingSummaryProps = { meeting: CommitteeMeeting; agenda: DashboardApplication[] }
-
-function MeetingSummary({ meeting, agenda }: MeetingSummaryProps) {
-  return (
-    <section aria-label={`${meeting.title}, ${weekdayText(meeting.startsAt)}`} className="flex flex-col gap-1">
-      <h3 className="font-medium">
-        {weekdayText(meeting.startsAt)} at {timeText(meeting.startsAt)}
-      </h3>
-      <p className="text-muted-foreground">
-        {meeting.title}, {meeting.location}
-      </p>
-      {meeting.submissionDeadline ? (
-        <p className="text-muted-foreground">Submissions close {weekdayText(meeting.submissionDeadline)}.</p>
-      ) : null}
-      {agenda.length > 0 ? (
-        <ul aria-label="Agenda" className="mt-1 flex flex-col gap-1">
-          {agenda.map((application) => (
-            <li key={application.id}>
-              {application.applicant.name}, {projectLabel(application).toLowerCase()}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </section>
+    <li>
+      <Item
+        render={<Link to="/applications/$applicationId" params={{ applicationId: application.id }} />}
+        variant="outline"
+        size="sm"
+      >
+        <ItemContent>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+            <ItemTitle>{projectLabel(application)}</ItemTitle>
+            <span className="text-sm text-muted-foreground tabular-nums">
+              {waited === 0 ? "Since today" : `Waiting ${daysText(waited)}`}
+            </span>
+          </div>
+          {application.description ? <ItemDescription>{application.description}</ItemDescription> : null}
+          <p className="text-sm text-muted-foreground">{detail}</p>
+        </ItemContent>
+      </Item>
+    </li>
   )
 }

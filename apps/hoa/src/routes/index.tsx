@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { CommitteeDashboard } from "@/features/dashboard/CommitteeDashboard/CommitteeDashboard"
-import { getNextRulebook } from "@/features/dashboard/dashboard.functions"
-import { loadDemoDashboards } from "@/features/dashboard/demoData"
+import { getNextRulebook, listDashboardApplications } from "@/features/dashboard/dashboard.functions"
 import { HomeownerDashboard } from "@/features/dashboard/HomeownerDashboard/HomeownerDashboard"
 import { useRole } from "@/features/role/RoleProvider"
 import { getDashboardSummary } from "@/features/rulebook/rulebook.functions"
@@ -9,20 +8,23 @@ import { getDashboardSummary } from "@/features/rulebook/rulebook.functions"
 export const Route = createFileRoute("/")({
   staticData: { title: "Dashboard" },
   loader: async () => {
-    const asOf = new Date()
-    // The rulebook's state is real; applications, meetings and activity are demo data until their queries exist.
-    const [summary, nextRulebook] = await Promise.all([getDashboardSummary(), getNextRulebook()])
-    return { summary, nextRulebook, asOf: asOf.toISOString(), ...loadDemoDashboards(asOf) }
+    const asOf = new Date().toISOString()
+    const [summary, nextRulebook, applications] = await Promise.all([
+      getDashboardSummary(),
+      getNextRulebook(),
+      listDashboardApplications()
+    ])
+    return { summary, nextRulebook, applications, asOf }
   },
   component: DashboardRoute
 })
 
 function DashboardRoute() {
-  const { summary, nextRulebook, asOf, homeowner, committee } = Route.useLoaderData()
+  const { summary, nextRulebook, applications, asOf } = Route.useLoaderData()
   const { role } = useRole()
   return role.id === "administrator" ? (
-    <CommitteeDashboard summary={summary} nextRulebook={nextRulebook} data={committee} asOf={asOf} />
+    <CommitteeDashboard summary={summary} nextRulebook={nextRulebook} applications={applications} asOf={asOf} />
   ) : (
-    <HomeownerDashboard summary={summary} data={homeowner} asOf={asOf} />
+    <HomeownerDashboard summary={summary} applications={applications} asOf={asOf} />
   )
 }
