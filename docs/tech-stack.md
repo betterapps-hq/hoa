@@ -52,6 +52,8 @@ The tools we reach for **first**. Prefer them before introducing an alternative 
 - ✅ **@t3-oss/env-core** — type-safe environment variables.
 - ✅ **ts-pattern** — pattern matching / exhaustive unions · **ts-extras** — type-safe stdlib helpers.
 - ✅ **tiny-invariant** — runtime assertions.
+- ✅ **minisearch** — client-side search boxes: relevance ranking across words in paragraph text, with per-word typo and
+  prefix matching; small, with no dependencies (Fuse.js is weaker on long text).
 - ✅ **react-error-boundary** — error boundaries.
 - ✅ **@tanstack/react-router** — type-safe, file-based routing through TanStack Start.
 - ◻️ **@mantine/hooks** — React hooks catalog.

@@ -1,9 +1,11 @@
 import { match } from "ts-pattern"
 import type { PageHighlight } from "@/features/documents/DocumentViewer/DocumentViewer.utils"
 import type { CoveragePassage, DocumentCoverage, EncodedValue } from "@/rulebook/coverage"
+import type * as T from "@/schema/types"
 import type { Vocabulary } from "@/schema/vocabulary"
 import { coverageKindLabels, coverageKindStyles } from "../coverageKinds"
 import { amountText, citationLabel, readableLabel } from "../rulebookRecords"
+import { noRuleReasonLabels } from "../ruleLabels"
 
 // The coverage reader (encoding.md, UX, Coverage): a document's passages on its pages, its gaps, and how each is named.
 
@@ -80,16 +82,22 @@ export const passageLabel = (passage: CoveragePassage) =>
     .with({ part: "wrap-up" }, ({ provision }) => `${readableLabel(provision.label)}, end`)
     .exhaustive()
 
-/** A passage's accessible name: its full label and what covers it. */
-export const passageName = (passage: CoveragePassage) =>
-  match(passage)
-    .with({ type: "outside" }, ({ passage: outside, kind }) => `Page ${outside.page}: ${coverageKindLabels[kind]}`)
-    .with({ part: "main" }, ({ provision, kind }) => `${citationLabel(provision.key)}: ${coverageKindLabels[kind]}`)
-    .with(
-      { part: "wrap-up" },
-      ({ provision, kind }) => `${citationLabel(provision.key)}, end: ${coverageKindLabels[kind]}`
-    )
+/** The reason a passage has no rule, when that's what covers it. */
+export const noRuleOf = (passage: CoveragePassage): T.NoRule | null =>
+  passage.type === "provision" && (passage.kind === "reason" || passage.kind === "to-review")
+    ? passage.provision.noRule
+    : null
+
+/** A passage's accessible name: its full label, what covers it and, with no rule, why. */
+export function passageName(passage: CoveragePassage) {
+  const name = match(passage)
+    .with({ type: "outside" }, ({ passage: outside }) => `Page ${outside.page}`)
+    .with({ part: "main" }, ({ provision }) => citationLabel(provision.key))
+    .with({ part: "wrap-up" }, ({ provision }) => `${citationLabel(provision.key)}, end`)
     .exhaustive()
+  const noRule = noRuleOf(passage)
+  return `${name}: ${coverageKindLabels[passage.kind]}${noRule ? `, ${noRuleReasonLabels[noRule.reason].toLowerCase()}` : ""}`
+}
 
 /** A value a rule encodes, in words: "55 years", "2/3", "22:00". */
 export const valueText = (value: EncodedValue, vocabulary: Vocabulary) =>

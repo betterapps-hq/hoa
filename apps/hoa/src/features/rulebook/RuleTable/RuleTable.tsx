@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useSearch } from "@/hooks/useSearch"
 import { approvalBlockers } from "@/rulebook/review"
 import { renderStatement } from "@/schema/statement"
 import type * as T from "@/schema/types"
@@ -20,6 +21,7 @@ import {
   narrowingCount,
   problemCount,
   requestTypesOf,
+  ruleSearchSetup,
   statusFilterOf,
   type RuleFilters,
   type StatusFilter
@@ -70,7 +72,8 @@ export function RuleTable({ initialStatus = null }: RuleTableProps) {
   )
   const [page, setPage] = useState(0)
   const statementOf = (rule: T.Rule) => renderStatement(rule.statement, (key, plural) => vocabulary.label(key, plural))
-  const shown = filterRules(records.rules, filters, { statementOf, issues })
+  const search = useSearch(records.rules, ruleSearchSetup(statementOf))
+  const shown = filterRules(records.rules, filters, { search, issues })
   const current = clampPage(shown.length, page, pageSize)
   const update = (change: Partial<RuleFilters>) => {
     setFilters((existing) => ({ ...existing, ...change }))

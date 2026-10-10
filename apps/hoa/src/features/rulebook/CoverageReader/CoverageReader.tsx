@@ -8,11 +8,13 @@ import type { CoveragePassage, CoverageReport, DocumentCoverage } from "@/rulebo
 import { coverageKindLabels, coverageKindStyles } from "../coverageKinds"
 import { PassageCoverage } from "../PassageCoverage/PassageCoverage"
 import { countOf } from "../rulebookRecords"
+import { noRuleText } from "../ruleLabels"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 import {
   fileOf,
   gapsOf,
   highlightsOf,
+  noRuleOf,
   pageOfPassage,
   passageLabel,
   passageName,
@@ -193,6 +195,7 @@ function PassageList({
           {shown.map((passage) => {
             const style = coverageKindStyles[passage.kind]
             const Icon = style.icon
+            const noRule = noRuleOf(passage)
             return (
               <li key={passage.key}>
                 <button
@@ -208,6 +211,9 @@ function PassageList({
                       <span className="font-medium">{passageLabel(passage)}</span>{" "}
                       <span className="text-muted-foreground">{coverageKindLabels[passage.kind]}</span>
                     </span>
+                    {noRule ? (
+                      <span className="line-clamp-2 text-xs text-muted-foreground italic">{noRuleText(noRule)}</span>
+                    ) : null}
                     <span className="line-clamp-1 text-xs text-muted-foreground">{passage.text}</span>
                   </span>
                 </button>

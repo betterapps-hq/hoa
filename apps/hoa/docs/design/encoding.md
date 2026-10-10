@@ -327,6 +327,11 @@ draft with its status, stops counting as coverage, and a rebuild carries the dec
 in the rules, terms and changes lists carry the same controls in a compact form; a row something blocks says it can't
 be approved yet, and its card says why. Rules, terms and the settings share `ReviewControls`.
 
+Every list's search box (rules, terms, the coverage list's provisions, and the term pickers) goes through one helper,
+`src/lib/search.ts` on MiniSearch: each word matches as a prefix and with typos scaled to its length (short words and
+numbers exactly), every word must match in any order, and a title or label counts more than body text. With words, the
+list is ordered by relevance; without, in its usual order. The other filters still apply.
+
 - **Rules:** a search box, with the other filters (review status, kind, area, request type) behind **Filters**; the
   domain is a filter, not a column. Each row has the title, which opens the rule's card, its main citation and its
   statement in words. "Approve the N rules shown" approves what a filter shows, skipping (and saying why) any record
@@ -346,7 +351,8 @@ be approved yet, and its card says why. Rules, terms and the settings share `Rev
   provisions aren't linked to any upload's pages says it's not built yet instead of showing a share. Two views:
   - **On the pages:** the document in the document viewer, every passage highlighted by what covers it (a tint per
     kind, plus an underline or stripes for the gaps, so color isn't the only cue). Clicking a passage, or choosing it
-    from the list beside the page ("On page N", then the gaps), shows what covers or cites it: rules, terms, settings
+    from the list beside the page ("On page N", then the gaps; a passage with no rule names its reason and note there),
+    shows what covers or cites it: rules, terms, settings
     clauses, questions, its no-rule reason, the values its rules encode, and the provisions that refer to it. The panel
     sits beside the page on wide screens and in a sheet on narrow ones; choosing from the list moves focus to it.
   - **As a list:** every provision with what cites it or its reason, uncovered ones first, searchable, and filtered to

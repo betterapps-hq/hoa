@@ -1,9 +1,11 @@
+import type { Search, SearchSetup } from "@/lib/search"
 import { isBlocking } from "@/rulebook/review"
 import type * as T from "@/schema/types"
 import type { RulebookIssue } from "@/schema/validate"
+import { citationLabel } from "../rulebookRecords"
 
-// Filtering the rules list (encoding.md, UX, Rules): by review status, kind, domain, request type and words, in the
-// documents' order.
+// Filtering the rules list (encoding.md, UX, Rules): by review status, kind, domain and request type in the documents'
+// order, and by words, best match first.
 
 export type StatusFilter = T.Review["status"] | "all" | "problems"
 
@@ -20,13 +22,25 @@ export const problemCount = (rule: T.Rule, found: RulebookIssue[] = []) =>
   rule.issues.filter((issue) => issue.resolution === null && isBlocking(issue.code)).length +
   found.filter((issue) => isBlocking(issue.code)).length
 
+/** The rules' search: a title counts most, then the citations' labels, then the statement in words. */
+export const ruleSearchSetup = (statementOf: (rule: T.Rule) => string): SearchSetup<T.Rule> => ({
+  id: (rule) => rule.key,
+  fields: {
+    title: { text: (rule) => rule.title, boost: 3 },
+    citations: {
+      text: (rule) => rule.citations.map((citation) => citationLabel(citation.provisionKey)).join(" "),
+      boost: 2
+    },
+    statement: { text: statementOf }
+  }
+})
+
 export function filterRules(
   rules: T.Rule[],
   filters: RuleFilters,
-  { statementOf, issues }: { statementOf: (rule: T.Rule) => string; issues: Map<string, RulebookIssue[]> }
+  { search, issues }: { search: Search<T.Rule>; issues: Map<string, RulebookIssue[]> }
 ) {
-  const words = filters.query.trim().toLowerCase()
-  return rules
+  const matches = rules
     .filter(
       (rule) =>
         (filters.domain === "all" || rule.domain === filters.domain) &&
@@ -35,10 +49,10 @@ export function filterRules(
         (filters.status === "all" ||
           (filters.status === "problems"
             ? problemCount(rule, issues.get(rule.key)) > 0
-            : rule.review.status === filters.status)) &&
-        (!words || [rule.title, statementOf(rule), rule.key].join(" ").toLowerCase().includes(words))
+            : rule.review.status === filters.status))
     )
     .toSorted((a, b) => a.key.localeCompare(b.key, "en", { numeric: true }))
+  return search.rank(matches, filters.query)
 }
 
 /** Every request type the rules run in. */

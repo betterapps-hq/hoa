@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import type { SourceText } from "@/rulebook/coverage"
-import { noPages, renderInWorkspace, sampleRecords } from "@/tests/rulebookWorkspace"
+import { approvedReview, noPages, renderInWorkspace, sampleRecords } from "@/tests/rulebookWorkspace"
 import type { RulebookSource } from "../useRulebookWorkspace"
 import { CoverageTab } from "./CoverageTab"
 
@@ -95,6 +95,39 @@ describe("CoverageTab", () => {
     expect(actions?.setNoRule).toHaveBeenCalledWith(uncoveredKey, { reason: "explanatory", note: null })
   })
 
+  it("shows why a passage has no rule, in the list beside the page and in its panel", async () => {
+    const reviewed = {
+      ...withUncovered,
+      provisions: withUncovered.provisions.map((provision) =>
+        provision.key === uncoveredKey
+          ? {
+              ...provision,
+              noRule: {
+                reason: "explanatory" as const,
+                note: "Describes the community.",
+                review: approvedReview
+              }
+            }
+          : provision
+      )
+    }
+    const { user } = renderInWorkspace(<CoverageTab />, { records: onPages(reviewed), source: pagesSource() })
+    await screen.findByRole("region", { name: /^Uploaded declaration, page \d+$/ })
+    while (!screen.queryByRole("region", { name: "On page 1" })) {
+      await user.click(screen.getByRole("button", { name: "Previous page" }))
+    }
+    const onPage = screen.getByRole("region", { name: "On page 1" })
+    const passage = within(onPage).getByRole("button", {
+      name: "Declaration 3.1(a): No rule, reason approved, explains, requires nothing"
+    })
+    expect(within(passage).getByText("Explains, requires nothing. Describes the community.")).toBeInTheDocument()
+    await user.click(passage)
+    const panel = await screen.findByRole("dialog", { name: "What covers it" })
+    const reason = within(panel).getByRole("region", { name: "Reason for having no rule" })
+    expect(reason).toHaveTextContent("No rule: Explains, requires nothing")
+    expect(reason).toHaveTextContent("Describes the community.")
+  })
+
   it("shows page text outside any provision as a gap", async () => {
     const outside = { fileId: "upload", page: 2, start: 35, end: 60, text: "Text no provision holds." }
     const { user } = renderInWorkspace(<CoverageTab />, {
@@ -137,6 +170,19 @@ describe("CoverageTab", () => {
       "approved",
       null
     )
+  })
+
+  it("searches provisions through typos and any word order, best match first, within the filter", async () => {
+    const { user } = renderInWorkspace(<CoverageTab />, { actions: null, source: noPages })
+    const box = screen.getByRole("searchbox", { name: "Search provisions" })
+    await user.type(box, "55 years of age")
+    const [first] = within(screen.getByRole("list", { name: "Provisions" })).getAllByRole("listitem")
+    expect(within(first!).getByRole("list", { name: "Rules citing Declaration 3.1(a)" })).toBeInTheDocument()
+    await user.clear(box)
+    await user.type(box, "age yeers 55")
+    expect(screen.getByRole("list", { name: "Rules citing Declaration 3.1(a)" })).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Uncovered" }))
+    expect(screen.queryByRole("list", { name: "Rules citing Declaration 3.1(a)" })).not.toBeInTheDocument()
   })
 
   it("shows the rules and terms citing a provision in the list", async () => {

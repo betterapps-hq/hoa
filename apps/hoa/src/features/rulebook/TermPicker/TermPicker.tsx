@@ -1,4 +1,5 @@
 import { XIcon } from "lucide-react"
+import { useState } from "react"
 import {
   Combobox,
   ComboboxContent,
@@ -8,7 +9,8 @@ import {
   ComboboxList
 } from "@/components/ui/combobox"
 import { InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
-import type { TermOption } from "./TermPicker.utils"
+import { useSearch } from "@/hooks/useSearch"
+import { termOptionSearchSetup, type TermOption } from "./TermPicker.utils"
 
 export type TermPickerProps = {
   id?: string
@@ -22,7 +24,7 @@ export type TermPickerProps = {
   isInvalid?: boolean
 }
 
-/** Picks one term by its label; the list narrows as you type. */
+/** Picks one term by its label; the list narrows as you type, best match first. */
 export function TermPicker({
   id,
   label,
@@ -37,9 +39,15 @@ export function TermPicker({
     value === null
       ? null
       : (options.find((option) => option.key === value) ?? { key: value, label: value, hint: "not a term here" })
+  const [query, setQuery] = useState("")
+  const search = useSearch(options, termOptionSearchSetup)
+  // The chosen term's label in the input lists every term, as before any typing.
+  const shown = query === selected?.label ? options : search.rank(options, query)
   return (
     <Combobox
       items={options}
+      filteredItems={shown}
+      onInputValueChange={setQuery}
       value={selected}
       onValueChange={(option) => onChange(option?.key ?? null)}
       itemToStringLabel={(option) => option.label}

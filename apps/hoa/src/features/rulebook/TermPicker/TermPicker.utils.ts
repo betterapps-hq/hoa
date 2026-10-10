@@ -1,3 +1,4 @@
+import type { SearchSetup } from "@/lib/search"
 import { coreTerms } from "@/schema/coreTerms"
 import type * as T from "@/schema/types"
 import type { Vocabulary } from "@/schema/vocabulary"
@@ -21,6 +22,12 @@ export function termOptions({ terms, vocabulary }: TermCatalog, include: (term: 
     .filter(include)
     .map((term): TermOption => ({ key: term.key, label: vocabulary.label(term.key), hint: term.key }))
     .toSorted((a, b) => a.label.localeCompare(b.label) || a.key.localeCompare(b.key))
+}
+
+/** A picker's search: the label counts more than the key. */
+export const termOptionSearchSetup: SearchSetup<TermOption> = {
+  id: (option) => option.key,
+  fields: { label: { text: (option) => option.label, boost: 2 }, key: { text: (option) => option.hint } }
 }
 
 /** Which terms fit a field. */

@@ -15,13 +15,24 @@ describe("VocabularyTab", () => {
     expect(screen.getByText(/^577 terms/)).toBeInTheDocument()
     expect(termsShown()).toHaveLength(25)
     await user.type(screen.getByRole("searchbox", { name: "Search terms" }), "premises leased")
-    const [term] = termsShown()
-    expect(within(term!).getByText(/^A property of lease registration/)).toBeInTheDocument()
+    const term = termsShown().find((item) => within(item).queryByText(/^A property of lease registration/))
     await user.click(within(term!).getByRole("button", { name: /used by \d+ rules?/ }))
     const rules = screen.getByRole("list", { name: "Rules using premises leased" })
     // The first button of a rule link is its title, which opens the rule.
     await user.click(within(rules).getAllByRole("button")[0]!)
     expect(openRule).toHaveBeenCalledWith(expect.stringMatching(/^declaration:/))
+  })
+
+  it("finds a term through a typo, a partial word and any word order, best match first", async () => {
+    const { user } = renderInWorkspace(<VocabularyTab />)
+    const box = screen.getByRole("searchbox", { name: "Search terms" })
+    for (const query of ["leased premisses", "premis lea"]) {
+      await user.clear(box)
+      await user.type(box, query)
+      expect(screen.getByText(/^5 of 577 terms/)).toBeInTheDocument()
+      expect(within(termsShown()[0]!).getByRole("button", { name: "Approve leased premises" })).toBeInTheDocument()
+      expect(screen.getByText(/^A property of lease registration/)).toBeInTheDocument()
+    }
   })
 
   it("filters by kind behind Filters, and approves or rejects a term", async () => {

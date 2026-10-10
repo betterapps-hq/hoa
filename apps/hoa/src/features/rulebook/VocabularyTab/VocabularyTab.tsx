@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { useSearch } from "@/hooks/useSearch"
 import { approvalBlockers } from "@/rulebook/review"
 import type * as T from "@/schema/types"
 import { BulkApprove } from "../BulkApprove/BulkApprove"
@@ -14,7 +15,7 @@ import { RuleLink } from "../RuleLink/RuleLink"
 import { TermChip } from "../TermChip/TermChip"
 import { describeTermKind, termKindLabels } from "../TermChip/TermChip.utils"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
-import { filterTerms, termUsage, type TermFilters } from "./VocabularyTab.utils"
+import { filterTerms, termSearchSetup, termUsage, type TermFilters } from "./VocabularyTab.utils"
 
 const pageSize = 25
 const kinds: T.Term["kind"][] = ["thing", "category", "property", "value", "value-set", "unit"]
@@ -42,7 +43,8 @@ export function VocabularyTab() {
   const [page, setPage] = useState(0)
   const [openUsage, setOpenUsage] = useState<string | null>(null)
   const usage = termUsage(records.rules)
-  const shown = filterTerms(records.terms, filters, vocabulary)
+  const search = useSearch(records.terms, termSearchSetup)
+  const shown = filterTerms(records.terms, filters, vocabulary, search)
   const current = clampPage(shown.length, page, pageSize)
   const update = (change: Partial<TermFilters>) => {
     setFilters((existing) => ({ ...existing, ...change }))

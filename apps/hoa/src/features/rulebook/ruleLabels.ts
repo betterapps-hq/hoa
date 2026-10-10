@@ -52,10 +52,14 @@ export const reviewLabels: Record<T.Review["status"], string> = {
 }
 
 export const noRuleReasonLabels: Record<T.NoRule["reason"], string> = {
-  heading: "A heading",
-  recital: "A recital",
-  reserved: "Reserved",
+  heading: "Only a heading",
+  recital: "A recital, background only",
+  reserved: "Reserved, no text in force",
   explanatory: "Explains, requires nothing",
-  duplicate: "Says what another provision says",
-  "not-evaluated": "Not evaluated yet"
+  duplicate: "Repeats another provision",
+  "not-evaluated": "A requirement not evaluated yet"
 }
+
+/** "Only a heading. Its text is in its paragraphs.": why a provision has no rule, in words, with its note. */
+export const noRuleText = ({ reason, note }: Pick<T.NoRule, "reason" | "note">) =>
+  note ? `${noRuleReasonLabels[reason]}. ${note}` : noRuleReasonLabels[reason]

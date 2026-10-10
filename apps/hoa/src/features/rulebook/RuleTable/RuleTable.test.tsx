@@ -33,9 +33,34 @@ describe("RuleTable", () => {
     expect(rulesShown()).toHaveLength(25)
   })
 
+  it("finds rules through typos, partial words and any word order, best match first", async () => {
+    const { user } = renderInWorkspace(<RuleTable />)
+    const box = screen.getByRole("searchbox", { name: "Search rules" })
+    await user.type(box, "ocupied unit somone")
+    expect(
+      within(rulesShown()[0]!).getByRole("button", { name: "Each occupied Unit has someone 55 or older" })
+    ).toBeInTheDocument()
+    await user.clear(box)
+    await user.type(box, "older 55 occup")
+    expect(
+      within(rulesShown()[0]!).getByRole("button", { name: "Each occupied Unit has someone 55 or older" })
+    ).toBeInTheDocument()
+  })
+
+  it("combines the words with the filters", async () => {
+    const { user } = renderInWorkspace(<RuleTable />)
+    await user.type(screen.getByRole("searchbox", { name: "Search rules" }), "ocupied unit somone")
+    expect(screen.getByRole("button", { name: "Each occupied Unit has someone 55 or older" })).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Filters" }))
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Kind" }), "norm")
+    expect(screen.getByRole("button", { name: "Each occupied Unit has someone 55 or older" })).toBeInTheDocument()
+    await user.selectOptions(screen.getByRole("combobox", { name: "Area" }), "architectural")
+    expect(screen.getByText("No rules match.")).toBeInTheDocument()
+  })
+
   it("opens a rule from its title, reviews it in its row, and approves the rules shown after confirming", async () => {
     const { user, openRule, actions } = renderInWorkspace(<RuleTable />, { records: sampleWithTermsApproved() })
-    await user.type(screen.getByRole("searchbox", { name: "Search rules" }), "55 or older")
+    await user.type(screen.getByRole("searchbox", { name: "Search rules" }), "occupied unit someone")
     await user.click(screen.getByRole("button", { name: "Each occupied Unit has someone 55 or older" }))
     expect(openRule).toHaveBeenCalledWith(ageRule)
     await user.click(screen.getByRole("button", { name: "Reject Each occupied Unit has someone 55 or older" }))
