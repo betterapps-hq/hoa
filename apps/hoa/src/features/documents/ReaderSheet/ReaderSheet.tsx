@@ -36,15 +36,17 @@ export function CitationsOpenInSheet({ children }: { children: ReactNode }) {
           </SheetDescription>
           {opened ? (
             <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex items-center gap-2 border-b py-2 pr-14 pl-4">
+              {/* One quiet icon beside the close button: the reader's own page, in a new tab. */}
+              <div className="flex h-16 shrink-0 items-center justify-end border-b pr-14 pl-4">
                 <a
-                  className={buttonVariants({ variant: "ghost", size: "sm", className: "-ml-2" })}
+                  className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
                   href={citationHref(opened.documentId, opened.provision, opened.cites)}
                   target="_blank"
                   rel="noreferrer"
+                  aria-label="Open in a new tab"
+                  title="Open in a new tab"
                 >
                   <ExternalLinkIcon aria-hidden />
-                  Open in new tab
                 </a>
               </div>
               <DocumentReader

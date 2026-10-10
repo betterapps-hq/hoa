@@ -93,10 +93,9 @@ describe("DocumentReader", () => {
       "Page 1",
       "Page 2, printed ii"
     ])
-    expect(screen.getByRole("link", { name: /Open the original/ }).getAttribute("href")).toMatch(
-      /^\/files\/governing\/upload-1#page=\d$/
-    )
+    // No stored file: no Original view and no file links that would lead nowhere.
     expect(screen.queryByRole("group", { name: "Show" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /Download/ })).not.toBeInTheDocument()
   })
 
   it("opens at a cited provision, marked with everything under it, and moves focus there", async () => {

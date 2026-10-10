@@ -11,6 +11,7 @@ import {
   runsOf,
   snippetOf,
   splitAt,
+  splitFigures,
   wordRanges,
   type Tone
 } from "./DocumentReader.utils"
@@ -83,6 +84,18 @@ describe("the reader's derived data", () => {
       ["related", 1]
     ])
     expect(groupsOf(blocks).map((group) => group.key)).toEqual(["doc:article-1", "doc:article-2"])
+  })
+
+  it("splits a page around its figures, keeping a caption and dropping the image's own text", () => {
+    expect(
+      splitFigures("Intro.\n\n<figure>\n\nPOST\n<figcaption>Fence  styles</figcaption>\n</figure>\n\nAfter.<figure>")
+    ).toEqual([
+      { type: "text", text: "Intro.\n\n" },
+      { type: "figure", caption: "Fence styles" },
+      { type: "text", text: "\n\nAfter." },
+      { type: "figure", caption: null }
+    ])
+    expect(splitFigures("No figures.")).toEqual([{ type: "text", text: "No figures." }])
   })
 
   it("flows top-level provisions without a heading as one text", () => {

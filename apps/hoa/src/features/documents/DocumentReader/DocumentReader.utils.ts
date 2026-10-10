@@ -126,6 +126,32 @@ export function snippetOf(text: string, words: readonly string[], length = 140) 
 }
 
 /** The blocks in groups the browser can skip laying out while they're off screen: each article, or each page. */
+export type PagePiece = { type: "text"; text: string } | { type: "figure"; caption: string | null }
+
+/**
+ * A page's OCR Markdown split around its figures. The layout model marks an image as a `<figure>` element (with any
+ * text it read inside the image, and an optional `<figcaption>`); the text view can't show the image, so it stands in
+ * for it with the caption, and the original view shows the picture.
+ */
+export function splitFigures(text: string): PagePiece[] {
+  const pieces: PagePiece[] = []
+  let rest = text
+  for (;;) {
+    const start = rest.indexOf("<figure>")
+    if (start < 0) {
+      break
+    }
+    const end = rest.indexOf("</figure>", start)
+    const inside = rest.slice(start + "<figure>".length, end < 0 ? undefined : end)
+    pieces.push({ type: "text", text: rest.slice(0, start) })
+    const caption = /<figcaption>([\s\S]*?)<\/figcaption>/.exec(inside)?.[1]?.replace(/\s+/g, " ").trim()
+    pieces.push({ type: "figure", caption: caption || null })
+    rest = end < 0 ? "" : rest.slice(end + "</figure>".length)
+  }
+  pieces.push({ type: "text", text: rest })
+  return pieces.filter((piece) => piece.type === "figure" || piece.text.trim() !== "")
+}
+
 export function groupsOf(blocks: readonly ReadingBlock[]) {
   const groups: { key: string; blocks: ReadingBlock[] }[] = []
   for (const block of blocks) {

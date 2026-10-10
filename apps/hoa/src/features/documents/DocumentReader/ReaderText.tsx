@@ -1,10 +1,12 @@
+import { ImageIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { Button } from "@/components/ui/button"
 import type { ReadingBlock, ReadingPage } from "@/documents/reading"
 import { cn } from "@/lib/utils"
 import { highlightRanges, rehypeHighlights } from "../DocumentViewer/DocumentViewer.utils"
-import { pageName, splitAt, wordRanges } from "./DocumentReader.utils"
+import { pageName, splitAt, splitFigures, wordRanges } from "./DocumentReader.utils"
 
 // The document's text as the reader lays it out: headings by level with their numbers, numbered provisions with the
 // number hanging in the margin, indented by depth, page markers in the flow, and the cited passage and search matches
@@ -71,10 +73,29 @@ export type ReaderBlockProps = {
   /** The search's words to mark, when this block matches it. */
   words: readonly string[]
   isFirst: boolean
+  /** Shows this block in the original document, where its figures are; absent when there's no original. */
+  onShowOriginal?: () => void
+}
+
+/** Stands in for an image the text can't show: its caption, and a way to see it in the original. */
+function FigurePlaceholder({ caption, onShow }: { caption: string | null; onShow?: () => void }) {
+  return (
+    <div className="my-4 flex items-center justify-between gap-3 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+      <span className="flex min-w-0 items-center gap-2">
+        <ImageIcon aria-hidden className="size-4 shrink-0" />
+        <span className="truncate">{caption ? `Figure: ${caption}` : "Figure"}</span>
+      </span>
+      {onShow ? (
+        <Button variant="link" size="sm" className="h-auto shrink-0 p-0 text-link" onClick={onShow}>
+          See it in the original
+        </Button>
+      ) : null}
+    </div>
+  )
 }
 
 /** One block of the document: a heading, a provision, text outside any provision, or an unstructured page. */
-export function ReaderBlock({ block, words, isFirst }: ReaderBlockProps) {
+export function ReaderBlock({ block, words, isFirst, onShowOriginal }: ReaderBlockProps) {
   const common = {
     "data-block": block.key,
     tabIndex: -1,
@@ -83,15 +104,28 @@ export function ReaderBlock({ block, words, isFirst }: ReaderBlockProps) {
   }
 
   if (block.type === "page") {
-    const ranges =
-      words.length > 0
-        ? highlightRanges(wordRanges(block.text, words).map((range) => ({ range, tone: markClass })))
-        : []
     return (
       <div {...common} className={cn(common.className, "reader-markdown")}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlights(ranges)]}>
-          {block.text}
-        </ReactMarkdown>
+        {splitFigures(block.text).map((piece, index) =>
+          // A page's pieces never reorder; the index is their identity.
+          piece.type === "figure" ? (
+            <FigurePlaceholder key={index} caption={piece.caption} onShow={onShowOriginal} />
+          ) : (
+            <ReactMarkdown
+              key={index}
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[
+                rehypeHighlights(
+                  words.length > 0
+                    ? highlightRanges(wordRanges(piece.text, words).map((range) => ({ range, tone: markClass })))
+                    : []
+                )
+              ]}
+            >
+              {piece.text}
+            </ReactMarkdown>
+          )
+        )}
       </div>
     )
   }

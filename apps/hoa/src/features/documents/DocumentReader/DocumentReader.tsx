@@ -1,6 +1,6 @@
 import { useReducedMotion, useUncontrolled } from "@mantine/hooks"
 import { useQuery } from "@tanstack/react-query"
-import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, ExternalLinkIcon, FileTextIcon, ListIcon } from "lucide-react"
+import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, FileTextIcon, ListIcon } from "lucide-react"
 import { Fragment, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -232,17 +232,6 @@ function LoadedReader({ reading, provision, cites, highlights, onStep, stepNames
   const groups = groupsOf(blocks)
   const markers = pageMarkers(reading)
   const contexts = blockContexts(blocks)
-  const pageAt = (() => {
-    const at = new Map<string, (typeof reading.pages)[number]>()
-    let page: (typeof reading.pages)[number] | undefined
-    for (const block of blocks) {
-      page = markers.get(block.key) ?? page
-      if (page) {
-        at.set(block.key, page)
-      }
-    }
-    return at
-  })()
   const fileTitles = new Map(
     reading.files.filter((file) => file.id !== reading.id).map((file) => [file.id, file.title])
   )
@@ -353,6 +342,13 @@ function LoadedReader({ reading, provision, cites, highlights, onStep, stepNames
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [firstTarget])
 
+  /** Opens the original at a block, such as a page whose figure the text can't show. */
+  const showOriginalAt = (key: string) => {
+    rememberView("original")
+    setView("original")
+    goTo(key, false, "original")
+  }
+
   /** Switches between the text and the original, keeping the place: the same passage, or the same page. */
   const switchView = (next: ReaderView) => {
     if (next === view) {
@@ -405,9 +401,6 @@ function LoadedReader({ reading, provision, cites, highlights, onStep, stepNames
   }
 
   const context: BlockContext | undefined = current ? contexts.get(current) : undefined
-  const currentPage = current ? pageAt.get(current) : reading.pages[0]
-  const textPage = currentPage?.fileId === reading.id ? currentPage.page : 1
-  const pageShown = isOriginal ? originalPage : textPage
   const currentKeys = new Set([context?.article?.key, context?.section?.key].filter((key) => key !== undefined))
   const contextLine = [context?.article, context?.section]
     .flatMap((block) => (block ? [blockTitle(block)] : []))
@@ -471,39 +464,21 @@ function LoadedReader({ reading, provision, cites, highlights, onStep, stepNames
               <IconAction label="Search and contents" className="@4xl/reader:hidden" onClick={() => setIsNavOpen(true)}>
                 <ListIcon />
               </IconAction>
-              {reading.pageCount > 0 ? (
-                <>
-                  <a
-                    className={buttonVariants({
-                      variant: "ghost",
-                      size: "sm",
-                      className: "@max-xl/reader:size-8 @max-xl/reader:px-0"
-                    })}
-                    href={documentFileUrl(reading.id, { page: pageShown })}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <ExternalLinkIcon aria-hidden />
-                    <span className="hidden @xl/reader:inline">Open the original</span>
-                    <span className="sr-only">
-                      {" "}
-                      of {reading.title} in a new tab, at page {pageShown}
-                    </span>
-                  </a>
-                  <a
-                    className={buttonVariants({
-                      variant: "ghost",
-                      size: "sm",
-                      className: "@max-xl/reader:size-8 @max-xl/reader:px-0"
-                    })}
-                    href={documentFileUrl(reading.id, { download: true })}
-                    download
-                  >
-                    <DownloadIcon aria-hidden />
-                    <span className="hidden @xl/reader:inline">Download</span>
-                    <span className="sr-only"> {reading.title}</span>
-                  </a>
-                </>
+              {/* The Original view shows the file; Download saves it. Neither shows without a stored file. */}
+              {canShowOriginal ? (
+                <a
+                  className={buttonVariants({
+                    variant: "ghost",
+                    size: "sm",
+                    className: "@max-xl/reader:size-8 @max-xl/reader:px-0"
+                  })}
+                  href={documentFileUrl(reading.id, { download: true })}
+                  download
+                >
+                  <DownloadIcon aria-hidden />
+                  <span className="hidden @xl/reader:inline">Download</span>
+                  <span className="sr-only"> {reading.title}</span>
+                </a>
               ) : null}
             </div>
           </div>
@@ -594,6 +569,7 @@ function LoadedReader({ reading, provision, cites, highlights, onStep, stepNames
                           block={block}
                           words={matched.has(block.key) ? words : noWords}
                           isFirst={groupIndex === 0 && block === group.blocks[0] && !markers.has(block.key)}
+                          onShowOriginal={canShowOriginal ? () => showOriginalAt(block.key) : undefined}
                         />
                       </Fragment>
                     )
