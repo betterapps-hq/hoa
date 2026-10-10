@@ -345,6 +345,24 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
     expect(judged.metrics).toMatchObject({ "extra-things": 0, "golden-gaps": 1 })
   })
 
+  it("B isn't asked to find a thing the golden adds only for a category to be of, which cites no provision", () => {
+    const item = datasets["defined-terms"].find((found) => found.expected.terms.some((term) => term.kind === "thing"))
+    expect(item).toBeDefined()
+    if (!item) {
+      return
+    }
+    const helper = termDraft.parse({
+      key: "thing-outside",
+      kind: "thing",
+      nature: "object",
+      labels: [{ text: "thing outside a building", role: "preferred" }],
+      citations: []
+    })
+    const withHelper = { ...item, expected: { terms: [...item.expected.terms, helper] } }
+    const score = scoreDefinedTerms(withHelper, { terms: item.expected.terms })
+    expect(score.metrics["thing-recall"]).toBe(1)
+  })
+
   it("B stops before a call past its spending limit and keeps what ran", async () => {
     const items = [1, 2].flatMap((copy) =>
       datasets["defined-terms"].map((item) => ({ ...item, id: `${item.id}~${copy}` }))

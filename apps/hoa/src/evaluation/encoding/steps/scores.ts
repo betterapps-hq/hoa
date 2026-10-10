@@ -165,7 +165,13 @@ export function scoreDefinedTerms(
       wanted.length
     )
   }
-  const isThing = (term: TermContent) => term.kind === "thing" && !isCoreKey(term.key)
+  const defining = new Set(definingProvisions(item.input.definitions, item.input.candidates))
+  // A thing the document defines cites a provision the step was given; a thing the golden adds only so a category or
+  // property has something to be of ("a thing on the outside of a Unit") isn't one the step could find.
+  const isThing = (term: TermContent) =>
+    term.kind === "thing" &&
+    !isCoreKey(term.key) &&
+    term.citations.some((citation) => defining.has(citation.provisionKey))
   const matched = new Set([...matches.values()].map((match) => match.pipeline))
   const offered = output.terms.filter((term) => term.kind === "thing" || term.kind === "category")
   // A new thing or category whose label is a core term's: the core term should have been refined instead.
@@ -181,7 +187,6 @@ export function scoreDefinedTerms(
       ? [...new Set(termLike(term.criteria))].filter((key) => !known.has(key)).map((key) => `${term.key} reads ${key}`)
       : []
   )
-  const defining = new Set(definingProvisions(item.input.definitions, item.input.candidates))
   const confirmed = new Set(confirmedGaps.map((label) => keySegment(label)))
   const unmatched = offered.filter((term) => !matched.has(term.key))
   // A returned term the golden has under the other kind (a thing for a category, or the reverse): a kind miss, not a gap.
