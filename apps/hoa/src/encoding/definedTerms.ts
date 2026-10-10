@@ -33,6 +33,9 @@ const definitionPatterns = [
 /** An inline definition opening a text, which names the list before it. */
 const openingDefinition = new RegExp(`^\\s*${inlineDefinition.source}`)
 
+/** A heading made only of quoted names joined by "or", "and" or commas, with an optional colon or period. */
+const quotedHeading = /^\s*["“][^"“”]+[,.]?["”](?:\s*(?:,|or|and)\s*["“][^"“”]+[,.]?["”])*\s*[:.]?\s*$/
+
 const textOf = (provision: Provision) => [provision.intro, provision.text, provision.wrapUp].filter(Boolean).join("\n")
 
 function sentencesOf(text: string) {
@@ -131,7 +134,11 @@ export function findTermCandidates(provisions: readonly Provision[]): TermCandid
   }
   provisions.forEach((provision, index) => {
     const text = textOf(provision)
-    const names = provision.kind === "definition" ? definedNames(text) : []
+    // A heading that is only quoted names ('"Unit"', '"Articles of Incorporation" or "Articles"') defines them: the
+    // section under it is their definition, however the article is titled.
+    const heading = provision.heading ?? ""
+    const headingNames = quotedHeading.test(heading) ? definedNames(heading) : []
+    const names = [...(provision.kind === "definition" ? definedNames(text) : []), ...headingNames]
     for (const name of names) {
       define(name.replace(/\([^)]*\)/g, "").trim(), [provision.key])
     }

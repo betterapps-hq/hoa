@@ -82,6 +82,20 @@ describe("findTermCandidates", () => {
     expect(found.find((candidate) => candidate.phrase === "Kept Animal")?.definedIn).toEqual(["doc:10", "doc:10(a)"])
   })
 
+  it("reads a section whose heading is only quoted names as their definition", () => {
+    const sections = [
+      { ...provision("2.1", "A parcel shown on the plat.", "section"), heading: '"Parcel"' },
+      { ...provision("2.2", "The articles filed with the state.", "section"), heading: '"Charter" or "Articles":' },
+      { ...provision("3.1", "Fences need approval.", "section"), heading: "Fences" }
+    ]
+    const defined = findTermCandidates(sections).filter((candidate) => candidate.source === "definition")
+    expect(defined.map((candidate) => [candidate.phrase, candidate.definedIn])).toEqual([
+      ["Articles", ["doc:2.2"]],
+      ["Charter", ["doc:2.2"]],
+      ["Parcel", ["doc:2.1"]]
+    ])
+  })
+
   it("shortens long samples", () => {
     const long = provision("5", `Each owner keeps the Common Grounds ${"very ".repeat(60)}clean.`)
     const [candidate] = findTermCandidates([long, long, long])

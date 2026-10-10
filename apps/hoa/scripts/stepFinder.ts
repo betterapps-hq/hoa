@@ -42,9 +42,12 @@ export function withFinder(
       const labels = term.labels.map((label) => label.text)
       for (const citation of term.citations) {
         const provision = byKey.get(citation.provisionKey)
-        const quoted = (label: string) =>
-          ['"', "“"].some((open) => textOf(provision!).includes(`${open}${label.toLowerCase()}`))
-        if (provision?.key.startsWith(`${document}:`) && (provision.kind === "definition" || labels.some(quoted))) {
+        if (!provision?.key.startsWith(`${document}:`)) {
+          continue
+        }
+        const text = textOf(provision)
+        const quoted = (label: string) => ['"', "“"].some((open) => text.includes(`${open}${label.toLowerCase()}`))
+        if (provision.kind === "definition" || labels.some(quoted)) {
           provisions.add(provision.key)
           names.push(...labels)
         }
