@@ -30,7 +30,7 @@ import {
   ruleStructuringVariables,
   type RuleStructuringAnswer
 } from "@/encoding/steps/ruleStructuring"
-import { runStepPrompt, type StepAi } from "@/encoding/steps/run"
+import { BudgetExceededError, runStepPrompt, type StepAi } from "@/encoding/steps/run"
 import {
   checkSharedVocabulary,
   sharedVocabularyAnswer,
@@ -153,6 +153,19 @@ type Context = {
   /** Reruns of a failing item, with its problems (0 or 1). */ reruns?: number
 }
 
+/** A call, or null when the spending limit stopped it (recorded as a problem; what ran so far is kept). */
+async function stoppable<T>(call: Promise<T>, stopped: (message: string) => void) {
+  try {
+    return await call
+  } catch (error) {
+    if (error instanceof BudgetExceededError) {
+      stopped(error.message)
+      return null
+    }
+    throw error
+  }
+}
+
 const zodProblems = (itemId: string, issues: readonly { message: string; path: PropertyKey[] }[]) =>
   issues.slice(0, 20).map((issue) => ({ itemId, code: "zod", message: `${issue.path.join(".")}: ${issue.message}` }))
 
@@ -177,13 +190,24 @@ export async function runDefinedTerms(
     const citable = citableProvisions(definitions, candidates)
     let problemsBlock: string | undefined
     for (let attempt = 0; attempt <= (context.reruns ?? 0); attempt += 1) {
-      const result = await runStepPrompt({
-        ...context,
-        step: "definedTerms",
-        itemId: item.id,
-        schema: definedTermsAnswer,
-        variables: definedTermsVariables({ ...item.input, problems: problemsBlock })
-      })
+      const result = await stoppable(
+        runStepPrompt({
+          ...context,
+          step: "definedTerms",
+          itemId: item.id,
+          schema: definedTermsAnswer,
+          variables: definedTermsVariables({ ...item.input, problems: problemsBlock })
+        }),
+        (message) => problems.push({ itemId: item.id, code: "budget", message })
+      )
+      if (result === null) {
+        return {
+          outputs,
+          calls,
+          problems,
+          handoff: { definedTerms: [...outputs.values()].flatMap((output) => output?.terms ?? []) }
+        }
+      }
       calls.push(result.call)
       if (!result.isValid) {
         outputs.set(item.id, null)

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { kindName, type Outline } from "@/encoding/steps/outline"
 import { findingKeys } from "@/encoding/steps/ruleFinding"
 import { structureOf } from "@/encoding/steps/ruleStructuring"
-import type { StepAi } from "@/encoding/steps/run"
+import { spendingLimit, type StepAi } from "@/encoding/steps/run"
 import { coreTerms } from "@/schema/coreTerms"
 import type { TermContent } from "@/schema/zod"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
@@ -280,6 +280,16 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
     },
     slow
   )
+
+  it("B stops before a call past its spending limit and keeps what ran", async () => {
+    const items = datasets["defined-terms"]
+    const answers = items.map((item) => definedTermsAnswer(item.expected.terms, item.input.definitions[0]?.key ?? ""))
+    const ai = { ...answering(answers), budget: spendingLimit(1, 1.5, 0.5) }
+    const run = await runDefinedTerms(items, { ai, cacheStage: "test", reruns: 0 })
+    expect(run.calls).toHaveLength(1)
+    expect(run.problems.filter((problem) => problem.code === "budget")).toHaveLength(1)
+    expect(run.outputs.size).toBe(1)
+  })
 
   it(
     "E outlines every section's rules",

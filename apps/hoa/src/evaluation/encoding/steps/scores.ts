@@ -1,10 +1,12 @@
 import { candidateTermPairs } from "@/encoding/consolidate"
 import type { Outline } from "@/encoding/steps/outline"
 import { kindName } from "@/encoding/steps/outline"
+import { coreTerms } from "@/schema/coreTerms"
 import type * as T from "@/schema/types"
 import type { JsonPath } from "@/schema/validate"
 import type { RuleContent, TermContent } from "@/schema/zod"
 import { matchLabel } from "@/text/match"
+import { labelForms } from "@/text/normalize"
 import { checkAgreement } from "../checkAgreement"
 import { alignTerms, isCoreKey, type TermMatch } from "../terms"
 import type {
@@ -56,6 +58,13 @@ const translator = (matches: ReadonlyMap<T.TermKey, TermMatch>) => (key: string 
   return matches.get(key)?.pipeline ?? `unmatched:${key}`
 }
 
+/** Every string in a condition that looks like a term key with a dot (a property or a value). */
+function termLike(value: unknown): string[] {
+  return (JSON.stringify(value).match(/"[a-z0-9]+(-[a-z0-9]+)*(\.[a-z0-9]+(-[a-z0-9]+)*)+"/g) ?? []).map((text) =>
+    text.slice(1, -1)
+  )
+}
+
 // ─── B. Defined terms ────────────────────────────────────────────────────────────────────────────
 
 export type DefinedTermsOutput = { terms: TermContent[] }
@@ -78,17 +87,42 @@ export function scoreDefinedTerms(item: DefinedTermsItem, output: DefinedTermsOu
   const isThing = (term: TermContent) => term.kind === "thing" && !isCoreKey(term.key)
   const matched = new Set([...matches.values()].map((match) => match.pipeline))
   const offered = output.terms.filter((term) => term.kind === "thing" || term.kind === "category")
+  // A new thing or category whose label is a core term's: the core term should have been refined instead.
+  const coreLabels = new Set(coreTerms.flatMap((term) => term.labels.flatMap(labelForms)))
+  const coreDuplicates = offered.filter(
+    (term) =>
+      !isCoreKey(term.key) && term.labels.some((label) => labelForms(label).some((form) => coreLabels.has(form)))
+  )
+  // A category whose criteria read a term neither the answer nor the core has.
+  const known = new Set([...coreTerms.map((term) => term.key), ...output.terms.map((term) => term.key)])
+  const unresolved = output.terms.flatMap((term) =>
+    term.kind === "category"
+      ? [...new Set(termLike(term.criteria))].filter((key) => !known.has(key)).map((key) => `${term.key} reads ${key}`)
+      : []
+  )
   const metrics = {
     "thing-recall": recall(isThing),
     "category-recall": recall((term) => term.kind === "category"),
     "refinement-recall": recall((term) => isCoreKey(term.key)),
     "criteria-property-recall": recall((term) => term.kind === "property"),
-    "extra-things": offered.filter((term) => !matched.has(term.key)).length
+    "criteria-value-recall": recall((term) => term.kind === "value-set" || term.kind === "value"),
+    "extra-things": offered.filter((term) => !matched.has(term.key)).length,
+    "core-duplicates": coreDuplicates.length,
+    "unresolved-criteria": unresolved.length
   }
-  const notes = expected
-    .filter((term) => !output.terms.some((o) => o.key === matches.get(term.key)?.pipeline))
-    .map((term) => `missing ${term.kind} ${term.key}`)
-  return { verdict: verdictOf(metrics, "thing-recall", ["extra-things"]), metrics, notes }
+  const notes = [
+    ...expected
+      .filter((term) => !output.terms.some((o) => o.key === matches.get(term.key)?.pipeline))
+      .map((term) => `missing ${term.kind} ${term.key}`),
+    ...offered.filter((term) => !matched.has(term.key)).map((term) => `not in the golden: ${term.kind} ${term.key}`),
+    ...coreDuplicates.map((term) => `${term.key} has a core term's label`),
+    ...unresolved.map((text) => `criteria: ${text} (undeclared)`)
+  ]
+  return {
+    verdict: verdictOf(metrics, "thing-recall", ["extra-things", "core-duplicates", "unresolved-criteria"]),
+    metrics,
+    notes
+  }
 }
 
 // ─── E. Find the rules ───────────────────────────────────────────────────────────────────────────
