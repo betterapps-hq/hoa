@@ -12,6 +12,7 @@ applications against it. It's written for a product that many HOAs onboard to, s
 | [schema.md](schema.md) | First pass, for review: the rules schema: governing documents, each organization's terms, rules, checks and evaluation |
 | [schema-examples.md](schema-examples.md) | 57 checked examples of the schema, from fence colors to fine schedules and quorum |
 | [encoding.md](encoding.md) | Spec: turning governing documents into a rulebook in the schema, from provisions to a published rules file |
+| [taxonomy-ingestion.md](taxonomy-ingestion.md) | Experiment: discover rule kinds across organizations, then sort and extract with small models, the large model as fallback |
 | [application-review.md](application-review.md) | Spec: reviewing an application against the rules file: selection, facts, the engine, the recommendation |
 | [implementation-plan.md](implementation-plan.md) | The phased tasks that build the schema, both pipelines and their UX |
 | [implementation-log.md](implementation-log.md) | Progress, decisions, open questions and evaluation results while the plan is built |
