@@ -12,6 +12,7 @@ import { uploadDocument } from "@/features/documents/uploadDocument"
 import { PublishedRulebook } from "@/features/rulebook/PublishedRulebook/PublishedRulebook"
 import {
   discardRulebookDraft,
+  getBuildResults,
   getPublishedRulesFileJson,
   getRulebookSources,
   getRulebookView,
@@ -145,6 +146,7 @@ function RulesRoute() {
           await startRulebookBuild()
         }}
         onStop={() => stopRulebookBuild()}
+        loadBuildResults={(jobId, since) => getBuildResults({ data: { jobId, since } })}
         onPublish={changing(async (id: string) => {
           await publishRulebook({ data: { rulebookId: id } })
         })}

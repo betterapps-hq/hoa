@@ -6,6 +6,7 @@ import type { GoverningDocument } from "@/documents/governingDocument"
 import { GoverningDocuments } from "@/features/documents/GoverningDocuments/GoverningDocuments"
 import type { DocumentDetails } from "@/features/documents/uploadDocument"
 import type { Job } from "@/jobs/job"
+import type { BuildResults } from "@/rulebook/buildResults.server"
 import type { StopResult } from "@/workflows/rulebookTrigger.server"
 import { attempt } from "../attempt"
 import { BuildProgress } from "../BuildProgress/BuildProgress"
@@ -39,6 +40,8 @@ export type RulebookPageProps = {
   onBuild: () => Promise<void>
   /** Stops the running build. */
   onStop: () => Promise<StopResult>
+  /** What a running build has produced so far, since a cursor. */
+  loadBuildResults: (jobId: string, since: string | null) => Promise<BuildResults>
   onPublish: (rulebookId: string) => Promise<void>
   onDiscard: (rulebookId: string) => Promise<void>
   onChanged: () => void
@@ -137,6 +140,7 @@ function StatusLine({ status, ...props }: { status: RulebookStatus } & RulebookP
               loadJob={props.loadJob}
               onFinished={props.onChanged}
               onStop={stop}
+              loadResults={(since) => props.loadBuildResults(props.draft.buildJobId ?? "", since)}
             />
           ) : null}
         </div>

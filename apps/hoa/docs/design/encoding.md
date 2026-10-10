@@ -32,6 +32,7 @@ and every Workflow step name starts with it.
 | # | Stage id | Steps | Output | Who does it |
 | --- | --- | --- | --- | --- |
 | 1 | `resolve-prompts` | `resolve-prompts` | Prompt versions on the job | Code |
+| 1b | `check` | `check` | Problems with the uploads' own records, which stop the build before any model call | Code |
 | 2 | `structure` | `structure:{documentId}` | Provisions with keys, labels, intro, text, wrap-up and page anchors | Code; a model only for documents the parser can't number |
 | 3 | `analyze` | `analyze:{documentId}` | Cross-references and named documents | Code |
 | 4 | `vocabulary` | `vocabulary:{documentId}` | The organization's terms from definitions and defined-term usage | Model, one call per document with definitions |
@@ -57,6 +58,15 @@ Workflow step whose output goes to R2, and `pnpm eval:encoding` runs the same mo
 
 As today: pin every prompt the build uses (`hoa-term-extraction`, `hoa-provision-encoding`, `hoa-encoding-repair`,
 `hoa-rulebook-consolidation`, `hoa-structure-repair`, and `hoa-provision-audit` once built) on the job.
+
+### 1b. Check
+
+Everything later steps validate about the uploads themselves is checked first, in code (`src/encoding/sourceCheck.ts`):
+each upload's documents and edition (`governingDocument`, as merge and save-draft parse them: keys, kinds, dates, file
+hashes), its structure (`documentStructure`), and that no two uploads use the same document key. A problem fails the
+job at once, not retryable, with one plain sentence per problem naming the document and the field ("The document
+“Declaration” has a record the build can't save: edition.files[0].sha256 ..."), before any model call. The rule
+holds for every stage: a check that doesn't need a model's answer runs before the first model step.
 
 ### 2. Structure
 
@@ -256,7 +266,9 @@ workflow instance, and a request whose workflow never starts fails its rulebook 
 build reads its documents in order of their keys, so a new version of one document doesn't reorder the others (term
 merging and rule key collisions follow document order, and with them the encoding units' cached context).
 
-The draft rulebook is written to D1 ([Storage](#storage)) and replaces the previous draft. **Carry forward**
+The draft rulebook is written to D1 ([Storage](#storage)) and replaces the previous draft, unless the build was
+stopped: a rulebook that isn't `building` any more saves nothing, so a stopped build never replaces the earlier draft
+or the documents' stored provisions. **Carry forward**
 (`src/rulebook/carryForward.ts`): for each record, the first earlier rulebook holding one with the same key and content
 hash decides its review, approved, rejected or still proposed, with the resolutions of the issues it had then. The
 current draft decides first, then the published rulebook, so a rebuild keeps the review work on the draft and only asks
@@ -319,7 +331,8 @@ organization with 2 documents or 20, 50 rules or 2,000, sees the same page.
 **In force (an administrator's default view).** Three parts, top to bottom:
 
 - **Status:** shown only when there's something to say, most pressing first (`rulebookStatus`): a build is running
-  (with `JobProgress`); a document is being read; a draft is ready ("A new draft of the rulebook is ready to review.
+  (with its progress, below); a document is being read; the last build was stopped ("The last build was stopped.",
+  with **Build a draft**, and **Review the earlier draft** when there is one); a draft is ready ("A new draft of the rulebook is ready to review.
   It was built after the Design Guidelines changed. It adds 5 rules, changes 12 rules and removes 2 rules." and
   **Review changes**); the last build failed (**Try again**); the documents differ from the published rulebook's and
   there's no draft (**Build a draft**); nothing is built yet (**Build the rulebook**).
@@ -334,6 +347,34 @@ organization with 2 documents or 20, 50 rules or 2,000, sees the same page.
   no separate build step.
 - **Rules in force:** the published version and date, the rules file to download, and the rulebook's records
   read-only in quiet tabs (Rules, Terms, Coverage, Questions when there are any, Settings).
+
+**The build's progress** (`BuildProgress`). A build takes up to an hour, so the status shows all of it up front, not
+one stage's bar at a time. The job records every stage it will report when it starts (`jobs.progress_json`,
+`src/jobs/progress.ts`), and each report marks the stages before it done and its own current, with its count and
+times. The page groups the stages into steps in plain words: Reading documents, Finding defined terms, Drafting rules
+("47 of 64 sections"), Checking drafts, Fixing problems (marked "If needed", and "Not needed" when the second repair
+round has nothing to do), Combining and checking for conflicts, Saving the draft. A stage the page has no words for is
+a step of its own, so the list stays true to the build's stages. Above the list: one line ("Drafting rules, step 3 of
+7, about 35–50 minutes left"), one bar for the whole build, and the time left and so far. The estimate starts from the
+plan (sections, calls per section with repairs, concurrency and the time an Opus call takes) and follows the build's
+own pace once sections are done; it says "Working out how long this takes" until the plan is known. The bar never
+reads full before the build ends. The steps fold away to the one line.
+
+**Results as they arrive** (`BuildFeed`). Under the steps, a quiet feed shows what the build has produced, newest
+first, the latest four and "Show all": the terms the vocabulary found (or kept, when its definitions didn't change),
+the rules each section drafted (title and citation, which opens the reader in a sheet), the problems checking found
+and how many each fix left, and the conflicts merging and consolidation found. Nothing in it is reviewable; review
+happens in the draft. `getBuildResults` (administrators, the organization's own builds) lists the build's step outputs
+in R2 and reads only those written since the page's cursor; the page polls it every four seconds. Polling, not
+server-sent events: a stream would hold a Worker request open for the hour a build runs and still have to poll R2
+inside it, while a poll is short, survives a dropped connection and reads nothing twice.
+
+**Stopping a build.** While a build runs, **Stop building** (quiet, beside the progress) asks "Stop this build? Work
+finished so far is kept and reused next time. Nothing is published." Stopping (`stopRulebookBuild`, administrators
+only) terminates the build's Workflow instance and marks its rulebook and job `cancelled`. No draft is saved, the job
+isn't marked failed, and no follow-up build starts; the next upload, or **Build a draft**, starts one, and the model
+answers the stopped build finished come from the content cache. A build that already finished, failed or was stopped
+is reported as such, not as an error.
 
 **Reviewing a draft** is a focused mode (`/rules?review=draft`; with nothing published, it's what the page shows). It
 leads with the way back to the rules in force, what the draft changes against them, and **Discard draft**, whose

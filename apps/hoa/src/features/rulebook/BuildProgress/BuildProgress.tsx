@@ -19,6 +19,8 @@ import { Spinner } from "@/components/ui/spinner"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { cn } from "@/lib/utils"
+import type { BuildResults } from "@/rulebook/buildResults.server"
+import { BuildFeed } from "../BuildFeed/BuildFeed"
 import {
   buildSteps,
   elapsedText,
@@ -35,6 +37,8 @@ export type BuildProgressProps = {
   onFinished: (job: Job) => void
   /** Stops the build; resolves once it's stopped or found already over. */
   onStop: () => Promise<void>
+  /** What the build has produced so far, since a cursor. */
+  loadResults: (since: string | null) => Promise<BuildResults>
   /** The time, in milliseconds; tests fix it. */
   now?: () => number
 }
@@ -44,7 +48,7 @@ export type BuildProgressProps = {
  * one bar for the whole build that's never full before it ends, every step in plain words behind a disclosure, and a
  * quiet way to stop it. Polls the job every 2 seconds.
  */
-export function BuildProgress({ jobId, loadJob, onFinished, onStop, now = Date.now }: BuildProgressProps) {
+export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults, now = Date.now }: BuildProgressProps) {
   const [isOpen, setIsOpen] = useState(true)
   const { data: job } = useQuery({
     queryKey: ["job", jobId],
@@ -93,6 +97,7 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, now = Date.n
         </CollapsibleContent>
       </Collapsible>
       {isRunning ? <StopBuild onStop={onStop} /> : null}
+      <BuildFeed jobId={jobId} loadResults={loadResults} isRunning={isRunning} />
     </div>
   )
 }

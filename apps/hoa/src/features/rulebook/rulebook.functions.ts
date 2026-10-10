@@ -13,6 +13,7 @@ import {
 } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus } from "@/db/rulebookRepository"
 import { readRulesFileJson } from "@/rulebook/assemble"
+import { loadBuildResults, type BuildResults } from "@/rulebook/buildResults.server"
 import { rulebookChanges, type RulebookChanges } from "@/rulebook/changes"
 import { textOutsideProvisions, type SourceText } from "@/rulebook/coverage"
 import { publishBlockers, publishDraft } from "@/rulebook/publish"
@@ -145,6 +146,18 @@ export const startRulebookBuild = createServerFn({ method: "POST" }).handler(asy
 export const stopRulebookBuild = createServerFn({ method: "POST" }).handler(async (): Promise<StopResult> =>
   stopBuild(getDb(), bindings.RULEBOOK_BUILD, await getRequestContext(), new Date().toISOString())
 )
+
+/**
+ * What the running build has produced so far, since a cursor (encoding.md, UX, Results as they arrive). The page polls
+ * it every few seconds rather than holding a server-sent event stream open for the hour a build takes: each poll lists
+ * the build's step outputs and reads only the new ones, and a dropped connection loses nothing.
+ */
+export const getBuildResults = createServerFn({ method: "GET" })
+  .validator((data: unknown) => z.object({ jobId: z.string(), since: z.string().nullable() }).parse(data))
+  .handler(async ({ data }): Promise<BuildResults> => {
+    const context = await requireAdministrator()
+    return loadBuildResults(getDb(), getBucket(), context.hoa.id, data)
+  })
 
 /** Deletes the draft rulebook and its records; the published rulebook stays as it is. */
 export const discardRulebookDraft = createServerFn({ method: "POST" })
