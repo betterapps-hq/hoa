@@ -22,7 +22,13 @@ import { getRequestContext, requireAdministrator } from "@/session/requestContex
 import { governingKeys } from "@/storage/keys"
 import { loadPages } from "@/storage/pages"
 import { getBucket } from "@/storage/storage.server"
-import { abandonRulebookBuild, newBuildIds, requestRulebookBuild } from "@/workflows/rulebookTrigger.server"
+import {
+  abandonRulebookBuild,
+  newBuildIds,
+  requestRulebookBuild,
+  stopRulebookBuild as stopBuild,
+  type StopResult
+} from "@/workflows/rulebookTrigger.server"
 import { describeBuildProblem } from "./rulebookView"
 
 type Rulebook = z.infer<typeof rulebookSchema>
@@ -38,6 +44,8 @@ export type RulebookView = {
   isBuilding: boolean
   /** Why the latest build failed or skipped items, when it did. */
   lastBuildError: string | null
+  /** Whether an administrator stopped the latest build. */
+  isLastBuildStopped: boolean
   /** Why the draft can't be published yet. */
   blockers: string[]
   /** What the draft changes against the published rulebook; null for the published view and a draft with no records. */
@@ -130,6 +138,14 @@ export const startRulebookBuild = createServerFn({ method: "POST" }).handler(asy
   return { jobId: request.jobId, rulebookId: request.rulebookId }
 })
 
+/**
+ * Stops the running build (encoding.md, UX): its Workflow ends, nothing is saved or published, and the model answers
+ * it finished stay cached for the next build. Says so plainly when the build already ended.
+ */
+export const stopRulebookBuild = createServerFn({ method: "POST" }).handler(async (): Promise<StopResult> =>
+  stopBuild(getDb(), bindings.RULEBOOK_BUILD, await getRequestContext(), new Date().toISOString())
+)
+
 /** Deletes the draft rulebook and its records; the published rulebook stays as it is. */
 export const discardRulebookDraft = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ rulebookId: z.string() }).parse(data))
@@ -166,6 +182,7 @@ export const getRulebookView = createServerFn({ method: "GET" })
       buildJobId: latestBuild?.id ?? null,
       isBuilding: building !== null,
       lastBuildError: describeBuildProblem(latestBuild),
+      isLastBuildStopped: latestBuild?.status === "cancelled",
       blockers: review?.blockers ?? [],
       changes: review?.changes ?? null
     }

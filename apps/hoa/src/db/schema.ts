@@ -103,6 +103,7 @@ export const jobs = sqliteTable(
     promptVersions: json<Record<string, number>>("prompt_versions_json").notNull(),
     failures: json<unknown[]>("failures_json").notNull(),
     error: json<unknown>("error_json"),
+    progress: json<unknown>("progress_json"),
     createdAt: timestamp("created_at"),
     updatedAt: timestamp("updated_at")
   },

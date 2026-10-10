@@ -46,6 +46,7 @@ const view = (overrides: Partial<RulebookView> = {}): RulebookView => ({
   buildJobId: null,
   isBuilding: false,
   lastBuildError: null,
+  isLastBuildStopped: false,
   blockers: [],
   changes: null,
   ...overrides

@@ -17,7 +17,8 @@ import {
   getRulebookView,
   getSourceText,
   publishRulebook,
-  startRulebookBuild
+  startRulebookBuild,
+  stopRulebookBuild
 } from "@/features/rulebook/rulebook.functions"
 import { RulebookPage } from "@/features/rulebook/RulebookPage/RulebookPage"
 import {
@@ -143,6 +144,7 @@ function RulesRoute() {
         onBuild={async () => {
           await startRulebookBuild()
         }}
+        onStop={() => stopRulebookBuild()}
         onPublish={changing(async (id: string) => {
           await publishRulebook({ data: { rulebookId: id } })
         })}

@@ -43,6 +43,13 @@
       "when": 1791596082981,
       "tag": "0005_archive_project_types",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791603147020,
+      "tag": "0006_job_progress",
+      "breakpoints": true
     }
   ]
 }

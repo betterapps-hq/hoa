@@ -10,6 +10,7 @@ export type RulebookStatus =
   | { kind: "reading"; reading: string[] }
   | { kind: "draft-ready"; isFirst: boolean; summary: string; builtFrom: string[] }
   | { kind: "build-failed"; error: string }
+  | { kind: "build-stopped"; hasDraft: boolean }
   | { kind: "documents-changed"; version: number | null }
   | { kind: "not-built" }
   | { kind: "none" }
@@ -46,6 +47,9 @@ export function rulebookStatus({
   }
   if (reading.length > 0) {
     return { kind: "reading", reading }
+  }
+  if (draft.isLastBuildStopped) {
+    return { kind: "build-stopped", hasDraft: draft.rulebook !== null && draft.content !== null }
   }
   if (draft.rulebook && draft.content) {
     const changes = draft.changes

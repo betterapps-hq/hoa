@@ -5,28 +5,46 @@ import { getJob } from "@/db/jobRepository"
 import { getRulebook, getRulebookByStatus } from "@/db/rulebookRepository"
 import type { GoverningDocument } from "@/documents/governingDocument"
 import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
-import { abandonRulebookBuild, requestRulebookBuild, type RulebookBuildBinding } from "./rulebookTrigger.server"
+import {
+  abandonRulebookBuild,
+  requestRulebookBuild,
+  stopRulebookBuild,
+  type RulebookBuildBinding
+} from "./rulebookTrigger.server"
 
 const hoaId = "demo-hoa"
 const now = "2026-10-09T00:00:00.000Z"
 
-/** A Workflow binding that records the instances it creates. */
+/** A Workflow binding that records the instances it creates, each running until it's terminated or `end`ed. */
 function fakeBinding() {
   const instances = new Set<string>()
+  const states = new Map<string, string>()
+  const terminate = vi.fn<(id: string) => Promise<void>>(async (id) => {
+    if (states.get(id) !== "running") {
+      throw new Error("Cannot terminate an instance that isn't running.")
+    }
+    states.set(id, "terminated")
+  })
   const create = vi.fn<RulebookBuildBinding["create"]>(async (options) => {
     if (instances.has(options.id)) {
       throw new Error("An instance with that id exists.")
     }
     instances.add(options.id)
+    states.set(options.id, "running")
     return { id: options.id }
   })
   const get = vi.fn<RulebookBuildBinding["get"]>(async (id) => {
     if (!instances.has(id)) {
       throw new Error("No such instance.")
     }
-    return { id }
+    return {
+      status: async () => ({ status: states.get(id) ?? "unknown" }),
+      terminate: () => terminate(id)
+    }
   })
-  return { binding: { create, get }, instances }
+  /** Ends an instance as the Workflow would: it finished, failed or was terminated. */
+  const end = (id: string, status: "complete" | "errored" | "terminated") => states.set(id, status)
+  return { binding: { create, get }, instances, terminate, end }
 }
 
 describe("requestRulebookBuild", { timeout: 30_000 }, () => {
@@ -120,5 +138,95 @@ describe("requestRulebookBuild", { timeout: 30_000 }, () => {
       error: { stage: "start", message: "Workflows is unavailable." }
     })
     expect(await getJob(db, hoaId, "job-1")).toMatchObject({ status: "failed" })
+  })
+})
+
+describe("stopRulebookBuild", { timeout: 30_000 }, () => {
+  let database: TestDatabase
+  const administrator = { hoa: { id: hoaId }, role: "administrator" as const }
+
+  beforeEach(async () => {
+    database = await createTestDatabase()
+  })
+
+  afterEach(async () => {
+    await database.dispose()
+  })
+
+  async function startBuild(binding: RulebookBuildBinding) {
+    const document = await createGoverningDocument(database.db, {
+      hoaId,
+      kind: "declaration",
+      title: "Declaration",
+      effectiveDate: null,
+      fileName: "Declaration.pdf",
+      mediaType: "application/pdf",
+      sizeBytes: 1,
+      uploadedBy: "admin",
+      uploadedAt: now
+    })
+    await updateGoverningDocument(database.db, hoaId, document.id, { status: "ready" })
+    const started = await requestRulebookBuild(database.db, binding, hoaId, { now })
+    if (started.status !== "started") {
+      throw new Error("The build should start")
+    }
+    return { ...started, documentId: document.id }
+  }
+
+  it("terminates a running build and marks it stopped, so nothing restarts it on its own", async () => {
+    const { db } = database
+    const { binding, terminate } = fakeBinding()
+    const started = await startBuild(binding)
+
+    expect(await stopRulebookBuild(db, binding, administrator, now)).toEqual({ status: "stopped" })
+    expect(terminate).toHaveBeenCalledWith(started.jobId)
+    expect(await getRulebook(db, hoaId, started.rulebookId)).toMatchObject({ status: "cancelled" })
+    expect(await getJob(db, hoaId, started.jobId)).toMatchObject({ status: "cancelled" })
+    expect(await getRulebookByStatus(db, hoaId, "building")).toBeNull()
+
+    // The stopped build's follow-up would compare against the same documents: nothing starts.
+    expect(await requestRulebookBuild(db, binding, hoaId, { now, unlessCurrentIs: [started.documentId] })).toEqual({
+      status: "skipped",
+      reason: "unchanged"
+    })
+    // The administrator's "Build a draft" starts a new one.
+    expect(await requestRulebookBuild(db, binding, hoaId, { now })).toMatchObject({ status: "started" })
+  })
+
+  it("says plainly when the build already finished, failed or was stopped", async () => {
+    const { db } = database
+    const { binding, end, terminate } = fakeBinding()
+    const started = await startBuild(binding)
+    end(started.jobId, "complete")
+
+    expect(await stopRulebookBuild(db, binding, administrator, now)).toEqual({ status: "already-finished" })
+    expect(terminate).not.toHaveBeenCalled()
+    expect(await getRulebook(db, hoaId, started.rulebookId)).toMatchObject({ status: "building" })
+
+    await abandonRulebookBuild(db, hoaId, started, "Failed.", now)
+    expect(await stopRulebookBuild(db, binding, administrator, now)).toEqual({ status: "not-building" })
+  })
+
+  it("is for administrators only", async () => {
+    const { db } = database
+    const { binding, terminate } = fakeBinding()
+    const started = await startBuild(binding)
+
+    await expect(stopRulebookBuild(db, binding, { hoa: { id: hoaId }, role: "homeowner" }, now)).rejects.toThrow(
+      "Only an administrator can do this."
+    )
+    expect(terminate).not.toHaveBeenCalled()
+    expect(await getRulebook(db, hoaId, started.rulebookId)).toMatchObject({ status: "building" })
+  })
+
+  it("only stops the organization's own build", async () => {
+    const { db } = database
+    const { binding, terminate } = fakeBinding()
+    await startBuild(binding)
+
+    expect(await stopRulebookBuild(db, binding, { ...administrator, hoa: { id: "other-hoa" } }, now)).toEqual({
+      status: "not-building"
+    })
+    expect(terminate).not.toHaveBeenCalled()
   })
 })

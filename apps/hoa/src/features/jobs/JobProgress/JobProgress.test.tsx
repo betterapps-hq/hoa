@@ -18,6 +18,7 @@ const job = (overrides: Partial<Job>): Job => ({
   promptVersions: {},
   failures: [],
   error: null,
+  progress: null,
   createdAt: "",
   updatedAt: "",
   ...overrides

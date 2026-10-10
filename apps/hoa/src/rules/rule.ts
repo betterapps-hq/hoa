@@ -8,7 +8,8 @@ export const rulebookSchema = z.object({
   id: z.string(),
   hoaId: z.string(),
   version: z.number().int().positive().nullable(),
-  status: z.enum(["building", "draft", "published", "superseded", "failed"]),
+  /** `cancelled`: an administrator stopped its build. */
+  status: z.enum(["building", "draft", "published", "superseded", "failed", "cancelled"]),
   error: errorInfoSchema.nullable(),
   catalogVersion: z.number().int(),
   sourceDocumentIds: z.array(z.string()),

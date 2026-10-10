@@ -63,16 +63,21 @@ import { repairStructure, structureRepairAnswer } from "./structureRepair"
 // review that carries forward.
 
 /** The job stages the build reports, in order (encoding.md, Stages). */
-export type BuildStage =
-  | "structure"
-  | "analyze"
-  | "vocabulary"
-  | "plan"
-  | "encode"
-  | "verify"
-  | "repair"
-  | "merge"
-  | "consolidate"
+export const buildStages = [
+  "structure",
+  "analyze",
+  "vocabulary",
+  "plan",
+  "encode",
+  "verify",
+  "repair",
+  "merge",
+  "consolidate"
+] as const
+export type BuildStage = (typeof buildStages)[number]
+
+/** Stages that may have nothing to do: the second repair round runs only for what the merged set shows. */
+export const optionalBuildStages: readonly BuildStage[] = ["repair"]
 
 /** What the build's model calls need: the prompt loader, models, versions pinned in resolve-prompts and the cache. */
 export type BuildAi = {

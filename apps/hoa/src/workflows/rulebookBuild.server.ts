@@ -11,12 +11,13 @@ import {
   listDocumentRecords,
   listProvisions
 } from "@/db/documentRepository"
-import { getJob, updateJob } from "@/db/jobRepository"
+import { getJob, reportJobProgress, updateJob } from "@/db/jobRepository"
 import { getRulebookContent } from "@/db/rulebookContentRepository"
 import { failRulebook, getRulebook, getRulebookByStatus } from "@/db/rulebookRepository"
 import { defaultDocumentStructure, uploadEdition } from "@/documents/documentStructure"
-import { buildRulebook } from "@/encoding/build"
+import { buildRulebook, buildStages, optionalBuildStages } from "@/encoding/build"
 import { buildScores } from "@/encoding/buildScores"
+import { finishProgress, startProgress } from "@/jobs/progress"
 import type { StepRunner } from "@/jobs/steps"
 import { compareCodeUnits } from "@/rulebook/canonical"
 import type { PreviousReview } from "@/rulebook/carryForward"
@@ -102,7 +103,7 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
       const count = (reported.get(name) ?? 0) + 1
       reported.set(name, count)
       return step.do(`${name}:${count}`, storageStep, () =>
-        updateJob(db, hoaId, jobId, { stage, done, total, now: now() })
+        reportJobProgress(db, hoaId, jobId, { stage, done, total, now: now() })
       )
     }
 
@@ -147,6 +148,15 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         return { sources: ordered, startedAt: now() }
       })
 
+      // Every step the build works through, up front, so the page shows the whole build and where it is.
+      await step.do("progress:start", storageStep, async () => {
+        const stages = ["resolve-prompts", ...buildStages, "save-draft"].map((stage) => ({
+          stage,
+          isOptional: optionalBuildStages.some((optional) => optional === stage)
+        }))
+        const workload = { concurrency: ai.encodingConcurrency, documents: loaded.sources.length }
+        await updateJob(db, hoaId, jobId, { progress: startProgress(stages, workload), now: now() })
+      })
       await progress("resolve-prompts", 0, 0)
       const promptVersions = await step.do("resolve-prompts", storageStep, async () => {
         const versions = await resolvePromptVersions(ai.loadPrompt, rulebookBuildPrompts)
@@ -213,19 +223,26 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
       })
       await step.do("save-draft:finish", storageStep, async () => {
         const { rules } = result.content
+        const finishedAt = now()
+        const job = await getJob(db, hoaId, jobId)
         await updateJob(db, hoaId, jobId, {
+          ...(job?.progress ? { progress: finishProgress(job.progress, finishedAt) } : {}),
           status: result.failures.length > 0 ? "completed-with-errors" : "completed",
           stage: null,
           done: rules.length,
           total: rules.length,
           failures: result.failures,
-          now: now()
+          now: finishedAt
         })
       })
     } catch (error) {
       await step.do("fail", storageStep, async () => {
+        const job = await getJob(db, hoaId, jobId)
+        if (job?.status === "cancelled") {
+          return // Stopped by an administrator: it stays stopped, not failed.
+        }
         const failed = {
-          stage: (await getJob(db, hoaId, jobId))?.stage ?? "build",
+          stage: job?.stage ?? "build",
           message: errorText(error),
           isRetryable: !(error instanceof NonRetryableError)
         }
@@ -236,7 +253,13 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
 
     // The rulebook is a draft or failed now, so a build can start. Compared with the documents this build read, an
     // unchanged set starts nothing, so a failed build isn't retried in a loop.
-    if (sourceDocumentIds.length > 0) {
+    // A stopped build asks for nothing: the next upload, or the administrator, starts one.
+    const isStopped = await step.do(
+      "follow-up:check",
+      storageStep,
+      async () => (await getJob(db, hoaId, jobId))?.status === "cancelled"
+    )
+    if (sourceDocumentIds.length > 0 && !isStopped) {
       await requestRulebookBuildStep(step, "follow-up", {
         db,
         binding: this.env.RULEBOOK_BUILD,

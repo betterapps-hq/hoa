@@ -41,6 +41,16 @@ export async function failRulebook(db: Database, hoaId: string, id: string, erro
     .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, id), eq(rulebooks.status, "building")))
 }
 
+/** Marks a building rulebook cancelled (its build was stopped); false when it wasn't building any more. */
+export async function cancelRulebook(db: Database, hoaId: string, id: string) {
+  const result = await db
+    .update(rulebooks)
+    .set({ status: "cancelled" })
+    .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, id), eq(rulebooks.status, "building")))
+    .returning({ id: rulebooks.id })
+  return result.length > 0
+}
+
 /** Publishes a draft as the next version, superseding the published one, in one batch. */
 export async function publishRulebook(
   db: Database,
