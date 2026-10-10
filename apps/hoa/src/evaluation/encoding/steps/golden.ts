@@ -108,10 +108,16 @@ export function goldenOutlines(golden: T.RulesFile, sections: readonly EncodingU
   return outlines
 }
 
-/** B's golden input for one document: its definitions and the candidates code finds. */
+/**
+ * B's golden input for one document: the candidates code finds, and every provision that defines a term in full: the
+ * definitions, and each provision a candidate is defined in. A definition outside a definitions article (a qualifying
+ * resident in a use section, a list of permitted kinds) then reaches the model whole, not as a one-sentence sample.
+ */
 export function goldenDefinitions(provisions: readonly T.Provision[]) {
-  const definitions = provisions.filter((provision) => provision.kind === "definition")
-  return { definitions, candidates: findTermCandidates(provisions) }
+  const candidates = findTermCandidates(provisions)
+  const defining = new Set(candidates.flatMap((candidate) => candidate.definedIn))
+  const definitions = provisions.filter((provision) => provision.kind === "definition" || defining.has(provision.key))
+  return { definitions, candidates }
 }
 
 /** What a document defines terms with: the provisions that define them and the names they're defined under. */

@@ -32,6 +32,7 @@
     "eval:datasets": "tsx scripts/eval-datasets.ts",
     "eval:step": "tsx --env-file=.env scripts/eval-step.ts",
     "eval:review": "tsx --env-file=.env scripts/eval-review.ts",
+    "golden:skeleton": "tsx scripts/golden-skeleton.ts",
     "review:corrections": "tsx --env-file=.env scripts/export-corrections.ts",
     "docs:schema": "node scripts/build-schema-doc.ts",
     "lint": "oxlint --max-warnings=0",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { provision as provisionSchema } from "@/schema/zod"
-import { syntheticPages } from "@/tests/syntheticDeclaration"
+import { pagesOf, syntheticPages } from "@/tests/syntheticDeclaration"
 import { cleanPages } from "./clean"
 import { definedNames, definitionSlug, splitHeading, structureDocument } from "./provisions"
 
@@ -158,5 +158,78 @@ describe("definitions", () => {
     expect(definitionSlug(["Maple Hollow Services", "MHS"])).toBe("mhs")
     expect(definitionSlug(["Private Amenity(ies)"])).toBe("private-amenity")
     expect(definitionSlug([])).toBeNull()
+  })
+})
+
+describe("documents that don't divide into articles", () => {
+  const labelsOf = (pages: string[]) =>
+    structureDocument(cleanPages(pagesOf(pages.map((text) => ({ text })))), { documentKey: "covenants", fileId: "f" })
+      .flatMap((document) => document.provisions)
+      .map((provision) => provision.label)
+
+  it("reads numbered sections as the top divisions when there are no articles", () => {
+    expect(
+      labelsOf([
+        [
+          "# COVENANTS FOR CEDAR BEND",
+          "",
+          "These covenants are made by the Cedar Bend Owners Club.",
+          "",
+          "## RECITALS",
+          "",
+          "The Club owns the land described below.",
+          "",
+          "## DEFINITIONS",
+          "",
+          '"Lot" shall mean any numbered parcel shown on the plat.',
+          "",
+          '"Club" shall mean the Cedar Bend Owners Club.',
+          "",
+          "## SECTION 1 - LAND USE",
+          "",
+          "1.1 USE. Lots shall be used for homes only.",
+          "",
+          "1.2 SIGNS. No sign shall exceed two square feet.",
+          "",
+          "1.2.1 One sale sign is allowed.",
+          "",
+          "## SECTION 2 - FENCES",
+          "",
+          "2.1 HEIGHT. No fence shall exceed six feet."
+        ].join("\n")
+      ])
+    ).toEqual([
+      "preamble",
+      "recitals",
+      "definitions",
+      "definitions/lot",
+      "definitions/club",
+      "section-1",
+      "1.1",
+      "1.2",
+      "1.2.1",
+      "section-2",
+      "2.1"
+    ])
+  })
+
+  it("reads numbered covenants with no division above them, Layout's escaped markers included", () => {
+    expect(
+      labelsOf([
+        [
+          "# RESTRICTIVE COVENANTS",
+          "",
+          "The owner declares the following covenants.",
+          "",
+          "1\\. Lots shall be used for homes only.",
+          "",
+          "2\\. No building shall exceed two stories.",
+          "",
+          "No tree shall be removed without approval.",
+          "",
+          "3\\. These covenants run for thirty years."
+        ].join("\n")
+      ])
+    ).toEqual(["preamble", "1", "2", "2/p2", "3"])
   })
 })

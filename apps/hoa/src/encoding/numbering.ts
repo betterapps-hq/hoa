@@ -144,6 +144,25 @@ export function parseHeadingMarker(text: string): HeadingMarker | null {
   return number === null ? null : { type: kind, printed, number, rest: text.slice(found[0].length).trim() }
 }
 
+export type DivisionMarker = { word: string; printed: string; number: number; rest: string }
+
+const divisionPattern = /^(section|chapter)\s+([0-9]+|[ivxlc]+)(?!\.?\d)\b\.?(?:\s*[-–—:]\s*|\s+|$)/i
+
+/**
+ * "SECTION 1 - LAND USE", "Chapter II": a numbered division named by a word other than Article or Part, with a whole
+ * number ("Section 4.3" is a section number, not a division).
+ */
+export function parseDivisionMarker(text: string): DivisionMarker | null {
+  const found = divisionPattern.exec(text)
+  const word = found?.[1]?.toLowerCase()
+  const printed = found?.[2]
+  if (!found || !word || !printed) {
+    return null
+  }
+  const number = headingNumber(printed)
+  return number === null ? null : { word, printed, number, rest: text.slice(found[0].length).trim() }
+}
+
 export type ExhibitMarker = { printed: string; rest: string }
 
 /** `EXHIBIT "C"`, `Exhibit A`, printed as a heading rather than a reference. */

@@ -36,6 +36,9 @@ function splitLines(text: string): RawLine[] {
 
 const withoutHashes = (text: string) => text.replace(/^#+\s*/, "").trim()
 
+/** Layout's markdown escapes a character that would start markdown syntax ("1\." for a numbered paragraph). */
+const unescapeMarkdown = (text: string) => text.replace(/\\([\\`*_{}[\]()#+\-.!|<>~])/g, "$1")
+
 /** Lines compared across pages: digits and spacing don't count, so "2001 120 4001459" and "2004 120 4001459" agree. */
 function repetitionKey(text: string) {
   return withoutHashes(text).toLowerCase().replace(/\d/g, "0").replace(/\s+/g, " ")
@@ -168,15 +171,17 @@ function cleanPageLines(page: number, lines: readonly RawLine[]) {
     if (cell && row) {
       const content = cell[2]?.trim() ?? ""
       const start = offset + trimmed.indexOf(content)
-      row.text = row.text ? `${row.text} ${content}` : content
+      row.text = row.text ? `${row.text} ${unescapeMarkdown(content)}` : unescapeMarkdown(content)
       row.pieces.push({ page, start, end: start + content.length })
       continue
     }
     const hashes = /^(#+)\s+/.exec(trimmed)
-    const content = trimmed
-      .slice(hashes?.[0].length ?? 0)
-      .replace(/<[^>]+>/g, "")
-      .trim()
+    const content = unescapeMarkdown(
+      trimmed
+        .slice(hashes?.[0].length ?? 0)
+        .replace(/<[^>]+>/g, "")
+        .trim()
+    )
     const start = offset + (hashes?.[0].length ?? 0)
     out.push({
       text: content,

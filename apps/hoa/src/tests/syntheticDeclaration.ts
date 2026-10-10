@@ -144,7 +144,12 @@ const texts: { text: string; header?: string }[] = [
 ]
 
 export function syntheticPages(): Page[] {
-  return texts.map(({ text, header }, index) => ({
+  return pagesOf(texts)
+}
+
+/** Page records for made-up page texts, numbered from 1. */
+export function pagesOf(pages: readonly { text: string; header?: string }[]): Page[] {
+  return pages.map(({ text, header }, index) => ({
     documentId: "synthetic",
     pageIndex: index + 1,
     pageLabel: null,

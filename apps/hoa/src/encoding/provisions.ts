@@ -3,6 +3,7 @@ import { anchorsOf, type CleanDocument, type CleanLine, type PagePiece } from ".
 import {
   decidePoint,
   isMarkerOnly,
+  parseDivisionMarker,
   parseExhibitMarker,
   parseHeadingMarker,
   parsePointMarker,
@@ -10,6 +11,7 @@ import {
   readSection,
   renderPoint,
   type PointMarker,
+  type SectionMarker,
   type PointReading
 } from "./numbering"
 
@@ -27,7 +29,8 @@ export type StructureOptions = {
 
 export type StructuredDocument = { key: string; provisions: Provision[] }
 
-type Paragraph = { text: string; pieces: PagePiece[]; isHeading: boolean }
+/** `level` is the heading's markdown level: 1 for the document's title, 2 and deeper for section headings. */
+type Paragraph = { text: string; pieces: PagePiece[]; isHeading: boolean; level: number | null }
 
 type NodeKind =
   | "preamble"
@@ -53,6 +56,11 @@ type Node = {
   reading: PointReading | null
   sectionParts: number[]
   isDefinitions: boolean
+  /**
+   * How a top division is named: by a word and a number ("article", "section", "chapter"), by its number alone
+   * ("number": numbered covenants with no divisions above them), or by its heading alone ("heading").
+   */
+  division: string | null
 }
 
 const spelledNumbers = [
@@ -125,6 +133,7 @@ function node(kind: NodeKind, fields: Partial<Node> = {}): Node {
     reading: null,
     sectionParts: [],
     isDefinitions: false,
+    division: null,
     ...fields
   }
 }
@@ -151,7 +160,8 @@ export function paragraphsOf(clean: CleanDocument): Paragraph[] {
       paragraphs.push({
         text: current.map((line) => line.text).join(" "),
         pieces: current.flatMap((line) => line.pieces),
-        isHeading: false
+        isHeading: false,
+        level: null
       })
     }
     current = []
@@ -168,7 +178,7 @@ export function paragraphsOf(clean: CleanDocument): Paragraph[] {
     const previous = current.at(-1)
     if (line.headingLevel !== null) {
       close()
-      paragraphs.push({ text: line.text, pieces: line.pieces, isHeading: true })
+      paragraphs.push({ text: line.text, pieces: line.pieces, isHeading: true, level: line.headingLevel })
     } else {
       const isNewPage = previous !== undefined && previous.page !== line.page
       const breaks = previous && isNewPage ? !continuesAcrossPage(previous, line) : isAfterBlank
@@ -393,13 +403,15 @@ class TreeBuilder {
     this.pendingHeading = heading ? null : this.top
   }
 
-  articleStart(marker: { printed: string; number: number; rest: string }, paragraph: Paragraph) {
+  /** A numbered top division: an article, or a section or chapter in a document that doesn't use articles. */
+  articleStart(marker: { printed: string; number: number; rest: string }, paragraph: Paragraph, word = "article") {
     this.closeAll()
     const heading = marker.rest ? titleCase(marker.rest.replace(/\.$/, "")) : null
     this.top = this.append(
       this.document,
       node("article", {
-        name: `article-${marker.number}`,
+        name: `${word}-${marker.number}`,
+        division: word,
         num: { printed: marker.printed, normalized: String(marker.number), source: "printed" },
         heading,
         isDefinitions: heading !== null && /definition/i.test(heading),
@@ -428,12 +440,96 @@ class TreeBuilder {
     this.pendingHeading = heading ? null : this.top
   }
 
+  /** Whether a top division named by `word` starts here: before any division, or after one named the same way. */
+  acceptsDivision(word: string) {
+    const top = this.top
+    return top === null || top.kind === "preamble" || top.division === word || top.division === "heading"
+  }
+
+  /**
+   * A section heading with no number ("RECITALS", "DEFINITIONS") before the document's first numbered division, or
+   * between such headings: a top division of its own, keyed by its heading.
+   */
+  headingDivision(paragraph: Paragraph) {
+    const top = this.top
+    const name = slugOf(paragraph.text)
+    if (
+      (paragraph.level ?? 1) < 2 ||
+      name === "" ||
+      !(top === null || top.kind === "preamble" || top.division === "heading")
+    ) {
+      return false
+    }
+    this.closeAll()
+    const heading = titleCase(paragraph.text.replace(/\.$/, ""))
+    // A heading printed twice (a contents page continued, a repeated title) keys as name-2, name-3.
+    const taken = new Set(this.document.items.map((item) => item.name))
+    let unique = name
+    for (let suffix = 2; taken.has(unique); suffix += 1) {
+      unique = `${name}-${suffix}`
+    }
+    this.top = this.append(
+      this.document,
+      node("article", {
+        name: unique,
+        heading,
+        division: "heading",
+        isDefinitions: /definition/i.test(heading),
+        pieces: paragraph.pieces
+      })
+    )
+    return true
+  }
+
+  /**
+   * A numbered covenant in a document with no divisions above its numbers ("1. These restrictions …"): a top section,
+   * when it's the next number; "1.1" under it is a subsection.
+   */
+  private numberedSection(marker: SectionMarker, paragraph: Paragraph) {
+    const top = this.top
+    const isNumbered = top?.division === "number"
+    if (!(top === null || top.kind === "preamble" || isNumbered)) {
+      return false
+    }
+    const deeper = isNumbered ? this.subsection(marker.parts) : null
+    const [number] = marker.parts
+    if (!deeper && (marker.parts.length !== 1 || number !== (isNumbered ? (top.sectionParts[0] ?? 0) + 1 : 1))) {
+      return false
+    }
+    const split = paragraph.isHeading
+      ? { heading: marker.rest.replace(/\.$/, "") || null, text: "" }
+      : splitHeading(marker.rest, true)
+    const parts = deeper?.parts ?? [number ?? 0]
+    const fields = {
+      name: parts.join("."),
+      num: { printed: marker.printed, normalized: parts.join("."), source: "printed" as const },
+      heading: split.heading,
+      own: split.text,
+      sectionParts: parts,
+      pieces: paragraph.pieces
+    }
+    this.closePoints()
+    this.definition = null
+    if (deeper) {
+      this.sections = this.sections.slice(0, this.sections.indexOf(deeper.parent) + 1)
+      this.sections.push(this.append(deeper.parent, node("section", fields)))
+      return true
+    }
+    this.closeAll()
+    this.top = this.append(this.document, node("section", { ...fields, division: "number" }))
+    this.sections = [this.top]
+    return true
+  }
+
   /** A section continuing the open article, or a dotted subsection of an open section. */
   section(text: string, paragraph: Paragraph) {
     const article = this.article
     const marker = parseSectionMarker(text)
-    if (!article || !marker) {
+    if (!marker) {
       return false
+    }
+    if (!article) {
+      return this.numberedSection(marker, paragraph)
     }
     const articleNumber = article.sectionParts[0] ?? 0
     const deeper = this.subsection(marker.parts)
@@ -470,7 +566,7 @@ class TreeBuilder {
   }
 
   private subsection(parts: number[]) {
-    if (parts.length < 3) {
+    if (parts.length < (this.top?.division === "number" ? 2 : 3)) {
       return null
     }
     const parent = this.sections.findLast(
@@ -609,6 +705,11 @@ function build(paragraphs: readonly Paragraph[], options: StructureOptions) {
         tree.part(heading, paragraph)
         return
       }
+      const division = parseDivisionMarker(candidate)
+      if (division && isStandalone && tree.acceptsDivision(division.word)) {
+        tree.articleStart(division, paragraph, division.word)
+        return
+      }
       const exhibit = parseExhibitMarker(candidate)
       if (exhibit && (paragraph.isHeading || candidate.length <= 60)) {
         tree.exhibit(exhibit.printed, exhibit.rest, paragraph)
@@ -617,6 +718,14 @@ function build(paragraphs: readonly Paragraph[], options: StructureOptions) {
     }
     if (/^IN WITNESS WHEREOF\b/i.test(text)) {
       tree.execution(paragraph)
+      return
+    }
+    if (
+      paragraph.isHeading &&
+      markers[index] === null &&
+      !parseSectionMarker(text) &&
+      tree.headingDivision(paragraph)
+    ) {
       return
     }
     const sectionCandidates = [text, withoutFragment(text)]
