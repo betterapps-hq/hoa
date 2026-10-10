@@ -17,6 +17,7 @@ import { failRulebook, getRulebook, getRulebookByStatus } from "@/db/rulebookRep
 import { defaultDocumentStructure, uploadEdition } from "@/documents/documentStructure"
 import { buildRulebook, buildStages, optionalBuildStages } from "@/encoding/build"
 import { buildScores } from "@/encoding/buildScores"
+import { SourcesRejectedError } from "@/encoding/sourceCheck"
 import { finishProgress, startProgress } from "@/jobs/progress"
 import type { StepRunner } from "@/jobs/steps"
 import { compareCodeUnits } from "@/rulebook/canonical"
@@ -244,7 +245,7 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         const failed = {
           stage: job?.stage ?? "build",
           message: errorText(error),
-          isRetryable: !(error instanceof NonRetryableError)
+          isRetryable: !(error instanceof NonRetryableError || error instanceof SourcesRejectedError)
         }
         await failRulebook(db, hoaId, rulebookId, failed)
         await updateJob(db, hoaId, jobId, { status: "failed", error: failed, now: now() })

@@ -9,6 +9,7 @@ import { promptText, replyingModel, scriptedModel, variableOf, variablesPromptLo
 import { syntheticPages } from "@/tests/syntheticDeclaration"
 import { buildRulebook, type BuildInput } from "./build"
 import { buildScores } from "./buildScores"
+import { SourcesRejectedError } from "./sourceCheck"
 
 const structure = {
   key: "declaration",
@@ -203,6 +204,29 @@ describe("buildRulebook", () => {
     expect(conduct).toMatchObject({ isValid: true, repairRounds: 1, problems: 0 })
     expect(result.report.validAfterEncode).toBe(result.report.units.length - 1)
     expect(result.report.calls.map((call) => call.stage)).toContain("encoding-repair")
+  })
+
+  it("refuses to start, before any model call, when an upload's record would fail later", async () => {
+    const createModel = vi.fn<() => ReturnType<typeof model>>(() => model())
+    const { step, names } = stepRunner()
+    const bad = input({
+      step,
+      ai: { ...input().ai, createModel },
+      sources: input().sources.map((source) => ({
+        ...source,
+        edition: {
+          ...source.edition,
+          files: source.edition.files.map((file) => ({ ...file, sha256: "sample-declaration-pages" }))
+        }
+      }))
+    })
+    const refused = buildRulebook(bad)
+    await expect(refused).rejects.toBeInstanceOf(SourcesRejectedError)
+    await expect(refused).rejects.toThrow(
+      /The document “Declaration for Maple Hollow” has a record the build can't save: edition\.files\[0\]\.sha256/
+    )
+    expect(createModel).not.toHaveBeenCalled()
+    expect(names).toEqual(["check"])
   })
 
   it("scores the build", async () => {

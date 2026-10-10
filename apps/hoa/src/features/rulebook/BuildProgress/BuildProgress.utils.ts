@@ -8,6 +8,7 @@ import type { JobProgress, JobStep } from "@/jobs/progress"
 /** How the build's stages read: consecutive stages with the same words are one step. */
 const stepWords: Record<string, { label: string; counted?: [string, string] }> = {
   "resolve-prompts": { label: "Reading documents" },
+  check: { label: "Reading documents" },
   structure: { label: "Reading documents" },
   analyze: { label: "Reading documents" },
   vocabulary: { label: "Finding defined terms" },

@@ -41,6 +41,7 @@ import {
 import { structureDocument, type StructuredDocument } from "./provisions"
 import { analyzeReferences, citedProvisions } from "./references"
 import { groupByUnit, problemsToRepairAlone, verifyUnit, type UnitProblem } from "./repair"
+import { checkSources, SourcesRejectedError } from "./sourceCheck"
 import {
   analysisOutput,
   consolidateOutput,
@@ -64,6 +65,7 @@ import { repairStructure, structureRepairAnswer } from "./structureRepair"
 
 /** The job stages the build reports, in order (encoding.md, Stages). */
 export const buildStages = [
+  "check",
   "structure",
   "analyze",
   "vocabulary",
@@ -232,6 +234,13 @@ export async function buildRulebook(input: BuildInput) {
     sessionId: ai.sessionId,
     cache: ai.cache?.(stage)
   })
+
+  // 1b. Check: what later steps validate about the uploads themselves, before any model call.
+  await progress("check", 0, input.sources.length)
+  const sourceProblems = await step("check", z.array(z.string()), async () => checkSources(input.sources))
+  if (sourceProblems.length > 0) {
+    throw new SourcesRejectedError(sourceProblems)
+  }
 
   // 2. Structure: provisions from the page records; a model proposes the outline only when the parser fails its check.
   await progress("structure", 0, input.sources.length)

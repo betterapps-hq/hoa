@@ -2,6 +2,7 @@ const stageLabels: Record<string, string> = {
   "resolve-prompts": "Getting ready",
   ocr: "Reading pages",
   visuals: "Describing drawings and photos",
+  check: "Checking the documents",
   structure: "Finding provisions",
   analyze: "Reading cross-references",
   vocabulary: "Building the vocabulary",
