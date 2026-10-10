@@ -34,7 +34,13 @@ export function createAiContext() {
     smallModelId: env.OPENROUTER_SMALL_MODEL ?? env.OPENROUTER_MODEL,
     /** Encoding and repair calls a rulebook build runs at once. */
     encodingConcurrency: env.ENCODING_CONCURRENCY,
-    loadPrompt: createPromptLoader(langfuse.prompt, env.LANGFUSE_PROMPT_LABEL),
+    loadPrompt: createPromptLoader(
+      {
+        get: async (name, options) => langfuse.prompt.get(name, options),
+        getChat: async (name, options) => langfuse.prompt.get(name, { ...options, type: "chat" })
+      },
+      env.LANGFUSE_PROMPT_LABEL
+    ),
     environment: env.LANGFUSE_TRACING_ENVIRONMENT,
     /** Scores observations, such as a build's root span. */
     scores: langfuse.score,

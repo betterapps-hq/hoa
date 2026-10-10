@@ -8,6 +8,7 @@ import {
   type LanguageModel,
   type LanguageModelUsage,
   type ModelMessage,
+  type SystemModelMessage,
   type ProviderMetadata
 } from "ai"
 import { z } from "zod"
@@ -108,6 +109,8 @@ export type CodeFields = { names: readonly string[]; fill: (answer: unknown) => 
 export type ObjectPromptOptions<T, Prompt extends PromptDefinition = PromptDefinition> = PromptRunOptions<Prompt> & {
   schema: z.ZodType<T>
   codeFields?: CodeFields
+  /** Send schemas used more than once (conditions, operands) once, as `$defs`, instead of inline at every use. */
+  sharedDefinitions?: boolean
 }
 
 /** An answer checked against its schema: the parsed object, or the answer as given with Zod's issues. */
@@ -118,6 +121,8 @@ export type CheckedObjectPromptResult<T> = PromptRunMetrics & CheckedAnswer<T>
 
 type GenerateRequest = {
   model: LanguageModel
+  /** A chat prompt's system message, with its cache breakpoint. */
+  instructions?: SystemModelMessage
   messages: ModelMessage[]
   providerOptions: { openrouter: Record<string, string | Record<string, string>> }
 }
@@ -350,9 +355,9 @@ function withValueAt(value: unknown, path: readonly PropertyKey[], replacement: 
  * and Bedrock refuse; `anyOf` accepts the same objects because each branch has a distinct literal discriminator. Fields
  * code fills in are left out, and filled before the answer is validated.
  */
-export function outputSchema<T>(schema: z.ZodType<T>, codeFields?: CodeFields) {
+export function outputSchema<T>(schema: z.ZodType<T>, codeFields?: CodeFields, sharedDefinitions = false) {
   const json = forModel(
-    z.toJSONSchema(schema, { target: "draft-7", io: "input", reused: "inline" }),
+    z.toJSONSchema(schema, { target: "draft-7", io: "input", reused: sharedDefinitions ? "ref" : "inline" }),
     new Set(codeFields?.names ?? [])
   )
   return jsonSchema<T>(z.record(z.string(), z.unknown()).parse(json), {
@@ -417,7 +422,7 @@ function invalidAnswer(issues: z.core.$ZodIssue[]) {
 }
 
 function runObject<T>(options: ObjectPromptOptions<T>, keepsInvalid: boolean) {
-  const inputSchema = outputSchema(options.schema, options.codeFields)
+  const inputSchema = outputSchema(options.schema, options.codeFields, options.sharedDefinitions)
   const check = (answer: unknown) => {
     const checked = checkAnswer(options.schema, answer, options.codeFields)
     if (!checked.isValid && !keepsInvalid) {
@@ -539,10 +544,9 @@ async function runInSpan<T>(
   }
 
   const startedAt = performance.now()
-  const { shared, rest } = sharedPrefix(template, options.prompt, options.variables, compiled)
   const request: GenerateRequest = {
     model: options.createModel(modelId),
-    messages: [{ role: "user", content: [...promptParts(shared, rest), ...attachments.map(toContentPart)] }],
+    ...requestMessages(template, options.prompt, options.variables, compiled, attachments),
     providerOptions: {
       openrouter: {
         ...(effort === undefined ? {} : { reasoning: { effort } }),
@@ -611,7 +615,7 @@ const sharedMarker = "\u0000unit\u0000"
  * when the template compiles differently than expected, nothing is shared.
  */
 export function sharedPrefix(
-  template: PromptTemplate,
+  template: Pick<PromptTemplate, "compile">,
   prompt: PromptDefinition,
   variables: Record<string, string>,
   compiled: string
@@ -635,6 +639,43 @@ export function sharedPrefix(
  * mark. Marking the end of the shared text caches both for five minutes, refreshed by every call that reads it.
  */
 export const cacheBreakpoint = { openrouter: { cacheControl: { type: "ephemeral" } } } as const
+
+/**
+ * The request's messages. A text prompt is one user message, its shared prefix marked for the cache. A chat prompt's
+ * system message is its own block with a breakpoint, and its user message gets the shared prefix's breakpoint too.
+ */
+function requestMessages(
+  template: PromptTemplate,
+  prompt: PromptDefinition,
+  variables: Record<string, string>,
+  compiled: string,
+  attachments: readonly PromptAttachment[]
+): Pick<GenerateRequest, "instructions" | "messages"> {
+  const { messages } = template
+  if (!messages) {
+    const { shared, rest } = sharedPrefix(template, prompt, variables, compiled)
+    return { messages: [{ role: "user", content: [...promptParts(shared, rest), ...attachments.map(toContentPart)] }] }
+  }
+  const userText = (values: Record<string, string>) =>
+    messages(values)
+      .filter((message) => message.role === "user")
+      .map((message) => message.content)
+      .join("\n")
+  const system = messages(variables)
+    .filter((message) => message.role === "system")
+    .map((message) => message.content)
+    .join("\n")
+  const { shared, rest } = sharedPrefix(
+    { compile: (values) => userText(values ?? {}) },
+    prompt,
+    variables,
+    userText(variables)
+  )
+  return {
+    ...(system ? { instructions: { role: "system", content: system, providerOptions: cacheBreakpoint } } : {}),
+    messages: [{ role: "user", content: [...promptParts(shared, rest), ...attachments.map(toContentPart)] }]
+  }
+}
 
 function promptParts(shared: string, rest: string) {
   return [

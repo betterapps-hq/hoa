@@ -380,6 +380,16 @@ describe("content cache", () => {
 })
 
 describe("outputSchema", () => {
+  it("sends schemas used more than once as definitions when asked, and strict objects refuse extra fields", () => {
+    const leaf = z.object({ value: z.number() })
+    const schema = z.object({ a: leaf, b: leaf, only: z.strictObject({ name: z.string() }) })
+    const inline = JSON.stringify(outputSchema(schema).jsonSchema)
+    const shared = JSON.stringify(outputSchema(schema, undefined, true).jsonSchema)
+    expect(shared).toContain("definitions")
+    expect(inline).not.toContain("definitions")
+    expect(shared).toContain('"additionalProperties":false')
+  })
+
   it("writes unions as anyOf, which every provider accepts, and still validates with Zod", async () => {
     const schema = outputSchema(z.object({ rules: z.array(ruleDraft) }))
     const json = JSON.stringify(await schema.jsonSchema)
@@ -477,6 +487,62 @@ describe("prompt caching", () => {
       cacheWriteTokens: 0,
       outputTokens: 900,
       costUsd: 0.05
+    })
+  })
+
+  it("sends a chat prompt's system message as its own cached block, and caches the user message's shared part", async () => {
+    const bodies: unknown[] = []
+    const fetch = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)))
+      return openRouterStream()
+    })
+    const model = createOpenRouter({ apiKey: "test-key", fetch }).chat("anthropic/claude-opus-5.5", {
+      usage: { include: true }
+    })
+    const chatPrompt = { ...encodingPrompt, chat: true } as const satisfies PromptDefinition
+    const messages = (variables?: Record<string, string>) => [
+      { role: "system" as const, content: "You encode rules." },
+      {
+        role: "user" as const,
+        content: `<core_terms>\n${variables?.coreTerms}\n</core_terms>\n<unit>\n${variables?.unit}\n</unit>`
+      }
+    ]
+    await runTextPrompt({
+      loadPrompt: async (prompt) => ({
+        name: prompt.name,
+        version: 1,
+        config: {},
+        messages,
+        compile: (variables) =>
+          messages(variables)
+            .map((message) => message.content)
+            .join("\n")
+      }),
+      createModel: () => model,
+      defaultModelId: "anthropic/claude-opus-5.5",
+      prompt: chatPrompt,
+      variables: { unit: "Section 4.2", coreTerms: "owner | party" },
+      traceName: "provision-encoding",
+      environment: "test"
+    })
+    expect(bodies[0]).toMatchObject({
+      messages: [
+        {
+          role: "system",
+          content: [{ type: "text", text: "You encode rules.", cache_control: { type: "ephemeral" } }]
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "<core_terms>\nowner | party\n</core_terms>\n<unit>\n",
+              cache_control: { type: "ephemeral" }
+            },
+            { type: "text", text: "Section 4.2\n</unit>" }
+          ]
+        }
+      ]
     })
   })
 

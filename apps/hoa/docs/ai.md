@@ -118,7 +118,11 @@ up to where the first other variable begins, marked with `cacheControl: { type: 
 Anthropic as `cache_control`), then the rest. Anthropic caches the request up to that mark, the tools first, so the
 `respond` tool's schema is cached with it. The cache lives five minutes and each read renews it; a write costs 1.25
 times the input price and a read a tenth. A template that puts a call's own variable first still works: its prefix is
-shorter. Prompts without `sharedVariables` send one text part, unmarked.
+shorter. Prompts without `sharedVariables` send one text part, unmarked. A chat prompt (its definition says `chat: true`; the redesigned
+encoding steps' prompts are) is loaded with its messages: the system message goes as the request's instructions with
+its own breakpoint, and the user message's text up to its first unshared variable gets the second. An object prompt can
+also send its schema's repeated parts (conditions, operands) once as definitions (`sharedDefinitions`), which keeps the
+tool schema, and with it the cached prefix, small.
 
 ### Streaming and retries
 

@@ -12,6 +12,11 @@ export type PromptDefinition<Variable extends string = string> = {
    * them before the others, so the text up to the first other variable is sent as a cached prefix (runPrompt.ts).
    */
   sharedVariables?: readonly Variable[]
+  /**
+   * A chat prompt: a system message the build never varies, then a user message holding the variables in XML tags.
+   * The system message and the user message's shared part each get a prompt-cache breakpoint (runPrompt.ts).
+   */
+  chat?: true
 }
 
 /** What a call to a prompt must fill in: exactly the variables it declares, checked by the compiler. */
