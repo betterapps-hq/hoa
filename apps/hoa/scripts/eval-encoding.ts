@@ -121,6 +121,7 @@ const result = await buildRulebook({
   progress: async (stage, done, total) => {
     console.warn(`  ${stage} ${done}/${total}`)
   },
+  concurrency: ai.encodingConcurrency,
   selectUnits: (unit) =>
     (split === null || selectsUnit(split)(unit)) && (unitSelectors === null || selectsUnit(unitSelectors)(unit))
 })

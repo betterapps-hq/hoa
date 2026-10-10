@@ -46,6 +46,8 @@ export const analysisOutput = z.object({
 export const vocabularyOutput = z.object({
   terms: z.array(termDraft),
   notes: z.array(z.string()),
+  /** Whether an earlier build's terms were reused because the document's definitions read the same. */
+  isReused: z.boolean(),
   calls: z.array(modelCall)
 })
 
@@ -92,7 +94,12 @@ export const unitState = z.object({
 })
 export type UnitState = z.infer<typeof unitState>
 
-export const repairOutput = z.object({ state: unitState, call: modelCall })
+/**
+ * One repair: the unit's state once the model's patch is applied and verified, or null when the patch failed Zod; the
+ * call; and notes on what the patch named that the draft doesn't have.
+ */
+export const repairOutput = z.object({ state: unitState.nullable(), call: modelCall, notes: z.array(z.string()) })
+export type RepairOutput = z.infer<typeof repairOutput>
 
 export const unitProblems = z.array(z.tuple([z.string(), z.array(unitProblem)]))
 

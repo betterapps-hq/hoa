@@ -186,7 +186,8 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         },
         previous: () => loadPreviousReview(db, hoaId),
         now: loaded.startedAt,
-        progress
+        progress,
+        concurrency: ai.encodingConcurrency
       })
 
       await progress("save-draft", 0, 1)
