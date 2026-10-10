@@ -35,10 +35,10 @@ and every Workflow step name starts with it.
 | 2 | `structure` | `structure:{documentId}` | Provisions with keys, labels, intro, text, wrap-up and page anchors | Code; a model only for documents the parser can't number |
 | 3 | `analyze` | `analyze:{documentId}` | Cross-references and named documents | Code |
 | 4 | `vocabulary` | `vocabulary:{documentId}` | The organization's terms from definitions and defined-term usage | Model, one call per document with definitions |
-| 5 | `plan` | `plan` | Encoding units: provision subtrees within a token budget, with their context | Code |
+| 5 | `plan` | `plan` | Encoding units: provision subtrees, small neighbours packed, within a token budget, with their context | Code |
 | 6 | `encode` | `encode:{unitId}` | An encoding draft per unit | Model, one call per unit, in parallel |
-| 7 | `verify` | `audit:{unitId}`, `verify`, `verify:merged` | The audit's values per provision; Zod, checker and audit problems per draft, then per unit in the merged set | Small model (the audit), then code |
-| 8 | `repair` | `repair:{unitId}:{round}` | Corrected drafts, at most two rounds | Model, only for units with problems |
+| 7 | `verify` | `verify:{unitId}`, `verify:merged` (`audit:{unitId}` not built) | Zod and checker problems per draft, then per unit in the merged set | Code |
+| 8 | `repair` | `repair:{unitId}:{round}` | A patch per repair, applied to the draft and verified again; round 1 as each unit is verified, round 2 after the merge | Model, only for units with problems |
 | 9 | `merge` | `merge` | One vocabulary, one rule set, settings, questions, coverage | Code |
 | 10 | `consolidate` | `consolidate` | Duplicates, cross-unit overrides, conflicts and questions | Model over summaries, then code |
 | 11 | `save-draft` | `save-draft`, `save-draft:scores`, `save-draft:finish`, then `follow-up:ids`, `follow-up` | The draft rulebook in D1, with carried-forward review decisions; the build's scores in Langfuse; a further build when the documents changed while this one ran | Code |
@@ -46,7 +46,8 @@ and every Workflow step name starts with it.
 | 13 | Publish | | The rules file in R2, with its hash | Code, in a server function |
 
 Model results are cached per organization as today (`hoas/{hoaId}/cache/{stage}/{hash}.json`), so rebuilding after one
-document changes only pays for units whose text or context changed.
+document changes only pays for units whose text or context changed. A unit's context includes its vocabulary slice, so
+the vocabulary is reused while a document's definitions read the same ([Vocabulary](#4-vocabulary)).
 
 The stages are one module, `buildRulebook` ([src/encoding/build.ts](../../src/encoding/build.ts)), with its step runner,
 models, cache, page records and previous rulebook injected: the `RulebookBuild` Workflow runs each stage step as a
@@ -111,13 +112,22 @@ It returns term drafts (`EncodedTerm`: things, properties, values, categories, u
 wording and the provisions that define them. Code merges terms across documents by key. The output is the shared
 vocabulary every encoding unit starts from; units add terms of their own.
 
+**Reuse.** The answer is stored per organization under a hash of the organization, the document's key, the
+term-extraction prompt version and the text of its definitions provisions (the `vocabulary` cache). A rebuild whose
+definitions read the same reuses it without a call, even when the candidates (found in the rest of the document) or the
+title changed, so the units' vocabulary slices, and with them their prompts, stay the same and hit the content cache.
+Changed definitions, or a new prompt version, extract again.
+
 ### 5. Plan
 
-Code divides each document into **encoding units**: a provision and its descendants, sized to at most about 6,000
-tokens of provision text. An article that fits is one unit; a larger one splits by section, and a large section by its
-items. Every unit gets:
+Code divides each document into **encoding units** of at most 3,000 estimated tokens of provision text
+(`unitTokenBudget`, [Cost and scale](#cost-and-scale)). An article that fits stays whole; a larger one splits by
+section, and a large section by its items. Neighbouring pieces of one document, articles included, then pack together
+in order up to the budget, so a run of short articles is one unit, not one each; no subtree that fits is divided, and
+no unit mixes documents. A unit's id is its first provision's key. Every unit gets:
 
 - its provisions (key, label, heading, intro, text, wrap-up, children);
+- for a packed unit, the references and vocabulary slice of all its provisions together;
 - the intros and wrap-ups of its ancestors, and the headings above it;
 - the text of every provision it references (step 3), truncated to 1,500 tokens each;
 - the **vocabulary slice**: every term whose labels appear in the unit's text or references (matched on normalized
@@ -131,7 +141,9 @@ items. Every unit gets:
 One call per unit, in parallel, with `hoa-provision-encoding`. The prompt's static text, kept in Langfuse, is the
 encoding conventions (the brief the hand-run used: keys, labels, modality, approval versus discretion, requirements,
 selectors, recurring duties, party-valued properties, remedies, sanctions, the no-rule reasons) and the schema's rules
-sections. It's identical for every unit, so provider prompt caching covers it.
+sections. The template puts the core terms and request types, which every unit shares, right after it and before the
+unit's own variables, and the call marks that shared prefix for Anthropic's prompt cache, which also caches the
+`respond` tool's schema sent before it ([ai.md, Prompt caching](../ai.md#prompt-caching)).
 
 The answer is an `EncodingDraft`, validated by Zod through the `respond` tool:
 
@@ -163,9 +175,9 @@ Code, run on every draft and again whenever an administrator edits a record:
   `compliance-period`, clause `except` lists name sanctions.
 - **Coverage:** every provision in the unit has a rule, a term or clause citing it, or a no-rule reason; a cited
   provision with a no-rule reason is a problem.
-- **Audit:** every number, duration, party and condition the audit read from a provision appears in a record citing it,
-  or the provision's no-rule note explains it (`unencoded-value`, `unencoded-party`, `unencoded-condition`;
-  [Recognition](#recognition)).
+- **Audit (not built):** every number, duration, party and condition the audit read from a provision appears in a
+  record citing it, or the provision's no-rule note explains it (`unencoded-value`, `unencoded-party`,
+  `unencoded-condition`; [Recognition](#recognition)).
 - **Typing:** path steps are properties of the thing before them; comparisons and arithmetic follow the typing rules;
   values belong to their sets.
 
@@ -175,12 +187,22 @@ the build, the editor and the tests).
 ### 8. Repair
 
 A unit with problems goes back to the model with `hoa-encoding-repair`: the draft, the problem list (each with its
-path in the draft), and the vocabulary slice. The model returns the whole corrected draft. Two rounds at most; a
-problem left after that becomes an issue on the record it belongs to, which blocks approval until an administrator
-fixes it. A unit whose problems are only unresolved references to terms or rules another unit defines is re-verified
-after [merge](#9-merge) before it's repaired. Round 1 repairs what each draft shows alone; round 2 repairs what the
-merged set shows (`verify:merged`) and drafts still failing Zod. A draft that still fails Zod is left out and recorded
-as a failure on the job.
+path in the draft), and the vocabulary slice. The model answers with a **patch** (`encodingPatch`), not the whole
+draft: the provision entries, terms, rules, referenced documents and clauses it changes or adds, in full and by key
+(each replaces the draft's record with its key, or is added), questions with the id they replace, the keys and clause
+names it removes, and notes to add. Code applies the patch to the unit's answer (`src/encoding/patch.ts`; to the answer
+as given when it failed Zod) and verifies the result again. A patch that fails Zod, or a result with more problems than
+before (or that breaks a valid draft), is set aside and the draft stays; keys the patch names that the draft doesn't
+have are noted on the build.
+
+**When.** Round 1 runs for each unit as soon as its own encode is verified, while other units are still encoding: it
+repairs every problem of an answer that fails Zod, and otherwise every problem but references to terms and rules the
+draft doesn't define, which another unit may define. Those wait for [merge](#9-merge): once every unit is through
+round 1, `verify:merged` checks the merged set, and round 2 repairs what it still shows (references no unit defines,
+conflicts across units) and drafts still failing Zod. Two rounds at most; a problem left after that becomes an issue on
+the record it belongs to, which blocks approval until an administrator fixes it. A draft that still fails Zod is left
+out and recorded as a failure on the job. Every step's name and output depend only on earlier step outputs, so a
+Workflow replay takes the same path whatever order the calls finished in; drafts merge in the units' order.
 
 Code, not the model, sets each rule's `effectiveFrom` (from its main citation's document edition) and each term's
 `organizationId`: those fields are left out of the schema the model sees.
@@ -387,7 +409,7 @@ draft and every review action are checked on the server (`requireAdministrator`)
 | `hoa-structure-repair` | `structure-repair` | `OPENROUTER_MODEL` | `documentTitle`, `pageText`, `parserOutline`, `problems` | `{ markers: { offset: number; marker: string; level: number }[] }` |
 | `hoa-term-extraction` | `term-extraction` | `anthropic/claude-opus-5.5`, high effort | `document`, `definitions`, `candidates`, `coreTerms` | `{ terms: EncodedTerm[]; notes: string[] }` |
 | `hoa-provision-encoding` | `provision-encoding` | `anthropic/claude-opus-5.5`, high effort | `document`, `provisions`, `context`, `references`, `terms`, `coreTerms`, `requestTypes` | `EncodingDraft` |
-| `hoa-encoding-repair` | `encoding-repair` | `anthropic/claude-opus-5.5`, high effort | `draft`, `problems`, `terms`, `coreTerms` | `EncodingDraft` |
+| `hoa-encoding-repair` | `encoding-repair` | `anthropic/claude-opus-5.5`, high effort | `draft`, `problems`, `terms`, `coreTerms` | `EncodingPatch`: the records changed, added or removed |
 | `hoa-rulebook-consolidation` | `rulebook-consolidation` | `anthropic/claude-opus-5.5`, high effort | `rules`, `termPairs`, `documents` | `Consolidation` |
 | `hoa-provision-audit` (not built) | `provision-audit` | `anthropic/claude-haiku-5.5` (`config.model`) | `document`, `provisions` | `{ items: { provisionKey, kind: "number" \| "duration" \| "party" \| "condition", quote, value }[] }` |
 
@@ -471,7 +493,30 @@ items.
 
 ## Cost and scale
 
-The sample Declaration is about 110 pages and 4,200 lines of text. It plans to roughly 60 units. Each encoding call
-reads about 18,000 tokens of static prompt (cached after the first call), 4,000 to 10,000 tokens of unit context, and
-writes 3,000 to 12,000 tokens. Repairs run on the units with problems, about a fifth of them in the hand-run.
-Consolidation is one call of about 30,000 tokens. The build caps concurrency at 8 encoding calls.
+Measured on a build of two documents (the sample Declaration and Design Guidelines) before the changes below: 64 units,
+130 to 180 calls to Opus 5.5 at high effort, 45 to 70 minutes and $77 to $108. An encode call read about 45,000 tokens
+and wrote about 22,000 (half of them reasoning); a repair read about 62,000 and wrote about 20,000, because it wrote the
+whole draft again, so repairs cost as much as encoding. No call read the prompt cache. Consolidation is one call of
+about 30,000 tokens. Every model stage stays on Opus 5.5 at high effort until the encoding's quality is good.
+
+- **Unit budget.** 3,000 estimated tokens of provision text per unit (`unitTokenBudget`), with small neighbours packed
+  up to it ([Plan](#5-plan)). An encode at that size already writes about 22,000 tokens; doubling it would bring
+  answers toward the 40,000 tokens that come close to a build step's 15-minute timeout, and a longer answer has more to
+  repair. Packing cuts the calls for documents of many short sections without growing the largest answers.
+- **Concurrency.** `ENCODING_CONCURRENCY` (default 16, [setup.md](../setup.md)) caps the encode and repair calls in
+  flight together. OpenRouter sets no request limit on paid models; the limits that matter are the upstream providers'
+  (OpenRouter spreads Opus over several) and Anthropic's per-minute output tokens: 16 calls each writing about 22,000
+  tokens over three to five minutes is roughly 70,000 to 120,000 output tokens a minute, well within them, and
+  prompt-cache reads don't count toward Anthropic's input limit. Calls stream, so a Worker's limit of six connections
+  waiting for response headers doesn't hold the others back. A call refused for now (429, overloaded, 5xx) waits for
+  the provider's `retry-after`, or 5, 10, 20, 40 and 60 seconds, and is retried up to six times (`defaultRetry` in
+  `runPrompt.ts`) before its step fails and the Workflow retries the step.
+- **Prompt caching.** Every encode and repair call marks its shared prefix (the `respond` tool's schema, about 15,000
+  tokens, then the instructions, the guide, core terms and request types, about 3,000 more) for Anthropic's five-minute
+  prompt cache, refreshed by each call that reads it. Calls in flight at the start each write it once (1.25 times the
+  input price); after that, reads cost a tenth. Repair has its own prefix, since its tool schema is the patch.
+- **Repair timing and size.** A unit's first repair starts when its own encode is verified, so repairs overlap the
+  encodes instead of waiting for the slowest one; only round 2 waits for the merge. A repair writes a patch, so its
+  output is the records it changes rather than the whole draft.
+- **Rebuilds.** The vocabulary is reused while definitions are unchanged, so unchanged units hit the content cache and
+  cost nothing.
