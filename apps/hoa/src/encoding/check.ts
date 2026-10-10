@@ -4,10 +4,19 @@ import { romanToInt } from "./numbering"
 import type { StructuredDocument } from "./provisions"
 
 // Check (encoding.md, Structure 5): how much of the cleaned text the provisions cover, whether every numbered sequence
-// runs without gaps, and whether keys are unique. A document with more than 2 percent of its text outside any
-// provision, a broken sequence or a repeated key goes to hoa-structure-repair; inferred numbers only need confirming.
+// runs without gaps, whether keys are unique, and whether the provisions are a plausible size and depth. A document with
+// more than 2 percent of its text outside any provision, a broken sequence, a repeated key, a provision too long to be
+// one (the parser missed the numbering under it) or nesting too deep to be real goes to hoa-structure-repair; inferred
+// numbers only need confirming.
 
-export const structureProblemCodes = ["uncovered-text", "broken-sequence", "duplicate-key", "inferred-number"] as const
+export const structureProblemCodes = [
+  "uncovered-text",
+  "broken-sequence",
+  "duplicate-key",
+  "oversized-provision",
+  "deep-nesting",
+  "inferred-number"
+] as const
 
 export type StructureProblem = {
   code: (typeof structureProblemCodes)[number]
@@ -23,6 +32,40 @@ export type StructureCheck = {
 }
 
 const maxOutside = 0.02
+/** Longer than any provision governing documents print (the longest seen across ten organizations' is about 700). */
+const maxWords = 1000
+/** Deeper than any outline governing documents print: article, section, subsection, and three list levels. */
+const maxDepth = 6
+
+const wordsOf = (provision: Provision) =>
+  [provision.text, provision.intro, provision.wrapUp].filter(Boolean).join(" ").split(/\s+/).filter(Boolean).length
+
+function sizeProblems(document: StructuredDocument) {
+  const byLabel = new Map(document.provisions.map((provision) => [provision.label, provision]))
+  const depthOf = (provision: Provision) => {
+    let depth = 1
+    for (
+      let label = provision.parentLabel;
+      label !== null && depth <= maxDepth;
+      label = byLabel.get(label)?.parentLabel ?? null
+    ) {
+      depth += 1
+    }
+    return depth
+  }
+  return document.provisions.flatMap((provision): StructureProblem[] => {
+    const words = wordsOf(provision)
+    if (words > maxWords) {
+      const message = `${provision.key} holds ${words} words, more than one provision does`
+      return [{ code: "oversized-provision", message, key: provision.key }]
+    }
+    if (depthOf(provision) > maxDepth) {
+      const message = `${provision.key} is nested more than ${maxDepth} levels deep`
+      return [{ code: "deep-nesting", message, key: provision.key }]
+    }
+    return []
+  })
+}
 
 type Range = { start: number; end: number }
 
@@ -124,7 +167,7 @@ export function checkStructure(clean: CleanDocument, documents: readonly Structu
     const percent = (outside * 100).toFixed(1)
     problems.push({ code: "uncovered-text", message: `${percent}% of the text is outside every provision`, key: null })
   }
-  problems.push(...documents.flatMap(sequenceProblems))
+  problems.push(...documents.flatMap(sequenceProblems), ...documents.flatMap(sizeProblems))
   const seen = new Set<string>()
   for (const provision of provisions) {
     if (seen.has(provision.key)) {

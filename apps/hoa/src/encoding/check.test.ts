@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Provision } from "@/schema/types"
-import { syntheticPages } from "@/tests/syntheticDeclaration"
+import { pagesOf, syntheticPages } from "@/tests/syntheticDeclaration"
 import { checkStructure } from "./check"
 import { cleanPages, type CleanDocument } from "./clean"
 import { structureDocument, type StructuredDocument } from "./provisions"
@@ -86,5 +86,25 @@ describe("checkStructure", () => {
       "inferred-number"
     ])
     expect(check.needsRepair).toBe(true)
+  })
+})
+
+describe("checkStructure on provision size", () => {
+  const checked = (text: string) => {
+    const cleaned = cleanPages(pagesOf([{ text }]))
+    return checkStructure(cleaned, structureDocument(cleaned, { documentKey: "covenants", fileId: "f" }))
+  }
+  const long = Array.from({ length: 1100 }, (_, index) => `word${index}`).join(" ")
+
+  it("sends a provision too long to be one to repair: the parser missed the numbering under it", () => {
+    const result = checked(`# COVENANTS\n\nARTICLE 1 USE\n\n1.1 Homes. ${long}.`)
+    expect(result.problems.map((problem) => problem.code)).toContain("oversized-provision")
+    expect(result.needsRepair).toBe(true)
+  })
+
+  it("passes provisions of an ordinary size", () => {
+    expect(
+      checked("# COVENANTS\n\nARTICLE 1 USE\n\n1.1 Homes. Lots are for homes.\n\n1.2 Signs. No signs.").problems
+    ).toEqual([])
   })
 })
