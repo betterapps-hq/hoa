@@ -123,9 +123,9 @@ export type BuildInput = {
 }
 
 /** hoa-term-extraction's answer (encoding.md, Prompts and models). */
-const termExtractionAnswer = z.object({ terms: z.array(termDraft), notes: z.array(z.string()).default([]) })
+export const termExtractionAnswer = z.object({ terms: z.array(termDraft), notes: z.array(z.string()).default([]) })
 
-const traceNames: Record<string, string> = {
+export const traceNames: Record<string, string> = {
   [pipelinePrompts.structureRepair.name]: "structure-repair",
   [pipelinePrompts.termExtraction.name]: "term-extraction",
   [pipelinePrompts.provisionEncoding.name]: "provision-encoding",
@@ -147,14 +147,14 @@ function mainDocumentKey(rule: Record<string, unknown>) {
 }
 
 /** Terms belong to the organization; the model doesn't say so. */
-const ownedTerms = (organizationId: string): CodeFields => ({
+export const ownedTerms = (organizationId: string): CodeFields => ({
   names: ["organizationId"],
   fill: (answer) =>
     isRecord(answer) ? { ...answer, terms: mapRecords(answer.terms, (term) => ({ ...term, organizationId })) } : answer
 })
 
 /** A draft's terms belong to the organization, and its rules take effect with their main citation's document. */
-function draftFields(organizationId: string, effectiveFrom: (documentKey: string) => string): CodeFields {
+export function draftFields(organizationId: string, effectiveFrom: (documentKey: string) => string): CodeFields {
   const terms = ownedTerms(organizationId)
   return {
     names: ["effectiveFrom", ...terms.names],

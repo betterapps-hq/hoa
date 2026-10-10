@@ -10,7 +10,7 @@ import type { StructureCheck } from "./check"
 import type { CleanDocument } from "./clean"
 import { summarizeRule, type TermPair } from "./consolidate"
 import type { TermCandidate } from "./definedTerms"
-import type { EncodingUnit } from "./plan"
+import type { EncodingUnit, UnitAncestor, UnitReference } from "./plan"
 import type { StructuredDocument } from "./provisions"
 import type { UnitProblem } from "./repair"
 import { cleanText, parserOutline } from "./structureRepair"
@@ -25,12 +25,12 @@ type Variables<Prompt extends keyof typeof pipelinePrompts> = PromptVariables<(t
 const byKey = <T extends { key: string }>(records: readonly T[]) =>
   records.toSorted((a, b) => compareCodeUnits(a.key, b.key))
 
-function documentLine(document: DocumentLine & { edition?: GoverningDocument["edition"] }) {
+export function documentLine(document: DocumentLine & { edition?: GoverningDocument["edition"] }) {
   const named = document.edition === null ? " (named, not uploaded)" : ""
   return `${document.key} (${document.kind}): ${document.title}${named}`
 }
 
-function valueTypeText(valueType: ValueType) {
+export function valueTypeText(valueType: ValueType) {
   switch (valueType.type) {
     case "quantity":
       return `quantity in ${valueType.unit}`
@@ -85,9 +85,9 @@ function termLine(term: TermContent) {
   return `${term.key} | ${kindText(term)} | ${labels}${definition}`
 }
 
-const termLines = (terms: readonly TermContent[]) => byKey(terms).map(termLine).join("\n")
+export const termLines = (terms: readonly TermContent[]) => byKey(terms).map(termLine).join("\n")
 
-const coreTermsText = () => termLines(coreTerms)
+export const coreTermsText = () => termLines(coreTerms)
 
 function headingOf(provision: Pick<Provision, "kind" | "label" | "heading">) {
   return `${provision.kind} ${provision.label}${provision.heading ? `: ${provision.heading}` : ""}`
@@ -105,9 +105,9 @@ export function provisionBlock(provision: Provision) {
     .join("\n")
 }
 
-/** hoa-provision-encoding: one unit and its context. */
-export function provisionEncodingVariables(unit: EncodingUnit, document: DocumentLine): Variables<"provisionEncoding"> {
-  const context = unit.context.map((ancestor) =>
+/** The lead-ins and wrap-ups of a unit's ancestors, outermost first; "none" without any. */
+export function contextText(ancestors: readonly UnitAncestor[]) {
+  const context = ancestors.map((ancestor) =>
     [
       `[${ancestor.key}] ${headingOf(ancestor)}`,
       ancestor.intro ? `intro: ${ancestor.intro}` : "",
@@ -116,15 +116,25 @@ export function provisionEncodingVariables(unit: EncodingUnit, document: Documen
       .filter(Boolean)
       .join("\n")
   )
-  const references = unit.references.map(
+  return context.join("\n\n") || "none"
+}
+
+/** The provisions a unit refers to, with their text; "none" without any. */
+export function referencesText(references: readonly UnitReference[]) {
+  const blocks = references.map(
     (reference) =>
       `[${reference.key}]${reference.heading ? ` ${reference.heading}` : ""}${reference.isTruncated ? " (truncated)" : ""}\n${reference.text}`
   )
+  return blocks.join("\n\n") || "none"
+}
+
+/** hoa-provision-encoding: one unit and its context. */
+export function provisionEncodingVariables(unit: EncodingUnit, document: DocumentLine): Variables<"provisionEncoding"> {
   return {
     document: documentLine(document),
     provisions: unit.provisions.map(provisionBlock).join("\n\n"),
-    context: context.join("\n\n") || "none",
-    references: references.join("\n\n") || "none",
+    context: contextText(unit.context),
+    references: referencesText(unit.references),
     terms: termLines(unit.terms) || "none",
     coreTerms: coreTermsText(),
     requestTypes: termLines(unit.requestTypes)
@@ -155,7 +165,7 @@ export function encodingRepairVariables(
   }
 }
 
-function candidateText(candidate: TermCandidate) {
+export function candidateText(candidate: TermCandidate) {
   const where = candidate.definedIn.length > 0 ? `defined in ${candidate.definedIn.join(", ")}; ` : ""
   const samples = candidate.samples.map((sample) => `  e.g. ${sample}`)
   const uses = `${candidate.count} use${candidate.count === 1 ? "" : "s"}`

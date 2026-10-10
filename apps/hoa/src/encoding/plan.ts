@@ -126,7 +126,8 @@ function choiceSets(slice: readonly TermContent[], vocabulary: readonly TermCont
   return vocabulary.filter((term) => sets.has(term.key) || (term.kind === "value" && sets.has(term.set)))
 }
 
-function coreRequestTypes(): TermContent[] {
+/** The core request types and their properties. */
+export function coreRequestTypes(): TermContent[] {
   const requests = new Set(
     coreTerms.filter((term) => term.kind === "thing" && term.nature === "request").map((term) => term.key)
   )

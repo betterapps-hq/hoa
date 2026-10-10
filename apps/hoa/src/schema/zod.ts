@@ -15,12 +15,12 @@ const timeOfDay = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "a time like 22:
 const monthDay = z.string().regex(/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/, "a month and day like 11-15")
 const weekday = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])
 const id = z.string().min(1)
-const termKey = z
+export const termKey = z
   .string()
   .regex(/^[a-z0-9]+(-[a-z0-9]+)*(\.[a-z0-9]+(-[a-z0-9]+)*)*$/, "a term key like fence-run.height")
-const documentKey = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "a document key like guidelines")
-const provisionKey = z.string().regex(/^[a-z0-9-]+:\S+$/, "a provision key like guidelines:5.4.2(i)")
-const ruleKey = z
+export const documentKey = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "a document key like guidelines")
+export const provisionKey = z.string().regex(/^[a-z0-9-]+:\S+$/, "a provision key like guidelines:5.4.2(i)")
+export const ruleKey = z
   .string()
   .regex(/^[a-z0-9-]+:\S+#[a-z0-9]+(-[a-z0-9]+)*$/, "a rule key like guidelines:5.4.2(i)#colors")
 const amount = z.object({ value: z.number(), unit: termKey })
@@ -40,11 +40,11 @@ const review = z.object({
 
 // ─── Expressions (recursive) ──────────────────────────────────────────────────────────────────────
 
-const root = z.enum(["subject", "request", "lot", "community"])
+export const root = z.enum(["subject", "request", "lot", "community"])
 const pathShape = { from: root.optional(), path: z.array(termKey) }
 const path = z.object(pathShape)
 
-const operand: z.ZodType<T.Operand, T.Operand> = z.lazy(() =>
+export const operand: z.ZodType<T.Operand, T.Operand> = z.lazy(() =>
   z.union([
     z.object({ type: z.literal("ref"), ...pathShape }),
     z.object({ type: z.literal("quantity"), value: z.number(), unit: termKey }),
@@ -94,7 +94,7 @@ const approvalTest = {
   written: z.boolean()
 }
 
-const condition: z.ZodType<T.Condition, T.Condition> = z.lazy(() =>
+export const condition: z.ZodType<T.Condition, T.Condition> = z.lazy(() =>
   z.union([
     z.object({ type: z.enum(["all", "any"]), of: z.array(condition).min(1) }),
     z.object({ type: z.literal("not"), of: condition }),
@@ -130,7 +130,7 @@ const condition: z.ZodType<T.Condition, T.Condition> = z.lazy(() =>
 
 // ─── Sources ──────────────────────────────────────────────────────────────────────────────────────
 
-const documentKind = z.enum([
+export const documentKind = z.enum([
   "statute",
   "ordinance",
   "declaration",
@@ -146,7 +146,7 @@ const documentKind = z.enum([
   "decision"
 ])
 
-const citation = z.object({
+export const citation = z.object({
   provisionKey,
   highlight: z.object({ start: z.number().int().nonnegative(), end: z.number().int().positive() }).nullable(),
   region: z
@@ -181,7 +181,7 @@ export const governingDocument = z.object({
   edition: edition.nullable()
 })
 
-const noRuleReason = z.enum(["heading", "recital", "reserved", "explanatory", "duplicate", "not-evaluated"])
+export const noRuleReason = z.enum(["heading", "recital", "reserved", "explanatory", "duplicate", "not-evaluated"])
 
 export const provision = z.object({
   key: provisionKey,
@@ -251,7 +251,7 @@ const label = z.object({
   provenance
 })
 
-const dimension = z.enum([
+export const dimension = z.enum([
   "length",
   "area",
   "volume",
@@ -278,10 +278,10 @@ const requestType = z.object({
   lot: z.enum(["required", "optional", "none"])
 })
 
-const nature = z.enum(["party", "request", "event", "document", "object"])
-const ifUnstated = z.enum(["unknown", "absent"])
-const decimal = z.string().regex(/^\d+(\.\d+)?$/, "an exact decimal")
-const derivation = z.object({ when: condition.nullable(), value: operand, citations: z.array(citation) })
+export const nature = z.enum(["party", "request", "event", "document", "object"])
+export const ifUnstated = z.enum(["unknown", "absent"])
+export const decimal = z.string().regex(/^\d+(\.\d+)?$/, "an exact decimal")
+export const derivation = z.object({ when: condition.nullable(), value: operand, citations: z.array(citation) })
 
 const termBase = {
   key: termKey,
@@ -347,7 +347,7 @@ const cell = z.union([
 
 const effect = z.object({ type: z.literal("deems"), target: path, value: operand })
 
-const check = z.union([
+export const check = z.union([
   z.object({ type: z.literal("test"), test: condition }),
   z.object({
     type: z.literal("table"),
@@ -378,12 +378,20 @@ const check = z.union([
   z.object({ type: z.literal("approval"), ...approvalTest })
 ])
 
-const domain = z.enum(["architectural", "use", "maintenance", "financial", "governance", "enforcement", "general"])
-const normModality = z.enum(["obligation", "prohibition", "permission", "recommendation", "requirement"])
-const sanctionModality = z.enum(["obligation", "permission"])
-const ruleRemedy = z.enum(["change-detail", "redesign", "none"])
-const cure = z.object({ value: z.number().nonnegative(), unit: termKey, after: path, curedBy: path.nullable() })
-const ruleSelection = z.union([
+export const domain = z.enum([
+  "architectural",
+  "use",
+  "maintenance",
+  "financial",
+  "governance",
+  "enforcement",
+  "general"
+])
+export const normModality = z.enum(["obligation", "prohibition", "permission", "recommendation", "requirement"])
+export const sanctionModality = z.enum(["obligation", "permission"])
+export const ruleRemedy = z.enum(["change-detail", "redesign", "none"])
+export const cure = z.object({ value: z.number().nonnegative(), unit: termKey, after: path, curedBy: path.nullable() })
+export const ruleSelection = z.union([
   z.array(ruleKey),
   z.object({
     documents: z.array(documentKey),
@@ -411,7 +419,7 @@ const ruleBase = {
   issues: z.array(issue)
 }
 
-const sanction = z.object({
+export const sanction = z.object({
   type: z.enum([
     "fine",
     "late-fee",
@@ -530,7 +538,7 @@ export const rule = z
 
 const recommendedAction = z.enum(["approve-with-conditions", "deny", "request-information", "refer-to-committee"])
 
-const clauses = z.object({
+export const clauses = z.object({
   precedence: z.object({ order: z.array(z.array(documentKind).min(1)), citations: z.array(citation) }),
   time: z.object({
     days: termKey,
@@ -738,16 +746,31 @@ export const termDraft = z
   ])
   .superRefine(checkTerm)
 
+/** A rule's statement as a draft writes it, with the term-link syntax described for the model. */
+export const statementDraft = z
+  .string()
+  .min(1)
+  .describe(
+    "Link a term by writing its key in double curly braces, such as {{fence-run}}; {{fence-run:plural}} for the plural."
+  )
+
+/** A sanction's body as a draft writes it: fields whose default is null or empty may be left out. */
+export const sanctionDraft = z.object({
+  type: sanction.shape.type,
+  amounts: sanction.shape.amounts,
+  after: d(sanction.shape.after.unwrap()),
+  occurrences: d(sanction.shape.occurrences.unwrap()),
+  repeats: d(sanction.shape.repeats.unwrap()),
+  cap: d(operand),
+  suspends: list(termKey),
+  lasts: d(sanction.shape.lasts.unwrap())
+})
+
 const draftBase = {
   key: ruleKey,
   domain,
   title: z.string().min(1),
-  statement: z
-    .string()
-    .min(1)
-    .describe(
-      "Link a term by writing its key in double curly braces, such as {{fence-run}}; {{fence-run:plural}} for the plural."
-    ),
+  statement: statementDraft,
   citations: z.array(citation).min(1),
   requestTypes: z.array(termKey).min(1),
   appliesTo: d(termKey),
@@ -781,16 +804,7 @@ export const ruleDraft = z
       enforces: z.object({ rules: list(ruleKey), documents: list(documentKey), except: list(ruleKey) }),
       against: z.array(termKey).min(1).default(["owner"]),
       imposedBy: termKey,
-      sanction: z.object({
-        type: sanction.shape.type,
-        amounts: sanction.shape.amounts,
-        after: d(sanction.shape.after.unwrap()),
-        occurrences: d(sanction.shape.occurrences.unwrap()),
-        repeats: d(sanction.shape.repeats.unwrap()),
-        cap: d(operand),
-        suspends: list(termKey),
-        lasts: d(sanction.shape.lasts.unwrap())
-      })
+      sanction: sanctionDraft
     }),
     z.object({
       ...draftBase,
