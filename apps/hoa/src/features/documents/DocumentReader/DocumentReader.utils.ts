@@ -129,8 +129,11 @@ export function snippetOf(text: string, words: readonly string[], length = 140) 
 export function groupsOf(blocks: readonly ReadingBlock[]) {
   const groups: { key: string; blocks: ReadingBlock[] }[] = []
   for (const block of blocks) {
+    // An article opens a group; top-level provisions without a heading flow on in the group before them, so a document
+    // with no articles reads as one text instead of a group (and its space) per provision.
     const startsGroup =
-      block.type === "page" || (block.type === "provision" && block.depth === 0 && block.part === "main")
+      block.type === "page" ||
+      (block.type === "provision" && block.depth === 0 && block.part === "main" && block.heading !== null)
     const last = groups.at(-1)
     if (!last || startsGroup) {
       groups.push({ key: block.key, blocks: [block] })

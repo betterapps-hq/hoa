@@ -85,6 +85,11 @@ describe("the reader's derived data", () => {
     expect(groupsOf(blocks).map((group) => group.key)).toEqual(["doc:article-1", "doc:article-2"])
   })
 
+  it("flows top-level provisions without a heading as one text", () => {
+    const flat = [provision("doc:1", 0, 1, { number: "1" }), provision("doc:2", 0, 1), provision("doc:3", 0, 2)]
+    expect(groupsOf(flat).map((group) => group.blocks.length)).toEqual([3])
+  })
+
   it("finds a search's words where words start, and cuts a snippet around the first", () => {
     expect(queryWords("the Fence of")).toEqual(["fence"])
     expect(queryWords("of")).toEqual(["of"])
