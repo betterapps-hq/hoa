@@ -19,7 +19,12 @@ export const modelCall = z.object({
   promptName: z.string(),
   promptVersion: z.number().int(),
   modelId: z.string(),
+  /** Every input token, cached or not. */
   inputTokens: z.number().nullable(),
+  /** Of those, read from the provider's prompt cache. */
+  cachedInputTokens: z.number().nullable(),
+  /** Of those, written to the provider's prompt cache. */
+  cacheWriteTokens: z.number().nullable(),
   outputTokens: z.number().nullable(),
   costUsd: z.number().nullable(),
   latencyMs: z.number(),
@@ -40,6 +45,8 @@ export function modelCallOf(
     promptVersion: metrics.promptVersion,
     modelId: metrics.modelId,
     inputTokens: metrics.inputTokens ?? null,
+    cachedInputTokens: metrics.cachedInputTokens ?? null,
+    cacheWriteTokens: metrics.cacheWriteTokens ?? null,
     outputTokens: metrics.outputTokens ?? null,
     costUsd: metrics.costUsd ?? null,
     latencyMs: metrics.latencyMs,

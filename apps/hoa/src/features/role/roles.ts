@@ -44,3 +44,10 @@ export const roles: Record<RoleId, Role> = {
 export function isRoleId(value: unknown): value is RoleId {
   return roleIds.some((id) => id === value)
 }
+
+/** Throws unless the role is the HOA's administrator: every review, build and publishing action checks it. */
+export function assertAdministrator(role: RoleId) {
+  if (role !== "administrator") {
+    throw new Error("Only an administrator can do this.")
+  }
+}

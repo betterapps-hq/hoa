@@ -1,7 +1,7 @@
 import { getCookie, getRequestHeader } from "@tanstack/react-start/server"
 import { getDb } from "@/db/client.server"
 import { getDefaultHoa } from "@/db/hoaRepository"
-import { isRoleId, roleCookie, roles, type RoleId } from "@/features/role/roles"
+import { assertAdministrator, isRoleId, roleCookie, roles, type RoleId } from "@/features/role/roles"
 import type { Hoa } from "@/hoa/hoa"
 
 export type RequestUser = { id: string; name: string; email: string }
@@ -27,8 +27,6 @@ export async function getRequestContext(): Promise<RequestContext> {
 /** Throws unless the request comes from the HOA's administrator role. */
 export async function requireAdministrator(): Promise<RequestContext> {
   const context = await getRequestContext()
-  if (context.role !== "administrator") {
-    throw new Error("Only an administrator can do this.")
-  }
+  assertAdministrator(context.role)
   return context
 }

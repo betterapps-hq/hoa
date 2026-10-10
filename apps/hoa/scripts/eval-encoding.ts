@@ -121,6 +121,7 @@ const result = await buildRulebook({
   progress: async (stage, done, total) => {
     console.warn(`  ${stage} ${done}/${total}`)
   },
+  concurrency: ai.encodingConcurrency,
   selectUnits: (unit) =>
     (split === null || selectsUnit(split)(unit)) && (unitSelectors === null || selectsUnit(unitSelectors)(unit))
 })
@@ -171,7 +172,7 @@ const report = [
     .map(([name, version]) => `${name} v${version}`)
     .join(", ")}.`,
   "",
-  `Duration ${durationSeconds.toFixed(0)} s; ${calls.length} model calls (${calls.filter((call) => call.isCached).length} cached); cost $${cost.toFixed(4)}; ${sum(calls.map((call) => call.inputTokens))} input and ${sum(calls.map((call) => call.outputTokens))} output tokens.`,
+  `Duration ${durationSeconds.toFixed(0)} s; ${calls.length} model calls (${calls.filter((call) => call.isCached).length} cached); cost $${cost.toFixed(4)}; ${sum(calls.map((call) => call.inputTokens))} input tokens (${sum(calls.map((call) => call.cachedInputTokens))} read from the prompt cache, ${sum(calls.map((call) => call.cacheWriteTokens))} written to it) and ${sum(calls.map((call) => call.outputTokens))} output tokens.`,
   "",
   "| Unit | Provisions | Valid | Repair rounds | Problems left |",
   "| --- | --- | --- | --- | --- |",

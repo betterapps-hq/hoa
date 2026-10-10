@@ -1,13 +1,25 @@
 import { LangfuseSpanProcessor } from "@langfuse/otel"
+import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { context, trace } from "@opentelemetry/api"
 import { BasicTracerProvider } from "@opentelemetry/sdk-trace-base"
+import { APICallError } from "ai"
 import { MockLanguageModelV4 } from "ai/test"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { ruleDraft } from "@/schema/zod"
+import { replyingModel, replyStream } from "@/tests/scriptedModel"
 import type { PromptLoader } from "./promptLoader"
 import type { PromptDefinition } from "./prompts"
-import { answerOf, outputSchema, runCheckedObjectPrompt, runObjectPrompt, runTextPrompt } from "./runPrompt"
+import {
+  answerOf,
+  defaultRetry,
+  isRetryableCall,
+  outputSchema,
+  runCheckedObjectPrompt,
+  runObjectPrompt,
+  runTextPrompt,
+  sharedPrefix
+} from "./runPrompt"
 import { registerTracerProvider } from "./telemetry.server"
 
 const prompt = { name: "hoa-sample", variables: [] } as const satisfies PromptDefinition
@@ -16,34 +28,11 @@ function createModel(
   providerMetadata?: Record<string, Record<string, number | Record<string, number>>>,
   text = "Ready to review."
 ) {
-  return new MockLanguageModelV4({
-    doGenerate: {
-      content: [{ type: "text", text }],
-      finishReason: { unified: "stop", raw: "stop" },
-      usage: {
-        inputTokens: { total: 42, noCache: 42, cacheRead: 0, cacheWrite: 0 },
-        outputTokens: { total: 5, text: 5, reasoning: 0 }
-      },
-      warnings: [],
-      ...(providerMetadata ? { providerMetadata } : {})
-    }
-  })
+  return replyingModel({ text, ...(providerMetadata ? { providerMetadata } : {}) })
 }
 
 /** A model that answers an object prompt by calling the respond tool. */
-function objectModel(input: unknown) {
-  return new MockLanguageModelV4({
-    doGenerate: {
-      content: [{ type: "tool-call", toolCallId: "call-1", toolName: "respond", input: JSON.stringify(input) }],
-      finishReason: { unified: "tool-calls", raw: "tool_use" },
-      usage: {
-        inputTokens: { total: 42, noCache: 42, cacheRead: 0, cacheWrite: 0 },
-        outputTokens: { total: 5, text: 5, reasoning: 0 }
-      },
-      warnings: []
-    }
-  })
-}
+const objectModel = (input: unknown) => replyingModel({ toolInput: input })
 
 /** A prompt whose calls fill in the applicant. */
 const applicantPrompt = { name: "hoa-test-review", variables: ["applicant"] } as const
@@ -75,7 +64,7 @@ describe("runTextPrompt", () => {
       sessionId: "session-1"
     })
 
-    expect(model.doGenerateCalls[0]?.prompt).toEqual([
+    expect(model.doStreamCalls[0]?.prompt).toEqual([
       { role: "user", content: [{ type: "text", text: "Managed prompt for Lot 12" }] }
     ])
     expect(result).toMatchObject({
@@ -103,7 +92,7 @@ describe("runTextPrompt", () => {
       sessionId: "session-1"
     })
 
-    expect(model.doGenerateCalls[0]?.providerOptions).toEqual({ openrouter: { session_id: "session-1" } })
+    expect(model.doStreamCalls[0]?.providerOptions).toEqual({ openrouter: { session_id: "session-1" } })
     expect(result.traceId).toBeUndefined()
     expect(result.promptVersion).toBe(3)
     expect(result.costUsd).toBeUndefined()
@@ -154,7 +143,7 @@ describe("runTextPrompt", () => {
     expect(span).toBeDefined()
     expect(span?.attributes).toMatchObject({ "langfuse.trace.name": "sample-stage", "session.id": "session-1" })
     expect(result.traceId).toBe(span?.traceId)
-    expect(model.doGenerateCalls[0]?.providerOptions).toEqual({
+    expect(model.doStreamCalls[0]?.providerOptions).toEqual({
       openrouter: {
         session_id: "session-1",
         trace: {
@@ -193,8 +182,8 @@ describe("runObjectPrompt", () => {
     })
 
     expect(result.object).toEqual({ recommendation: "request-information", missing: ["Height"] })
-    expect(model.doGenerateCalls[0]?.toolChoice).toEqual({ type: "auto" })
-    expect(model.doGenerateCalls[0]?.prompt).toMatchObject([
+    expect(model.doStreamCalls[0]?.toolChoice).toEqual({ type: "auto" })
+    expect(model.doStreamCalls[0]?.prompt).toMatchObject([
       {
         role: "user",
         content: [
@@ -272,7 +261,7 @@ describe("runCheckedObjectPrompt", () => {
         terms: [{ key: "pet", organizationId: "org-1" }]
       }
     })
-    const sent = JSON.stringify(model.doGenerateCalls[0]?.tools)
+    const sent = JSON.stringify(model.doStreamCalls[0]?.tools)
     expect(sent).toContain("title")
     expect(sent).not.toContain("effectiveFrom")
     expect(sent).not.toContain("organizationId")
@@ -346,7 +335,7 @@ describe("model and version selection", () => {
         traceName: "sample-stage",
         environment: "test"
       })
-      return model.doGenerateCalls[0]?.providerOptions?.openrouter
+      return model.doStreamCalls[0]?.providerOptions?.openrouter
     }
 
     expect(await run({ effort: "high" })).toMatchObject({ reasoning: { effort: "high" } })
@@ -385,7 +374,7 @@ describe("content cache", () => {
     expect(first).toMatchObject({ isCached: false, object: { recommendation: "approve" } })
     expect(second).toMatchObject({ isCached: true, costUsd: 0, object: { recommendation: "approve" } })
     expect(third.isCached).toBe(false)
-    expect(model.doGenerateCalls).toHaveLength(2)
+    expect(model.doStreamCalls).toHaveLength(2)
     expect(stored.size).toBe(2)
   })
 })
@@ -407,5 +396,193 @@ describe("answerOf", () => {
     expect(answerOf({ toolCalls: [], text: 'Here it is:\n```json\n{"a": 2}\n```' })).toEqual({ a: 2 })
     expect(answerOf({ toolCalls: [], text: "{not json}" })).toBeUndefined()
     expect(answerOf({ toolCalls: [{ toolName: "other", input: {} }], text: "No answer." })).toBeUndefined()
+  })
+})
+
+describe("prompt caching", () => {
+  /** A prompt whose core terms every call shares, with the unit after them, as the encoding templates put them. */
+  const encodingPrompt = {
+    name: "hoa-test-encoding",
+    variables: ["unit", "coreTerms"],
+    sharedVariables: ["coreTerms"]
+  } as const satisfies PromptDefinition
+  const loadPrompt: PromptLoader = async (prompt) => ({
+    name: prompt.name,
+    version: 2,
+    config: {},
+    compile: (variables) => `Guide.\nCore terms:\n${variables?.coreTerms}\nThe unit:\n${variables?.unit}\nAnswer.`
+  })
+
+  /** OpenRouter's streamed reply: one text chunk, then the finish with usage, cached tokens and cost. */
+  function openRouterStream() {
+    const chunks = [
+      { id: "gen-1", model: "anthropic/claude-opus-5.5", choices: [{ index: 0, delta: { content: "Done." } }] },
+      {
+        id: "gen-1",
+        model: "anthropic/claude-opus-5.5",
+        choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+        usage: {
+          prompt_tokens: 20_000,
+          completion_tokens: 900,
+          total_tokens: 20_900,
+          prompt_tokens_details: { cached_tokens: 18_000, cache_write_tokens: 0 },
+          cost: 0.05
+        }
+      }
+    ]
+    const body = `${chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("")}data: [DONE]\n\n`
+    return new Response(body, { headers: { "content-type": "text/event-stream" } })
+  }
+
+  it("marks the shared prefix for Anthropic's prompt cache in the request OpenRouter receives", async () => {
+    const bodies: unknown[] = []
+    const fetch = vi.fn<typeof globalThis.fetch>(async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)))
+      return openRouterStream()
+    })
+    const model = createOpenRouter({ apiKey: "test-key", fetch }).chat("anthropic/claude-opus-5.5", {
+      usage: { include: true }
+    })
+
+    const result = await runTextPrompt({
+      loadPrompt,
+      createModel: () => model,
+      defaultModelId: "anthropic/claude-opus-5.5",
+      prompt: encodingPrompt,
+      variables: { unit: "Section 4.2", coreTerms: "owner | party" },
+      traceName: "provision-encoding",
+      environment: "test"
+    })
+
+    expect(bodies[0]).toMatchObject({
+      stream: true,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Guide.\nCore terms:\nowner | party\nThe unit:\n",
+              cache_control: { type: "ephemeral" }
+            },
+            { type: "text", text: "Section 4.2\nAnswer." }
+          ]
+        }
+      ]
+    })
+    expect(result).toMatchObject({
+      text: "Done.",
+      inputTokens: 20_000,
+      cachedInputTokens: 18_000,
+      cacheWriteTokens: 0,
+      outputTokens: 900,
+      costUsd: 0.05
+    })
+  })
+
+  it("splits at the first variable that isn't shared, and marks nothing for a prompt without shared variables", async () => {
+    const template = { name: "t", version: 1, config: {}, compile: (await loadPrompt(encodingPrompt)).compile }
+    const variables = { unit: "U", coreTerms: "C" }
+    const compiled = template.compile(variables)
+    expect(sharedPrefix(template, encodingPrompt, variables, compiled)).toEqual({
+      shared: "Guide.\nCore terms:\nC\nThe unit:\n",
+      rest: "U\nAnswer."
+    })
+    expect(sharedPrefix(template, applicantPrompt, variables, compiled)).toEqual({ shared: "", rest: compiled })
+
+    const model = createModel()
+    await runTextPrompt({
+      loadPrompt: langfusePrompt,
+      createModel: () => model,
+      defaultModelId: "test-model",
+      prompt: applicantPrompt,
+      variables: { applicant: "Lot 12" },
+      traceName: "sample-stage",
+      environment: "test"
+    })
+    expect(JSON.stringify(model.doStreamCalls[0]?.prompt)).not.toContain("cacheControl")
+  })
+})
+
+describe("retries", () => {
+  const rateLimited = (headers: Record<string, string> = {}) =>
+    new APICallError({
+      message: "Rate limit exceeded",
+      url: "https://openrouter.ai/api/v1/chat/completions",
+      requestBodyValues: {},
+      statusCode: 429,
+      responseHeaders: headers,
+      isRetryable: true
+    })
+
+  it("waits and retries a rate-limited call instead of failing it, honoring retry-after", async () => {
+    const waits: number[] = []
+    let calls = 0
+    const model = new MockLanguageModelV4({
+      doStream: async () => {
+        calls += 1
+        if (calls === 1) {
+          throw rateLimited({ "retry-after": "7" })
+        }
+        if (calls === 2) {
+          throw rateLimited()
+        }
+        return replyStream({ toolInput: { recommendation: "approve" } })
+      }
+    })
+
+    const result = await runObjectPrompt({
+      loadPrompt: langfusePrompt,
+      createModel: () => model,
+      defaultModelId: "test-model",
+      prompt: applicantPrompt,
+      variables: { applicant: "Lot 12" },
+      schema: z.object({ recommendation: z.string() }),
+      traceName: "provision-encoding",
+      environment: "test",
+      retry: { ...defaultRetry, sleep: async (ms) => void waits.push(ms) }
+    })
+
+    expect(result.object).toEqual({ recommendation: "approve" })
+    expect(calls).toBe(3)
+    // The provider's 7 seconds, then the second attempt's backoff: twice the base delay.
+    expect(waits).toEqual([7000, 2 * defaultRetry.baseDelayMs])
+  })
+
+  it("gives up after the policy's attempts, and never retries a call the provider rejects outright", async () => {
+    const sleep = vi.fn<(ms: number) => Promise<void>>(async () => undefined)
+    const failing = (error: Error) =>
+      new MockLanguageModelV4({
+        doStream: async () => {
+          throw error
+        }
+      })
+    const run = (model: MockLanguageModelV4) =>
+      runTextPrompt({
+        loadPrompt: langfusePrompt,
+        createModel: () => model,
+        defaultModelId: "test-model",
+        prompt,
+        variables: {},
+        traceName: "sample-stage",
+        environment: "test",
+        retry: { attempts: 3, baseDelayMs: 1, maxDelayMs: 1, sleep }
+      })
+
+    const limited = failing(rateLimited())
+    await expect(run(limited)).rejects.toThrow("Rate limit exceeded")
+    expect(limited.doStreamCalls).toHaveLength(3)
+
+    const badRequest = new APICallError({
+      message: "Bad request",
+      url: "https://openrouter.ai/api/v1/chat/completions",
+      requestBodyValues: {},
+      statusCode: 400,
+      isRetryable: false
+    })
+    const refused = failing(badRequest)
+    await expect(run(refused)).rejects.toThrow("Bad request")
+    expect(refused.doStreamCalls).toHaveLength(1)
+    expect(isRetryableCall(badRequest)).toBe(false)
   })
 })

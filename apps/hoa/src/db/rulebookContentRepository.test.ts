@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { saveBuiltDraft } from "@/rulebook/saveDraft"
 import type { Review } from "@/schema/types"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
 import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
@@ -15,7 +16,7 @@ import {
   saveRulebookChanges,
   type RulebookContent
 } from "./rulebookContentRepository"
-import { getRulebook, insertRulebook, publishRulebook } from "./rulebookRepository"
+import { cancelRulebook, getRulebook, insertRulebook, publishRulebook } from "./rulebookRepository"
 import { rulebookQuestions, rulebookRules, rulebookTerms } from "./schema"
 
 const hoaId = "demo-hoa"
@@ -142,6 +143,30 @@ describe("rulebookContentRepository", { timeout: 30_000 }, () => {
     expect(await getRulebook(db, hoaId, "next")).toBeNull()
     expect(await rowsOf("next")).toBe(0)
     expect(await rowsOf("new")).toBeGreaterThan(0)
+  })
+
+  it("never lets a stopped build replace the draft", async () => {
+    const { db } = database
+    await insertRulebook(db, rulebook("old", "draft"))
+    await saveRulebookContent(db, hoaId, "old", content)
+    await insertRulebook(db, rulebook("stopped", "building"))
+    expect(await cancelRulebook(db, hoaId, "stopped")).toBe(true)
+    expect(await cancelRulebook(db, hoaId, "stopped")).toBe(false)
+
+    await promoteToDraft(db, hoaId, "stopped")
+    expect((await getRulebook(db, hoaId, "old"))?.status).toBe("draft")
+    expect((await getRulebookContent(db, hoaId, "old"))?.rules).toHaveLength(content.rules.length)
+    expect((await getRulebook(db, hoaId, "stopped"))?.status).toBe("cancelled")
+    await expect(
+      saveBuiltDraft(db, hoaId, {
+        rulebookId: "stopped",
+        documents: { uploads: [], referenced: [] },
+        content,
+        recordedBy: "rulebook-build",
+        now
+      })
+    ).rejects.toThrow("was stopped")
+    expect(await getRulebookContent(db, hoaId, "stopped")).toBeNull()
   })
 
   it("finds the published rulebook's rules file", async () => {

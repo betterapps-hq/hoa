@@ -8,6 +8,8 @@ const call = (costUsd: number | null) => ({
   promptVersion: 1,
   modelId: "model",
   inputTokens: 1,
+  cachedInputTokens: null,
+  cacheWriteTokens: null,
   outputTokens: 1,
   costUsd,
   latencyMs: 1,

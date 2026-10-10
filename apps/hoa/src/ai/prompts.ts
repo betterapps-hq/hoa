@@ -7,6 +7,11 @@ export type PromptDefinition<Variable extends string = string> = {
   name: string
   /** The `{{variables}}` the code fills in. The Langfuse prompt must use exactly these (`promptLoader.ts`). */
   variables: readonly Variable[]
+  /**
+   * The variables whose values are the same on every call of a stage (core terms, request types). The template puts
+   * them before the others, so the text up to the first other variable is sent as a cached prefix (runPrompt.ts).
+   */
+  sharedVariables?: readonly Variable[]
 }
 
 /** What a call to a prompt must fill in: exactly the variables it declares, checked by the compiler. */

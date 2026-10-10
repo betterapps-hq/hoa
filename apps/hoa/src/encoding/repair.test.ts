@@ -8,7 +8,7 @@ import {
   secondDraft,
   vocabulary
 } from "@/tests/encodingDrafts"
-import { decideRepair, groupByUnit, keysDefinedElsewhere, verifyUnit, type UnitProblem } from "./repair"
+import { groupByUnit, problemsToRepairAlone, verifyUnit, type UnitProblem } from "./repair"
 
 const context = { organizationId: "org-1", documents: draftDocuments, provisions: draftProvisions, vocabulary }
 const firstUnit = ["declaration:4.1", "rules:1"]
@@ -89,7 +89,7 @@ describe("groupByUnit", () => {
   })
 })
 
-describe("decideRepair", () => {
+describe("problemsToRepairAlone", () => {
   const missing = (term: string): UnitProblem => ({
     source: "validator",
     code: "undefined-term",
@@ -97,29 +97,16 @@ describe("decideRepair", () => {
     path: [],
     reference: term
   })
+  const invariant: UnitProblem = { ...missing("x"), code: "invariant", reference: null }
 
-  it("waits for the merge when every problem is a term another unit defines", () => {
-    expect(decideRepair([], new Set())).toBe("none")
-    expect(decideRepair([missing("garden-shed")], new Set(["garden-shed"]))).toBe("after-merge")
-    expect(decideRepair([missing("gazebo")], new Set(["garden-shed"]))).toBe("repair")
-    expect(
-      decideRepair(
-        [missing("garden-shed"), { ...missing("x"), code: "invariant", reference: null }],
-        new Set(["garden-shed"])
-      )
-    ).toBe("repair")
+  it("leaves references to terms and rules the draft doesn't define for the merged set", () => {
+    const draft = parsedDraft(firstDraft)
+    expect(problemsToRepairAlone({ draft, problems: [] })).toEqual([])
+    expect(problemsToRepairAlone({ draft, problems: [missing("garden-shed")] })).toEqual([])
+    expect(problemsToRepairAlone({ draft, problems: [missing("garden-shed"), invariant] })).toEqual([invariant])
   })
 
-  it("knows which terms and rules the other units define", () => {
-    const drafts = new Map([
-      ["unit-1", parsedDraft(firstDraft)],
-      ["unit-2", parsedDraft(secondDraft)]
-    ])
-    expect([...keysDefinedElsewhere("unit-1", drafts)]).toEqual([
-      "shed",
-      "garden-shed",
-      "rules:1#max-height",
-      "rules:2(a)#max-height"
-    ])
+  it("repairs everything an answer that fails Zod has", () => {
+    expect(problemsToRepairAlone({ draft: null, problems: [missing("garden-shed"), invariant] })).toHaveLength(2)
   })
 })

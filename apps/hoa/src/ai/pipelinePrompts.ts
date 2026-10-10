@@ -12,12 +12,21 @@ export const pipelinePrompts = {
     name: "hoa-structure-repair",
     variables: ["documentTitle", "pageText", "parserOutline", "problems"]
   },
-  termExtraction: { name: "hoa-term-extraction", variables: ["document", "definitions", "candidates", "coreTerms"] },
+  termExtraction: {
+    name: "hoa-term-extraction",
+    variables: ["document", "definitions", "candidates", "coreTerms"],
+    sharedVariables: ["coreTerms"]
+  },
   provisionEncoding: {
     name: "hoa-provision-encoding",
-    variables: ["document", "provisions", "context", "references", "terms", "coreTerms", "requestTypes"]
+    variables: ["document", "provisions", "context", "references", "terms", "coreTerms", "requestTypes"],
+    sharedVariables: ["coreTerms", "requestTypes"]
   },
-  encodingRepair: { name: "hoa-encoding-repair", variables: ["draft", "problems", "terms", "coreTerms"] },
+  encodingRepair: {
+    name: "hoa-encoding-repair",
+    variables: ["draft", "problems", "terms", "coreTerms"],
+    sharedVariables: ["coreTerms"]
+  },
   rulebookConsolidation: { name: "hoa-rulebook-consolidation", variables: ["rules", "termPairs", "documents"] },
   // The application review (application-review.md). The subjects and facts calls also receive the packet's images.
   pageClassification: {

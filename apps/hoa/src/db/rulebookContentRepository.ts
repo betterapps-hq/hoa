@@ -137,6 +137,14 @@ export async function discardDraftRulebook(db: Database, hoaId: string, rulebook
  * and its records go in the same batch, so there's never more than one.
  */
 export async function promoteToDraft(db: Database, hoaId: string, rulebookId: string) {
+  const promoted = await db
+    .select({ status: rulebooks.status })
+    .from(rulebooks)
+    .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId)))
+    .get()
+  if (promoted?.status !== "building") {
+    return // Stopped, or already promoted: the earlier draft stays.
+  }
   const previous = await db
     .select({ id: rulebooks.id })
     .from(rulebooks)

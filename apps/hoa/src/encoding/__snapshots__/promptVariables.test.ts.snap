@@ -160,15 +160,18 @@ vote.subject | property of vote: choice of vote-subject | "subject"
 work | thing (object) | "work"
 year | unit of calendar-period (12 base units) | "years"",
   "document": "rules (rules): Community Rules",
-  "provisions": "[rules:2] section 2
+  "provisions": "[rules:1] section 1
+A shed may be at most ten feet tall.
+
+[rules:2] section 2
 Sheds must also look like the house:
 
 [rules:2(a)] point 2(a)
-No shed may be taller than ten feet.",
-  "references": "[rules:1]
-A shed may be at most ten feet tall.
+No shed may be taller than ten feet.
 
-[declaration:4.1]
+[rules:3] section 3
+Paint colors are listed in the color guide.",
+  "references": "[declaration:4.1]
 Sheds are allowed on every Lot.",
   "requestTypes": "architectural-application | thing (request); request: flow application, governing date architectural-application.submitted-on, lot required | "application"
 architectural-application.decided-on | property of architectural-application: date | "decided on"

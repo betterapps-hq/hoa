@@ -5,10 +5,11 @@ import { uploadEdition } from "@/documents/documentStructure"
 import type { StepRunner } from "@/jobs/steps"
 import type { RuleDraft } from "@/schema/zod"
 import { cite } from "@/tests/encodingDrafts"
-import { scriptedModel, variableOf, variablesPromptLoader } from "@/tests/scriptedModel"
+import { promptText, replyingModel, scriptedModel, variableOf, variablesPromptLoader } from "@/tests/scriptedModel"
 import { syntheticPages } from "@/tests/syntheticDeclaration"
 import { buildRulebook, type BuildInput } from "./build"
 import { buildScores } from "./buildScores"
+import { SourcesRejectedError } from "./sourceCheck"
 
 const structure = {
   key: "declaration",
@@ -69,10 +70,10 @@ function encode(text: string, isFirstTry: boolean) {
   }
 }
 
-/** Answers a repair like an encoder: the whole draft again, for the provisions it names. */
+/** Answers a repair like an encoder: a patch that replaces the rules of the provisions the draft names. */
 function repair(text: string) {
   const keys = [...variableOf(text, "draft").matchAll(/"key":"([^"#]+)"/g)].map((match) => `[${match[1] ?? ""}]`)
-  return encode(`## provisions\n${keys.join("\n")}`, false)
+  return { rules: encode(`## provisions\n${keys.join("\n")}`, false).rules }
 }
 
 /** Answers each build prompt the way the model would. */ function answer(text: string) {
@@ -146,6 +147,7 @@ function input(overrides: Partial<BuildInput> = {}): BuildInput {
     },
     previous: null,
     now: "2026-10-09T12:00:00.000Z",
+    concurrency: 8,
     ...overrides
   }
 }
@@ -162,9 +164,9 @@ describe("buildRulebook", () => {
         "analyze:upload-1",
         "vocabulary:upload-1",
         "plan",
-        "encode:declaration:article-3",
+        "encode:declaration:preamble",
         "encode:conduct-rules:exhibit-a",
-        "verify",
+        "verify:conduct-rules:exhibit-a",
         "repair:conduct-rules:exhibit-a:1",
         "verify:merged",
         "merge",
@@ -204,6 +206,29 @@ describe("buildRulebook", () => {
     expect(result.report.calls.map((call) => call.stage)).toContain("encoding-repair")
   })
 
+  it("refuses to start, before any model call, when an upload's record would fail later", async () => {
+    const createModel = vi.fn<() => ReturnType<typeof model>>(() => model())
+    const { step, names } = stepRunner()
+    const bad = input({
+      step,
+      ai: { ...input().ai, createModel },
+      sources: input().sources.map((source) => ({
+        ...source,
+        edition: {
+          ...source.edition,
+          files: source.edition.files.map((file) => ({ ...file, sha256: "sample-declaration-pages" }))
+        }
+      }))
+    })
+    const refused = buildRulebook(bad)
+    await expect(refused).rejects.toBeInstanceOf(SourcesRejectedError)
+    await expect(refused).rejects.toThrow(
+      /The document “Declaration for Maple Hollow” has a record the build can't save: edition\.files\[0\]\.sha256/
+    )
+    expect(createModel).not.toHaveBeenCalled()
+    expect(names).toEqual(["check"])
+  })
+
   it("scores the build", async () => {
     const scores = buildScores(await buildRulebook(input()))
     const score = (name: string) => scores.find((item) => item.name === name)?.value
@@ -225,10 +250,10 @@ describe("buildRulebook", () => {
     const result = await buildRulebook(
       input({
         ai: { ...input().ai, createModel: () => failing },
-        selectUnits: (unit) => unit.id === "conduct-rules:exhibit-a" || unit.id === "declaration:article-1"
+        selectUnits: (unit) => unit.id === "conduct-rules:exhibit-a" || unit.id === "declaration:preamble"
       })
     )
-    expect(result.report.units.map((unit) => unit.id)).toEqual(["declaration:article-1", "conduct-rules:exhibit-a"])
+    expect(result.report.units.map((unit) => unit.id)).toEqual(["declaration:preamble", "conduct-rules:exhibit-a"])
     expect(result.failures).toEqual([
       expect.objectContaining({
         stage: "encode",
@@ -307,8 +332,100 @@ describe("buildRulebook", () => {
     ])
   })
 
+  it("repairs a unit as soon as its own encode is verified, while other units are still encoding", async () => {
+    const events: string[] = []
+    let repairStarted = () => undefined as void
+    const started = new Promise<void>((resolve) => {
+      repairStarted = resolve
+    })
+    const model = replyingModel(async (options) => {
+      const text = promptText(options)
+      if (text.startsWith(`# ${pipelinePrompts.encodingRepair.name}`)) {
+        events.push("repair conduct rules")
+        repairStarted()
+      }
+      if (
+        text.startsWith(`# ${pipelinePrompts.provisionEncoding.name}`) &&
+        unitKeys(text).includes("declaration:3.1")
+      ) {
+        // This unit's encode finishes only once the conduct rules' repair has started, or after a second.
+        await Promise.race([started, new Promise((resolve) => setTimeout(resolve, 1000))])
+        events.push("encoded declaration")
+      }
+      return { toolInput: answer(text), usage: { input: 100, output: 10 } }
+    })
+    const result = await buildRulebook(input({ ai: { ...input().ai, createModel: () => model } }))
+    expect(events).toEqual(["repair conduct rules", "encoded declaration"])
+    expect(result.report.units.find((unit) => unit.id === "conduct-rules:exhibit-a")).toMatchObject({
+      isValid: true,
+      repairRounds: 1
+    })
+  })
+
+  it("keeps at most `concurrency` model calls in flight, encodes and repairs together", async () => {
+    let inFlight = 0
+    let most = 0
+    const model = replyingModel(async (options) => {
+      inFlight += 1
+      most = Math.max(most, inFlight)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      inFlight -= 1
+      return { toolInput: answer(promptText(options)), usage: { input: 100, output: 10 } }
+    })
+    const result = await buildRulebook(input({ concurrency: 1, ai: { ...input().ai, createModel: () => model } }))
+    expect(result.report.units.length).toBeGreaterThan(1)
+    expect(most).toBe(1)
+  })
+
+  it("reuses a document's vocabulary while its definitions read the same, and extracts it again when they change", async () => {
+    const stored = new Map<string, unknown>()
+    const cache: PromptCache = {
+      get: async (key) => stored.get(key),
+      put: async (key, value) => {
+        stored.set(key, value)
+      }
+    }
+    const extractions = () => {
+      let count = 0
+      const model = scriptedModel((text) => {
+        if (text.startsWith(`# ${pipelinePrompts.termExtraction.name}`)) {
+          count += 1
+        }
+        return answer(text)
+      })
+      return { model, count: () => count }
+    }
+    const build = async (change: (text: string) => string, title: string) => {
+      const counted = extractions()
+      const result = await buildRulebook(
+        input({
+          ai: { ...input().ai, createModel: () => counted.model, cache: () => cache },
+          sources: input().sources.map((source) => ({
+            ...source,
+            title,
+            loadPages: async () => syntheticPages().map((page) => ({ ...page, text: change(page.text) }))
+          }))
+        })
+      )
+      return { result, extractions: counted.count() }
+    }
+
+    const first = await build((text) => text, "Declaration for Maple Hollow")
+    expect(first.extractions).toBe(1)
+    // A new title changes the term-extraction prompt, so the content cache misses, but the definitions are the same.
+    const retitled = await build((text) => text, "Amended Declaration for Maple Hollow")
+    expect(retitled.extractions).toBe(0)
+    expect(retitled.result.content.terms.map((term) => term.key)).toContain("common-grounds")
+    const redefined = await build(
+      (text) => text.replace('"Lot": A parcel shown on the plat.', '"Lot": A numbered parcel shown on the plat.'),
+      "Amended Declaration for Maple Hollow"
+    )
+    expect(redefined.extractions).toBe(1)
+  })
+
   it("keeps a valid draft when its repair fails Zod", async () => {
-    // The conduct rules' rule applies to a term nobody defines, and every repair answer lacks its provisions.
+    // The conduct rules' rule applies to a term nobody defines, which the merged set shows, and every repair answer
+    // lacks its provisions.
     const breaking = scriptedModel((text) => {
       if (text.startsWith(`# ${pipelinePrompts.encodingRepair.name}`)) {
         return { provisions: null }
@@ -324,7 +441,7 @@ describe("buildRulebook", () => {
     })
     const { step, names } = stepRunner()
     const result = await buildRulebook(input({ step, ai: { ...input().ai, createModel: () => breaking } }))
-    expect(names).toContain("repair:conduct-rules:exhibit-a:1")
+    expect(names).toContain("repair:conduct-rules:exhibit-a:2")
     expect(result.report.units.find((unit) => unit.id === "conduct-rules:exhibit-a")).toMatchObject({ isValid: true })
     expect(result.content.rules.find((rule) => rule.key === "conduct-rules:a#no-noise")?.issues).not.toEqual([])
     expect(result.failures).toEqual([])
@@ -345,6 +462,20 @@ describe("buildRulebook", () => {
     const rule = result.content.rules.find((item) => item.key === "conduct-rules:a#no-noise")
     expect(rule).toMatchObject({ bearer: "owner" })
     expect(result.failures).toEqual([])
+  })
+
+  it("notes a patch that removes a record the draft doesn't have, and applies the rest", async () => {
+    const removing = scriptedModel((text) =>
+      text.startsWith(`# ${pipelinePrompts.encodingRepair.name}`)
+        ? { ...repair(text), remove: { rules: ["conduct-rules:a#no-such-rule"] } }
+        : answer(text)
+    )
+    const result = await buildRulebook(input({ ai: { ...input().ai, createModel: () => removing } }))
+    expect(result.report.units.find((unit) => unit.id === "conduct-rules:exhibit-a")).toMatchObject({
+      isValid: true,
+      problems: 0
+    })
+    expect(result.report.notes).toContainEqual(expect.stringContaining("rules conduct-rules:a#no-such-rule"))
   })
 
   it("asks the model for the outline when the parser can't number a document", async () => {

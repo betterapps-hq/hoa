@@ -50,7 +50,7 @@ export function reviewReport(
     return [
       `## ${item.id}: ${item.title}`,
       "",
-      `Recommendation ${item.recommendation}; ${item.calls.length} model calls (${item.calls.filter((call) => call.isCached).length} cached), $${costOf(item.calls).toFixed(4)}, ${sum(item.calls.map((call) => call.inputTokens))} input and ${sum(item.calls.map((call) => call.outputTokens))} output tokens, ${item.durationSeconds.toFixed(0)} s.`,
+      `Recommendation ${item.recommendation}; ${item.calls.length} model calls (${item.calls.filter((call) => call.isCached).length} cached), $${costOf(item.calls).toFixed(4)}, ${sum(item.calls.map((call) => call.inputTokens))} input tokens (${sum(item.calls.map((call) => call.cachedInputTokens))} cached) and ${sum(item.calls.map((call) => call.outputTokens))} output tokens, ${item.durationSeconds.toFixed(0)} s.`,
       "",
       `Entities aligned: ${Object.entries(item.score.alignment)
         .filter(([wanted]) => !["request", "lot", "community"].includes(wanted))

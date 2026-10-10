@@ -1,12 +1,15 @@
 import { DownloadIcon } from "lucide-react"
 import { useState, type ReactNode } from "react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import type { GoverningDocument } from "@/documents/governingDocument"
 import { GoverningDocuments } from "@/features/documents/GoverningDocuments/GoverningDocuments"
 import type { DocumentDetails } from "@/features/documents/uploadDocument"
-import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
+import type { BuildResults } from "@/rulebook/buildResults.server"
+import type { StopResult } from "@/workflows/rulebookTrigger.server"
 import { attempt } from "../attempt"
+import { BuildProgress } from "../BuildProgress/BuildProgress"
 import { DraftReview } from "../DraftReview/DraftReview"
 import { saveFile } from "../PublishedRulebook/PublishedRulebook.utils"
 import type { RulebookSources, RulebookView } from "../rulebook.functions"
@@ -35,6 +38,10 @@ export type RulebookPageProps = {
   onUpload: (file: File, details: DocumentDetails) => Promise<unknown>
   /** Builds a draft from the current documents, when one didn't start on its own or failed. */
   onBuild: () => Promise<void>
+  /** Stops the running build. */
+  onStop: () => Promise<StopResult>
+  /** What a running build has produced so far, since a cursor. */
+  loadBuildResults: (jobId: string, since: string | null) => Promise<BuildResults>
   onPublish: (rulebookId: string) => Promise<void>
   onDiscard: (rulebookId: string) => Promise<void>
   onChanged: () => void
@@ -104,6 +111,13 @@ function StatusLine({ status, ...props }: { status: RulebookStatus } & RulebookP
     setIsBusy(false)
     props.onChanged()
   }
+  const stop = async () => {
+    const result = await attempt(props.onStop, "The build couldn’t be stopped.")
+    if (result && result.status !== "stopped") {
+      toast("The build had already finished, so there was nothing to stop.")
+    }
+    props.onChanged()
+  }
   const line = (sentence: ReactNode, detail: ReactNode, action: ReactNode = null) => (
     <section aria-label="Status" className="flex flex-col gap-3 rounded-lg border p-5">
       <p className="text-lg leading-snug">{sentence}</p>
@@ -116,13 +130,19 @@ function StatusLine({ status, ...props }: { status: RulebookStatus } & RulebookP
     case "building":
       return line(
         "Updating the rulebook from your documents.",
-        <div className="flex flex-col gap-2">
-          {props.draft.buildJobId ? (
-            <JobProgress jobId={props.draft.buildJobId} loadJob={props.loadJob} onFinished={props.onChanged} />
-          ) : null}
+        <div className="flex flex-col gap-4">
           <p>
             You can leave this page. When it&rsquo;s done, you review what changed here before it&rsquo;s published.
           </p>
+          {props.draft.buildJobId ? (
+            <BuildProgress
+              jobId={props.draft.buildJobId}
+              loadJob={props.loadJob}
+              onFinished={props.onChanged}
+              onStop={stop}
+              loadResults={(since) => props.loadBuildResults(props.draft.buildJobId ?? "", since)}
+            />
+          ) : null}
         </div>
       )
     case "reading":
@@ -144,6 +164,23 @@ function StatusLine({ status, ...props }: { status: RulebookStatus } & RulebookP
         <Button className="w-fit" onClick={() => props.onReviewingChange(true)}>
           {status.isFirst ? "Review the draft" : "Review changes"}
         </Button>
+      )
+    case "build-stopped":
+      return line(
+        "The last build was stopped.",
+        status.hasDraft
+          ? "Work it finished is kept and reused next time. The earlier draft is still here to review."
+          : "Work it finished is kept and reused next time. Nothing was published.",
+        <div className="flex flex-wrap gap-2">
+          <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
+            Build a draft
+          </Button>
+          {status.hasDraft ? (
+            <Button variant="ghost" className="w-fit" onClick={() => props.onReviewingChange(true)}>
+              Review the earlier draft
+            </Button>
+          ) : null}
+        </div>
       )
     case "build-failed":
       return line(

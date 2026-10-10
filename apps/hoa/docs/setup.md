@@ -46,6 +46,7 @@ non-secret values in `wrangler.jsonc` `vars` (preview values in its `previews` b
 | `OPENROUTER_API_KEY` (secret) | Model calls. Without it, AI features report that it's missing. | hoa key | Same | Same |
 | `OPENROUTER_MODEL` | Main model; defaults to `anthropic/claude-haiku-5.5` | Default | Default | Default |
 | `OPENROUTER_SMALL_MODEL` (phase 1) | Routing, structure and classification; defaults to the main model | Default | Default | Default |
+| `ENCODING_CONCURRENCY` | Encoding and repair calls a rulebook build runs at once; defaults to 16 ([design/encoding.md](design/encoding.md#cost-and-scale)) | Default | Default | Default |
 | `LANGFUSE_PUBLIC_KEY` (secret) | Tracing and prompt management | `arc-review` key | `arc-review` key | `arc-review` key |
 | `LANGFUSE_SECRET_KEY` (secret) | Tracing and prompt management | `arc-review` key | `arc-review` key | `arc-review` key |
 | `LANGFUSE_BASE_URL` | Defaults to the US cloud region | Default | Default | Default |

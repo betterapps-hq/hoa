@@ -5,8 +5,8 @@ import { questionId, type DraftLocation } from "./merge"
 
 // Verify and repair (encoding.md, Verify and Repair): Zod and validateRulebook problems on one unit's draft, each with
 // its JSON path in the draft, so hoa-encoding-repair can fix them; after merge, the whole rulebook's issues grouped
-// back by unit. A unit whose only problems are terms or rules another unit defines waits for the merge instead of a
-// repair.
+// back by unit. A unit's references to terms or rules it doesn't define wait for the merge, since another unit may
+// define them; its other problems are repaired as soon as it's verified.
 
 export type UnitProblem = {
   source: "zod" | "validator"
@@ -23,8 +23,6 @@ export type UnitContext = {
   provisions: readonly Provision[]
   vocabulary: readonly TermContent[]
 }
-
-export type RepairDecision = "none" | "repair" | "after-merge"
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null
 
@@ -140,22 +138,11 @@ export function groupByUnit(
 }
 
 /**
- * Repair or wait (encoding.md, Repair): a unit whose only problems are references to terms or rules that other units
- * define is verified again after the merge; any other problem goes to hoa-encoding-repair.
+ * The problems a unit's first repair fixes as soon as its own encode is verified, without waiting for other units
+ * (encoding.md, Repair): every problem of an answer that fails Zod; otherwise all but references to terms and rules
+ * the draft doesn't define, which another unit may define. Those wait for the merged set, and round 2 repairs the
+ * ones it still shows.
  */
-export function decideRepair(problems: readonly UnitProblem[], definedElsewhere: ReadonlySet<string>): RepairDecision {
-  if (problems.length === 0) {
-    return "none"
-  }
-  const isWaiting = problems.every((problem) => problem.reference !== null && definedElsewhere.has(problem.reference))
-  return isWaiting ? "after-merge" : "repair"
-}
-
-/** The terms and rules the other units' drafts define, so a unit can see which of its missing keys they define. */
-export function keysDefinedElsewhere(unitId: string, drafts: ReadonlyMap<string, EncodingDraftContent>) {
-  return new Set(
-    [...drafts]
-      .filter(([id]) => id !== unitId)
-      .flatMap(([, draft]) => [...draft.terms.map((term) => term.key), ...draft.rules.map((rule) => rule.key)])
-  )
+export function problemsToRepairAlone(state: { draft: EncodingDraftContent | null; problems: readonly UnitProblem[] }) {
+  return state.draft === null ? [...state.problems] : state.problems.filter((problem) => problem.reference === null)
 }

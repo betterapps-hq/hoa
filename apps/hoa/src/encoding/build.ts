@@ -18,18 +18,21 @@ import {
 } from "@/documents/documentStructure"
 import { modelCallOf, type ModelCall, type StepRunner } from "@/jobs/steps"
 import type { Page } from "@/ocr/page"
+import { canonicalJson, sha256Hex } from "@/rulebook/canonical"
 import { carryNoRules, type PreviousReview } from "@/rulebook/carryForward"
-import type { Edition, GoverningDocument, ProvisionKey } from "@/schema/types"
-import { encodingDraft, termDraft } from "@/schema/zod"
+import type { Edition, GoverningDocument, Provision, ProvisionKey } from "@/schema/types"
+import { encodingDraft, encodingPatch, termDraft } from "@/schema/zod"
 import { draftContent, type BuildFailure } from "./buildRecords"
 import { checkStructure } from "./check"
 import { cleanPages } from "./clean"
 import { applyConsolidation, consolidation } from "./consolidate"
 import { findTermCandidates } from "./definedTerms"
 import { mergeDrafts, mergeTerms, type MergeInput } from "./merge"
+import { applyPatch } from "./patch"
 import { planUnits, type EncodingUnit } from "./plan"
 import {
   encodingRepairVariables,
+  provisionBlock,
   provisionEncodingVariables,
   rulebookConsolidationVariables,
   structureRepairVariables,
@@ -37,7 +40,8 @@ import {
 } from "./promptVariables"
 import { structureDocument, type StructuredDocument } from "./provisions"
 import { analyzeReferences, citedProvisions } from "./references"
-import { decideRepair, groupByUnit, keysDefinedElsewhere, verifyUnit, type UnitProblem } from "./repair"
+import { groupByUnit, problemsToRepairAlone, verifyUnit, type UnitProblem } from "./repair"
+import { checkSources, SourcesRejectedError } from "./sourceCheck"
 import {
   analysisOutput,
   consolidateOutput,
@@ -49,6 +53,7 @@ import {
   unitProblems,
   unitState,
   vocabularyOutput,
+  type RepairOutput,
   type UnitState
 } from "./stepOutputs"
 import { repairStructure, structureRepairAnswer } from "./structureRepair"
@@ -59,16 +64,22 @@ import { repairStructure, structureRepairAnswer } from "./structureRepair"
 // review that carries forward.
 
 /** The job stages the build reports, in order (encoding.md, Stages). */
-export type BuildStage =
-  | "structure"
-  | "analyze"
-  | "vocabulary"
-  | "plan"
-  | "encode"
-  | "verify"
-  | "repair"
-  | "merge"
-  | "consolidate"
+export const buildStages = [
+  "check",
+  "structure",
+  "analyze",
+  "vocabulary",
+  "plan",
+  "encode",
+  "verify",
+  "repair",
+  "merge",
+  "consolidate"
+] as const
+export type BuildStage = (typeof buildStages)[number]
+
+/** Stages that may have nothing to do: the second repair round runs only for what the merged set shows. */
+export const optionalBuildStages: readonly BuildStage[] = ["repair"]
 
 /** What the build's model calls need: the prompt loader, models, versions pinned in resolve-prompts and the cache. */
 export type BuildAi = {
@@ -107,11 +118,9 @@ export type BuildInput = {
   progress?: (stage: BuildStage, done: number, total: number) => Promise<void>
   /** Encodes only the units this keeps (evaluation slices); the rest of the documents is left out of the draft. */
   selectUnits?: (unit: EncodingUnit) => boolean
-  /** Encoding calls in flight at once. */
-  concurrency?: number
+  /** Encoding and repair calls in flight at once: `ENCODING_CONCURRENCY` (encoding.md, Cost and scale). */
+  concurrency: number
 }
-
-const maxConcurrency = 8
 
 /** hoa-term-extraction's answer (encoding.md, Prompts and models). */
 const termExtractionAnswer = z.object({ terms: z.array(termDraft), notes: z.array(z.string()).default([]) })
@@ -163,6 +172,27 @@ function draftFields(organizationId: string, effectiveFrom: (documentKey: string
 
 const callOf = (itemId: string, metrics: PromptRunMetrics) => modelCallOf(itemId, metrics, traceNames)
 
+/**
+ * What a document's vocabulary is reused by: the organization, the document, the term-extraction version and the text
+ * of its definitions. The candidates code finds elsewhere in the document are left out, so a change outside the
+ * definitions keeps the vocabulary, and with it every unchanged unit's prompt.
+ */
+const definitionsKey = (
+  organizationId: string,
+  documentKey: string,
+  promptVersion: number | undefined,
+  definitions: readonly Provision[]
+) =>
+  sha256Hex(
+    canonicalJson({
+      reuse: "vocabulary-by-definitions",
+      organizationId,
+      documentKey,
+      promptVersion: promptVersion ?? null,
+      definitions: definitions.map((provision) => provisionBlock(provision))
+    })
+  )
+
 /** Runs `run` over `items`, at most `limit` at a time, settling each like `Promise.allSettled`. */
 export async function settleEach<T, R>(items: readonly T[], limit: number, run: (item: T) => Promise<R>) {
   const results: PromiseSettledResult<R>[] = []
@@ -204,6 +234,13 @@ export async function buildRulebook(input: BuildInput) {
     sessionId: ai.sessionId,
     cache: ai.cache?.(stage)
   })
+
+  // 1b. Check: what later steps validate about the uploads themselves, before any model call.
+  await progress("check", 0, input.sources.length)
+  const sourceProblems = await step("check", z.array(z.string()), async () => checkSources(input.sources))
+  if (sourceProblems.length > 0) {
+    throw new SourcesRejectedError(sourceProblems)
+  }
 
   // 2. Structure: provisions from the page records; a model proposes the outline only when the parser fails its check.
   await progress("structure", 0, input.sources.length)
@@ -264,7 +301,9 @@ export async function buildRulebook(input: BuildInput) {
     uploaded.flatMap((document) => (document.edition ? [[document.key, document.edition.effectiveFrom]] : []))
   )
 
-  // 4. Vocabulary: one call per document with definitions; terms merge across documents by key.
+  // 4. Vocabulary: one call per document with definitions; terms merge across documents by key. A document whose
+  // definitions read as they did in an earlier build reuses that build's terms, so its units' prompts stay the same and
+  // hit the content cache.
   const withDefinitions = structured.filter(({ documents }) =>
     documents.some((document) => document.provisions.some((provision) => provision.kind === "definition"))
   )
@@ -276,18 +315,27 @@ export async function buildRulebook(input: BuildInput) {
       vocabularyOutput,
       async () => {
         const provisions = documents.flatMap((document) => document.provisions)
+        const definitions = provisions.filter((provision) => provision.kind === "definition")
+        const options = promptOptions(pipelinePrompts.termExtraction, "vocabulary")
+        const reuse = ai.cache?.("vocabulary")
+        const reuseKey = await definitionsKey(organizationId, source.structure.key, options.promptVersion, definitions)
+        const previous = termExtractionAnswer.safeParse(await reuse?.get(reuseKey))
+        if (previous.success) {
+          return { ...previous.data, isReused: true, calls: [] }
+        }
         const result = await runObjectPrompt({
-          ...promptOptions(pipelinePrompts.termExtraction, "vocabulary"),
+          ...options,
           prompt: pipelinePrompts.termExtraction,
           schema: termExtractionAnswer,
           codeFields: ownedTerms(organizationId),
           variables: termExtractionVariables(
             { key: source.structure.key, kind: source.structure.kind, title: source.title },
-            provisions.filter((provision) => provision.kind === "definition"),
+            definitions,
             findTermCandidates(provisions)
           )
         })
-        return { ...result.object, calls: [callOf(source.documentId, result)] }
+        await reuse?.put(reuseKey, result.object)
+        return { ...result.object, isReused: false, calls: [callOf(source.documentId, result)] }
       },
       "model"
     )
@@ -324,12 +372,74 @@ export async function buildRulebook(input: BuildInput) {
     )
   })
 
-  // 6. Encode: one call per unit, in parallel; a unit that fails after retries is recorded and left out.
-  const concurrency = input.concurrency ?? maxConcurrency
-  let encodedCount = 0
+  // 6 to 8. Encode, verify and repair: each unit is encoded, verified alone, and repaired at once when it has problems
+  // of its own, while other units are still encoding; at most `concurrency` model calls are in flight. Then the drafts
+  // are merged and verified together, and round 2 repairs what only the merged set shows. A unit whose encode fails
+  // after retries is recorded and left out.
+  const { concurrency } = input
+  const states = new Map<string, UnitState>()
+  const repairs = new Map<string, number>()
+  /** The valid drafts in the units' order, whatever order their calls finished in, so the merge is deterministic. */
+  const drafts = () =>
+    new Map(
+      units.flatMap((unit) => {
+        const draft = states.get(unit.id)?.draft
+        return draft ? [[unit.id, draft] as const] : []
+      })
+    )
+
+  /** One repair round of one unit: the model's patch, applied to the unit's answer and verified again. */
+  const repairUnit = (unit: EncodingUnit, state: UnitState, problems: readonly UnitProblem[], round: number) =>
+    step(
+      `repair:${unit.id}:${round}`,
+      repairOutput,
+      async () => {
+        const result = await runCheckedObjectPrompt({
+          ...promptOptions(pipelinePrompts.encodingRepair, "repair"),
+          prompt: pipelinePrompts.encodingRepair,
+          schema: encodingPatch,
+          codeFields: fields(unit),
+          variables: encodingRepairVariables(state.draft ?? state.answer, problems, unit.terms)
+        })
+        const call = callOf(`${unit.id}:${round}`, result)
+        const which = `The repair of ${unit.id} (round ${round})`
+        if (!result.isValid) {
+          const [issue] = result.issues
+          return {
+            state: null,
+            call,
+            notes: [`${which} sent a patch that fails Zod: ${issue?.message ?? "no answer"}.`]
+          }
+        }
+        const applied = applyPatch(state.draft ?? state.answer, result.object)
+        return {
+          state: verifyAnswer(unit, applied.answer),
+          call,
+          notes: applied.unmatched.map((item) => `${which} names ${item}, which the draft doesn't have.`)
+        }
+      },
+      "model"
+    )
+
+  /**
+   * The state a repair leaves: a repair that breaks a valid draft, leaves it with more problems, or sent a patch that
+   * fails Zod is set aside, and the draft stays with its problems, which become issues.
+   */
+  const settleRepair = (unit: EncodingUnit, before: UnitState, output: RepairOutput, round: number) => {
+    calls.push(output.call)
+    notes.push(...output.notes)
+    repairs.set(unit.id, round)
+    const repaired = output.state
+    const isBetter =
+      repaired !== null &&
+      (before.draft === null || (repaired.draft !== null && repaired.problems.length <= before.problems.length))
+    return isBetter ? repaired : before
+  }
+
+  let finished = 0
   await progress("encode", 0, units.length)
-  const encodeResults = await settleEach(units, concurrency, async (unit) => {
-    const output = await step(
+  const unitResults = await settleEach(units, concurrency, async (unit) => {
+    const encoded = await step(
       `encode:${unit.id}`,
       encodeOutput,
       async () => {
@@ -348,74 +458,44 @@ export async function buildRulebook(input: BuildInput) {
       },
       "model"
     )
-    encodedCount += 1
-    await progress("encode", encodedCount, units.length)
-    return output
-  })
-  const encoded = units.flatMap((unit, index) => {
-    const result = encodeResults[index]
-    if (result?.status === "fulfilled") {
-      calls.push(result.value.call)
-      return [{ unit, answer: result.value.answer }]
-    }
-    failures.push({ stage: "encode", itemId: unit.id, message: messageOf(result?.reason) })
-    return []
-  })
-
-  // 7. Verify: Zod and the validator on each draft, alone.
-  await progress("verify", 0, encoded.length)
-  const verified = await step("verify", unitState.array(), async () =>
-    encoded.map(({ unit, answer }) => verifyAnswer(unit, answer))
-  )
-  const states = new Map(verified.map((state) => [state.unitId, state]))
-  const problemsBefore = verified.reduce((sum, state) => sum + state.problems.length, 0)
-  const validAfterEncode = verified.filter((state) => state.draft !== null).length
-  const drafts = () =>
-    new Map([...states.values()].flatMap((state) => (state.draft ? [[state.unitId, state.draft] as const] : [])))
-  const repairs = new Map<string, number>()
-
-  // 8. Repair, at most two rounds: problems a unit has alone, then those the merged rulebook shows.
-  const repairRound = async (round: number, problemsOf: (state: UnitState) => UnitProblem[] | null) => {
-    const due = encoded.flatMap(({ unit }) => {
-      const state = states.get(unit.id)
-      const problems = state ? problemsOf(state) : null
-      return state && problems && problems.length > 0 ? [{ unit, state, problems }] : []
-    })
-    await progress("repair", 0, due.length)
-    const results = await settleEach(due, concurrency, ({ unit, state, problems }) =>
-      step(
-        `repair:${unit.id}:${round}`,
-        repairOutput,
-        async () => {
-          const result = await runCheckedObjectPrompt({
-            ...promptOptions(pipelinePrompts.encodingRepair, "repair"),
-            prompt: pipelinePrompts.encodingRepair,
-            schema: encodingDraft,
-            codeFields: fields(unit),
-            variables: encodingRepairVariables(state.draft ?? state.answer, problems, unit.terms)
-          })
-          const answer = result.isValid ? result.object : result.answer
-          return { state: verifyAnswer(unit, answer), call: callOf(`${unit.id}:${round}`, result) }
-        },
-        "model"
-      )
-    )
-    due.forEach(({ unit, state }, index) => {
-      const result = results[index]
-      if (result?.status === "fulfilled") {
-        calls.push(result.value.call)
-        repairs.set(unit.id, round)
-        // A repair that breaks a valid draft, or leaves it with more problems, is set aside: the draft stays, and its
-        // problems become issues.
-        const repaired = result.value.state
-        if (state.draft === null || (repaired.draft !== null && repaired.problems.length <= state.problems.length)) {
-          states.set(unit.id, repaired)
-        }
-      } else {
-        failures.push({ stage: "repair", itemId: `${unit.id}:${round}`, message: messageOf(result?.reason) })
+    const verified = await step(`verify:${unit.id}`, unitState, async () => verifyAnswer(unit, encoded.answer))
+    const problems = problemsToRepairAlone(verified)
+    let repair: { output: RepairOutput } | { error: unknown } | null = null
+    if (problems.length > 0) {
+      try {
+        repair = { output: await repairUnit(unit, verified, problems, 1) }
+      } catch (error) {
+        repair = { error }
       }
-    })
-  }
+    }
+    finished += 1
+    await progress("encode", finished, units.length)
+    return { encoded, verified, repair }
+  })
+
+  // The units' results in the units' order, so calls, notes and failures read the same on every replay.
+  const verifiedAlone: UnitState[] = []
+  units.forEach((unit, index) => {
+    const result = unitResults[index]
+    if (result?.status !== "fulfilled") {
+      failures.push({ stage: "encode", itemId: unit.id, message: messageOf(result?.reason) })
+      return
+    }
+    const { encoded, verified, repair } = result.value
+    calls.push(encoded.call)
+    verifiedAlone.push(verified)
+    if (repair === null) {
+      states.set(unit.id, verified)
+    } else if ("output" in repair) {
+      states.set(unit.id, settleRepair(unit, verified, repair.output, 1))
+    } else {
+      states.set(unit.id, verified)
+      failures.push({ stage: "repair", itemId: `${unit.id}:1`, message: messageOf(repair.error) })
+    }
+  })
+  const problemsBefore = verifiedAlone.reduce((sum, state) => sum + state.problems.length, 0)
+  const validAfterEncode = verifiedAlone.filter((state) => state.draft !== null).length
+
   const mergeInput = (): MergeInput => ({
     organizationId,
     documents: governing,
@@ -423,21 +503,45 @@ export async function buildRulebook(input: BuildInput) {
     vocabulary,
     units: [...drafts()].map(([unitId, draft]) => ({ unitId, draft }))
   })
-
-  await repairRound(1, (state) =>
-    decideRepair(state.problems, keysDefinedElsewhere(state.unitId, drafts())) === "repair" ? state.problems : null
-  )
+  await progress("verify", 0, 1)
   const merged = new Map(
     await step("verify:merged", unitProblems, async () => {
       const result = mergeDrafts(mergeInput())
       return [...groupByUnit(result.issues, result.sources, drafts())]
     })
   )
-  await repairRound(2, (state) => (state.draft ? (merged.get(state.unitId) ?? null) : state.problems))
-  for (const state of states.values()) {
-    const [problem] = state.problems
-    if (state.draft === null && problem) {
-      failures.push({ stage: "repair", itemId: state.unitId, message: `The draft still fails Zod: ${problem.message}` })
+
+  // Round 2: what only the merged set shows (references no unit defines, conflicts across units), and drafts that
+  // still fail Zod.
+  const due = units.flatMap((unit) => {
+    const state = states.get(unit.id)
+    if (!state) {
+      return []
+    }
+    const problems = state.draft ? (merged.get(unit.id) ?? []) : state.problems
+    return problems.length > 0 ? [{ unit, state, problems }] : []
+  })
+  let repaired = 0
+  await progress("repair", 0, due.length)
+  const roundTwo = await settleEach(due, concurrency, async ({ unit, state, problems }) => {
+    const output = await repairUnit(unit, state, problems, 2)
+    repaired += 1
+    await progress("repair", repaired, due.length)
+    return output
+  })
+  due.forEach(({ unit, state }, index) => {
+    const result = roundTwo[index]
+    if (result?.status === "fulfilled") {
+      states.set(unit.id, settleRepair(unit, state, result.value, 2))
+    } else {
+      failures.push({ stage: "repair", itemId: `${unit.id}:2`, message: messageOf(result?.reason) })
+    }
+  })
+  for (const unit of units) {
+    const state = states.get(unit.id)
+    const [problem] = state?.draft === null ? state.problems : []
+    if (problem) {
+      failures.push({ stage: "repair", itemId: unit.id, message: `The draft still fails Zod: ${problem.message}` })
     }
   }
   for (const draft of drafts().values()) {

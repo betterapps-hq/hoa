@@ -65,7 +65,11 @@ trace with cost and latency, and a dataset with scores that every prompt or mode
   output. `runPrompt.ts` wraps it in `propagateAttributes`, so the trace name and session ID land on every observation
   the app creates. OpenRouter's generation can't inherit those, so the same values (plus `prompt_name` and
   `prompt_version`) go in its `trace` field instead.
-- Each span records the prompt name and version as metadata, and its output records latency and cost.
+- Each span records the prompt name and version as metadata, and its output records latency, cost and usage: `input`
+  (every input token), `input_cached` (read from the prompt cache), `input_cache_write` (written to it) and `output`.
+  The same counts are on every result (`inputTokens`, `cachedInputTokens`, `cacheWriteTokens`, `outputTokens`) and on a
+  job's model calls (`ModelCall`), and the evaluation reports print them. Cost is OpenRouter's billed cost, which
+  already prices cache reads and writes.
 - Read traces through the v2 observations API (`/api/public/v2/observations?traceId=...`). The legacy trace endpoints
   return `410 Gone`.
 - **Trace names.** Name each trace after its feature or pipeline stage, as listed in each design page's "Prompts
@@ -103,6 +107,26 @@ When a feature needs a production evaluator:
   review's facts: design/application-review.md, Recognition).
 - **Content cache.** Pass a `cache` to reuse results: the key covers the trace name, model, compiled prompt and
   attachments, so only a real change triggers a new model call. Cached results report `isCached` and cost 0.
+
+### Prompt caching
+
+The provider's prompt cache is separate from the content cache: it makes a repeated prefix of a request cheaper, not
+the answer free. A prompt opts in by naming its `sharedVariables` in its registry entry (the rulebook build's encoding,
+repair and term-extraction prompts name `coreTerms`, and encoding `requestTypes` too); their templates put those
+variables before the call's own. `runPrompt.ts` (`sharedPrefix`) sends the compiled prompt as two text parts: the text
+up to where the first other variable begins, marked with `cacheControl: { type: "ephemeral" }` (OpenRouter passes it to
+Anthropic as `cache_control`), then the rest. Anthropic caches the request up to that mark, the tools first, so the
+`respond` tool's schema is cached with it. The cache lives five minutes and each read renews it; a write costs 1.25
+times the input price and a read a tenth. A template that puts a call's own variable first still works: its prefix is
+shorter. Prompts without `sharedVariables` send one text part, unmarked.
+
+### Streaming and retries
+
+Calls stream (`streamText`), and are read to the end before the answer is used: a Worker can hold only six connections
+waiting for response headers, and a streamed call gets its headers at once, so a build's parallel calls don't queue
+behind each other. A call refused for now (429, an overloaded or failing provider, a timeout) is retried by
+`withRetries` with the policy's backoff, honoring `retry-after`; the SDK's own retries are off. Any other error throws,
+and a Workflow step retries as before.
 
 Not planned for the demo: recording summaries instead of content for application stages, and Broadcast's privacy
 mode. Both are needed before real HOAs onboard ([design/documents.md](design/documents.md#privacy-and-retention)).

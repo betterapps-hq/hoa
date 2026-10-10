@@ -11,11 +11,11 @@ import type { RulebookSources, RulebookView } from "../rulebook.functions"
 import { RulebookPage, type RulebookPageProps } from "./RulebookPage"
 
 vi.mock("sonner", () => ({
-  toast: {
+  toast: Object.assign(vi.fn<(message: string) => void>(), {
     error: vi.fn<(message: string) => void>(),
     success: vi.fn<(message: string) => void>(),
     message: vi.fn<(message: string) => void>()
-  }
+  })
 }))
 
 const rulebook = (status: "draft" | "published") => ({
@@ -55,6 +55,7 @@ const draft: RulebookView = {
   buildJobId: null,
   isBuilding: false,
   lastBuildError: null,
+  isLastBuildStopped: false,
   blockers: ["884 rules and terms still need review."],
   changes: {
     isFirst: false,
@@ -113,6 +114,12 @@ function setup(overrides: Partial<RulebookPageProps> = {}) {
     loadRulesFile: vi.fn<() => Promise<string>>(async () => '{"rules":[]}'),
     onUpload: vi.fn<RulebookPageProps["onUpload"]>(async () => undefined),
     onBuild: vi.fn<() => Promise<void>>(async () => undefined),
+    onStop: vi.fn<RulebookPageProps["onStop"]>(async () => ({ status: "stopped" })),
+    loadBuildResults: vi.fn<RulebookPageProps["loadBuildResults"]>(async () => ({
+      results: [],
+      cursor: null,
+      documents: []
+    })),
     onPublish: vi.fn<(rulebookId: string) => Promise<void>>(async () => undefined),
     onDiscard: vi.fn<(rulebookId: string) => Promise<void>>(async () => undefined),
     onChanged: vi.fn<() => void>(),
@@ -204,5 +211,69 @@ describe("RulebookPage", () => {
     expect(props.loadRulesFile).toHaveBeenCalled()
     expect(createObjectURL).toHaveBeenCalled()
     vi.unstubAllGlobals()
+  })
+
+  it("stops a running build after a plain confirmation, and says when it had already finished", async () => {
+    const running: Job = {
+      id: "job-1",
+      hoaId: "hoa",
+      kind: "rulebook-build",
+      subjectId: "rb",
+      status: "running",
+      stage: "encode",
+      done: 3,
+      total: 8,
+      promptVersions: {},
+      failures: [],
+      error: null,
+      progress: {
+        workload: { concurrency: 4, documents: 1 },
+        steps: [
+          {
+            stage: "structure",
+            status: "done",
+            isOptional: false,
+            done: 1,
+            total: 1,
+            startedAt: null,
+            finishedAt: null
+          },
+          {
+            stage: "encode",
+            status: "current",
+            isOptional: false,
+            done: 3,
+            total: 8,
+            startedAt: null,
+            finishedAt: null
+          }
+        ]
+      },
+      createdAt: new Date().toISOString(),
+      updatedAt: ""
+    }
+    const { props, user } = setup({
+      draft: { ...noDraft, isBuilding: true, buildJobId: "job-1" },
+      loadJob: vi.fn<(jobId: string) => Promise<Job | null>>(async () => running),
+      onStop: vi.fn<RulebookPageProps["onStop"]>(async () => ({ status: "already-finished" }))
+    })
+    expect(await screen.findByText(/Drafting rules, step 2 of 2/)).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Stop building" }))
+    const dialog = await screen.findByRole("alertdialog")
+    expect(
+      within(dialog).getByText("Work finished so far is kept and reused next time. Nothing is published.")
+    ).toBeInTheDocument()
+    await user.click(within(dialog).getByRole("button", { name: "Stop building" }))
+    expect(props.onStop).toHaveBeenCalled()
+    const { toast } = await import("sonner")
+    expect(toast).toHaveBeenCalledWith("The build had already finished, so there was nothing to stop.")
+    expect(props.onChanged).toHaveBeenCalled()
+  })
+
+  it("says the last build was stopped, with Build a draft as the action", async () => {
+    const { props, user } = setup({ draft: { ...noDraft, isLastBuildStopped: true } })
+    expect(screen.getByText("The last build was stopped.")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Build a draft" }))
+    expect(props.onBuild).toHaveBeenCalled()
   })
 })

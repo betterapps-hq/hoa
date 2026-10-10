@@ -12,12 +12,14 @@ import { uploadDocument } from "@/features/documents/uploadDocument"
 import { PublishedRulebook } from "@/features/rulebook/PublishedRulebook/PublishedRulebook"
 import {
   discardRulebookDraft,
+  getBuildResults,
   getPublishedRulesFileJson,
   getRulebookSources,
   getRulebookView,
   getSourceText,
   publishRulebook,
-  startRulebookBuild
+  startRulebookBuild,
+  stopRulebookBuild
 } from "@/features/rulebook/rulebook.functions"
 import { RulebookPage } from "@/features/rulebook/RulebookPage/RulebookPage"
 import {
@@ -143,6 +145,8 @@ function RulesRoute() {
         onBuild={async () => {
           await startRulebookBuild()
         }}
+        onStop={() => stopRulebookBuild()}
+        loadBuildResults={(jobId, since) => getBuildResults({ data: { jobId, since } })}
         onPublish={changing(async (id: string) => {
           await publishRulebook({ data: { rulebookId: id } })
         })}
