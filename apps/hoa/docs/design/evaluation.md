@@ -22,6 +22,7 @@ Two model stages have no dataset of their own and are measured through the stage
 | `review-writer` | Findings, recommendation and action items | None: judged by the coding agent ([below](#judging-by-the-coding-agent)) | Items from `review-decision` |
 | `rule-corrections` | An administrator's edit or rejection | The corrected rule | Production; reviewed before it's copied into `rule-extraction` |
 | `encoding-evaluation` | One split of the sample Declaration (`encoding-dev`, `encoding-test`) | The golden encoding, `samples/declaration/rules.json` | `pnpm eval:encoding:score <run> --record`: one dataset run per evaluation run, a score per measure code computes (evaluation round 1) |
+| Encoding step datasets (local) | One input of one redesigned encoding step | Derived from the golden | `pnpm eval:datasets`, local files only ([below](#encoding-step-datasets)) |
 
 The gold rulebook comes from the governing documents only: guidelines Article 5 and its exhibits, CC&R Article 4, and
 the HOA's blank application form and checklist (until the HOA provides a blank copy, the packet's form pages with every
@@ -110,6 +111,76 @@ The agent's loop:
 
 Where the pipeline and the golden disagree and the text supports the pipeline, the agent says so; a confirmed golden
 error is fixed in the sample with a cited reason, as any expected-data change.
+
+## Encoding step datasets
+
+The redesigned encoding steps (B defined terms, E find the rules, C shared vocabulary, C-merge, F structure the rules
+and its retry, consolidation; prompt code in `src/encoding/steps/`) each have a local dataset, so a prompt is tested on
+its own before it's wired into the build. `pnpm eval:datasets` (no model call, nothing to Langfuse) builds the items from
+every golden in `samples/*/rules.json` and writes them to `.fixtures/eval/datasets/<step>/` (git-ignored: items quote
+the documents); rerun it when a golden changes. Each item has a stable id, the step's input as the step receives it, the
+expected output derived from the golden, and slice tags: document, split (dev, test, or `other` for provisions in
+neither, such as the guidelines), topic areas (rule domains) and features present (check types, override, sanction,
+judgment, cross-reference, amendment, text condition, no-rule reason).
+
+| Step | Item | Input | Expected |
+| --- | --- | --- | --- |
+| `defined-terms` | A document | Its definitions (none: candidates only) and candidates | Things, parties, categories, refinements and the terms criteria read |
+| `rule-finding` | A section, planned from the golden | Its provisions, context and references, every definition | Each provision's outlines (with reads) or no-rule reason |
+| `shared-vocabulary` | A group of sections | The golden outlines with their reads, the defined terms | The terms those outlines read, with the outlines each serves |
+| `vocabulary-merge` | The synthetic set | Golden terms, planted duplicates (an alternative wording rekeyed), same-key value-type collisions | The merges, the renames, lookalikes kept apart |
+| `rule-structuring` | A batch of about 15 golden outlines | The outlines with their term keys, the whole vocabulary, cited provisions, settings flags | The golden rules |
+| `rule-retry` | A failing rule a saved run recorded | The rule, its problems (paths inside it), its provisions and vocabulary | Fixed, with nothing changed outside the problems |
+| `consolidation` | A split | Its golden rules with every cross-section override removed, cross-references, similar pairs | The removed overrides |
+
+**The v3 and v5 columns.** The same command scores each item against what the old pipeline's saved runs produced for
+the same input (`--runs`; by default v3 `2026-10-09T22-47-00-dev` and `22-45-54-test`, v5 `23-14-52-dev`). The old
+pipeline had other steps, so code maps them: its vocabulary step to B, its encode answers (before repair) to E's outlines
+(kind, modality, bearer, subject, request types, citations per rule) and to F's structured rules, its first repair to
+F's retry, its consolidation to consolidation; C and C-merge have no equivalent and say so. Each item gets a verdict per
+run: correct, partly correct (the notes say what's wrong), wrong, missing (no old result: the run never encoded the
+item's document or section, as with the guidelines), or no equivalent. `results.json` holds every verdict and metric,
+`summary.md` the counts by slice, each run's accuracy per metric and per slice, and the items every run got wrong (the
+most useful test items), and `compare/<item>.md` the input, the expected output and each run's output for the coding
+agent to judge what code can't (faithfulness, whether two terms or rules mean the same).
+
+**What code scores, per step** (`src/evaluation/encoding/steps/scores.ts`):
+
+| Step | Metrics |
+| --- | --- |
+| B | Recall of golden things and parties, categories, refinements and criteria properties (by key, label or alignment); extra things |
+| E | Coverage (a reason, an outline citing it, or covered outside the section); rule recall and precision (pairs by key, then kind, per provision); kind, bearer, subject (a label counts when it is the golden term's), request-type and no-rule-reason agreement |
+| C | Recall of properties, value sets and values, things and categories; duplicates (two terms sharing a label in one scope) |
+| C-merge | Merge recall and precision; collisions renamed; lookalikes merged |
+| F | Rules structured; valid before any retry (Zod); without problems (Zod and the validator); kind agreement; check agreement through the engine; problems |
+| F retry | Fixed; collateral changes (a structural diff outside the problem paths; title and statement reported apart) |
+| Consolidation | Recall and precision of the removed cross-section overrides; invalid and not-allowed overrides |
+
+## Running one step
+
+`pnpm eval:step --stage <step>` runs one step alone, so a drafted prompt is tested cheaply before the pipeline uses it.
+Without `--yes` it only prints what it would run (items, calls, pinned prompts) and stops: every model run needs the
+person's approval.
+
+- **Golden mode** (the default): the step runs over its dataset's items, built in memory from the golden as above, so
+  it's measured against perfect upstream input. `--golden <sample>` picks the golden (default `declaration`).
+- **From a saved build run**: `--from <run under .fixtures/eval/encoding>` freezes that run's saved steps as the
+  inputs: its structure for `defined-terms`, its sections for `rule-finding`, its recorded failures for `rule-retry`.
+- **Chained**: `--from <run under .fixtures/eval/steps>` reads an earlier step run's `handoff.json`, so steps run in
+  pipeline order on accepted outputs (E's outlines and flags, then C's terms, then C-merge's frozen vocabulary for F,
+  then F's rules for consolidation). Items whose ids match the dataset's are scored against it.
+- **Replays of today's build stages** (`vocabulary`, `encode`, `repair` round 1, `consolidate`, `--from <build run>`):
+  the run's saved steps are the frozen inputs and its prompt versions are pinned; with the content cache a replay calls
+  no model and must give back exactly what the run saved (`reproduced`, compared as the runner writes JSON;
+  `replay.test.ts`).
+
+Options: `--items <id part>,...` keeps matching items; `--prompts <name>=<version>,...` pins versions no label points
+at (drafted prompts are loaded by version, labeled or not); `--repeat <n>` runs again with its own content cache per
+repeat for the noise band and key stability; `--reruns 0|1` reruns a failing B, E or C item once with its problems;
+`--retries 0-2` runs F's retry on the rules still failing. Each run writes `.fixtures/eval/steps/<run id>/`: `run.json`
+(calls with input, cached-input, cache-write and output tokens, cost and latency; problems), `outputs/`,
+`handoff.json`, `scores.json`, `report.md` (calls, cost, time, cached tokens, problems by class, the scores beside the
+dataset's v3 and v5 columns) and `compare/`.
 
 ## In production
 
