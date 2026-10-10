@@ -18,7 +18,7 @@ export type Search<Item> = {
 }
 
 // Words too common to narrow a search: dropped from a query that has other words, so "the fence" finds a fence.
-const stopWords = new Set([
+const stopWords: ReadonlySet<string> = new Set([
   "a",
   "an",
   "and",
@@ -39,6 +39,9 @@ const stopWords = new Set([
   "to",
   "with"
 ])
+
+/** Whether a word is too common to narrow a search or a match, such as "the" or "of". */
+export const isStopWord = (word: string) => stopWords.has(word)
 
 const tokenize: (text: string) => string[] = MiniSearch.getDefault("tokenize")
 

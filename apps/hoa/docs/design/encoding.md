@@ -302,9 +302,13 @@ organization with 2 documents or 20, 50 rules or 2,000, sees the same page.
   **Review changes**); the last build failed (**Try again**); the documents differ from the published rulebook's and
   there's no draft (**Build a draft**); nothing is built yet (**Build the rulebook**).
 - **Governing documents:** each document's current version (kind, version, pages, date) with its earlier versions
-  behind a disclosure, and quiet actions: **Read** (the document viewer, page by page), **Download** (the original
-  file), and **New version** (a new edition that replaces it, or an amendment that changes part of it). **Upload** adds
-  a document. Uploading builds the rulebook on its own once the file is read ([Save draft](#11-save-draft)); there's
+  behind a disclosure. **Read** (the document viewer, page by page) shows on the row; **Download** (the original file)
+  and **New version** are in its ellipsis menu (a homeowner, with nothing else to do, sees Download beside Read). One
+  **Upload** takes every file: once it's chosen, the dialog asks what it is, a new document (kind and title) or a new
+  version of one of the documents (a new edition that replaces it, or an amendment that changes part of it). It
+  preselects its guess from the file's name (`guessDocument`: the document whose title and kind explain more than half
+  of the name's words, typos and prefixes allowed; otherwise a new document), and a row's **New version** preselects
+  that row's document. Uploading builds the rulebook on its own once the file is read ([Save draft](#11-save-draft)); there's
   no separate build step.
 - **Rules in force:** the published version and date, the rules file to download, and the rulebook's records
   read-only in quiet tabs (Rules, Terms, Coverage, Questions when there are any, Settings).

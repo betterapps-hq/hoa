@@ -10,14 +10,16 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
 
-/** One thing a row offers: destructive ones come last, after a separator, and should confirm or offer undo. */
+/**
+ * One thing a row offers, done on select or a link it opens (`download` saves the file instead). Destructive ones come
+ * last, after a separator, and should confirm or offer undo.
+ */
 export type RowAction = {
   label: string
   icon: LucideIcon
-  onSelect: () => void
   disabled?: boolean
   isDestructive?: boolean
-}
+} & ({ onSelect: () => void; href?: never; download?: never } | { href: string; download?: boolean; onSelect?: never })
 
 export type RowActionsProps = {
   /** The row's name, for the menu button's accessible name: "Actions for Fence height". */
@@ -32,12 +34,21 @@ export type RowActionsProps = {
 export function RowActions({ name, actions, note, disabled = false }: RowActionsProps) {
   const safe = actions.filter((action) => !action.isDestructive)
   const destructive = actions.filter((action) => action.isDestructive)
-  const item = ({ label, icon: Icon, onSelect, disabled: isDisabled, isDestructive }: RowAction) => (
+  const item = ({ label, icon: Icon, onSelect, href, download, disabled: isDisabled, isDestructive }: RowAction) => (
     <DropdownMenuItem
       key={label}
       variant={isDestructive ? "destructive" : "default"}
       disabled={isDisabled}
       onClick={onSelect}
+      render={
+        href === undefined
+          ? undefined
+          : ({ children, ...props }) => (
+              <a {...props} href={href} download={download}>
+                {children}
+              </a>
+            )
+      }
     >
       <Icon aria-hidden />
       {label}
