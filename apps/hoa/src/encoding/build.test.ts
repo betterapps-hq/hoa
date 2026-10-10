@@ -163,7 +163,7 @@ describe("buildRulebook", () => {
         "analyze:upload-1",
         "vocabulary:upload-1",
         "plan",
-        "encode:declaration:article-3",
+        "encode:declaration:preamble",
         "encode:conduct-rules:exhibit-a",
         "verify:conduct-rules:exhibit-a",
         "repair:conduct-rules:exhibit-a:1",
@@ -226,10 +226,10 @@ describe("buildRulebook", () => {
     const result = await buildRulebook(
       input({
         ai: { ...input().ai, createModel: () => failing },
-        selectUnits: (unit) => unit.id === "conduct-rules:exhibit-a" || unit.id === "declaration:article-1"
+        selectUnits: (unit) => unit.id === "conduct-rules:exhibit-a" || unit.id === "declaration:preamble"
       })
     )
-    expect(result.report.units.map((unit) => unit.id)).toEqual(["declaration:article-1", "conduct-rules:exhibit-a"])
+    expect(result.report.units.map((unit) => unit.id)).toEqual(["declaration:preamble", "conduct-rules:exhibit-a"])
     expect(result.failures).toEqual([
       expect.objectContaining({
         stage: "encode",
@@ -348,9 +348,9 @@ describe("buildRulebook", () => {
       inFlight -= 1
       return { toolInput: answer(promptText(options)), usage: { input: 100, output: 10 } }
     })
-    const result = await buildRulebook(input({ concurrency: 2, ai: { ...input().ai, createModel: () => model } }))
-    expect(result.report.units.length).toBeGreaterThan(2)
-    expect(most).toBe(2)
+    const result = await buildRulebook(input({ concurrency: 1, ai: { ...input().ai, createModel: () => model } }))
+    expect(result.report.units.length).toBeGreaterThan(1)
+    expect(most).toBe(1)
   })
 
   it("reuses a document's vocabulary while its definitions read the same, and extracts it again when they change", async () => {

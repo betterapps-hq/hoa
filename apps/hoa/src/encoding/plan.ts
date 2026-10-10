@@ -4,9 +4,11 @@ import type { Provision, ProvisionKey, TermKey } from "@/schema/types"
 import type { TermContent } from "@/schema/zod"
 import { findLabels, type MatchKind } from "@/text/match"
 
-// Plan (encoding.md, Plan): each document divides into encoding units, a provision and its descendants within a token
-// budget. An article that fits is one unit; a larger one splits by section, and a large section by its items, with
-// neighbouring pieces packed together up to the budget. Each unit carries the context its encoder needs.
+// Plan (encoding.md, Plan): each document divides into encoding units within a token budget of provision text. An
+// article that fits stays whole; a larger one splits by section, and a large section by its items. Neighbouring pieces
+// of one document, articles included, pack together up to the budget, and no provision's subtree is divided unless it
+// alone is over the budget. Each unit carries the context its encoder needs: its references and vocabulary slice cover
+// all of its provisions.
 
 export type UnitAncestor = Pick<Provision, "key" | "kind" | "label" | "heading" | "intro" | "wrapUp">
 export type UnitReference = Pick<Provision, "key" | "label" | "heading"> & { text: string; isTruncated: boolean }
@@ -35,6 +37,13 @@ export type PlanInput = {
 }
 
 export type PlanOptions = { maxTokens?: number; referenceTokens?: number }
+
+/**
+ * The most provision text one unit holds, in estimated tokens (encoding.md, Cost and scale). An encode call at this
+ * size already writes about 22,000 tokens, half of them reasoning; doubling it would approach the 40,000-token answers
+ * that nearly reach a build step's timeout, and a longer answer has more to repair.
+ */
+export const unitTokenBudget = 3000
 
 const charactersPerToken = 4
 
@@ -67,11 +76,8 @@ function planDocument(provisions: readonly Provision[], maxTokens: number) {
       0
     )
 
-  const split = (provision: Provision): Member[][] => {
-    if (size(provision) <= maxTokens || kids(provision).length === 0) {
-      return [[{ provision, whole: true }]]
-    }
-    const pieces = [[{ provision, whole: false }], ...kids(provision).flatMap(split)]
+  /** Packs neighbouring pieces, in order, while their sum stays within the budget. A piece is never divided. */
+  const pack = (pieces: readonly Member[][]) => {
     const packed: Member[][] = []
     for (const piece of pieces) {
       const last = packed.at(-1)
@@ -84,9 +90,16 @@ function planDocument(provisions: readonly Provision[], maxTokens: number) {
     return packed
   }
 
+  const split = (provision: Provision): Member[][] =>
+    size(provision) <= maxTokens || kids(provision).length === 0
+      ? [[{ provision, whole: true }]]
+      : pack([[{ provision, whole: false }], ...kids(provision).flatMap(split)])
+
   const expand = ({ provision, whole }: Member): Provision[] =>
     whole ? [provision, ...kids(provision).flatMap((kid) => expand({ provision: kid, whole: true }))] : [provision]
-  return (children.get(null) ?? []).flatMap(split).map((group) => group.flatMap(expand))
+  // Small top-level sections (and the last pieces of a split one) pack with their neighbours too, so a document of
+  // many short articles makes a few units, not one each.
+  return pack((children.get(null) ?? []).flatMap(split)).map((group) => group.flatMap(expand))
 }
 
 function truncate(text: string, tokens: number) {
@@ -122,7 +135,7 @@ function coreRequestTypes(): TermContent[] {
 
 /** Divides the documents into encoding units with their context (encoding.md, Plan). */
 export function planUnits(input: PlanInput, options: PlanOptions = {}): EncodingUnit[] {
-  const maxTokens = options.maxTokens ?? 3000
+  const maxTokens = options.maxTokens ?? unitTokenBudget
   const referenceTokens = options.referenceTokens ?? 1500
   const byKey = new Map(input.documents.flatMap((document) => document.provisions.map((p) => [p.key, p] as const)))
   const labels = input.vocabulary.flatMap((term) =>

@@ -28,7 +28,7 @@ const units = planUnits({
   references: new Map([["rules:2(a)", ["rules:1", "declaration:4.1"]]]),
   vocabulary
 })
-const rulesUnit = units.find((unit) => unit.id === "rules:2")
+const rulesUnit = units.find((unit) => unit.provisions.some((item) => item.key === "rules:2"))
 
 describe("prompt variables", () => {
   it("serializes a unit for hoa-provision-encoding", () => {
@@ -41,7 +41,7 @@ describe("prompt variables", () => {
       references: new Map([["rules:2(a)", ["declaration:4.1", "rules:1"]]]),
       vocabulary
     })
-    const unit = again.find((item) => item.id === "rules:2")
+    const unit = again.find((item) => item.id === rulesUnit?.id)
     expect(unit && rules && provisionEncodingVariables(unit, rules).terms).toBe(
       rulesUnit && rules && provisionEncodingVariables(rulesUnit, rules).terms
     )
