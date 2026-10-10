@@ -1,40 +1,82 @@
-import { MockLanguageModelV4 } from "ai/test"
+import { convertArrayToReadableStream, MockLanguageModelV4 } from "ai/test"
 import type { PromptLoader } from "@/ai/promptLoader"
 
-// A model for pipeline tests that answers each call through the respond tool with whatever `answer` makes of the
-// prompt's text, and a prompt loader whose text is the prompt's name and its variables, so `answer` can tell calls
-// apart and read what the code sent. Tests never call a paid model.
+// Mock models for tests, which stream their answers as the app's calls read them (runPrompt.ts). `scriptedModel`
+// answers each call through the respond tool with whatever `answer` makes of the prompt's text, and
+// `variablesPromptLoader` is a prompt loader whose text is the prompt's name and its variables, so `answer` can tell
+// calls apart and read what the code sent. Tests never call a paid model.
 
-type CallOptions = Parameters<MockLanguageModelV4["doGenerate"]>[0]
+export type CallOptions = Parameters<MockLanguageModelV4["doStream"]>[0]
+type StreamResult = Awaited<ReturnType<MockLanguageModelV4["doStream"]>>
+type StreamPart = StreamResult["stream"] extends ReadableStream<infer Part> ? Part : never
 
-/** The text of a call's user messages. */
-function promptText(options: CallOptions) {
+/** What a mock model answers: text, the respond tool's input, or both, with its usage and provider metadata. */
+export type ModelReply = {
+  text?: string
+  toolInput?: unknown
+  usage?: { input: number; output: number; cacheRead?: number; cacheWrite?: number }
+  providerMetadata?: Record<string, Record<string, number | Record<string, number>>>
+}
+
+/** A reply as the stream a provider sends. */
+export function replyStream(reply: ModelReply): StreamResult {
+  const usage = reply.usage ?? { input: 42, output: 5 }
+  const cacheRead = usage.cacheRead ?? 0
+  const cacheWrite = usage.cacheWrite ?? 0
+  const isToolCall = reply.toolInput !== undefined
+  const parts: StreamPart[] = [
+    { type: "stream-start", warnings: [] },
+    ...(reply.text === undefined
+      ? []
+      : ([
+          { type: "text-start", id: "text-1" },
+          { type: "text-delta", id: "text-1", delta: reply.text },
+          { type: "text-end", id: "text-1" }
+        ] as const)),
+    ...(isToolCall
+      ? [
+          {
+            type: "tool-call" as const,
+            toolCallId: "call-1",
+            toolName: "respond",
+            input: JSON.stringify(reply.toolInput)
+          }
+        ]
+      : []),
+    {
+      type: "finish",
+      finishReason: isToolCall ? { unified: "tool-calls", raw: "tool_use" } : { unified: "stop", raw: "stop" },
+      usage: {
+        inputTokens: { total: usage.input, noCache: usage.input - cacheRead - cacheWrite, cacheRead, cacheWrite },
+        outputTokens: { total: usage.output, text: usage.output, reasoning: 0 }
+      },
+      ...(reply.providerMetadata ? { providerMetadata: reply.providerMetadata } : {})
+    }
+  ]
+  return { stream: convertArrayToReadableStream(parts) }
+}
+
+/** A model that streams `reply`, or what `reply` makes of each call. */
+export function replyingModel(reply: ModelReply | ((options: CallOptions) => ModelReply | Promise<ModelReply>)) {
+  return new MockLanguageModelV4({
+    doStream: async (options) => replyStream(typeof reply === "function" ? await reply(options) : reply)
+  })
+}
+
+/** The text of a call's user messages: the prompt's parts (its shared prefix and the rest) joined as compiled. */
+export function promptText(options: CallOptions) {
   return options.prompt
     .flatMap((message) => (message.role === "user" ? message.content : []))
     .flatMap((part) => (part.type === "text" ? [part.text] : []))
-    .join("\n")
+    .join("")
 }
 
 export function scriptedModel(answer: (text: string) => unknown) {
-  return new MockLanguageModelV4({
-    doGenerate: async (options) => ({
-      content: [
-        {
-          type: "tool-call",
-          toolCallId: "call-1",
-          toolName: "respond",
-          input: JSON.stringify(answer(promptText(options)))
-        }
-      ],
-      finishReason: { unified: "tool-calls", raw: "tool_use" },
-      usage: {
-        inputTokens: { total: 100, noCache: 100, cacheRead: 0, cacheWrite: 0 },
-        outputTokens: { total: 10, text: 10, reasoning: 0 }
-      },
-      providerMetadata: { openrouter: { usage: { cost: 0.01 } } },
-      warnings: []
-    })
-  })
+  return replyingModel((options) => ({
+    toolInput: answer(promptText(options)),
+    usage: { input: 100, output: 10 },
+    providerMetadata: { openrouter: { usage: { cost: 0.01 } } }
+  }))
 }
 
 /** Prompts whose text is `# {name}` and then each variable as `## {variable}` with its value. */

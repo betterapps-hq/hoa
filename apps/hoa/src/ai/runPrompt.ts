@@ -1,8 +1,17 @@
 import { propagateAttributes, startActiveObservation, type LangfuseSpan } from "@langfuse/tracing"
 import { isSpanContextValid } from "@opentelemetry/api"
-import { generateText, jsonSchema, tool, type LanguageModel, type ModelMessage, type ProviderMetadata } from "ai"
+import {
+  APICallError,
+  jsonSchema,
+  streamText,
+  tool,
+  type LanguageModel,
+  type LanguageModelUsage,
+  type ModelMessage,
+  type ProviderMetadata
+} from "ai"
 import { z } from "zod"
-import type { PromptConfig, PromptLoader } from "./promptLoader"
+import type { PromptConfig, PromptLoader, PromptTemplate } from "./promptLoader"
 import type { PromptDefinition, PromptVariables } from "./prompts"
 
 /** Builds a model by id. The prompt version's `config.model` picks the id, else the stage's default. */
@@ -37,13 +46,47 @@ export type PromptRunOptions<Prompt extends PromptDefinition = PromptDefinition>
   environment: string
   sessionId?: string
   cache?: PromptCache
+  /** How a call the provider refuses for now (429, overloaded, 5xx) is retried; `defaultRetry` when left out. */
+  retry?: RetryPolicy
+}
+
+/**
+ * Retries for calls the provider refuses for now: a rate limit (429), an overloaded or failing provider (5xx) or a
+ * timeout. Each waits for the provider's `retry-after` when it sends one, else `baseDelayMs` doubled per attempt, at
+ * most `maxDelayMs`.
+ */
+export type RetryPolicy = {
+  /** Calls in all, the first one included. */
+  attempts: number
+  baseDelayMs: number
+  maxDelayMs: number
+  sleep: (ms: number) => Promise<void>
+}
+
+/**
+ * Six calls over about two and a half minutes of waiting (5, 10, 20, 40 and 60 seconds), which stays well inside a
+ * build step's timeout with a long encoding call after it; a step that still fails is retried by the Workflow.
+ */
+export const defaultRetry: RetryPolicy = {
+  attempts: 6,
+  baseDelayMs: 5000,
+  maxDelayMs: 60_000,
+  sleep: (ms) =>
+    new Promise((resolve) => {
+      setTimeout(resolve, ms)
+    })
 }
 
 export type PromptRunMetrics = {
   promptName: string
   promptVersion: number
   modelId: string
+  /** Every input token, cached or not. */
   inputTokens: number | undefined
+  /** Input tokens read from the provider's prompt cache (billed at a tenth of the input price on Anthropic). */
+  cachedInputTokens: number | undefined
+  /** Input tokens written to the provider's prompt cache (billed at 1.25 times the input price on Anthropic). */
+  cacheWriteTokens: number | undefined
   outputTokens: number | undefined
   /** Billed cost reported by OpenRouter, in US dollars; 0 for a cached result. */
   costUsd: number | undefined
@@ -81,7 +124,7 @@ type GenerateRequest = {
 
 type Generated<T> = {
   value: T
-  usage: { inputTokens: number | undefined; outputTokens: number | undefined }
+  usage: LanguageModelUsage
   providerMetadata: ProviderMetadata | undefined
 }
 
@@ -95,13 +138,84 @@ type Generator<T> = {
 
 const openRouterCost = z.object({ openrouter: z.object({ usage: z.object({ cost: z.number() }) }) })
 
+type StreamedCall = {
+  consumeStream: () => PromiseLike<void>
+  text: PromiseLike<string>
+  toolCalls: PromiseLike<readonly { toolName: string; input: unknown }[]>
+  totalUsage: PromiseLike<LanguageModelUsage>
+  providerMetadata: PromiseLike<ProviderMetadata | undefined>
+}
+
+type StreamOptions = { maxRetries: number; onError: (event: { error: unknown }) => void }
+
+/**
+ * Starts a streamed call and reads it to its end, throwing the first error it reports. Calls stream so the response's
+ * headers arrive at once: a Worker holds at most six connections waiting for headers, and a long encoding call that
+ * answered only at the end would hold one for minutes. Retries are `withRetries`' job, so the SDK's own are off.
+ */
+async function streamed(start: (options: StreamOptions) => StreamedCall) {
+  const errors: unknown[] = []
+  const result = start({ maxRetries: 0, onError: ({ error }) => errors.push(error) })
+  await result.consumeStream()
+  if (errors.length > 0) {
+    throw errors[0]
+  }
+  const [text, toolCalls, usage, providerMetadata] = await Promise.all([
+    result.text,
+    result.toolCalls,
+    result.totalUsage,
+    result.providerMetadata
+  ])
+  return { text, toolCalls, usage, providerMetadata }
+}
+
+/** Whether a failed call is worth retrying: a rate limit, an overloaded or failing provider, or a timeout. */
+export function isRetryableCall(error: unknown) {
+  return APICallError.isInstance(error) && (error.statusCode === 429 || error.isRetryable)
+}
+
+/** How long the provider asks to wait, from `retry-after-ms` or `retry-after` (seconds or a date), if it says. */
+function retryAfterMs(error: unknown, now: number) {
+  const headers = APICallError.isInstance(error) ? (error.responseHeaders ?? {}) : {}
+  const milliseconds = Number(headers["retry-after-ms"])
+  if (Number.isFinite(milliseconds) && milliseconds >= 0) {
+    return milliseconds
+  }
+  const after = headers["retry-after"]
+  if (after === undefined) {
+    return null
+  }
+  const seconds = Number(after)
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return seconds * 1000
+  }
+  const date = Date.parse(after)
+  return Number.isNaN(date) ? null : Math.max(0, date - now)
+}
+
+/** Runs `call`, retrying it under `policy` while it fails with a retryable error. */
+export async function withRetries<T>(policy: RetryPolicy, call: () => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await call()
+    } catch (error) {
+      if (attempt >= policy.attempts || !isRetryableCall(error)) {
+        throw error
+      }
+      const backoff = policy.baseDelayMs * 2 ** (attempt - 1)
+      const asked = retryAfterMs(error, Date.now())
+      await policy.sleep(Math.min(policy.maxDelayMs, asked ?? backoff))
+    }
+  }
+}
+
 /** Runs a Langfuse-managed prompt and returns the model's text. */
 export async function runTextPrompt<Prompt extends PromptDefinition>(
   options: PromptRunOptions<Prompt>
 ): Promise<TextPromptResult> {
   const { value, ...metrics } = await runTraced(options, {
     generate: async (request) => {
-      const result = await generateText(request)
+      const result = await streamed((options) => streamText({ ...request, ...options }))
       return { value: result.text, usage: result.usage, providerMetadata: result.providerMetadata }
     },
     encode: (text) => text,
@@ -313,13 +427,16 @@ function runObject<T>(options: ObjectPromptOptions<T>, keepsInvalid: boolean) {
   }
   return runTraced(options, {
     generate: async (request) => {
-      const result = await generateText({
-        ...request,
-        tools: {
-          [respondTool]: tool({ description: "Call this once with your complete answer.", inputSchema })
-        },
-        toolChoice: "auto"
-      })
+      const result = await streamed((options) =>
+        streamText({
+          ...request,
+          ...options,
+          tools: {
+            [respondTool]: tool({ description: "Call this once with your complete answer.", inputSchema })
+          },
+          toolChoice: "auto"
+        })
+      )
       return { value: check(answerOf(result)), usage: result.usage, providerMetadata: result.providerMetadata }
     },
     encode: (checked: CheckedAnswer<T>) => (checked.isValid ? checked.object : checked.answer),
@@ -409,15 +526,23 @@ async function runInSpan<T>(
     if (hit !== undefined && hit !== null) {
       const value = generator.decode(hit)
       span.update({ output: { result: generator.encode(value), isCached: true } })
-      const usage = { inputTokens: undefined, outputTokens: undefined, costUsd: 0, latencyMs: 0 }
+      const usage = {
+        inputTokens: undefined,
+        cachedInputTokens: undefined,
+        cacheWriteTokens: undefined,
+        outputTokens: undefined,
+        costUsd: 0,
+        latencyMs: 0
+      }
       return { value, promptName: template.name, promptVersion, modelId, ...usage, traceId, isCached: true }
     }
   }
 
   const startedAt = performance.now()
-  const generated = await generator.generate({
+  const { shared, rest } = sharedPrefix(template, options.prompt, options.variables, compiled)
+  const request: GenerateRequest = {
     model: options.createModel(modelId),
-    messages: [{ role: "user", content: [{ type: "text", text: compiled }, ...attachments.map(toContentPart)] }],
+    messages: [{ role: "user", content: [...promptParts(shared, rest), ...attachments.map(toContentPart)] }],
     providerOptions: {
       openrouter: {
         ...(effort === undefined ? {} : { reasoning: { effort } }),
@@ -439,7 +564,8 @@ async function runInSpan<T>(
           : {})
       }
     }
-  })
+  }
+  const generated = await withRetries(options.retry ?? defaultRetry, () => generator.generate(request))
   const latencyMs = Math.round(performance.now() - startedAt)
   if (options.cache && cacheKey) {
     await options.cache.put(cacheKey, generator.encode(generated.value))
@@ -452,14 +578,69 @@ async function runInSpan<T>(
     promptVersion,
     modelId,
     inputTokens: generated.usage.inputTokens,
+    cachedInputTokens: generated.usage.inputTokenDetails.cacheReadTokens,
+    cacheWriteTokens: generated.usage.inputTokenDetails.cacheWriteTokens,
     outputTokens: generated.usage.outputTokens,
     costUsd: cost.success ? cost.data.openrouter.usage.cost : undefined,
     latencyMs,
     traceId,
     isCached: false
   }
-  span.update({ output: { result: generator.encode(generated.value), latencyMs, costUsd: run.costUsd } })
+  span.update({
+    output: {
+      result: generator.encode(generated.value),
+      latencyMs,
+      costUsd: run.costUsd,
+      usage: {
+        input: run.inputTokens,
+        input_cached: run.cachedInputTokens,
+        input_cache_write: run.cacheWriteTokens,
+        output: run.outputTokens
+      }
+    }
+  })
   return run
+}
+
+const sharedMarker = "\u0000unit\u0000"
+
+/**
+ * The compiled prompt as the text every call of a stage shares and the rest. The shared text runs up to where the
+ * first variable outside the prompt's `sharedVariables` begins (the instructions, the guide and, in the templates that
+ * put them first, the core terms and request types), and gets a prompt-cache breakpoint. Without shared variables, or
+ * when the template compiles differently than expected, nothing is shared.
+ */
+export function sharedPrefix(
+  template: PromptTemplate,
+  prompt: PromptDefinition,
+  variables: Record<string, string>,
+  compiled: string
+) {
+  const sharedNames = new Set<string>(prompt.sharedVariables ?? [])
+  if (sharedNames.size === 0) {
+    return { shared: "", rest: compiled }
+  }
+  const probe = template.compile(
+    Object.fromEntries(
+      Object.entries(variables).map(([name, value]) => [name, sharedNames.has(name) ? value : sharedMarker])
+    )
+  )
+  const at = probe.indexOf(sharedMarker)
+  const shared = at < 0 ? probe : probe.slice(0, at)
+  return compiled.startsWith(shared) ? { shared, rest: compiled.slice(shared.length) } : { shared: "", rest: compiled }
+}
+
+/**
+ * Anthropic caches the request up to a marked block: the tools (the respond tool's schema), then the messages up to the
+ * mark. Marking the end of the shared text caches both for five minutes, refreshed by every call that reads it.
+ */
+export const cacheBreakpoint = { openrouter: { cacheControl: { type: "ephemeral" } } } as const
+
+function promptParts(shared: string, rest: string) {
+  return [
+    ...(shared ? [{ type: "text" as const, text: shared, providerOptions: cacheBreakpoint }] : []),
+    ...(rest || !shared ? [{ type: "text" as const, text: rest }] : [])
+  ]
 }
 
 function toContentPart(attachment: PromptAttachment) {
