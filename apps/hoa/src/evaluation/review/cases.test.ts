@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "vitest"
 import { fenceRulesFile } from "@/tests/fenceSchemaFixture"
-import { sampleRulesFile } from "@/tests/sampleRulesFile"
+import { sampleDeclarationRulesFile } from "@/tests/sampleRulesFile"
 import { reviewCase } from "./cases"
 import { toPacket } from "./packetFixture"
 import { mergeRulesFiles } from "./rulesFile"
@@ -14,7 +14,7 @@ const root = join(import.meta.dirname, "../../../samples/garage-enclosure")
 const cases = readdirSync(root).map((name) =>
   reviewCase.parse(JSON.parse(readFileSync(join(root, name, "case.json"), "utf8")))
 )
-const rulesFile = mergeRulesFiles(sampleRulesFile(), fenceRulesFile())
+const rulesFile = mergeRulesFiles(sampleDeclarationRulesFile(), fenceRulesFile())
 const ruleKeys = new Set(rulesFile.rules.map((rule) => rule.key))
 const termKeys = new Set([...rulesFile.terms, ...rulesFile.proposedCore].map((term) => term.key))
 

@@ -25,7 +25,7 @@ describe("RulebookWorkspace", () => {
     expect(within(sheet).getByRole("button", { name: "Approve" })).toBeInTheDocument()
     await user.keyboard("{Escape}")
     await user.click(screen.getByRole("tab", { name: "Questions" }))
-    expect(screen.getByText(/7 of 7 to answer/)).toBeInTheDocument()
+    expect(screen.getByText(/15 of 15 to answer/)).toBeInTheDocument()
   })
 
   it("shows a member the rules and terms only, read-only", () => {

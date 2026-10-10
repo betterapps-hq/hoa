@@ -46,11 +46,17 @@ const pairs = agentPairs.parse(hasAgentPairs ? readJson(pairsPath) : {})
 
 const selectors = splitSelectors(run.split)
 const pipelineProvisions = runProvisions(draft)
-// The split's provisions, and of those only the units a --units run encoded.
+// The split's provisions, and of those only the units a --units run encoded, in the documents the run encoded (the
+// golden also encodes part of the Design Guidelines).
 const allProvisions = [...golden.provisions, ...pipelineProvisions]
-const membership = [selectors, run.units?.split(",") ?? null].flatMap((keys) =>
-  keys === null ? [] : [splitMembership(allProvisions, keys)]
-)
+const documentOf = (key: string) => key.slice(0, key.indexOf(":"))
+const runDocuments = new Set(pipelineProvisions.map((provision) => documentOf(provision.key)))
+const membership = [
+  ...[selectors, run.units?.split(",") ?? null].flatMap((keys) =>
+    keys === null ? [] : [splitMembership(allProvisions, keys)]
+  ),
+  (key: string) => runDocuments.has(documentOf(key))
+]
 const inSplit = (key: string) => membership.every((isIn) => isIn(key))
 
 const scores = scoreRun({ golden, draft, report: run.report, inSplit, pairs })

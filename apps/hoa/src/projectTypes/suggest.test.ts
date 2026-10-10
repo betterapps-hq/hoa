@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { mergeRulesFiles } from "@/evaluation/review/rulesFile"
 import { fenceRulesFile } from "@/tests/fenceSchemaFixture"
-import { sampleRulesFile } from "@/tests/sampleRulesFile"
+import { sampleDeclarationRulesFile } from "@/tests/sampleRulesFile"
 import { buildDefinition, projectSubjects } from "./build"
 import { checkSuggestions, rulebookForPrompt, type SuggestionAnswer } from "./suggest"
 
-const rulesFile = mergeRulesFiles(sampleRulesFile(), fenceRulesFile())
+const rulesFile = mergeRulesFiles(sampleDeclarationRulesFile(), fenceRulesFile())
 const requestType = "architectural-application"
 const on = "2026-10-09"
 const [subject] = projectSubjects(rulesFile, requestType)

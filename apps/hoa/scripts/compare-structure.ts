@@ -20,16 +20,17 @@ const pages = z.array(pageSchema).parse(JSON.parse(readFileSync(join(fixtures, "
 const layouts = readdirSync(fixtures)
   .filter((file) => /^layout-.*\.json$/.test(file))
   .map((file) => layoutResultSchema.parse(analyzeResultOf(readFileSync(join(fixtures, file), "utf8"))))
-const golden = rulesFile.parse(
-  JSON.parse(readFileSync(join(import.meta.dirname, "../samples/declaration/rules.json"), "utf8"))
-).provisions
-
 const clean = cleanPages(pages, layouts)
 const documents = structureDocument(clean, {
   documentKey: "declaration",
   fileId: "declaration",
   exhibitDocuments: { C: "use-restrictions" }
 })
+// The golden provisions of the documents structured here (the golden also encodes part of the Design Guidelines).
+const structured = new Set(documents.map((document) => document.key))
+const golden = rulesFile
+  .parse(JSON.parse(readFileSync(join(import.meta.dirname, "../samples/declaration/rules.json"), "utf8")))
+  .provisions.filter((provision) => structured.has(provision.key.slice(0, provision.key.indexOf(":"))))
 const check = checkStructure(clean, documents)
 const ours = documents.flatMap((document) => document.provisions)
 

@@ -60,7 +60,7 @@ describe("CoverageTab", () => {
   it("shows a built document on its pages, each passage highlighted, and what covers a chosen passage", async () => {
     const { user } = renderInWorkspace(<CoverageTab />, { records: onPages(records), source: pagesSource() })
     expect(
-      screen.getByRole("heading", { name: /^\d+(\.\d)?% of the text of 2 documents is covered/ })
+      screen.getByRole("heading", { name: /^\d+(\.\d)?% of the text of 3 documents is covered/ })
     ).toBeInTheDocument()
     expect(screen.getByRole("list", { name: "What the colors mean" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "On the pages", pressed: true })).toBeInTheDocument()
@@ -163,7 +163,7 @@ describe("CoverageTab", () => {
     expect(within(item!).getByText(/^No rule: /)).toBeInTheDocument()
     await user.click(within(item!).getByRole("button", { name: "Approve the reason" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "provision", key: expect.any(String) }], "approved", null)
-    await user.click(screen.getByRole("button", { name: "Approve the 246 reasons shown" }))
+    await user.click(screen.getByRole("button", { name: "Approve the 281 reasons shown" }))
     await user.click(await screen.findByRole("button", { name: "Approve them" }))
     expect(actions?.review).toHaveBeenLastCalledWith(
       expect.arrayContaining([expect.objectContaining({ type: "provision" })]),

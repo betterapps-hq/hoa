@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { fenceRulesFile } from "@/tests/fenceSchemaFixture"
-import { sampleRulesFile } from "@/tests/sampleRulesFile"
+import { sampleDeclarationRulesFile } from "@/tests/sampleRulesFile"
 import { mergeRulesFiles } from "./rulesFile"
 
 describe("mergeRulesFiles", () => {
-  it("adds the fence rules to the whole sample, and the merge validates", () => {
-    const sample = sampleRulesFile()
+  it("adds the fence rules to the sample Declaration, and the merge validates", () => {
+    const sample = sampleDeclarationRulesFile()
     const merged = mergeRulesFiles(sample, fenceRulesFile())
     const keys = merged.rules.map((rule) => rule.key)
     expect(keys).toContain("guidelines:5.4.2(i)#colors")

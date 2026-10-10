@@ -86,7 +86,7 @@ describe("seedRulebook", { timeout: 60_000 }, () => {
     expect(await listGoverningDocuments(db, organization.id)).toEqual([])
     const documents = await listDocumentRecords(db, organization.id)
     expect(documents.map((record) => [record.id, record.document.edition === null])).toContainEqual([
-      "sample-declaration:guidelines",
+      "sample-declaration:by-laws",
       true
     ])
     expect((await getProvision(db, organization.id, "declaration:1.1"))?.heading).toBe("Purpose and Intent")

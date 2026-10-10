@@ -3,7 +3,7 @@ import { storedRule, storedTerm } from "@/schema/exampleRulebook.test-data"
 import * as ex from "@/schema/examples.test-data"
 import type * as T from "@/schema/types"
 import { type RuleDraft, rulesFile, type TermDraft } from "@/schema/zod"
-import { sampleRulesFile } from "./sampleRulesFile"
+import { sampleDeclarationRulesFile } from "./sampleRulesFile"
 
 // The sample fence application as rules and facts (application-review.md, Expected result for the sample application;
 // implementation-plan.md, 2.13): the Design Guidelines' fence rules from the schema examples, completed where the
@@ -553,7 +553,7 @@ function citedProvisions(value: unknown, found = new Set<string>()): Set<string>
 
 /** The fence fixture's rules file, parsed with rulesFile: a fresh copy each call. */
 export function fenceRulesFile(): T.RulesFile {
-  const sample = sampleRulesFile()
+  const sample = sampleDeclarationRulesFile()
   const rules = [
     ...sample.rules.filter((rule) => rule.key.startsWith("declaration:4.")),
     ...[...guidelineRules, ...exampleRules, ...packetRules].map(storedRule)
@@ -718,7 +718,7 @@ export function confirmedReview(file: T.RulesFile, ruleKey: string, entity: stri
 /** The document reader confirmed the plans; the model couldn't judge harmony confidently from the photos. */
 export function fenceAnswers(): Answers {
   return {
-    documentReviews: [confirmedReview(sampleRulesFile(), "declaration:4.3(b)#plans", "request")],
+    documentReviews: [confirmedReview(sampleDeclarationRulesFile(), "declaration:4.3(b)#plans", "request")],
 
     judgments: [
       {

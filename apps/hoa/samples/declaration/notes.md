@@ -1,8 +1,8 @@
 # Encoders' notes
 
-The judgment calls and schema gaps each encoder recorded while encoding the sample Declaration into
-[rules.json](rules.json). A note starting with "SCHEMA GAP:" marks a clause the schema can't express faithfully yet; the
-closest faithful form is encoded.
+The judgment calls and schema gaps each encoder recorded while encoding the sample Declaration, and later a slice of the
+Residential Design Guidelines, into [rules.json](rules.json). A note starting with "SCHEMA GAP:" marks a clause the
+schema can't express faithfully yet; the closest faithful form is encoded.
 
 ## Articles 1 and 2: the shared vocabulary
 
@@ -819,3 +819,101 @@ closest faithful form is encoded.
   'Article 21' for 'Article 211', and 'EP-1' and 'PB-4' in Exhibit A.
 - The recording volume and page numbers in Exhibits A and B are illegible in the scan and are shown as [illegible]
   rather than guessed.
+
+## Residential Design Guidelines: Articles 3 and 5, Sections 7.13 and 7.14, Exhibits K to O
+
+Hand-encoded by a coding agent (no model call), from the OCR page records of the Guidelines as Board approved on
+2025-11-12. The provisions are the structure parser's output (`structureDocument` on `cleanPages` of the page records,
+no layout files, as the build runs it), with the parser's genuine mistakes fixed by hand:
+
+- 3.5.3: the impervious surface table runs onto the next page, where the parser made each row a counted paragraph
+  (3.5.3/p2 to p22) and dropped the three "62%" cells; the rows are folded back into 3.5.3, one per line, and the cells
+  restored.
+- 5.2.4 and 5.2.5: one-sentence sections printed like headings were read as headings with no text; the sentence is the
+  text.
+- 5.3.2: the numbered manufacturers, laid out as a table, stayed in 5.3.2's text; they're points 5.3.2(i) to (iv) under
+  the lead-in "Approved Manufacturers include:", as items set on their own lines are elsewhere.
+- 5.6.1(i) and 5.8.3: run-in headings ("Boundary Line Fences", "Fencing Installed Near Sidewalks, Streets and/ or
+  Driveways") stayed in the text; their siblings got theirs.
+- 5.10.3, 5.10.4 and 5.11.3 to 5.11.6: after OCR read "5.10.3" as "10.3", sections whose number starts the text's line
+  became counted paragraphs of 5.10.2 and 5.11.2; they're sections again, 5.10.3's number marked inferred.
+- 7.13.2(ii) and (iii): the one-word items "Materials." and "Colors." were read as headings with no text.
+- Text fixes, not structure: "7½ feet" for OCR's "71/2 feet" (5.5.1(ii)), "Non-Boundary" for "Non- Boundary"
+  (5.6.1(ii)), a stray "3" and "semi-transparent" across a line break (5.11.3), and in Exhibits K to O the figure
+  callouts' certain misreadings (POBT8 to POSTS, RAL to RAIL, IX4 and LX4 to 1X4, BOARD! to BOARDS) with stray drawing
+  marks removed; uncertain dimensions ("5-2' MIN", "5/8° 80", "3'-8'") are kept as read.
+
+Judgment calls:
+
+- The slice is the review procedures (Article 3), all of Article 5 (fences, gates, screens), the detached structures and
+  patio, porch and deck sections (7.13, 7.14) and the fence and lattice exhibits they cite (K to O). Together they have
+  numeric limits, tables keyed by another value (3.5.3, 5.4.1(iii), 5.4.2(i)), figures, recommendations, required
+  documents, approvals and case-by-case variances, which the Declaration mostly lacks.
+- Anchors are empty, as in the Declaration's encoding; the guidelines' edition lists no files.
+- No rule has noExceptions. 5.2.3 ("No other alternatives will be considered") and 3.1.2 ("deviation ... cannot be
+  approved") would rule out variances, but Declaration 4.5 lets the Reviewer vary any of its guidelines and a guideline
+  can't take that away; 5.2.3 simply has no discretion rule of its own.
+- 3.1.2's COMPLIANCE ONLY exemption overrides only the guidelines' own approval rule. The Declaration's (4.1/p1) still
+  applies unless the Board's adoption of the guidelines counts as a 4.3(b)/p9 resolution (work.exempt-by-resolution),
+  which the text doesn't say; a guideline can't override the Declaration.
+- Owners' obligations and prohibitions in violations carry Declaration 4.8/p1's cure (the time the written request
+  gives), as the Declaration's Article 4 rules do.
+- 3.1.5's "In general, applications are reviewed within 30 days" is a recommendation on the DRC, measured to the
+  decision date; "Applications must be completed before they are reviewed" is a requirement the DRC judges, the items
+  themselves coming from the guidelines' document rules.
+- 3.3.2 (no authority to approve what may violate other documents or law) and 3.3.3 (final approval waits for King
+  County) are requirements: what the approval needs to take effect.
+- 3.4.2's responsibility for the accuracy of plans can't be checked and isn't encoded; its photo recommendation is.
+- 3.4.4's "advised in writing prior to inspection" is a deadline of 0 days before the entry, so notice the same day
+  passes.
+- 3.5.3's table is keyed by Unit type, the home models being narrower values of their collections; the coverage is a
+  stated percentage of the Unit. "Should follow" against "required percentages" (and 7.14.1's "must") is a question.
+- 3.6/p1 makes the Board the Reviewer for variances from shall and shall-not guidelines: a discretion rule decided by
+  the Board over the whole document, since a selector can't choose rules by modality. The homeowner's right to appeal a
+  DRC decision to the Board isn't encoded (there's no appeal request type, and no time limit to check). Whether 3.6/p2
+  lets the DRC waive any guideline or only the procedures is a question.
+- 5.2.1's "See Exhibits K, L and M for the specific approved wood fence styles" is read as restrictive (an obligation to
+  use one of them). Whether the exhibits' drawn dimensions bind (Exhibit L's 40 to 48 inches) is a question, and so is
+  what 5.2.2's "K style" means.
+- 5.2.1 cites "RDG 6.12" for landscape screenings, a section this edition doesn't have (screens are 5.10).
+- 5.3.2's "Approved Manufacturers include" is read as the full list, since (iv) sends others case by case.
+- A wood fence's color is its stain (fence-run.stain-color, with its manufacturer for 5.4.1(iii)'s table and its opacity
+  for 5.4.1(ii)); fence-run.color stays a composite fence's color, as in the schema examples. "Other brown and grey
+  tones" keys on a stated tone, because an unlisted color matches no value term.
+- Lattice and arbors are properties of their fence run (heights, colors, materials), checked only when present.
+- 5.5.1(i)'s 72-inch maximum applies to wood and composite boundary and return fences (the heading); whether its 40-inch
+  minimum for "any fence" reaches metal fences is a question. 5.5.1(ii)'s fence-plus-lattice limit applies to fences
+  with lattice. 5.5.2(i) applies to metal boundary fences only, as written (the schema example applies it to every metal
+  fence).
+- 5.6.1(i) covers side and rear fences on the boundary line with a neighboring Unit, and fences attached to another
+  Unit's fence; it runs in applications only ("in the DRC application packet"). Whether (c)'s attachment agreement
+  applies to every such fence is a question.
+- 5.6.2's lead-in ("evaluated in terms of their compatibility with the overall appearance of the streetscape") is a
+  judged obligation; 5.6.2(ii)'s "Windows and utilities may require other setbacks. Other considerations will be
+  case-by-case." is one discretion rule over the setback recommendation.
+- The Reviewer's powers to require more (a greater distance in 5.7.2, plantings, deviations and a 3 to 5 foot set-back
+  in 5.8.3, more screening under decks in 7.14.7, disclosure to neighbors in 3.1.3) are conditions of approval, decision
+  rules citing these provisions as their authority; 5.8.3, which says nothing else, is not-evaluated.
+- "Coordinate with the adjacent fence types" and "substantially the same height" (5.9.1, 5.9.3) are judgments; 5.9.2's
+  total gate height counts the gate's lattice, with or without an arbor.
+- 5.10.1's approval "prior to submitting a proposal and application" is an approval check by the Association Staff or
+  the DRC (any), prior to the governing date, which is the submission date.
+- 5.10.2's "colors ... shall follow the guidelines outlined in Article 5.4" is a judgment rather than a copy of 5.4's
+  tables per material; 5.11.3's "stain that complies with Article 5.4" is one of 5.4.1(iii)'s listed colors.
+- 5.10.4 at exactly 16 feet is neither "under 16 feet" nor "beyond 16 feet"; it's encoded as needing vertical planks.
+- Whether 5.11.3's finishes are the only ones allowed is a question; its "Metal and composite materials will be
+  considered" has no rule, since nothing requires wood.
+- 7.13.3's "usually required" material examples and "Wood is preferred" are recommendations ("other materials will be
+  considered" is discretion over the wood one); its "should be compatible with the home" is a recommendation beside
+  7.13.2's obligation.
+- 7.14's patios, porches and decks are one thing (patio, porch or deck) with a category per kind, so 7.14.1 is stated
+  once; 7.14.2's "extends into the 5-foot easement from the wall" is a distance from the wall under 5 feet. Whether
+  7.14.4's patio floor materials are the only ones allowed is a question.
+- Matching the home's body or trim color (7.14.8) and a wood-color stain compatible with the deck and house (7.14.9) are
+  judgments.
+- Exhibit K's note "Arched and scalloped style gates allowed on solid wood fences" is a permission overriding 5.9.1's
+  coordination judgment.
+- The Declaration's DRC (committee) and managing agent ("Management") terms gain the guidelines' citations; the
+  application form takes the guidelines' name, the DRC Application packet.
+- SCHEMA GAP: 3.1.7's notification is the Association's document, but a document check reads the requester's files; it's
+  encoded as a document check on the disapproval notice all the same.

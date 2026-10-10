@@ -186,7 +186,7 @@ describe("coverageReport", () => {
   it("counts the sample's characters by kind, per document and article", () => {
     const records = sampleRecords()
     const report = coverageReport(records, coverageOf(records), vocabulary)
-    expect(report.documents.map((document) => document.key)).toEqual(["declaration", "use-restrictions"])
+    expect(report.documents.map((document) => document.key)).toEqual(["declaration", "use-restrictions", "guidelines"])
     const declaration = report.documents[0]
     expect(declaration?.articles[0]?.provision.key).toBe("declaration:preamble")
     const characters = records.provisions.reduce(

@@ -7,7 +7,7 @@ import { mergeRulesFiles } from "@/evaluation/review/rulesFile"
 import type * as T from "@/schema/types"
 import { fenceReview } from "@/tests/fenceReview"
 import { fenceRulesFile, runs } from "@/tests/fenceSchemaFixture"
-import { sampleRulesFile } from "@/tests/sampleRulesFile"
+import { sampleDeclarationRulesFile } from "@/tests/sampleRulesFile"
 import { reportRules } from "../applicationView"
 import { entityCards, filterMatrix, outcomeCounts, reviewMatrix, type ReviewMatrixModel } from "./ReviewMatrix.utils"
 
@@ -144,7 +144,7 @@ describe("reviewMatrix on the garage enclosure's expected result", () => {
     { id: "lot", type: "lot", label: "The lot", ref: null },
     ...garage.expected.entities.map((entity) => ({ ...entity, ref: null }))
   ]
-  const rulesFile = mergeRulesFiles(sampleRulesFile(), fenceRulesFile())
+  const rulesFile = mergeRulesFiles(sampleDeclarationRulesFile(), fenceRulesFile())
   const rules = rulesByKey(
     reportRules(
       rulesFile,
