@@ -61,8 +61,6 @@ export type UploadDocumentDialogProps = {
   onOpenChange: (isOpen: boolean) => void
   /** The organization's documents, each its current version: the file can be a new version of any of them. */
   documents: readonly GoverningDocument[]
-  /** The document the person asked to upload a new version of; null to guess from the file's name. */
-  of: GoverningDocument | null
   onUpload: (file: File, details: DocumentDetails) => Promise<unknown>
   onUploaded: () => void
 }
@@ -75,25 +73,23 @@ const required = (
 
 /**
  * Uploads a governing document (encoding.md, UX, Documents). Once a file is chosen it asks what the file is: a new
- * document, or a new version of an existing one (guessed from the file's name, or the one the person started from),
- * which is a new edition that replaces it or an amendment that changes part of it. The rulebook is rebuilt once the
+ * document, or a new version of an existing one (guessed from the file's name), which is a new edition that replaces it or an amendment that changes part of it. The rulebook is rebuilt once the
  * file is read.
  */
 export function UploadDocumentDialog({
   isOpen,
   onOpenChange,
   documents,
-  of,
   onUpload,
   onUploaded
 }: UploadDocumentDialogProps) {
   const [error, setError] = useState<string | null>(null)
-  // Once the person has said what the file is (or started from a document), a new file doesn't change the answer.
-  const [isTargetChosen, setIsTargetChosen] = useState(of !== null)
+  // Once the person has said what the file is, a new file doesn't change the answer.
+  const [isTargetChosen, setIsTargetChosen] = useState(false)
   const defaultValues: UploadValues = {
-    target: of?.id ?? newDocument,
-    kind: of?.kind ?? "design-guidelines",
-    title: of?.title ?? "",
+    target: newDocument,
+    kind: "design-guidelines",
+    title: "",
     relation: "edition",
     file: null
   }

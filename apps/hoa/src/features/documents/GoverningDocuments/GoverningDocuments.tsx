@@ -1,13 +1,11 @@
-import { BookOpenTextIcon, ChevronDownIcon, DownloadIcon, FileTextIcon, UploadIcon } from "lucide-react"
+import { BookOpenTextIcon, ChevronDownIcon, FileTextIcon, UploadIcon } from "lucide-react"
 import { useState } from "react"
-import { RowActions } from "@/components/RowActions/RowActions"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import type { GoverningDocument } from "@/documents/governingDocument"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { citationHref } from "../citationLink"
-import { documentFileUrl } from "../documentFile"
 import { DocumentFileLinks } from "../DocumentFileLinks/DocumentFileLinks"
 import { documentKindLabels, documentVersions } from "../documentKinds"
 import { ReaderLink } from "../ReaderLink/ReaderLink"
@@ -37,8 +35,7 @@ function dateText(value: string) {
 /**
  * The organization's governing documents (encoding.md, UX, Documents): each document's current version with its
  * earlier ones behind a disclosure, each one opened or downloaded as uploaded. Administrators upload documents and new
- * versions of them through one Upload (a row's New version starts it at that document); the rulebook is rebuilt from
- * them once they're read.
+ * versions of them through one Upload, which asks which it is; the rulebook is rebuilt from them once they're read.
  */
 export function GoverningDocuments({
   uploads,
@@ -48,13 +45,9 @@ export function GoverningDocuments({
   onChanged,
   initialCount = 6
 }: GoverningDocumentsProps) {
-  // The upload dialog: which document it starts from (null to guess from the file), and a new key for each opening.
-  const [upload, setUpload] = useState<{ isOpen: boolean; of: GoverningDocument | null; key: number }>({
-    isOpen: false,
-    of: null,
-    key: 0
-  })
-  const openUpload = (of: GoverningDocument | null) => setUpload(({ key }) => ({ isOpen: true, of, key: key + 1 }))
+  // The upload dialog, with a new key for each opening so it starts empty.
+  const [upload, setUpload] = useState({ isOpen: false, key: 0 })
+  const openUpload = () => setUpload(({ key }) => ({ isOpen: true, key: key + 1 }))
   const [isAllShown, setIsAllShown] = useState(false)
   const documents = documentVersions(uploads)
   const shown = isAllShown ? documents : documents.slice(0, initialCount)
@@ -66,7 +59,7 @@ export function GoverningDocuments({
           Governing documents
         </h2>
         {onUpload && documents.length > 0 ? (
-          <Button size="sm" variant="outline" onClick={() => openUpload(null)}>
+          <Button size="sm" variant="outline" onClick={() => openUpload()}>
             <UploadIcon />
             Upload
           </Button>
@@ -87,7 +80,7 @@ export function GoverningDocuments({
           </EmptyHeader>
           {onUpload ? (
             <EmptyContent>
-              <Button onClick={() => openUpload(null)}>
+              <Button onClick={() => openUpload()}>
                 <UploadIcon />
                 Upload a document
               </Button>
@@ -104,7 +97,6 @@ export function GoverningDocuments({
                 loadJob={loadJob}
                 onChanged={onChanged}
                 isReadable={latest.status === "ready" && Boolean(latest.pageCount)}
-                onNewVersion={onUpload ? () => openUpload(latest) : undefined}
               />
               {earlier.length > 0 ? <EarlierVersions versions={earlier} /> : null}
             </li>
@@ -122,7 +114,6 @@ export function GoverningDocuments({
           isOpen={upload.isOpen}
           onOpenChange={(isOpen) => setUpload((current) => ({ ...current, isOpen }))}
           documents={documents.map(({ latest }) => latest)}
-          of={upload.of}
           onUpload={onUpload}
           onUploaded={onChanged}
         />
@@ -136,8 +127,7 @@ function DocumentRow({
   jobId,
   loadJob,
   onChanged,
-  isReadable,
-  onNewVersion
+  isReadable
 }: {
   document: GoverningDocument
   jobId: string | undefined
@@ -145,8 +135,6 @@ function DocumentRow({
   onChanged: () => void
   /** Whether its pages were read, so it opens in the document reader. */
   isReadable: boolean
-  /** With this, the row's actions are in its menu: Download and New version. Without, Download shows beside Read. */
-  onNewVersion?: () => void
 }) {
   // An upload that didn't finish has no file to save.
   const isDownloadable = document.status !== "uploading"
@@ -184,25 +172,7 @@ function DocumentRow({
             <span className="sr-only"> {document.title}</span>
           </ReaderLink>
         ) : null}
-        {onNewVersion ? (
-          <RowActions
-            name={document.title}
-            actions={[
-              ...(isDownloadable
-                ? [
-                    {
-                      label: "Download",
-                      icon: DownloadIcon,
-                      href: documentFileUrl(document.id, { download: true }),
-                      download: true
-                    }
-                  ]
-                : []),
-              { label: "New version", icon: UploadIcon, onSelect: onNewVersion }
-            ]}
-          />
-        ) : null}
-        {!onNewVersion && isDownloadable ? <DocumentFileLinks documentId={document.id} title={document.title} /> : null}
+        {isDownloadable ? <DocumentFileLinks documentId={document.id} title={document.title} /> : null}
       </div>
     </div>
   )

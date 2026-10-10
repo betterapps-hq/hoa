@@ -220,8 +220,8 @@ describe("GoverningDocuments", () => {
     expect(screen.getByText(/version 2/)).toBeInTheDocument()
     expect(await screen.findByText("Describing drawings and photos: 3 of 12")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Read Bylaws of the association" })).toBeInTheDocument()
-    expect(screen.queryByRole("link", { name: /^Download/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: /New version/ })).not.toBeInTheDocument()
+    // A new version goes through the one Upload, which asks what the file is; rows only read and download.
+    expect(screen.queryByRole("button", { name: /New version|Actions/ })).not.toBeInTheDocument()
     expect(screen.getAllByRole("button", { name: "Upload" })).toHaveLength(1)
 
     await user.click(screen.getByRole("button", { name: "1 earlier version" }))
@@ -229,25 +229,16 @@ describe("GoverningDocuments", () => {
       "href",
       "/files/governing/doc-1?download"
     )
-
-    await user.click(screen.getByRole("button", { name: "Actions for Residential design guidelines" }))
-    const menu = await screen.findByRole("menu")
-    const download = within(menu).getByRole("menuitem", { name: "Download" })
-    expect(download).toHaveAttribute("href", "/files/governing/doc-2?download")
-    expect(download).toHaveAttribute("download")
-    expect(within(menu).getByRole("menuitem", { name: "New version" })).toBeInTheDocument()
   })
 
-  it("starts the upload at a row's document from its menu, and uploads an amendment to it", async () => {
+  it("uploads an amendment to an existing document through the one Upload", async () => {
     const user = userEvent.setup()
     const onUpload = uploader()
     render(<GoverningDocuments {...props} uploads={[document(), bylaws]} onUpload={onUpload} />, { wrapper })
-    await user.click(screen.getByRole("button", { name: "Actions for Bylaws of the association" }))
-    await user.click(await screen.findByRole("menuitem", { name: "New version" }))
+    await user.click(screen.getByRole("button", { name: "Upload" }))
     const dialog = await screen.findByRole("dialog", { name: "Upload a governing document" })
-    // The person said which document it's for, so a file named like another one doesn't change it.
     await user.upload(within(dialog).getByLabelText(/File/), pdf())
-    expect(within(dialog).getByRole("radio", { name: "A new version of Bylaws of the association" })).toBeChecked()
+    await user.click(within(dialog).getByRole("radio", { name: "A new version of Bylaws of the association" }))
 
     await user.click(within(dialog).getByRole("radio", { name: "An amendment that changes part of it" }))
     expect(within(dialog).getByLabelText(/Title of the amendment/)).toHaveValue("")
