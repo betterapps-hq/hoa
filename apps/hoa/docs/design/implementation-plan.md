@@ -39,7 +39,7 @@ saved build run or an earlier step run (`pnpm eval:step`; [evaluation.md](evalua
 | --- | --- | --- |
 | R.1 | Step answer formats, variables, checks and scorers; `pnpm eval:datasets` and `pnpm eval:step`. | Done. |
 | R.2 | B defined terms. | Done: `hoa-defined-terms` v6 on Opus at high effort. |
-| R.3 | E find the rules. | In testing: `hoa-rule-finding` v2 (with `hoa-guide-rule-kinds` v2), checked on held-out organizations. |
+| R.3 | E find the rules. | Done: `hoa-rule-finding` v5 (with `hoa-guide-rule-kinds` v5) on Opus at high effort, checked on four held-out organizations. |
 | R.4 | C shared vocabulary and C-merge. | Built, not yet tested: each clears its dataset on `pnpm eval:step`. |
 | R.5 | F structure the rules, with its retry. | Built, not yet tested: clears its dataset on `pnpm eval:step`. |
 | R.6 | Consolidation. | Built, not yet tested: clears its dataset on `pnpm eval:step`. |
