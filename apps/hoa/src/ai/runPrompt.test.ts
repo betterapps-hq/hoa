@@ -280,6 +280,26 @@ describe("runCheckedObjectPrompt", () => {
     expect(text.isValid ? [] : text.issues.map((issue) => issue.path)).toEqual([["rules"]])
   })
 
+  it("drops a key the schema doesn't know when its value is null, and keeps one with a value as an issue", async () => {
+    const strict = z.strictObject({ outlines: z.array(z.strictObject({ kind: z.string() })) })
+    const check = (answer: unknown) =>
+      runCheckedObjectPrompt({
+        loadPrompt: langfusePrompt,
+        createModel: () => objectModel(answer),
+        defaultModelId: "test-model",
+        prompt: applicantPrompt,
+        variables: { applicant: "Lot 12" },
+        schema: strict,
+        traceName: "provision-encoding",
+        environment: "test"
+      })
+    expect(await check({ outlines: [{ kind: "obligation", kind_: null }] })).toMatchObject({
+      isValid: true,
+      object: { outlines: [{ kind: "obligation" }] }
+    })
+    expect(await check({ outlines: [{ kind: "obligation", kind_: "prohibition" }] })).toMatchObject({ isValid: false })
+  })
+
   it("returns an answer that fails Zod with its issues, and caches it", async () => {
     const stored = new Map<string, unknown>()
     const cache = {

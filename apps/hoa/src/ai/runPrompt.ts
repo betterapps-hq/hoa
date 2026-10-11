@@ -257,10 +257,36 @@ function checkAnswer<T>(schema: z.ZodType<T>, answer: unknown, codeFields?: Code
   if (parsed.success) {
     return { isValid: true, object: parsed.data }
   }
-  const unwrapped = parsedJsonStrings(answer, parsed.error.issues)
-  return unwrapped === null
+  const repaired = parsedJsonStrings(answer, parsed.error.issues) ?? withoutNullStrays(answer, parsed.error.issues)
+  return repaired === null
     ? { isValid: false, answer: filled, issues: parsed.error.issues }
-    : checkAnswer(schema, unwrapped, codeFields)
+    : checkAnswer(schema, repaired, codeFields)
+}
+
+/**
+ * The answer without each key the schema doesn't know whose value is null; null when there's none. Claude models
+ * sometimes add a stray null field beside a real one (`"kind_": null` next to `"kind"`), which says nothing.
+ */
+function withoutNullStrays(answer: unknown, issues: readonly z.core.$ZodIssue[]) {
+  let result = answer
+  for (const issue of issues) {
+    if (issue.code !== "unrecognized_keys") {
+      continue
+    }
+    const value = valueAt(result, issue.path)
+    if (!isRecord(value)) {
+      continue
+    }
+    const strays = issue.keys.filter((key) => value[key] === null)
+    if (strays.length > 0) {
+      result = withValueAt(
+        result,
+        issue.path,
+        Object.fromEntries(Object.entries(value).filter(([key]) => !strays.includes(key)))
+      )
+    }
+  }
+  return result === answer ? null : result
 }
 
 /**
