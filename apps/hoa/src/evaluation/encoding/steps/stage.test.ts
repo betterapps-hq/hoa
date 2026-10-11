@@ -1,3 +1,4 @@
+import invariant from "tiny-invariant"
 import { describe, expect, it } from "vitest"
 import { citableProvisions, definingProvisions } from "@/encoding/steps/definedTerms"
 import { kindName, type Outline } from "@/encoding/steps/outline"
@@ -399,6 +400,31 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
     slow
   )
 
+  it("E counts a rule split finer than the golden's as found, not as extras", () => {
+    const item = datasets["rule-finding"].find((entry) =>
+      entry.expected.provisions.some((provision) => provision.outlines.length === 1)
+    )
+    invariant(item, "a section with a one-rule provision")
+    const provisions = item.expected.provisions.map((provision) => {
+      const [rule] = provision.outlines
+      if (provision.outlines.length !== 1 || !rule) {
+        return provision
+      }
+      const words = rule.summary.split(" ")
+      const half = Math.ceil(words.length / 2)
+      return {
+        ...provision,
+        outlines: [
+          { ...rule, key: `${rule.key}-first`, summary: words.slice(0, half).join(" ") },
+          { ...rule, key: `${rule.key}-second`, summary: words.slice(half).join(" ") }
+        ]
+      }
+    })
+    const score = scoreFinding(item, { provisions }, termAlignment(terms, terms), terms)
+    expect(score.metrics["rule-recall"]).toBe(1)
+    expect(score.metrics["rule-precision"]).toBe(1)
+  })
+
   it(
     "C serves every outline's reads",
     async () => {
@@ -540,7 +566,7 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
         scoreStructuring(item, run.outputs.get(item.id) ?? null, sides, termAlignment(terms, terms))
       )
       const metrics = scores.map((score) => score.metrics)
-      // F's format has no judgment check for a requirement: a batch holding one of the golden's two such rules can't be
+      // F's format has no judgment check for a requirement: a batch holding one of the golden's such rules can't be
       // answered as the golden is (a SCHEMA GAP of the format); every other batch comes back whole and valid.
       const gap = new Set(
         golden.rules
@@ -548,7 +574,7 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
           .map((rule) => rule.key)
       )
       const blocked = items.filter((item) => item.expected.rules.some((rule) => gap.has(rule.key)))
-      expect(blocked).toHaveLength(gap.size)
+      expect(blocked.flatMap((item) => item.expected.rules.filter((rule) => gap.has(rule.key)))).toHaveLength(gap.size)
       for (const item of items.filter((found) => !blocked.includes(found))) {
         const metric = scores[items.indexOf(item)]?.metrics ?? {}
         expect([item.id, metric.structured, metric["valid-before-repair"]]).toEqual([item.id, 1, 1])

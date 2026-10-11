@@ -51,6 +51,8 @@ export type RuleFindingItem = DatasetItem<
       /** Covered without this section's rules: by a term, a settings clause or a rule of another section citing it. */
       coveredOutside: boolean
     }[]
+    /** The section's interpretation questions: each option's rule keys, one reading of an ambiguous passage. */
+    readings: T.RuleKey[][][]
   }
 >
 export type SharedVocabularyItem = DatasetItem<
@@ -252,7 +254,13 @@ export function buildDatasets(context: GoldenContext) {
           outlines: outlines.filter((outline) => outline.provisionKey === provision.key),
           coveredOutside:
             termCited.has(provision.key) || clauseCited.has(provision.key) || citedElsewhere.has(provision.key)
-        }))
+        })),
+        readings: golden.questions
+          .filter((question) => question.kind === "interpretation")
+          .map((question) =>
+            question.options.map((option) => option.keeps.filter((key) => unitRules.some((rule) => rule.key === key)))
+          )
+          .filter((options) => options.filter((keys) => keys.length > 0).length > 1)
       }
     }
   })

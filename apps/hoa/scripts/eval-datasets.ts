@@ -7,8 +7,8 @@ import { fixtures, writeJson } from "./evalFiles.ts"
 import { defaultRetryQuota, defaultRuns, goldenContext, goldenSamples, labeledRuns, pairs } from "./stepDatasets.ts"
 
 // The per-step datasets (evaluation.md, Datasets): items built by code from every golden encoding in samples/ (input as
-// the step receives it, expected output, slice tags), scored against the old pipeline's saved runs (the v3 and v5
-// columns) with no model call, written to .fixtures/eval/datasets/<step>/ (git-ignored: items quote the documents):
+// the step receives it, expected output, slice tags), scored against the old pipeline's saved runs (the v5
+// column) with no model call, written to .fixtures/eval/datasets/<step>/ (git-ignored: items quote the documents):
 // items/<id>.json, results.json (each item's verdict and metrics per run), summary.md and compare/<id>.md for the
 // coding agent. Nothing goes to Langfuse. Usage, from apps/hoa:
 //   pnpm eval:datasets [--runs <label>=<run id>,...] [--retry-quota <class prefix>=<count>,...]

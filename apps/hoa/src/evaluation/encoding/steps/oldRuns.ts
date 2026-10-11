@@ -15,7 +15,7 @@ import type { DatasetItem, RuleFindingItem, RuleStructuringItem } from "./datase
 import type { SavedRun } from "./savedRun"
 import type { ConsolidationOutput, FindingOutput, RetryOutput, StructuringOutput } from "./scores"
 
-// What an old pipeline run produced for each dataset item (evaluation.md, Datasets, the v3 and v5 columns). The old
+// What an old pipeline run produced for each dataset item (evaluation.md, Datasets, the v5 column). The old
 // pipeline had other steps, so its outputs are mapped: its vocabulary step to B, its encode answers to E's outlines and
 // F's structured rules, its repair to F's retry, its consolidation to consolidation. C and C-merge have no
 // equivalent.

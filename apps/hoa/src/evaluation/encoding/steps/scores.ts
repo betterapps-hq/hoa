@@ -3,12 +3,13 @@ import { citableProvisions, definingProvisions } from "@/encoding/steps/definedT
 import type { Outline } from "@/encoding/steps/outline"
 import { kindName } from "@/encoding/steps/outline"
 import { keySegment } from "@/encoding/steps/termKeys"
+import { isStopWord } from "@/lib/search"
 import { coreTerms } from "@/schema/coreTerms"
 import type * as T from "@/schema/types"
 import type { JsonPath } from "@/schema/validate"
 import type { RuleContent, TermContent } from "@/schema/zod"
 import { matchLabel } from "@/text/match"
-import { labelForms } from "@/text/normalize"
+import { labelForms, singularOf } from "@/text/normalize"
 import { checkAgreement } from "../checkAgreement"
 import { alignTerms, isCoreKey, type TermMatch, type TermPair } from "../terms"
 import type {
@@ -269,26 +270,95 @@ export type FindingOutput = {
 
 type Pair = { expected: Outline; output: Outline }
 
-/** Pairs expected and output outlines of one provision: the same key, then the same kind, then in order. */
+// Words a rule summary needs whatever it says, so they don't make two summaries alike.
+const summaryFiller = new Set(["must", "may", "not", "no", "only", "if", "its", "their", "that", "this", "any", "each"])
+
+/** A summary's content words, singular, without stop words and modal filler. */
+function summaryWords(summary: string) {
+  return new Set(
+    summary
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((word) => word.length > 1 && !isStopWord(word) && !summaryFiller.has(word))
+      .map(singularOf)
+  )
+}
+
+/** The share of a's summary words that b's summary also has. */
+function containment(a: Outline, b: Outline) {
+  const words = summaryWords(a.summary)
+  const other = summaryWords(b.summary)
+  return words.size === 0 ? 0 : [...words].filter((word) => other.has(word)).length / words.size
+}
+
+/** How alike two summaries are: the smaller share of either's words that the other has. */
+const likeness = (a: Outline, b: Outline) => Math.min(containment(a, b), containment(b, a))
+
+/** An output outline whose summary this much inside an expected rule's is part of that rule, split finer. */
+const partShare = 0.7
+
+/** Whether a provision is under another: "rules:4.2(a)" and "rules:4.2/p2" are under "rules:4.2". */
+const under = (key: string, parent: string) => key.startsWith(parent) && /^[(/]/.test(key.slice(parent.length))
+
+/** Whether two outlines' provisions are related: one under the other, or one outline citing the other's provision. */
+const related = (a: Outline, b: Outline) =>
+  under(a.provisionKey, b.provisionKey) ||
+  under(b.provisionKey, a.provisionKey) ||
+  a.citations.includes(b.provisionKey) ||
+  b.citations.includes(a.provisionKey)
+
+/**
+ * Pairs expected and output outlines of one provision: the same key, then the most alike summaries, then the same
+ * kind, then in order. An unpaired output outline whose summary lies inside an expected rule's is a part of that rule:
+ * rules split finer than the golden's (one per requirement a reviewer could find unmet) aren't extras.
+ */
 function pairOutlines(expected: readonly Outline[], output: readonly Outline[]) {
   const pairs: Pair[] = []
   const left = [...expected]
   const right = [...output]
+  const pair = (a: Outline, b: Outline) => {
+    pairs.push({ expected: a, output: b })
+    left.splice(left.indexOf(a), 1)
+    right.splice(right.indexOf(b), 1)
+  }
   const take = (match: (a: Outline, b: Outline) => boolean) => {
     for (const a of left.slice()) {
-      const index = right.findIndex((b) => match(a, b))
-      const b = right[index]
+      const b = right.find((candidate) => match(a, candidate))
       if (b) {
-        pairs.push({ expected: a, output: b })
-        left.splice(left.indexOf(a), 1)
-        right.splice(index, 1)
+        pair(a, b)
       }
     }
   }
   take((a, b) => a.key === b.key)
+  const alike = left
+    .flatMap((a) => right.map((b) => ({ a, b, score: likeness(a, b) })))
+    .filter((option) => option.score >= 0.5)
+    .toSorted((x, y) => y.score - x.score)
+  for (const { a, b } of alike) {
+    if (left.includes(a) && right.includes(b)) {
+      pair(a, b)
+    }
+  }
+  const parts: Pair[] = []
+  for (const b of right.slice()) {
+    const whole = expected
+      .map((a) => ({ a, share: containment(b, a) }))
+      .filter((option) => option.share >= partShare)
+      .toSorted((x, y) => y.share - x.share)[0]
+    if (whole) {
+      parts.push({ expected: whole.a, output: b })
+      right.splice(right.indexOf(b), 1)
+    }
+  }
+  // A rule split into parts is found, though no one outline is all of it.
+  for (const a of left.slice()) {
+    if (parts.some((part) => part.expected === a)) {
+      left.splice(left.indexOf(a), 1)
+    }
+  }
   take((a, b) => kindName(a) === kindName(b))
   take(() => true)
-  return { pairs, unpairedExpected: left, unpairedOutput: right }
+  return { pairs, parts, unpairedExpected: left, unpairedOutput: right }
 }
 
 export function scoreFinding(
@@ -318,6 +388,10 @@ export function scoreFinding(
   )
   const notes: string[] = []
   const pairs: Pair[] = []
+  const unpairedExpected: Outline[] = []
+  const unpairedOutput: Outline[] = []
+  let partCount = 0
+  let splitCount = 0
   let expectedCount = 0
   let outputCount = 0
   let covered = 0
@@ -344,11 +418,47 @@ export function scoreFinding(
     expectedCount += entry.outlines.length
     outputCount += found?.outlines.length ?? 0
     pairs.push(...paired.pairs)
-    notes.push(
-      ...paired.unpairedExpected.map((outline) => `golden ${outline.key} (${kindName(outline)}) has no outline`)
-    )
-    notes.push(...paired.unpairedOutput.map((outline) => `${outline.key} (${kindName(outline)}) has no golden rule`))
+    partCount += paired.parts.length
+    splitCount += new Set(
+      paired.parts.map((part) => part.expected).filter((rule) => !paired.pairs.some((p) => p.expected === rule))
+    ).size
+    unpairedExpected.push(...paired.unpairedExpected)
+    unpairedOutput.push(...paired.unpairedOutput)
   }
+  // A part can sit on a related provision: a list item under the golden's lead-in, or a provision either one cites.
+  const allExpected = item.expected.provisions.flatMap((entry) => entry.outlines)
+  for (const b of unpairedOutput.slice()) {
+    const whole = allExpected
+      .filter((a) => related(a, b))
+      .map((a) => ({ a, share: containment(b, a) }))
+      .filter((option) => option.share >= partShare)
+      .toSorted((x, y) => y.share - x.share)[0]
+    if (whole) {
+      partCount += 1
+      unpairedOutput.splice(unpairedOutput.indexOf(b), 1)
+      if (unpairedExpected.includes(whole.a)) {
+        splitCount += 1
+        unpairedExpected.splice(unpairedExpected.indexOf(whole.a), 1)
+      }
+    }
+  }
+  // An ambiguous passage's readings are alternatives: finding one reading's rules doesn't miss the others'.
+  const missed = new Set(unpairedExpected.map((outline) => outline.key))
+  for (const options of item.expected.readings ?? []) {
+    const chosen = options.find((keys) => keys.some((key) => !missed.has(key)))
+    for (const key of options.flat()) {
+      if (chosen && !chosen.includes(key) && missed.has(key)) {
+        missed.delete(key)
+        expectedCount -= 1
+        unpairedExpected.splice(
+          unpairedExpected.findIndex((outline) => outline.key === key),
+          1
+        )
+      }
+    }
+  }
+  notes.push(...unpairedExpected.map((outline) => `golden ${outline.key} (${kindName(outline)}) has no outline`))
+  notes.push(...unpairedOutput.map((outline) => `${outline.key} (${kindName(outline)}) has no golden rule`))
   const agreeing = (same: (pair: Pair) => boolean, what: string) => {
     const misses = pairs.filter((pair) => !same(pair))
     notes.push(...misses.map((pair) => `${pair.output.key}: ${what} differs from golden ${pair.expected.key}`))
@@ -356,8 +466,8 @@ export function scoreFinding(
   }
   const metrics = {
     coverage: share(covered, item.expected.provisions.length),
-    "rule-recall": share(pairs.length, expectedCount),
-    "rule-precision": share(pairs.length, outputCount),
+    "rule-recall": share(pairs.length + splitCount, expectedCount),
+    "rule-precision": share(pairs.length + partCount, outputCount),
     "kind-agreement": agreeing((pair) => kindName(pair.expected) === kindName(pair.output), "kind"),
     "bearer-agreement": agreeing((pair) => same(pair.expected.bearer, pair.output.bearer), "bearer"),
     "subject-agreement": agreeing((pair) => same(pair.expected.appliesTo, pair.output.appliesTo), "subject"),

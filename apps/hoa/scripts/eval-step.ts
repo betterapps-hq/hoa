@@ -25,6 +25,7 @@ import {
   scoreConsolidation,
   scoreDefinedTerms,
   scoreFinding,
+  type FindingOutput,
   scoreMerge,
   scoreRetry,
   scoreStructuring,
@@ -394,6 +395,10 @@ const definedTerms = fromStep?.definedTerms ?? datasets["shared-vocabulary"][0]?
 
 /** B's and C's output as their run folders hold it. */
 const termsOutput = z.object({ terms: z.array(termDraft) })
+/** E's saved output, read back as written: the run wrote it from a checked answer. */
+const findingOutput = z.custom<FindingOutput>(
+  (value) => typeof value === "object" && value !== null && "provisions" in value && Array.isArray(value.provisions)
+)
 const byId = <I extends { id: string }>(items: readonly I[]) => new Map(items.map((item) => [item.id, item]))
 
 switch (stage) {
@@ -452,8 +457,10 @@ switch (stage) {
           definedTerms,
           provisions: fromBuild?.provisions ?? goldenProvisions
         }),
-      score: (item, output) => scoreFinding(item, output, termAlignment(allGoldenTerms, allGoldenTerms)),
-      previous: fromStep ?? {}
+      score: (item, output) =>
+        scoreFinding(item, output, termAlignment(allGoldenTerms, allGoldenTerms), allGoldenTerms),
+      previous: fromStep ?? {},
+      output: findingOutput
     })
     break
   }

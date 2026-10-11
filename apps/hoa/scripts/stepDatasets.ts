@@ -16,7 +16,8 @@ import { sampleDocuments } from "./sampleDocuments.ts"
 // What the step datasets' scripts share: the golden encoding with its splits and references, the old runs they're
 // compared with, and comma-separated `name=value` options.
 
-export const defaultRuns = "v3=2026-10-09T22-47-00-dev,v3=2026-10-09T22-45-54-test,v5=2026-10-09T23-14-52-dev"
+// v5 only: the v3 runs had problems and an overfitted prompt, so they're no fair baseline.
+export const defaultRuns = "v5=2026-10-09T23-14-52-dev"
 export const defaultRetryQuota = "undefined-term=10,type-mismatch=8,invariant=4,shape=8"
 
 export const pairs = (option: string | undefined) =>

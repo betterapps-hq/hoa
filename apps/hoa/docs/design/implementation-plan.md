@@ -39,7 +39,7 @@ saved build run or an earlier step run (`pnpm eval:step`; [evaluation.md](evalua
 | --- | --- | --- |
 | R.1 | Step answer formats, variables, checks and scorers; `pnpm eval:datasets` and `pnpm eval:step`. | Done. |
 | R.2 | B defined terms. | Done: `hoa-defined-terms` v6 on Opus at high effort. |
-| R.3 | E find the rules. | In testing: `hoa-rule-finding` v1. |
+| R.3 | E find the rules. | In testing: `hoa-rule-finding` v2 (with `hoa-guide-rule-kinds` v2), checked on held-out organizations. |
 | R.4 | C shared vocabulary and C-merge. | Built, not yet tested: each clears its dataset on `pnpm eval:step`. |
 | R.5 | F structure the rules, with its retry. | Built, not yet tested: clears its dataset on `pnpm eval:step`. |
 | R.6 | Consolidation. | Built, not yet tested: clears its dataset on `pnpm eval:step`. |
@@ -47,6 +47,43 @@ saved build run or an earlier step run (`pnpm eval:step`; [evaluation.md](evalua
 | R.8 | Update the build's UX (steps, estimate, results as they arrive) for the new stages. | Browser check during a build. |
 
 Tested one step at a time: revise a prompt, run it alone, judge every miss, then move to the next step.
+
+### Open issue for R.5: requirements that need a judgment
+
+The schema lets a requirement (a norm with modality requirement and no bearer) carry a judgment check, and the golden
+has six such rules. Neither step can produce one:
+
+- E has no judged kind for a requirement. Its kinds are `obligation-judged` and `recommendation-judged`; a requirement
+  outline is always `requirement`, so nothing tells F a judgment is wanted.
+- F's answer format (`structuredRule` in `src/encoding/steps/ruleStructuring.ts`) gives a `requirement` only a fact
+  check (`factCheck`, every check type except judgment). A batch holding one of these rules can't be answered as the
+  golden is; `stage.test.ts` ("F structures every batch as the golden does") counts them as a known gap.
+
+The six golden rules, with the judgment each asks:
+
+| Rule | Request type | Judgment |
+| --- | --- | --- |
+| `guidelines:3.1.5#complete-before-review` | architectural-application | Is the application complete, with every item the guidelines require for the proposed work? |
+| `guidelines:3.3.2#no-authority` | architectural-application | Is the application free of anything that, in the Reviewer's determination, may violate the other governing documents or the law? |
+| `declaration:3.1(a)(i)/p2#written-request` | violation | Was the request to let an occupant stay a written request giving every proposed resident's name and age? |
+| `declaration:6.2/p1#entity-representative` | meeting | Were a non-individual Owner's membership rights exercised only by its officer, director, partner or trustee, or by someone it designated in writing? |
+| `declaration:6.4(b)#separate-slate` | meeting | Did each Voting Group vote on a separate slate of candidates? |
+| `declaration:6.4(b)#equal-directors` | meeting | Was each Voting Group entitled to elect the same number of directors? |
+
+The first two are true judgments: completeness and possible violations are the Reviewer's call. The last four were
+added on 2026-10-11 from the step E review (samples/declaration/notes.md, "Corrections from evaluation"), and some may
+be better as fact checks: whether each Voting Group had its own slate, or elects the same number of directors, is a
+fact a meeting's record can state. None of the six names who decides (`decidedBy` is null).
+
+To decide when R.5 is tested, one of:
+
+1. Add a judged requirement: a `requirement-judged` kind in E's outlines and a matching branch in F's format with a
+   judgment check and `decidedBy`, as the judged obligation and recommendation have.
+2. Keep requirements fact-checked only: re-encode the golden rules whose answer a fact settles as fact checks, and
+   make the true judgments (3.1.5, 3.3.2) judged obligations on the applicant if the schema's meaning allows, so the
+   schema no longer needs a judged requirement.
+
+Either way, the golden's six rules and the format must agree before F's scores mean anything for them.
 
 A second approach is being explored beside this one: [taxonomy-ingestion.md](taxonomy-ingestion.md) discovers rule
 kinds across organizations and sorts provisions with small models, the large model as fallback.

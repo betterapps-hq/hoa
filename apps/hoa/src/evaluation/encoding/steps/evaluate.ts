@@ -28,7 +28,7 @@ import {
   type ItemScore
 } from "./scores"
 
-// Scores every dataset item against the old pipeline's saved runs (the v3 and v5 columns), and writes nothing: the
+// Scores every dataset item against the old pipeline's saved runs (the v5 column), and writes nothing: the
 // generator script stores the items, these results, the summaries and the comparison files.
 
 export type Datasets = ReturnType<typeof buildDatasets> & { "rule-retry": RetryItem[] }
@@ -147,7 +147,7 @@ export function evaluateDatasets(datasets: Datasets, runs: readonly LabeledRun[]
       runs,
       (item, run) => {
         const output = oldFinding(run, item)
-        return { output, score: scoreFinding(item, output, matchesOf(run)) }
+        return { output, score: scoreFinding(item, output, matchesOf(run), terms) }
       },
       (item) => item.input.unit.provisions.map(provisionBlock).join("\n\n")
     ),
