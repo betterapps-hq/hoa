@@ -7,13 +7,15 @@ import { getProvision, listDocumentRecords, listGoverningDocuments } from "@/db/
 import { getPublishedRulesFile } from "@/db/rulebookContentRepository"
 import { getRulebook, insertRulebook } from "@/db/rulebookRepository"
 import { hoas } from "@/db/schema"
-import { sampleRulesFile } from "@/tests/sampleRulesFile"
+import { builtRecords, now } from "@/tests/builtDraft"
 import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
 import { assembleRulesFile, loadRulebookRecords } from "./assemble"
 import { seedRulebook } from "./seedRulebook"
 
-const organization = { id: "demo-hoa", name: "Sample community" }
-const now = "2026-10-09T00:00:00.000Z"
+// A small rulebook (one rule over a few provisions), so the seed's SQL runs in seconds; the sample's own seed is the same
+// statements over more rows.
+const { organization } = builtRecords
+const ruleProvision = builtRecords.provisions.find((provision) => provision.key === "rules:1")
 
 /** Runs the seed's SQL in batches of a few hundred statements: one batch of them all can reset the local runtime's
  * connection when other test files load it too. */
@@ -56,7 +58,7 @@ describe("seedRulebook", { timeout: 60_000 }, () => {
       publishedAt: now
     })
     const seed = await seedRulebook({
-      file: sampleRulesFile(),
+      file: (await assembleRulesFile(builtRecords)).file,
       organization,
       rulebookId: "sample-declaration",
       approvedBy: "admin",
@@ -89,6 +91,6 @@ describe("seedRulebook", { timeout: 60_000 }, () => {
       "sample-declaration:by-laws",
       true
     ])
-    expect((await getProvision(db, organization.id, "declaration:1.1"))?.heading).toBe("Purpose and Intent")
+    expect((await getProvision(db, organization.id, "rules:1"))?.heading).toBe(ruleProvision?.heading)
   })
 })

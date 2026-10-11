@@ -195,15 +195,6 @@ export async function getRulebookContent(
   }
 }
 
-export async function getRulebookRule(db: Database, hoaId: string, rulebookId: string, ruleKey: string) {
-  const row = await db
-    .select({ rule: rulebookRules.rule })
-    .from(rulebookRules)
-    .where(and(inRulebook(rulebookRules, hoaId, rulebookId), eq(rulebookRules.ruleKey, ruleKey)))
-    .get()
-  return row ? ruleSchema.parse(row.rule) : null
-}
-
 /** Records an administrator changed in review, saved in one batch: rules, terms and questions by key, and the settings. */
 export type RecordChanges = {
   rules?: Rule[]

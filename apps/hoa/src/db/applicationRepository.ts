@@ -221,16 +221,6 @@ export async function setPageKinds(db: Database, hoaId: string, fileId: string, 
   ])
 }
 
-export async function listPageKinds(db: Database, hoaId: string, fileIds: readonly string[]) {
-  if (fileIds.length === 0) {
-    return []
-  }
-  return db
-    .select({ fileId: applicationPages.fileId, pageIndex: applicationPages.pageIndex, kind: applicationPages.kind })
-    .from(applicationPages)
-    .where(and(eq(applicationPages.hoaId, hoaId), inArray(applicationPages.fileId, [...fileIds])))
-}
-
 export type ReviewSummary = {
   id: string
   hoaId: string

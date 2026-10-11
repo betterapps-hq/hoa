@@ -159,14 +159,6 @@ export async function listSections(db: Database, hoaId: string, documentId: stri
   return rows.map(toSection)
 }
 
-/** The latest routing result, for display; nothing published depends on it. */
-export async function setSectionRouting(db: Database, hoaId: string, sectionId: string, routing: Section["routing"]) {
-  await db
-    .update(sections)
-    .set({ routing })
-    .where(and(eq(sections.hoaId, hoaId), eq(sections.id, sectionId)))
-}
-
 // ─── The rules schema's documents and provisions (encoding.md, Storage) ──────────────────────────
 
 /** A governing document as the rules schema sees it, with the id of its row. */

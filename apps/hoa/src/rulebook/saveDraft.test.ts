@@ -1,16 +1,8 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import {
-  getDocumentStructures,
-  listDocumentRecords,
-  listProvisions,
-  saveProvisions,
-  saveReferencedDocuments,
-  setDocumentStructure
-} from "@/db/documentRepository"
+import { listDocumentRecords, listProvisions, saveProvisions, saveReferencedDocuments } from "@/db/documentRepository"
 import { getRulebookContent, saveRulebookContent } from "@/db/rulebookContentRepository"
 import { getRulebook, getRulebookByStatus } from "@/db/rulebookRepository"
-import { defaultDocumentStructure } from "@/documents/documentStructure"
 import { builtContent, hoaId, insertBuildingRulebook, now, seedUpload } from "@/tests/builtDraft"
 import { provision } from "@/tests/encodingDrafts"
 import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
@@ -75,16 +67,5 @@ describe("saveBuiltDraft", { timeout: 30_000 }, () => {
     expect(await getRulebookContent(db, hoaId, "old-draft")).toBeNull()
     expect((await getRulebookContent(db, hoaId, "built"))?.rules).toEqual(builtContent.rules)
     expect((await getRulebookByStatus(db, hoaId, "draft"))?.id).toBe("built")
-  })
-
-  it("stores how builds structure an upload", async () => {
-    const { db } = database
-    const documents = await seedUpload(db)
-    const id = documents.uploads[0]?.documentId ?? ""
-    expect(await getDocumentStructures(db, hoaId, [id])).toEqual(new Map())
-    expect(await getDocumentStructures(db, hoaId, [])).toEqual(new Map())
-    const structure = defaultDocumentStructure("declaration")
-    await setDocumentStructure(db, hoaId, id, structure)
-    expect(await getDocumentStructures(db, hoaId, [id])).toEqual(new Map([[id, structure]]))
   })
 })

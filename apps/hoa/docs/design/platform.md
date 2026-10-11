@@ -305,8 +305,10 @@ migrations/         D1 migrations
   Layout responses from the governing documents (never application data). The decision engine's tests include the
   arborless gate, the arbor without lattice, and a conflicting fact.
 - Repository tests run in the normal Vitest run, with v8 coverage: `src/tests/testDatabase.ts` starts an in-memory D1
-  through Wrangler's `getPlatformProxy` and applies every migration, so the real SQL, unique and partial indexes
-  included, is exercised. (Cloudflare's Vitest plugin still requires Vitest 4.)
+  through Wrangler's `getPlatformProxy` and applies every migration. They cover only the rules the database itself
+  enforces: unique and partial indexes, guarded updates, cascades, organization isolation, D1's statement limits and
+  destructive resets. A test that saves records and reads them back would test Drizzle and SQLite, not our code, so
+  there are none. (Cloudflare's Vitest plugin still requires Vitest 4.)
 - `src/server.ts`, `src/workflows/**` and `*.functions.ts` are excluded from coverage, alongside `*.server.ts`.
 - `wrangler` is an `apps/hoa` dev dependency. `cloudflare:workers` resolves to a stub in unit tests
   (`vitest.config.ts`), and knip ignores it as a dependency.

@@ -7,30 +7,18 @@ import {
   deleteApplication,
   deleteApplicationFile,
   getApplication,
-  getApplicationFile,
   listApplicationFiles,
   listApplications,
   listExpiredApplications,
-  listPageKinds,
   listReviewSummaries,
   saveReviewSummary,
-  setPageKinds,
   transitionApplication,
-  updateApplication,
-  updateApplicationFile
+  updateApplication
 } from "./applicationRepository"
-import {
-  createGoverningDocument,
-  findDocumentByHash,
-  getGoverningDocument,
-  listGoverningDocuments,
-  listSections,
-  saveSections,
-  setSectionRouting,
-  updateGoverningDocument
-} from "./documentRepository"
-import { getJob, getLatestJob, getLatestJobOfKind, insertJob, listJobs, newJob, updateJob } from "./jobRepository"
+import { listSections, saveSections } from "./documentRepository"
 import { failRulebook, getRulebook, getRulebookByStatus, insertRulebook, publishRulebook } from "./rulebookRepository"
+
+// The rules the database itself enforces: unique indexes, guarded updates, cascades and D1's statement limits.
 
 const hoaId = "demo-hoa"
 const now = "2026-10-08T00:00:00.000Z"
@@ -46,86 +34,25 @@ describe("repositories", () => {
     await database.dispose()
   })
 
-  it("versions governing documents within a lineage and finds duplicates by hash", async () => {
-    const { db } = database
-    const input = {
-      hoaId,
-      kind: "design-guidelines" as const,
-      title: "Design guidelines",
-      effectiveDate: null,
-      fileName: "guidelines.pdf",
-      mediaType: "application/pdf",
-      sizeBytes: 100,
-      uploadedBy: "admin",
-      uploadedAt: now
-    }
-    const first = await createGoverningDocument(db, input)
-    const second = await createGoverningDocument(db, { ...input, lineageId: first.lineageId })
-    expect([first.version, second.version]).toEqual([1, 2])
-    expect(second.lineageId).toBe(first.id)
-
-    await updateGoverningDocument(db, hoaId, first.id, { status: "ready", sha256: "abc", pageCount: 3 })
-    expect(await getGoverningDocument(db, hoaId, first.id)).toMatchObject({ status: "ready", pageCount: 3 })
-    expect((await findDocumentByHash(db, hoaId, "abc", second.id))?.id).toBe(first.id)
-    expect(await findDocumentByHash(db, hoaId, "abc", first.id)).toBeNull()
-    expect(await getGoverningDocument(db, "other-hoa", first.id)).toBeNull()
-    expect(await listGoverningDocuments(db, hoaId)).toHaveLength(2)
-  })
-
-  const section = {
-    id: "doc:0",
-    documentId: "doc",
-    ordinal: 0,
-    number: "5.4.2",
-    heading: "5.4.2 Composite Fence Colors",
-    kind: "body" as const,
-    parentId: null,
-    pageStart: 17,
-    pageEnd: 17,
-    startOffset: 0,
-    endOffset: 100,
-    references: ["doc:1"]
-  }
-  it("writes sections once and keeps their latest routing", async () => {
-    const { db } = database
-    await saveSections(db, hoaId, [section])
-    await saveSections(db, hoaId, [{ ...section, heading: "Changed" }])
-    await setSectionRouting(db, hoaId, "doc:0", { projectTypes: ["project"], topics: ["topic"], isRelevant: true })
-    expect(await listSections(db, hoaId, "doc")).toEqual([
-      { ...section, routing: { projectTypes: ["project"], topics: ["topic"], isRelevant: true } }
-    ])
-  })
-
   it("saves more sections than fit in one statement's bound parameters", async () => {
     const { db } = database
     const many = Array.from({ length: 30 }, (_, ordinal) => ({
-      ...section,
       id: `long:${ordinal}`,
       documentId: "long",
-      ordinal
+      ordinal,
+      number: "5.4.2",
+      heading: "5.4.2 Composite Fence Colors",
+      kind: "body" as const,
+      parentId: null,
+      pageStart: 17,
+      pageEnd: 17,
+      startOffset: 0,
+      endOffset: 100,
+      references: ["long:1"]
     }))
     await saveSections(db, hoaId, many)
     await saveSections(db, hoaId, [])
     expect(await listSections(db, hoaId, "long")).toHaveLength(30)
-  })
-
-  it("records jobs and finds the latest one for a subject", async () => {
-    const { db } = database
-    const older = newJob({ hoaId, kind: "document-ingest", subjectId: "doc", now })
-    const newer = newJob({ hoaId, kind: "document-ingest", subjectId: "doc", now: "2026-10-09T00:00:00.000Z" })
-    await insertJob(db, older)
-    await insertJob(db, newer)
-    await updateJob(db, hoaId, older.id, {
-      status: "failed",
-      error: { stage: "ocr", message: "x", isRetryable: true },
-      now
-    })
-    expect((await getJob(db, hoaId, older.id))?.status).toBe("failed")
-    expect((await getLatestJob(db, hoaId, "doc"))?.id).toBe(newer.id)
-    expect(await listJobs(db, hoaId, "doc")).toHaveLength(2)
-    expect(await getLatestJob(db, hoaId, "nothing")).toBeNull()
-    expect((await getLatestJobOfKind(db, hoaId, "document-ingest"))?.id).toBe(newer.id)
-    expect(await getLatestJobOfKind(db, hoaId, "application-review")).toBeNull()
   })
 
   it("publishes a draft as the next version, superseding the last, and allows one draft at a time", async () => {
@@ -187,7 +114,7 @@ describe("repositories", () => {
     expect(await listExpiredApplications(db, "2026-12-01T00:00:00.000Z")).toHaveLength(0)
   })
 
-  it("stores files, page kinds and reviews, and deletes an application with everything in it", async () => {
+  it("deletes a file with the files taken from it, and an application with everything in it", async () => {
     const { db } = database
     const application = await createApplication(db, {
       hoaId,
@@ -218,32 +145,18 @@ describe("repositories", () => {
       status: "ready",
       now
     })
-    await updateApplicationFile(db, hoaId, word.id, { status: "ready", kind: "letter", pageCount: 1 })
-    expect(await getApplicationFile(db, hoaId, word.id)).toMatchObject({ kind: "letter", pageCount: 1 })
-    await setPageKinds(db, hoaId, word.id, ["letter"])
-    await setPageKinds(db, hoaId, picture.id, ["photo"])
-    expect(await listPageKinds(db, hoaId, [word.id, picture.id])).toHaveLength(2)
-    expect(await listPageKinds(db, hoaId, [])).toEqual([])
-    expect((await listApplicationFiles(db, hoaId, application.id)).map((file) => file.fileName)).toEqual([
-      "appendix.docx",
-      "image2.png"
-    ])
-
-    const summary = {
+    await saveReviewSummary(db, {
       id: "review-1",
       hoaId,
       applicationId: application.id,
       jobId: "job",
       rulebookId: "rb",
       rulesFileSha256: "a".repeat(64),
-      recommendation: "request-information" as const,
+      recommendation: "request-information",
       costUsd: 0.01,
       sessionId: "job",
       createdAt: now
-    }
-    await saveReviewSummary(db, summary)
-    await saveReviewSummary(db, summary)
-    expect(await listReviewSummaries(db, hoaId, application.id)).toEqual([summary])
+    })
 
     expect(await deleteApplicationFile(db, hoaId, word.id)).toEqual([word.id, picture.id])
     expect(await listApplicationFiles(db, hoaId, application.id)).toEqual([])
