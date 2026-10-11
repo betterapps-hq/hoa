@@ -570,8 +570,15 @@ export async function runRuleStructuring(
   // the round before, since a rule's check reads every rule of the run.
   await inParallel(items, context.concurrency ?? 8, async (item) => {
     const batch: Batch = { id: item.id, ...item.input }
-    const first = await structureBatch(batch, context)
+    let first = await structureBatch(batch, context)
     calls.push(first.call)
+    // An answer that fails Zod as a whole (an empty tool call, a malformed field) is rerun once with its problems, as
+    // B, C and E are; the problems make it a new call rather than the cached one.
+    if (!first.answer && context.retries > 0) {
+      const block = problemsText(first.issues.map(({ code, message }) => ({ recordKey: "answer", code, message })))
+      first = await structureBatch(batch, context, block)
+      calls.push(first.call)
+    }
     problems.push(...first.issues)
     const proposed = (first.answer?.proposedTerms ?? []).map(proposedPropertyTerm)
     done.set(item.id, { batch, structured: first.structured, proposed })

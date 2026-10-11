@@ -37,13 +37,14 @@ const factCheck = z.union(check.options.filter((option) => option.shape.type.val
 const judgment = z.object({ type: z.literal("judgment"), question: z.string().min(1), evidence: z.array(termKey) })
 const scheduleRef = z.object({ type: z.literal("ref"), from: root.optional(), path: z.array(termKey).min(1) })
 const ruleCure = z.union([cure, z.literal("none")]).nullable()
+/** Rules a norm or a clause excepts or overrides; null, which the model writes for none, means none. */
+const selectionOrNone = ruleSelection.nullable().transform((selection) => selection ?? [])
 const base = { key: ruleKey, title: z.string().min(1), statement: statementDraft, appliesWhen: condition.nullable() }
 const normBase = {
   ...base,
   beneficiary: termKey.nullable(),
   noExceptions: provisionKey.nullable(),
-  // A norm that overrides nothing may say so with null, which means no overrides.
-  overrides: ruleSelection.nullable().transform((selection) => selection ?? [])
+  overrides: selectionOrNone
 }
 
 /** The structure of one rule, by its outline's kind. */
@@ -90,10 +91,12 @@ const clauseDrafts = z
   .object({
     precedence: clauses.shape.precedence.extend(withCitations),
     time: clauses.shape.time.extend(withCitations),
-    liability: z.array(clauses.shape.liability.element.extend(withCitations)),
+    liability: z.array(clauses.shape.liability.element.extend({ except: selectionOrNone, ...withCitations })),
     cure: cure.extend(withCitations),
     deciders: z.array(clauses.shape.deciders.element.extend(withCitations)),
-    sanctionPreconditions: z.array(clauses.shape.sanctionPreconditions.element.extend(withCitations))
+    sanctionPreconditions: z.array(
+      clauses.shape.sanctionPreconditions.element.extend({ except: selectionOrNone, ...withCitations })
+    )
   })
   .partial()
 
