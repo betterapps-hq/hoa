@@ -7,10 +7,10 @@ import {
   listGoverningDocuments,
   updateGoverningDocument
 } from "@/db/documentRepository"
-import { insertRulebook } from "@/db/rulebookRepository"
-import { checkCurrentSources, isRefusedBuild, refusedDocuments } from "@/rulebook/buildSources"
-import { currentDocumentIds } from "@/rulebook/currentDocuments"
+import { failRulebook, insertRulebook } from "@/db/rulebookRepository"
+import { isRefusedBuild, refusedDocuments } from "@/rulebook/buildSources"
 import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
+import { untouchedDatabase } from "@/tests/untouchedDatabase"
 import { removeDocument } from "./removeDocument"
 
 const hoaId = "demo-hoa"
@@ -45,85 +45,41 @@ describe("removeDocument", () => {
     return document
   }
 
-  it("is for administrators only", async () => {
-    const document = await upload("Declaration", "a".repeat(64))
-    await expect(
-      removeDocument(database.db, { hoa: { id: hoaId }, role: "homeowner" }, document.id, now)
-    ).rejects.toThrow("Only an administrator can do this.")
-    expect(await listGoverningDocuments(database.db, hoaId)).toHaveLength(1)
-  })
-
-  it("takes every version out of the documents builds read, and clears a refusal it caused", async () => {
+  it("is refused while a build reads the documents, and otherwise takes out every version of the document", async () => {
     const { db } = database
-    const bad = await upload("Declaration (sample pages)", "sample-declaration-pages")
-    const newer = await upload("Declaration (sample pages)", "b".repeat(64), bad.lineageId)
-    const good = await upload("Declaration, restated", "c".repeat(64))
-
-    const current = currentDocumentIds(await listGoverningDocuments(db, hoaId))
-    expect(current).toContain(newer.id)
-
-    await removeDocument(db, administrator, newer.id, now)
-    const remaining = await listGoverningDocuments(db, hoaId)
-    expect(remaining.map((document) => document.id)).toEqual([good.id])
-    // What cites its pages still opens them, and the same file can be uploaded again.
-    expect(await getGoverningDocument(db, hoaId, bad.id)).not.toBeNull()
-    expect(await findDocumentByHash(db, hoaId, "sample-declaration-pages", "new-upload")).toBeNull()
-    expect(await checkCurrentSources(db, hoaId, currentDocumentIds(remaining))).toEqual([])
-
-    await expect(removeDocument(db, administrator, newer.id, now)).rejects.toThrow("already removed")
-  })
-
-  it("is refused while a build reads the documents", async () => {
-    const document = await upload("Declaration", "a".repeat(64))
-    await insertRulebook(database.db, {
+    const first = await upload("Declaration", "a".repeat(64))
+    const newer = await upload("Declaration", "b".repeat(64), first.lineageId)
+    const other = await upload("Declaration, restated", "c".repeat(64))
+    await insertRulebook(db, {
       id: "building",
       hoaId,
       version: null,
       status: "building",
       error: null,
       catalogVersion: 0,
-      sourceDocumentIds: [document.id],
+      sourceDocumentIds: [newer.id],
       jobId: "job",
       createdAt: now,
       publishedBy: null,
       publishedAt: null
     })
-    await expect(removeDocument(database.db, administrator, document.id, now)).rejects.toThrow("being built")
+    await expect(removeDocument(db, administrator, newer.id, now)).rejects.toThrow("being built")
+    await failRulebook(db, hoaId, "building", { stage: "check", message: "x", isRetryable: false })
+
+    await removeDocument(db, administrator, newer.id, now)
+    expect((await listGoverningDocuments(db, hoaId)).map((document) => document.id)).toEqual([other.id])
+    // What cites its pages still opens them, and the same file can be uploaded again.
+    expect(await getGoverningDocument(db, hoaId, first.id)).not.toBeNull()
+    expect(await findDocumentByHash(db, hoaId, "a".repeat(64), "new-upload")).toBeNull()
+    await expect(removeDocument(db, administrator, newer.id, now)).rejects.toThrow("already removed")
   })
 })
 
-describe("checkCurrentSources", () => {
-  let database: TestDatabase
-
-  beforeEach(async () => {
-    database = await createTestDatabase()
-  })
-
-  afterEach(async () => {
-    await database.dispose()
-  })
-
-  it("finds what a build would refuse in the documents as they are", async () => {
-    const { db } = database
-    const document = await createGoverningDocument(db, {
-      hoaId,
-      kind: "declaration",
-      title: "Declaration (sample pages)",
-      effectiveDate: null,
-      fileName: "declaration.pdf",
-      mediaType: "application/pdf",
-      sizeBytes: 100,
-      uploadedBy: "admin",
-      uploadedAt: now
-    })
-    await updateGoverningDocument(db, hoaId, document.id, {
-      status: "ready",
-      sha256: "sample-declaration-pages",
-      pageCount: 3
-    })
-    expect(await checkCurrentSources(db, hoaId, [document.id])).toEqual([
-      { documentId: document.id, title: "Declaration (sample pages)", kind: "file-invalid" }
-    ])
+describe("removing a document", () => {
+  it("is for administrators only", async () => {
+    await expect(
+      removeDocument(untouchedDatabase(), { hoa: { id: hoaId }, role: "homeowner" }, "document", now)
+    ).rejects.toThrow("Only an administrator can do this.")
   })
 })
 

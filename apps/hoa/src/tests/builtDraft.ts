@@ -1,7 +1,6 @@
 import type { Database } from "@/db/database"
 import { createGoverningDocument, type BuiltDocuments } from "@/db/documentRepository"
 import type { RulebookContent } from "@/db/rulebookContentRepository"
-import { insertRulebook } from "@/db/rulebookRepository"
 import { hoas } from "@/db/schema"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import { buildSettings } from "@/schema/defaultSettings"
@@ -69,6 +68,20 @@ export const builtRecords: RulebookRecords = {
   questions: []
 }
 
+/** The documents a build of the upload would save: the declaration with its rules exhibit, and the By-Laws they name. */
+export function builtDocuments(uploadId: string): BuiltDocuments {
+  const provisionsOf = (key: string) => builtProvisions.filter((provision) => provision.key.startsWith(`${key}:`))
+  return {
+    uploads: [
+      {
+        documentId: uploadId,
+        documents: draftDocuments.map((document) => ({ document, provisions: provisionsOf(document.key) }))
+      }
+    ],
+    referenced: [byLaws]
+  }
+}
+
 /** Inserts the organization and an upload, and returns the documents a build of that upload would save. */
 export async function seedUpload(db: Database): Promise<BuiltDocuments> {
   await db.insert(hoas).values({ id: hoaId, name: "Maple Hollow", slug: "maple-hollow", settings: {}, createdAt: now })
@@ -83,30 +96,5 @@ export async function seedUpload(db: Database): Promise<BuiltDocuments> {
     uploadedBy: "admin",
     uploadedAt: now
   })
-  const provisionsOf = (key: string) => builtProvisions.filter((provision) => provision.key.startsWith(`${key}:`))
-  return {
-    uploads: [
-      {
-        documentId: upload.id,
-        documents: draftDocuments.map((document) => ({ document, provisions: provisionsOf(document.key) }))
-      }
-    ],
-    referenced: [byLaws]
-  }
-}
-
-export async function insertBuildingRulebook(db: Database, id: string, status: "building" | "draft" = "building") {
-  await insertRulebook(db, {
-    id,
-    hoaId,
-    version: null,
-    status,
-    error: null,
-    catalogVersion: 0,
-    sourceDocumentIds: [],
-    jobId: `job-${id}`,
-    createdAt: now,
-    publishedBy: null,
-    publishedAt: null
-  })
+  return builtDocuments(upload.id)
 }

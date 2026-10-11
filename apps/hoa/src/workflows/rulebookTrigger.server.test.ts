@@ -5,12 +5,19 @@ import { getJob } from "@/db/jobRepository"
 import { getRulebook, getRulebookByStatus } from "@/db/rulebookRepository"
 import type { GoverningDocument } from "@/documents/governingDocument"
 import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
+import { untouchedDatabase } from "@/tests/untouchedDatabase"
 import {
   abandonRulebookBuild,
   requestRulebookBuild,
   stopRulebookBuild,
+  terminateBuild,
   type RulebookBuildBinding
 } from "./rulebookTrigger.server"
+
+// What starts a build and how stopping one meets its Workflow are tested without a database (buildDecision in
+// currentDocuments.test.ts, terminateBuild here); these database tests keep only what the SQL decides: a retried
+// request finds the rulebook it inserted, a build that can't start doesn't stay building, and an organization reaches
+// only its own build.
 
 const hoaId = "demo-hoa"
 const now = "2026-10-09T00:00:00.000Z"
@@ -58,7 +65,7 @@ describe("requestRulebookBuild", { timeout: 30_000 }, () => {
     await database.dispose()
   })
 
-  async function upload(title: string, status: GoverningDocument["status"], lineageId?: string) {
+  async function upload(title: string, status: GoverningDocument["status"]) {
     const document = await createGoverningDocument(database.db, {
       hoaId,
       kind: "declaration",
@@ -68,47 +75,11 @@ describe("requestRulebookBuild", { timeout: 30_000 }, () => {
       mediaType: "application/pdf",
       sizeBytes: 1,
       uploadedBy: "admin",
-      uploadedAt: now,
-      ...(lineageId ? { lineageId } : {})
+      uploadedAt: now
     })
     await updateGoverningDocument(database.db, hoaId, document.id, { status })
     return document
   }
-
-  it("builds the current documents once nothing is being read or built", async () => {
-    const { db } = database
-    const { binding } = fakeBinding()
-    expect(await requestRulebookBuild(db, binding, hoaId, { now })).toEqual({
-      status: "skipped",
-      reason: "no-documents"
-    })
-
-    const first = await upload("Declaration", "ready")
-    const second = await upload("Declaration, restated", "processing", first.lineageId)
-    expect(await requestRulebookBuild(db, binding, hoaId, { now })).toEqual({ status: "skipped", reason: "processing" })
-
-    await updateGoverningDocument(db, hoaId, second.id, { status: "ready" })
-    expect(await requestRulebookBuild(db, binding, hoaId, { now, unlessCurrentIs: [second.id] })).toEqual({
-      status: "skipped",
-      reason: "unchanged"
-    })
-    const started = await requestRulebookBuild(db, binding, hoaId, { now, unlessCurrentIs: [first.id] })
-    if (started.status !== "started") {
-      throw new Error("The build should start")
-    }
-    expect(await getRulebook(db, hoaId, started.rulebookId)).toMatchObject({
-      status: "building",
-      sourceDocumentIds: [second.id],
-      jobId: started.jobId
-    })
-    expect(await getJob(db, hoaId, started.jobId)).toMatchObject({ kind: "rulebook-build", status: "running" })
-    expect(binding.create).toHaveBeenCalledWith({
-      id: started.jobId,
-      params: { hoaId, rulebookId: started.rulebookId, jobId: started.jobId }
-    })
-
-    expect(await requestRulebookBuild(db, binding, hoaId, { now })).toEqual({ status: "skipped", reason: "building" })
-  })
 
   it("starts the workflow a retried request inserted the rulebook for, once", async () => {
     const { db } = database
@@ -173,52 +144,6 @@ describe("stopRulebookBuild", { timeout: 30_000 }, () => {
     return { ...started, documentId: document.id }
   }
 
-  it("terminates a running build and marks it stopped, so nothing restarts it on its own", async () => {
-    const { db } = database
-    const { binding, terminate } = fakeBinding()
-    const started = await startBuild(binding)
-
-    expect(await stopRulebookBuild(db, binding, administrator, now)).toEqual({ status: "stopped" })
-    expect(terminate).toHaveBeenCalledWith(started.jobId)
-    expect(await getRulebook(db, hoaId, started.rulebookId)).toMatchObject({ status: "cancelled" })
-    expect(await getJob(db, hoaId, started.jobId)).toMatchObject({ status: "cancelled" })
-    expect(await getRulebookByStatus(db, hoaId, "building")).toBeNull()
-
-    // The stopped build's follow-up would compare against the same documents: nothing starts.
-    expect(await requestRulebookBuild(db, binding, hoaId, { now, unlessCurrentIs: [started.documentId] })).toEqual({
-      status: "skipped",
-      reason: "unchanged"
-    })
-    // The administrator's "Build a draft" starts a new one.
-    expect(await requestRulebookBuild(db, binding, hoaId, { now })).toMatchObject({ status: "started" })
-  })
-
-  it("says plainly when the build already finished, failed or was stopped", async () => {
-    const { db } = database
-    const { binding, end, terminate } = fakeBinding()
-    const started = await startBuild(binding)
-    end(started.jobId, "complete")
-
-    expect(await stopRulebookBuild(db, binding, administrator, now)).toEqual({ status: "already-finished" })
-    expect(terminate).not.toHaveBeenCalled()
-    expect(await getRulebook(db, hoaId, started.rulebookId)).toMatchObject({ status: "building" })
-
-    await abandonRulebookBuild(db, hoaId, started, "Failed.", now)
-    expect(await stopRulebookBuild(db, binding, administrator, now)).toEqual({ status: "not-building" })
-  })
-
-  it("is for administrators only", async () => {
-    const { db } = database
-    const { binding, terminate } = fakeBinding()
-    const started = await startBuild(binding)
-
-    await expect(stopRulebookBuild(db, binding, { hoa: { id: hoaId }, role: "homeowner" }, now)).rejects.toThrow(
-      "Only an administrator can do this."
-    )
-    expect(terminate).not.toHaveBeenCalled()
-    expect(await getRulebook(db, hoaId, started.rulebookId)).toMatchObject({ status: "building" })
-  })
-
   it("only stops the organization's own build", async () => {
     const { db } = database
     const { binding, terminate } = fakeBinding()
@@ -228,5 +153,51 @@ describe("stopRulebookBuild", { timeout: 30_000 }, () => {
       status: "not-building"
     })
     expect(terminate).not.toHaveBeenCalled()
+  })
+})
+
+describe("stopping a build", () => {
+  it("is for administrators only", async () => {
+    const { binding, terminate } = fakeBinding()
+    await expect(
+      stopRulebookBuild(untouchedDatabase(), binding, { hoa: { id: hoaId }, role: "homeowner" }, now)
+    ).rejects.toThrow("Only an administrator can do this.")
+    expect(terminate).not.toHaveBeenCalled()
+  })
+})
+
+describe("terminateBuild", () => {
+  /** A Workflow instance that reports each status in turn, then the last one. */
+  const terminated = () => vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
+  function instance(statuses: string[], terminate = terminated()) {
+    let reads = 0
+    const status = async () => {
+      const found = statuses[Math.min(reads, statuses.length - 1)] ?? "running"
+      reads += 1
+      return { status: found }
+    }
+    return { status, terminate }
+  }
+
+  it("terminates a running build's instance", async () => {
+    const running = instance(["running"])
+    expect(await terminateBuild(running)).toBe("terminated")
+    expect(running.terminate).toHaveBeenCalledOnce()
+    // A build whose instance can't be found or read is stopped all the same.
+    expect(await terminateBuild(null)).toBe("terminated")
+    expect(
+      await terminateBuild({ status: async () => Promise.reject(new Error("gone")), terminate: terminated() })
+    ).toBe("terminated")
+  })
+
+  it("says plainly when the build already finished, failed or was stopped, even in the moment before terminating", async () => {
+    for (const ended of ["complete", "errored", "terminated"]) {
+      const over = instance([ended])
+      expect(await terminateBuild(over)).toBe("already-finished")
+      expect(over.terminate).not.toHaveBeenCalled()
+    }
+    const refused = vi.fn<() => Promise<void>>(async () => Promise.reject(new Error("not running")))
+    expect(await terminateBuild(instance(["running", "complete"], refused))).toBe("already-finished")
+    await expect(terminateBuild(instance(["running"], refused))).rejects.toThrow("not running")
   })
 })

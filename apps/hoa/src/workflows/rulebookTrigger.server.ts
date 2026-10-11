@@ -5,7 +5,7 @@ import { getJob, insertJob, newJob, updateJob } from "@/db/jobRepository"
 import { cancelRulebook, failRulebook, getRulebook, getRulebookByStatus, insertRulebook } from "@/db/rulebookRepository"
 import { assertAdministrator, type RoleId } from "@/features/role/roles"
 import { stopProgress } from "@/jobs/progress"
-import { currentDocumentIds, isSameDocumentSet } from "@/rulebook/currentDocuments"
+import { buildDecision, type BuildDecision } from "@/rulebook/currentDocuments"
 import type { rulebookSchema } from "@/rules/rule"
 import type { RulebookBuildParams } from "./rulebookBuild.server"
 
@@ -34,13 +34,7 @@ export type RulebookBuildBinding = {
 /** The ids a build gets: a Workflow step makes them once, so a retried request reuses them. */
 export type BuildIds = { rulebookId: string; jobId: string }
 
-export type BuildRequest =
-  | ({ status: "started" } & BuildIds)
-  | {
-      status: "skipped"
-      /** A document is still being read, a build is running, no document is ready, or the documents are unchanged. */
-      reason: "processing" | "building" | "no-documents" | "unchanged"
-    }
+export type BuildRequest = ({ status: "started" } & BuildIds) | Extract<BuildDecision, { status: "skipped" }>
 
 export const newBuildIds = (): BuildIds => ({ rulebookId: crypto.randomUUID(), jobId: crypto.randomUUID() })
 
@@ -76,20 +70,15 @@ export async function requestRulebookBuild(
     }
     return { status: "started", ...ids }
   }
-  const uploads = await listGoverningDocuments(db, hoaId)
-  if (uploads.some((upload) => upload.status === "processing")) {
-    return { status: "skipped", reason: "processing" }
+  const [uploads, building] = await Promise.all([
+    listGoverningDocuments(db, hoaId),
+    getRulebookByStatus(db, hoaId, "building")
+  ])
+  const decision = buildDecision(uploads, { isBuilding: building !== null, unlessCurrentIs: options.unlessCurrentIs })
+  if (decision.status === "skipped") {
+    return decision
   }
-  if (await getRulebookByStatus(db, hoaId, "building")) {
-    return { status: "skipped", reason: "building" }
-  }
-  const sourceDocumentIds = currentDocumentIds(uploads)
-  if (sourceDocumentIds.length === 0) {
-    return { status: "skipped", reason: "no-documents" }
-  }
-  if (options.unlessCurrentIs && isSameDocumentSet(sourceDocumentIds, options.unlessCurrentIs)) {
-    return { status: "skipped", reason: "unchanged" }
-  }
+  const { sourceDocumentIds } = decision
   const job = newJob({ id: ids.jobId, hoaId, kind: "rulebook-build", subjectId: ids.rulebookId, now: options.now })
   const rulebook: Rulebook = {
     id: ids.rulebookId,
@@ -137,6 +126,27 @@ async function isOver(instance: RulebookBuildInstance | null) {
 }
 
 /**
+ * Terminates a build's Workflow instance, if it has one: "already-finished" when it finished, failed or was stopped
+ * first, including in the moment between checking and terminating.
+ */
+export async function terminateBuild(
+  instance: RulebookBuildInstance | null
+): Promise<"terminated" | "already-finished"> {
+  if (await isOver(instance)) {
+    return "already-finished"
+  }
+  try {
+    await instance?.terminate()
+  } catch (error) {
+    if (await isOver(instance)) {
+      return "already-finished"
+    }
+    throw error
+  }
+  return "terminated"
+}
+
+/**
  * Stops the organization's running build (encoding.md, UX): terminates its Workflow instance, then marks the rulebook
  * and its job cancelled, so no draft is saved and no follow-up build starts. The model answers it already has stay in
  * the content cache, so the next build reuses them. A build whose instance already finished, failed or was stopped is
@@ -155,19 +165,8 @@ export async function stopRulebookBuild(
     return { status: "not-building" }
   }
   const instance = await binding.get(building.jobId).catch(() => null)
-  if (await isOver(instance)) {
+  if ((await terminateBuild(instance)) === "already-finished") {
     return { status: "already-finished" }
-  }
-  if (instance) {
-    try {
-      await instance.terminate()
-    } catch (error) {
-      // It ended between the two calls.
-      if (await isOver(instance)) {
-        return { status: "already-finished" }
-      }
-      throw error
-    }
   }
   const isCancelled = await cancelRulebook(db, hoaId, building.id)
   if (!isCancelled) {

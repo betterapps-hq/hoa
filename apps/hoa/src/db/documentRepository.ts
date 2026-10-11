@@ -341,19 +341,13 @@ export type BuiltDocuments = {
 }
 
 /**
- * Keys the uploads and writes their provisions, the exhibits that are documents of their own and the documents the
- * text names, in one batch. A document of the organization that held one of these keys gives it up, with its
- * provisions. Builds write these ids again on every run, so a retried step writes them once.
+ * The records a build's documents are saved as: an upload's own document keeps the upload's id, and its exhibits and
+ * the documents the text names, which have no file, take an id from their key. The same key gives the same id on every
+ * build, so a later build finds and replaces them.
  */
-export async function saveBuiltDocuments(
-  db: Database,
-  hoaId: string,
-  built: BuiltDocuments,
-  recordedBy: string,
-  recordedAt: string
-) {
+export function builtDocumentRecords(hoaId: string, built: BuiltDocuments) {
   const fileLessId = (key: string) => `${hoaId}:${key}`
-  const records = [
+  return [
     ...built.uploads.flatMap(({ documentId, documents }) =>
       documents.map(({ document, provisions: items }, index) => ({
         id: index === 0 ? documentId : fileLessId(document.key),
@@ -369,6 +363,21 @@ export async function saveBuiltDocuments(
       provisions: []
     }))
   ]
+}
+
+/**
+ * Keys the uploads and writes their provisions, the exhibits that are documents of their own and the documents the
+ * text names, in one batch. A document of the organization that held one of these keys gives it up, with its
+ * provisions. Builds write these ids again on every run, so a retried step writes them once.
+ */
+export async function saveBuiltDocuments(
+  db: Database,
+  hoaId: string,
+  built: BuiltDocuments,
+  recordedBy: string,
+  recordedAt: string
+) {
+  const records = builtDocumentRecords(hoaId, built)
   const keys = records.map((record) => record.document.key)
   const ids = records.map((record) => record.id)
   if (records.length === 0) {

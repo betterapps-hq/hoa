@@ -308,7 +308,9 @@ migrations/         D1 migrations
   through Wrangler's `getPlatformProxy` and applies every migration. They cover only the rules the database itself
   enforces: unique and partial indexes, guarded updates, cascades, organization isolation, D1's statement limits and
   destructive resets. A test that saves records and reads them back would test Drizzle and SQLite, not our code, so
-  there are none. (Cloudflare's Vitest plugin still requires Vitest 4.)
+  there are none. A feature's decisions are pure functions tested without a database (such as `buildDecision`), and a
+  permission check made before any query is tested against `src/tests/untouchedDatabase.ts`, whose every query throws.
+  (Cloudflare's Vitest plugin still requires Vitest 4.)
 - `src/server.ts`, `src/workflows/**` and `*.functions.ts` are excluded from coverage, alongside `*.server.ts`.
 - `wrangler` is an `apps/hoa` dev dependency. `cloudflare:workers` resolves to a stub in unit tests
   (`vitest.config.ts`), and knip ignores it as a dependency.

@@ -1,22 +1,8 @@
 // @vitest-environment node
 import { match } from "ts-pattern"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { getPublishedRulesFile, saveRulebookContent } from "@/db/rulebookContentRepository"
-import { getRulebook } from "@/db/rulebookRepository"
-import {
-  builtContent,
-  builtRecords,
-  builtRule,
-  hoaId,
-  insertBuildingRulebook,
-  now,
-  seedUpload
-} from "@/tests/builtDraft"
-import { createMemoryBucket } from "@/tests/memoryBucket"
-import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
-import { readRulesFile } from "./assemble"
-import { publishBlockers, publishDraft } from "./publish"
-import { saveBuiltDraft } from "./saveDraft"
+import { describe, expect, it } from "vitest"
+import { builtRecords, builtRule } from "@/tests/builtDraft"
+import { publishBlockers } from "./publish"
 
 const proposed = { status: "proposed" as const, by: null, at: null, note: null }
 const openIssue = { code: "undefined-term" as const, message: "gazebo isn't a term", related: [], resolution: null }
@@ -65,64 +51,5 @@ describe("publishBlockers", () => {
       "1 provision isn't covered by a rule or a reason.",
       "The approved records would make a rules file with 1 problem, such as rules:3: nothing cites it, and it has no reason for having no rule."
     ])
-  })
-})
-
-describe("publishDraft", { timeout: 30_000 }, () => {
-  let database: TestDatabase
-
-  beforeEach(async () => {
-    database = await createTestDatabase()
-  })
-
-  afterEach(async () => {
-    await database.dispose()
-  })
-
-  it("writes the rules file, stores its hash and supersedes the published rulebook", async () => {
-    const { db } = database
-    const { bucket } = createMemoryBucket()
-    const documents = await seedUpload(db)
-    await insertBuildingRulebook(db, "first")
-    await saveBuiltDraft(db, hoaId, { rulebookId: "first", documents, content: builtContent, recordedBy: "admin", now })
-    const first = await publishDraft(db, bucket, hoaId, { rulebookId: "first", userId: "admin", now })
-    expect(first.version).toBe(1)
-
-    await insertBuildingRulebook(db, "second")
-    await saveBuiltDraft(db, hoaId, {
-      rulebookId: "second",
-      documents,
-      content: builtContent,
-      recordedBy: "admin",
-      now
-    })
-    const second = await publishDraft(db, bucket, hoaId, { rulebookId: "second", userId: "admin", now })
-
-    expect(second).toMatchObject({ version: 2, fileKey: `hoas/${hoaId}/rulebooks/second/rules.json` })
-    expect(second.fileSha256).toBe(first.fileSha256)
-    expect(await getPublishedRulesFile(db, hoaId)).toEqual({
-      rulebookId: "second",
-      publishedAt: expect.any(String),
-      fileKey: second.fileKey,
-      fileSha256: second.fileSha256
-    })
-    expect((await getRulebook(db, hoaId, "first"))?.status).toBe("superseded")
-    const file = await readRulesFile(bucket, second)
-    expect(file.rules.map((rule) => rule.key)).toEqual(["rules:1#max-height"])
-    expect(file.documents.map((document) => document.key)).toEqual(["by-laws", "declaration", "rules"])
-  })
-
-  it("refuses a draft that isn't ready", async () => {
-    const { db } = database
-    const { bucket } = createMemoryBucket()
-    await seedUpload(db)
-    await insertBuildingRulebook(db, "draft", "draft")
-    await expect(publishDraft(db, bucket, hoaId, { rulebookId: "draft", userId: "admin", now })).rejects.toThrow(
-      "no records"
-    )
-    await saveRulebookContent(db, hoaId, "draft", { ...builtContent, rules: [{ ...builtRule, review: proposed }] })
-    await expect(publishDraft(db, bucket, hoaId, { rulebookId: "draft", userId: "admin", now })).rejects.toThrow(
-      "still needs review"
-    )
   })
 })

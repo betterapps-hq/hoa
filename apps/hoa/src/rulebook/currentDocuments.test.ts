@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { GoverningDocument } from "@/documents/governingDocument"
-import { currentDocumentIds, isSameDocumentSet } from "./currentDocuments"
+import { buildDecision, currentDocumentIds, isSameDocumentSet } from "./currentDocuments"
 
 function upload(
   id: string,
@@ -50,5 +50,34 @@ describe("isSameDocumentSet", () => {
     expect(isSameDocumentSet(["a", "b"], ["b", "a"])).toBe(true)
     expect(isSameDocumentSet(["a", "b"], ["a"])).toBe(false)
     expect(isSameDocumentSet(["a"], ["b"])).toBe(false)
+  })
+})
+
+describe("buildDecision", () => {
+  const ready = upload("d-1", "d", 1, "ready")
+  const restated = upload("d-2", "d", 2, "ready")
+
+  it("builds the current documents once nothing is being read or built", () => {
+    expect(buildDecision([], { isBuilding: false })).toEqual({ status: "skipped", reason: "no-documents" })
+    expect(buildDecision([ready, upload("d-2", "d", 2, "processing")], { isBuilding: false })).toEqual({
+      status: "skipped",
+      reason: "processing"
+    })
+    expect(buildDecision([ready, restated], { isBuilding: true })).toEqual({ status: "skipped", reason: "building" })
+    expect(buildDecision([ready, restated], { isBuilding: false })).toEqual({
+      status: "start",
+      sourceDocumentIds: ["d-2"]
+    })
+  })
+
+  it("doesn't rebuild the documents a build just read, so a stopped build's follow-up starts nothing", () => {
+    expect(buildDecision([ready, restated], { isBuilding: false, unlessCurrentIs: ["d-2"] })).toEqual({
+      status: "skipped",
+      reason: "unchanged"
+    })
+    expect(buildDecision([ready, restated], { isBuilding: false, unlessCurrentIs: ["d-1"] })).toEqual({
+      status: "start",
+      sourceDocumentIds: ["d-2"]
+    })
   })
 })
