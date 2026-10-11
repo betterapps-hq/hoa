@@ -84,8 +84,12 @@ Each step has a gate. The next step starts only when the gate is met.
 
 ## Tasks
 
-Runs in parallel with the current investigation (the defined-terms finder: GLiNER and Decide picking the paragraphs
-step B reads, then a large-model run comparing it with today's candidate finder).
+Runs in parallel with the defined-terms finder: GLiNER and Decide picking the paragraphs step B reads, compared with
+today's code finder. On 2026-10-11, after the paragraph truth was audited and the models retrained on it, every
+held-out error was judged: on the two held-out organizations (little text shared with training), GLiNER base found
+defining paragraphs at precision 0.85 and recall 0.86 (F1 0.86), Decide at 0.75 and 0.96 (F1 0.84), and the code
+finder at F1 0.69. Both models' main false flag is a numbered run-in heading. Next for the finder: a large-model run of
+step B on GLiNER's candidates against the code finder's, and unique provision keys for the held-out answer keys.
 
 | # | Task | Step | State |
 | --- | --- | --- | --- |
