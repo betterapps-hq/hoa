@@ -154,7 +154,7 @@ export const stopRulebookBuild = createServerFn({ method: "POST" }).handler(asyn
 )
 
 /**
- * What the running build has produced so far, since a cursor (encoding.md, UX, Results as they arrive). The page polls
+ * What the running build has produced so far, since a cursor (encoding.md, UX, Counts as they arrive). The page polls
  * it every few seconds rather than holding a server-sent event stream open for the hour a build takes: each poll lists
  * the build's step outputs and reads only the new ones, and a dropped connection loses nothing.
  */

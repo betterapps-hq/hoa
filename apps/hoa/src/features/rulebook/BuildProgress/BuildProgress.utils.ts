@@ -1,6 +1,7 @@
 import { stageLabel } from "@/features/jobs/JobProgress/JobProgress.utils"
 import type { Job } from "@/jobs/job"
 import type { JobProgress, JobStep } from "@/jobs/progress"
+import type { BuildResult } from "@/rulebook/buildResults"
 
 // The build's progress for people (encoding.md, UX, The build's progress): the job's stages grouped into a few steps
 // in plain words, each done, current, upcoming or skipped, and one estimate of the time left for the whole build.
@@ -14,7 +15,7 @@ const stepWords: Record<string, { label: string; counted?: [string, string] }> =
   "defined-terms": { label: "Finding defined terms", counted: ["document", "documents"] },
   plan: { label: "Finding rules" },
   "find-rules": { label: "Finding rules", counted: ["section", "sections"] },
-  vocabulary: { label: "Building the vocabulary" },
+  vocabulary: { label: "Building the vocabulary", counted: ["group of sections", "groups of sections"] },
   "vocabulary-merge": { label: "Building the vocabulary" },
   "structure-rules": { label: "Drafting rules", counted: ["batch of rules", "batches of rules"] },
   merge: { label: "Combining and checking for conflicts" },
@@ -27,8 +28,64 @@ export type BuildStep = {
   status: JobStep["status"]
   /** A step that runs only when there's something for it to do. */
   isOptional: boolean
-  /** "47 of 64 sections", for a step with countable work under way or done. */
+  /** "47 of 64 sections, 4 under way", for a step with countable work under way or done. */
   count: string | null
+  /** How much of the step's countable work is done, from 0 to 1, while it runs; null otherwise. */
+  fraction: number | null
+  /** What the step has produced so far, as a count: "112 rules found", "40 of 112 rules drafted". */
+  found: string | null
+}
+
+const counted = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
+
+/** The newest result of each section E looked at: a rerun replaces its first answer. */
+function latestOutlines(results: readonly BuildResult[]) {
+  const bySection = new Map<string, Extract<BuildResult, { kind: "outlines" }>>()
+  for (const result of results) {
+    if (result.kind !== "outlines") {
+      continue
+    }
+    const seen = bySection.get(result.unitId)
+    if (!seen || result.at > seen.at) {
+      bySection.set(result.unitId, result)
+    }
+  }
+  return [...bySection.values()]
+}
+
+/** What each step has produced so far, by the step's label, as counts from the build's results. */
+export function stepFindings(results: readonly BuildResult[]): Record<string, string> {
+  const findings: Record<string, string> = {}
+  const definedTerms = new Set(results.flatMap((result) => (result.kind === "terms" ? result.labels : [])))
+  if (results.some((result) => result.kind === "terms")) {
+    findings["Finding defined terms"] = `${counted(definedTerms.size, "term", "terms")} found`
+  }
+  const outlines = latestOutlines(results)
+  const ruleCount = outlines.reduce((sum, result) => sum + result.rules.length, 0)
+  if (outlines.length > 0) {
+    findings["Finding rules"] = `${counted(ruleCount, "rule", "rules")} found`
+  }
+  const vocabulary = results.filter((result) => result.kind === "vocabulary")
+  if (vocabulary.length > 0) {
+    const terms = vocabulary.reduce((sum, result) => sum + result.labels.length, 0)
+    findings["Building the vocabulary"] = `${counted(terms, "term", "terms")} so far`
+  }
+  const drafted = new Set(
+    results.flatMap((result) => (result.kind === "rules" ? result.rules.map((rule) => rule.key) : []))
+  )
+  if (results.some((result) => result.kind === "rules")) {
+    findings["Drafting rules"] =
+      ruleCount > 0
+        ? `${drafted.size} of ${ruleCount} rules drafted`
+        : `${counted(drafted.size, "rule", "rules")} drafted`
+  }
+  const combined =
+    results.find((result) => result.kind === "consolidated") ?? results.find((result) => result.kind === "combined")
+  if (combined && (combined.kind === "consolidated" || combined.kind === "combined")) {
+    findings["Combining and checking for conflicts"] =
+      combined.conflicts === 0 ? "No conflicts" : `${counted(combined.conflicts, "conflict", "conflicts")} to decide`
+  }
+  return findings
 }
 
 function groupStatus(steps: readonly JobStep[]): JobStep["status"] {
@@ -45,8 +102,12 @@ function groupStatus(steps: readonly JobStep[]): JobStep["status"] {
   return steps.some((step) => step.status === "done") ? "current" : "upcoming"
 }
 
-/** The job's stages as steps in plain words, in order. A stage with no words of its own is a step by itself. */
-export function buildSteps(progress: JobProgress): BuildStep[] {
+/**
+ * The job's stages as steps in plain words, in order, each with what it has produced so far. A stage with no words of
+ * its own is a step by itself.
+ */
+export function buildSteps(progress: JobProgress, results: readonly BuildResult[] = []): BuildStep[] {
+  const findings = stepFindings(results)
   const groups: { label: string; steps: JobStep[] }[] = []
   for (const step of progress.steps) {
     const label = stepWords[step.stage]?.label ?? stageLabel(step.stage)
@@ -59,16 +120,22 @@ export function buildSteps(progress: JobProgress): BuildStep[] {
   }
   return groups.map(({ label, steps }) => {
     const status = groupStatus(steps)
-    const counted = steps.find((step) => stepWords[step.stage]?.counted && step.total > 0 && step.status !== "upcoming")
-    const words = counted ? stepWords[counted.stage]?.counted : undefined
+    const work = steps.find((step) => stepWords[step.stage]?.counted && step.total > 0 && step.status !== "upcoming")
+    const words = work ? stepWords[work.stage]?.counted : undefined
+    const isRunning = work?.status === "current"
+    // The calls in flight: the job runs at most `concurrency` at once, so a step reads as working before its first
+    // call finishes.
+    const underWay = work && isRunning ? Math.min(work.total - work.done, progress.workload.concurrency) : 0
     return {
       label,
       status,
       isOptional: steps.every((step) => step.isOptional),
       count:
-        counted && words
-          ? `${status === "done" ? counted.total : counted.done} of ${counted.total} ${counted.total === 1 ? words[0] : words[1]}`
-          : null
+        work && words
+          ? `${status === "done" ? work.total : work.done} of ${work.total} ${work.total === 1 ? words[0] : words[1]}${underWay > 0 ? `, ${underWay} under way` : ""}`
+          : null,
+      fraction: work && isRunning ? work.done / work.total : null,
+      found: findings[label] ?? null
     }
   })
 }

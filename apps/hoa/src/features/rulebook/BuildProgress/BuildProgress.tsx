@@ -20,8 +20,8 @@ import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { cn } from "@/lib/utils"
 import type { BuildResults } from "@/rulebook/buildResults.server"
-import { BuildFeed } from "../BuildFeed/BuildFeed"
 import { buildSteps, elapsedText, estimateBuild, summaryText, type BuildStep } from "./BuildProgress.utils"
+import { useBuildResults } from "./useBuildResults"
 
 export type BuildProgressProps = {
   jobId: string
@@ -55,12 +55,14 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults,
     refetchInterval: (query) => (query.state.data?.status === "running" || !query.state.data ? 2000 : false)
   })
 
+  const isRunning = !job || job.status === "running"
+  const results = useBuildResults(jobId, loadResults, isRunning)
+
   if (job && !job.progress) {
     return <JobProgress jobId={jobId} loadJob={loadJob} onFinished={onFinished} />
   }
-  const steps = job?.progress ? buildSteps(job.progress) : []
+  const steps = job?.progress ? buildSteps(job.progress, results) : []
   const estimate = job ? estimateBuild(job, now()) : null
-  const isRunning = !job || job.status === "running"
 
   return (
     <div className="flex flex-col gap-3">
@@ -86,7 +88,6 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults,
         </CollapsibleContent>
       </Collapsible>
       {isRunning ? <StopBuild onStop={onStop} /> : null}
-      <BuildFeed jobId={jobId} loadResults={loadResults} isRunning={isRunning} />
     </div>
   )
 }
@@ -101,6 +102,7 @@ const statusWords: Record<BuildStep["status"], string> = {
 function StepRow({ step }: { step: BuildStep }) {
   const optionalWords: Partial<Record<BuildStep["status"], string>> = { skipped: "Not needed", upcoming: "If needed" }
   const detail = (step.isOptional ? optionalWords[step.status] : undefined) ?? step.count
+  const found = step.status === "upcoming" ? null : step.found
   return (
     <li
       aria-current={step.status === "current" ? "step" : undefined}
@@ -112,12 +114,21 @@ function StepRow({ step }: { step: BuildStep }) {
       <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
         <StepIcon status={step.status} />
       </span>
-      <span className="flex min-w-0 flex-col">
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className={step.status === "current" ? "font-medium" : ""}>
           {step.label}
           <span className="sr-only">: {statusWords[step.status]}</span>
         </span>
-        {detail ? <span className="text-muted-foreground">{detail}</span> : null}
+        {detail || found ? (
+          <span className="text-muted-foreground">{[detail, found].filter(Boolean).join(", ")}</span>
+        ) : null}
+        {step.fraction === null ? null : (
+          <Progress
+            value={Math.round(step.fraction * 100)}
+            aria-label={`${step.label} progress`}
+            className="h-1 max-w-48"
+          />
+        )}
       </span>
     </li>
   )

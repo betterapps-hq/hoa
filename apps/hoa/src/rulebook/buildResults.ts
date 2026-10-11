@@ -9,7 +9,7 @@ import {
   structureRulesOutput
 } from "@/encoding/stepOutputs"
 
-// A running build's results so far (encoding.md, UX, Results as they arrive): what each finished step produced, read
+// A running build's results so far (encoding.md, UX, Counts as they arrive): what each finished step produced, read
 // from the step outputs the build writes to storage, newest since a cursor. Nothing here is reviewable: review happens
 // in the draft. The page polls this every few seconds.
 

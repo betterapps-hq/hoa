@@ -12,7 +12,7 @@ export type BuildDocument = { key: string; title: string; documentId: string }
 export type BuildResults = BuildResultsPage & { documents: BuildDocument[] }
 
 /**
- * The organization's build's results since `since` (encoding.md, UX, Results as they arrive). Only a rulebook build of
+ * The organization's build's results since `since` (encoding.md, UX, Counts as they arrive). Only a rulebook build of
  * the asking organization is read: another organization's job id finds nothing.
  */
 export async function loadBuildResults(

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { buildStages } from "@/encoding/build"
 import { advanceProgress, finishProgress, startProgress, type JobProgress } from "@/jobs/progress"
-import { buildSteps, elapsedText, estimateBuild, summaryText, timeLeftText } from "./BuildProgress.utils"
+import type { BuildResult } from "@/rulebook/buildResults"
+import { buildSteps, elapsedText, estimateBuild, stepFindings, summaryText, timeLeftText } from "./BuildProgress.utils"
 
 const stages = ["resolve-prompts", ...buildStages, "save-draft"].map((stage) => ({
   stage,
@@ -40,8 +41,8 @@ describe("buildSteps", () => {
       ["Saving the draft", "upcoming"]
     ])
     expect(steps[1]?.count).toBe("2 of 2 documents")
-    expect(steps[2]?.count).toBe("47 of 64 sections")
-    expect(steps[3]).toMatchObject({ isOptional: false, count: null })
+    expect(steps[2]).toMatchObject({ count: "47 of 64 sections, 16 under way", fraction: 47 / 64 })
+    expect(steps[3]).toMatchObject({ isOptional: false, count: null, fraction: null })
   })
 
   it("skips merging the vocabulary when it has nothing to decide", () => {
@@ -56,8 +57,47 @@ describe("buildSteps", () => {
     expect(steps.find((step) => step.label === "Building the vocabulary")?.status).toBe("done")
     expect(steps.find((step) => step.label === "Drafting rules")).toMatchObject({
       status: "current",
-      count: "3 of 20 batches of rules"
+      count: "3 of 20 batches of rules, 16 under way"
     })
+  })
+})
+
+describe("stepFindings", () => {
+  const rule = (key: string) => ({ key, title: key, provisionKey: null })
+  const results: BuildResult[] = [
+    { id: "t", at: at(1), kind: "terms", documentKey: "declaration", labels: ["Lot", "Owner"] },
+    { id: "o1", at: at(2), kind: "outlines", unitId: "a", rules: [rule("a#1")], isRerun: false },
+    { id: "o2", at: at(3), kind: "outlines", unitId: "b", rules: [rule("b#1"), rule("b#2")], isRerun: false },
+    { id: "o3", at: at(4), kind: "outlines", unitId: "a", rules: [rule("a#1"), rule("a#2")], isRerun: true },
+    { id: "v", at: at(5), kind: "vocabulary", unitId: "a", labels: ["Height", "Fence", "Material"] },
+    { id: "r1", at: at(6), kind: "rules", batchId: "a#1", rules: [rule("a#1"), rule("a#2")], round: 0 },
+    { id: "r2", at: at(7), kind: "rules", batchId: "a#1", rules: [rule("a#2")], round: 1 }
+  ]
+
+  it("counts what each step produced: a rerun replaces a section's rules, a retry doesn't count twice", () => {
+    expect(stepFindings(results)).toEqual({
+      "Finding defined terms": "2 terms found",
+      "Finding rules": "4 rules found",
+      "Building the vocabulary": "3 terms so far",
+      "Drafting rules": "2 of 4 rules drafted"
+    })
+    expect(
+      stepFindings([...results, { id: "c", at: at(9), kind: "consolidated", problems: 0, conflicts: 1 }])
+    ).toMatchObject({
+      "Combining and checking for conflicts": "1 conflict to decide"
+    })
+  })
+
+  it("puts the counts on their steps", () => {
+    const steps = buildSteps(
+      progressOf([
+        ["find-rules", 2, 2, 9],
+        ["vocabulary", 0, 1, 10]
+      ]),
+      results
+    )
+    expect(steps.find((step) => step.label === "Finding rules")?.found).toBe("4 rules found")
+    expect(steps.find((step) => step.label === "Saving the draft")?.found).toBeNull()
   })
 })
 
