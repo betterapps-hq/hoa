@@ -21,10 +21,14 @@ export type BulkApproveProps = {
   refs: RecordRef[]
   /** What the records are, in the plural: "rules", "terms", "reasons". */
   noun: string
+  /** The button's words, when not "Approve the 4 rules shown". */
+  label?: string
+  /** The confirmation's question, when not "Approve the 4 rules shown?". */
+  title?: string
 }
 
 /** Approves every record a filter shows, after a confirmation; records something blocks stay to review. */
-export function BulkApprove({ refs, noun }: BulkApproveProps) {
+export function BulkApprove({ refs, noun, label, title }: BulkApproveProps) {
   const { actions } = useRulebookWorkspace()
   const [isBusy, setIsBusy] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
@@ -49,13 +53,11 @@ export function BulkApprove({ refs, noun }: BulkApproveProps) {
     <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
       <AlertDialogTrigger render={<Button variant="outline" size="sm" disabled={isBusy} />}>
         <CheckCheckIcon />
-        Approve the {refs.length} {noun} shown
+        {label ?? `Approve the ${refs.length} ${noun} shown`}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>
-            Approve the {refs.length} {noun} shown?
-          </AlertDialogTitle>
+          <AlertDialogTitle>{title ?? `Approve the ${refs.length} ${noun} shown?`}</AlertDialogTitle>
           <AlertDialogDescription>
             Each one is checked first: any with open problems, unreviewed terms or an open question stays to review.
           </AlertDialogDescription>

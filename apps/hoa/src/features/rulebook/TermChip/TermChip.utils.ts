@@ -3,7 +3,7 @@ import type * as T from "@/schema/types"
 import type { Vocabulary } from "@/schema/vocabulary"
 import type { TermContent } from "@/schema/zod"
 
-// What kind of term a key is, in words, for the term popover and the vocabulary list.
+// What kind of term a key is, in words, for the term popover and the terms tab.
 
 const dimensionLabels: Record<T.Dimension, string> = {
   length: "length",
@@ -18,18 +18,19 @@ const dimensionLabels: Record<T.Dimension, string> = {
   "business-time": "business days"
 }
 
-export const termKindLabels: Record<TermContent["kind"], string> = {
-  thing: "Thing",
-  category: "Category",
-  property: "Property",
-  value: "Value",
-  "value-set": "Value set",
-  unit: "Unit"
+/** A unit spelled out, as its longest label in letters: "inches" rather than "in"; its plural label without one. */
+function unitWords(unit: T.TermKey, vocabulary: Vocabulary) {
+  const words = (vocabulary.get(unit)?.labels ?? [])
+    .map((label) => label.text)
+    .filter((text) => /^[\p{L} ]+$/u.test(text))
+  const [longest] = words.toSorted((a, b) => b.length - a.length)
+  return longest ?? vocabulary.label(unit, true)
 }
 
-function valueTypeOf(valueType: T.ValueType, vocabulary: Vocabulary) {
+/** What a property holds, in words: "a quantity in inches", "yes or no", "one of the fence materials". */
+export function describeValueType(valueType: T.ValueType, vocabulary: Vocabulary) {
   return match(valueType)
-    .with({ type: "quantity" }, ({ unit }) => `a quantity in ${vocabulary.label(unit)}`)
+    .with({ type: "quantity" }, ({ unit }) => `a quantity in ${unitWords(unit, vocabulary)}`)
     .with({ type: "count" }, () => "a count")
     .with({ type: "boolean" }, () => "yes or no")
     .with({ type: "choice" }, ({ set }) => `one of the ${vocabulary.label(set, true)}`)
@@ -45,7 +46,7 @@ function valueTypeOf(valueType: T.ValueType, vocabulary: Vocabulary) {
     .exhaustive()
 }
 
-/** "A property of fence run: a quantity in inches" */
+/** "A detail of fence run: a quantity in inches" */
 export function describeTermKind(term: TermContent, vocabulary: Vocabulary) {
   return match(term)
     .with({ kind: "thing" }, (thing) =>
@@ -60,10 +61,12 @@ export function describeTermKind(term: TermContent, vocabulary: Vocabulary) {
     .with({ kind: "category" }, ({ of }) => `A kind of ${vocabulary.label(of)}`)
     .with({ kind: "property" }, (property) => {
       const many = property.many ? ", any number of them" : ""
-      return `A property of ${vocabulary.label(property.of)}: ${valueTypeOf(property.valueType, vocabulary)}${many}`
+      return `A detail of ${vocabulary.label(property.of)}: ${describeValueType(property.valueType, vocabulary)}${many}`
     })
-    .with({ kind: "value" }, ({ set }) => `A value of ${vocabulary.label(set)}`)
-    .with({ kind: "value-set" }, ({ complete }) => (complete ? "A closed list of values" : "An open list of values"))
+    .with({ kind: "value" }, ({ set }) => `One of the ${vocabulary.label(set, true)}`)
+    .with({ kind: "value-set" }, ({ complete }) =>
+      complete ? "A fixed list of choices" : "A list of choices that allows others"
+    )
     .with({ kind: "unit" }, ({ dimension }) => `A unit of ${dimensionLabels[dimension]}`)
     .exhaustive()
 }

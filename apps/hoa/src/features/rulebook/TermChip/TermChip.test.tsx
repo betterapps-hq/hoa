@@ -28,6 +28,6 @@ describe("TermChip", () => {
     )
     expect(screen.getByTitle("gazebo isn't a term")).toHaveTextContent("gazebo")
     await user.click(screen.getByRole("button"))
-    expect(await screen.findByText(/^A property of .+: a quantity in /)).toBeInTheDocument()
+    expect(await screen.findByText(/^A detail of .+: a quantity in /)).toBeInTheDocument()
   })
 })
