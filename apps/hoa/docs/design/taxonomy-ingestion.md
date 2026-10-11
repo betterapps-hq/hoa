@@ -95,11 +95,11 @@ step B on GLiNER's candidates against the code finder's, and unique provision ke
 | --- | --- | --- | --- |
 | 1 | Goldens for nine more organizations: defined terms and per-provision rule labels; two held out | — | Done |
 | 2 | Embedding units from the goldens: rule-bearing provisions with heading path and lead-in | 1 | Done (1,905 units) |
-| 3 | The same units from raw Azure paragraphs and headings, without the parser | 1 | Running |
-| 4 | Embed with text-embedding-3-small and -large, Voyage 4 and 4-large; cluster each with BERTopic | 2 | Embedded (7 cents); clustering running |
-| 5 | Manual review: name, merge and split clusters; list missing kinds; choose the embedding model | 2 | To do |
-| 6 | Draft taxonomy: kinds with descriptions, which template and which don't | 3 | To do |
-| 7 | Coverage: share of rules per kind, templated share, outliers | 3 | To do |
+| 3 | The same units from raw Azure paragraphs and headings, without the parser | 1 | Done: the same kinds emerge (most provision clusters have a mutual best match among the Azure clusters, cosine 0.94 to 0.98), so discovery doesn't need the parser |
+| 4 | Embed with text-embedding-3-small and -large, Voyage 4 and 4-large; cluster each with BERTopic | 2 | Done (7 cents): Voyage 4 and 4-large agree closely (ARI 0.90) and keep probe topics (signs, liens, leasing) together across associations better than OpenAI's; Voyage 4-large chosen: 39 clusters, 10% outliers, 24 clusters spanning five or more associations |
+| 5 | Manual review: name, merge and split clusters; list missing kinds; choose the embedding model | 2 | Done (2026-10-11): clusters are subjects, not fillable rules (fences, not fence height); some look single-association only because one association's design guidelines are in the units; repeated per-division covenants and a few mis-sorts noted |
+| 6 | Draft taxonomy: kinds with descriptions, which template and which don't | 3 | Drafted: 30 kinds in five families (owner property and conduct, money, governance, property rights, enforcement and disputes), each marked templated, partly or not, with field sketches; owner property and conduct, money and vote thresholds template best |
+| 7 | Coverage: share of rules per kind, templated share, outliers | 3 | Measured on the sample's 684 rules by shape: 50% template-shaped (one fact against fixed values, an approval, a fixed deadline, a document check), 19% a single judged question, 10% sanctions, limits and discretions, 22% complex; 135 of the 302 rules applications and violations review are template-shaped. An upper bound: it counts shape, not whether small models recognize the kind and fill it |
 | 8 | Label every golden rule provision with its kind; fine-tune Decide; test on the held-out organizations; review errors | 4 | To do |
 | 9 | Field schemas for the templated kinds, as views onto the rules schema | 5 | To do |
 | 10 | GLiNER field extraction against the sample's golden rules, then a labeled sample from other organizations; review errors | 5 | To do |
