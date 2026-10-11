@@ -30,6 +30,7 @@ export type Outline = {
   domain: Domain
   /** The other provisions the rule depends on. */
   citations: ProvisionKey[]
+  /** One reading of an ambiguous passage, recorded beside the others until an interpretation question settles it. */
   interpretation: boolean
   /** The facts the rule tests, in plain words (E): what each is about and the fact. */
   reads: Read[]
@@ -276,7 +277,8 @@ export function vocabularyLine(outline: Outline) {
 
 /**
  * One outline as F reads it: key | kind | bearer | subject | request types | remedy required or no remedy | targets
- * resolved to keys | summary | terms: the keys its reads mapped to.
+ * resolved to keys | summary (marked when it's one reading of an ambiguous passage, kept beside the others) | terms: the
+ * keys its reads mapped to.
  */
 export function structuringLine(outline: Outline, flowOf: (requestType: TermKey) => string | null) {
   return [
@@ -287,7 +289,7 @@ export function structuringLine(outline: Outline, flowOf: (requestType: TermKey)
     outline.requestTypes.join(", "),
     remedyRequired(outline, flowOf) ? "remedy required" : "no remedy",
     targetsText(outline) || "-",
-    outline.summary,
+    outline.interpretation ? `one reading of an ambiguous passage: ${outline.summary}` : outline.summary,
     `terms: ${outline.readKeys.join(", ") || "none"}`
   ].join(" | ")
 }

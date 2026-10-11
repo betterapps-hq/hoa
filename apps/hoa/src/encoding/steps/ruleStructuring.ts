@@ -125,6 +125,23 @@ export function clausesOf(answer: RuleStructuringAnswer) {
   })
 }
 
+/**
+ * The outlines of other batches a batch reads beside its own: those its outlines override, enforce or except, and those
+ * citing a provision the batch shows (a rule elsewhere may already cover part of it).
+ */
+export function relatedOutlines(batch: readonly Outline[], all: readonly Outline[]) {
+  const keys = new Set(batch.map((outline) => outline.key))
+  const targeted = new Set(
+    batch.flatMap((outline) => [...(outline.resolved?.rules ?? []), ...(outline.resolved?.except ?? [])])
+  )
+  const shown = new Set(batch.flatMap((outline) => [outline.provisionKey, ...outline.citations]))
+  return all.filter(
+    (outline) =>
+      !keys.has(outline.key) &&
+      (targeted.has(outline.key) || [outline.provisionKey, ...outline.citations].some((key) => shown.has(key)))
+  )
+}
+
 /** Batches of outlines in document order, about `size` rules each and never more than `max`; a provision's stay together. */
 export function structuringBatches(outlines: readonly Outline[], size = 15, max = 20) {
   const byProvision = new Map<ProvisionKey, Outline[]>()
@@ -271,7 +288,7 @@ const flowOf = (requestType: TermKey) => createVocabulary([]).requestOf(requestT
 /** hoa-rule-structuring's variables for one batch; `problems` holds the failing rules on a retry. */
 export function ruleStructuringVariables(input: {
   outlines: readonly Outline[]
-  /** Outlines of other batches these override or enforce. */
+  /** Outlines of other batches these override, enforce or except, or that cite the provisions shown (`relatedOutlines`). */
   related: readonly Outline[]
   vocabulary: readonly TermContent[]
   documents: readonly Pick<GoverningDocument, "key" | "kind" | "title" | "edition">[]

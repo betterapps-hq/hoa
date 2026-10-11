@@ -5,7 +5,7 @@ import { crossReferenceLines } from "@/encoding/steps/consolidation"
 import { definingProvisions } from "@/encoding/steps/definedTerms"
 import { keysIn } from "@/encoding/steps/drafts"
 import type { Outline } from "@/encoding/steps/outline"
-import { structuringBatches } from "@/encoding/steps/ruleStructuring"
+import { relatedOutlines, structuringBatches } from "@/encoding/steps/ruleStructuring"
 import { vocabularyGroups } from "@/encoding/steps/vocabulary"
 import type { TermOrigin, VocabularyEntry } from "@/encoding/steps/vocabularyMerge"
 import { compareCodeUnits } from "@/rulebook/canonical"
@@ -333,7 +333,7 @@ export function buildDatasets(context: GoldenContext) {
       input: {
         batchId: first?.key ?? "",
         outlines: batch,
-        related: outlines.filter((outline) => targeted.has(outline.key) && !keys.has(outline.key)),
+        related: relatedOutlines(batch, outlines),
         vocabulary,
         documents,
         provisions,

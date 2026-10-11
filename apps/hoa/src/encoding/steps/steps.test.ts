@@ -22,7 +22,7 @@ import {
   withHeadingReasons
 } from "./ruleFinding"
 import { changedPaths, collateralChanges, outlineOfRecord, retryProblemsText } from "./ruleRetry"
-import { clausesOf, draftsOf, ruleStructuringAnswer, structuringBatches } from "./ruleStructuring"
+import { clausesOf, draftsOf, relatedOutlines, ruleStructuringAnswer, structuringBatches } from "./ruleStructuring"
 import { checkSharedVocabulary, sharedVocabularyAnswer, sharedVocabularyTerms } from "./vocabulary"
 import {
   applyVocabularyMerge,
@@ -582,6 +582,20 @@ describe("F and its retry", () => {
   it("batches outlines by count, keeping a provision's together", () => {
     const outlines = Array.from({ length: 25 }, (_value, index) => outline(`rules:${Math.floor(index / 5)}#r${index}`))
     expect(structuringBatches(outlines, 15, 20).map((batch) => batch.length)).toEqual([15, 10])
+  })
+
+  it("relates the outlines a batch targets and those citing a provision it shows", () => {
+    const batch = [
+      outline("rules:1#limit", { citations: ["rules:2"] }),
+      outline("rules:3#exception", { resolved: { rules: ["rules:9#base"], documents: [], except: [] } })
+    ]
+    const all = [
+      ...batch,
+      outline("rules:9#base"),
+      outline("rules:7#covers", { citations: ["rules:2"] }),
+      outline("rules:8#elsewhere", { citations: ["rules:5"] })
+    ]
+    expect(relatedOutlines(batch, all).map((item) => item.key)).toEqual(["rules:9#base", "rules:7#covers"])
   })
 
   it("finds keys, kinds and targets the outlines don't allow, and wraps clause citations", () => {

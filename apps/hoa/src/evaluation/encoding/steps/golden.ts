@@ -89,6 +89,12 @@ export function goldenOutlines(golden: T.RulesFile, sections: readonly EncodingU
   const vocabulary = createVocabulary(terms)
   const byKey = new Map([...coreTerms.map((term) => termContent(term)), ...terms].map((term) => [term.key, term]))
   const section = sectionOf(sections)
+  // A rule an interpretation question keeps in one of its options is one reading of an ambiguous passage.
+  const readings = new Set(
+    golden.questions
+      .filter((question) => question.kind === "interpretation")
+      .flatMap((question) => question.options.flatMap((option) => option.keeps))
+  )
   const outlines = golden.rules.map((rule): Outline => {
     const content = ruleContent(rule)
     const read = termsRead(content, byKey).filter((key) => {
@@ -101,6 +107,7 @@ export function goldenOutlines(golden: T.RulesFile, sections: readonly EncodingU
         section(content.citations[0]?.provisionKey ?? "") ?? "",
         statementSummary(content, vocabulary)
       ),
+      interpretation: readings.has(rule.key),
       reads: read.flatMap((key) => readOf(key, vocabulary) ?? []),
       readKeys: read
     }

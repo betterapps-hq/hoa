@@ -5,7 +5,7 @@ import { z } from "zod"
 import { createAiContext } from "../src/ai/aiContext.server.ts"
 import { findTermCandidates } from "../src/encoding/definedTerms.ts"
 import { crossReferenceLines } from "../src/encoding/steps/consolidation.ts"
-import { structuringBatches } from "../src/encoding/steps/ruleStructuring.ts"
+import { relatedOutlines, structuringBatches } from "../src/encoding/steps/ruleStructuring.ts"
 import type { StepAi } from "../src/encoding/steps/run.ts"
 import { vocabularyGroups, withReadKeys } from "../src/encoding/steps/vocabulary.ts"
 import { buildDatasets, settingsFlags, type DatasetItem } from "../src/evaluation/encoding/steps/datasets.ts"
@@ -546,7 +546,6 @@ switch (stage) {
             (batch) => {
               const cited = new Set(batch.flatMap((outline) => [outline.provisionKey, ...outline.citations]))
               const keys = new Set(batch.map((outline) => outline.key))
-              const targeted = new Set(batch.flatMap((outline) => outline.resolved?.rules ?? []))
               return {
                 id: `rule-structuring:${batch[0]?.key ?? ""}`,
                 step: "rule-structuring",
@@ -554,9 +553,7 @@ switch (stage) {
                 input: {
                   batchId: batch[0]?.key ?? "",
                   outlines: batch,
-                  related: (fromStep.outlines ?? []).filter(
-                    (outline) => targeted.has(outline.key) && !keys.has(outline.key)
-                  ),
+                  related: relatedOutlines(batch, fromStep.outlines ?? []),
                   vocabulary: (fromStep.terms ?? []).map((term) => ({ ...term })),
                   documents: goldenDocuments.map(({ key, kind, title, edition }) => ({ key, kind, title, edition })),
                   provisions: goldenProvisions.filter((provision) => cited.has(provision.key)),
