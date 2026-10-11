@@ -864,7 +864,7 @@ export async function buildRulebook(input: BuildInput) {
     consolidateOutput,
     async () => {
       const { rulebook } = mergedRulebook
-      const unchanged = { rulebook, problems: [], issues: mergedRulebook.issues, call: null, answerProblems: [] }
+      const unchanged = { rulebook, problems: [], issues: mergedRulebook.issues, calls: [], answerProblems: [] }
       if (rulebook.rules.length < 2) {
         return unchanged
       }
@@ -872,37 +872,36 @@ export async function buildRulebook(input: BuildInput) {
         ...readingsOf(rulebook.questions),
         ...findings.outlines.filter((outline) => outline.interpretation).map((outline) => outline.key)
       ]
-      const result = await consolidateRules({
-        ai,
-        cacheStage: "consolidate",
-        itemId: "rulebook",
-        input: consolidationInputOf({
-          rulebook,
-          references,
-          sectionOf,
-          unresolved: findings.unresolved,
-          readings: [...new Set(readings)]
-        })
+      const input = consolidationInputOf({
+        rulebook,
+        references,
+        sectionOf,
+        unresolved: findings.unresolved,
+        readings: [...new Set(readings)]
       })
+      // The model can end its turn without answering; one rerun of the same call, as every other stage has.
+      const first = await consolidateRules({ ai, cacheStage: "consolidate", itemId: "rulebook", input })
+      const result = first.isValid
+        ? first
+        : await consolidateRules({ ai, cacheStage: "consolidate", itemId: "rulebook:rerun", input })
+      const made = result === first ? [first.call] : [first.call, result.call]
       if (!result.isValid) {
-        return { ...unchanged, call: result.call, answerProblems: zodProblems(result.issues) }
+        return { ...unchanged, calls: made, answerProblems: zodProblems(result.issues) }
       }
       const applied = applyConsolidationAnswer(rulebook, result.object)
-      return { ...applied, issues: inScope(applied.issues), call: result.call, answerProblems: [] }
+      return { ...applied, issues: inScope(applied.issues), calls: made, answerProblems: [] }
     },
     "model"
   )
-  if (consolidated.call) {
-    calls.push(consolidated.call)
-  }
+  calls.push(...consolidated.calls)
   if (consolidated.answerProblems.length > 0) {
     failures.push({ stage: "consolidate", itemId: "rulebook", message: stillInvalid(consolidated.answerProblems) })
   }
   stages.push({
     stage: "consolidate",
-    items: consolidated.call ? 1 : 0,
-    calls: consolidated.call ? 1 : 0,
-    reruns: 0,
+    items: consolidated.calls.length > 0 ? 1 : 0,
+    calls: consolidated.calls.length,
+    reruns: Math.max(0, consolidated.calls.length - 1),
     problems: consolidated.problems.length + consolidated.answerProblems.length,
     problemsLeft: consolidated.issues.length
   })

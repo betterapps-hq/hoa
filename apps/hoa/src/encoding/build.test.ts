@@ -429,6 +429,21 @@ describe("buildRulebook", () => {
     expect(result.failures).toEqual([])
   })
 
+  it("reruns consolidation once when the model ends without an answer", async () => {
+    let consolidations = 0
+    const once = scriptedModel((text) => {
+      if (isPrompt(text, stepPrompts.consolidation) && consolidations++ === 0) {
+        return {}
+      }
+      return answer(text)
+    })
+    const result = await buildRulebook(withModel(() => once))
+    expect(consolidations).toBe(2)
+    expect(result.report.stages.find((stage) => stage.stage === "consolidate")).toMatchObject({ calls: 2, reruns: 1 })
+    expect(result.content.questions).toEqual([expect.objectContaining({ kind: "conflict" })])
+    expect(result.failures).toEqual([])
+  })
+
   it("retries a rule the validator faults, with its problems, once every batch is structured", async () => {
     const { step, names } = stepRunner()
     const result = await buildRulebook(withModel(() => model({ faultsNoise: true }), { step }))

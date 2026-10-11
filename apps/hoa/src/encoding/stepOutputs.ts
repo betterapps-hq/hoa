@@ -252,7 +252,8 @@ export const consolidateOutput = z.object({
     })
   ),
   issues: z.array(rulebookIssue),
-  call: modelCall.nullable(),
+  /** The call, and its rerun when the first answer failed Zod. */
+  calls: z.array(modelCall),
   /** What failed Zod in an answer the rulebook was left unconsolidated for. */
   answerProblems: z.array(itemProblem)
 })
