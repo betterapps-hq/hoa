@@ -10,7 +10,13 @@ import type { StepAi } from "../src/encoding/steps/run.ts"
 import { vocabularyGroups, withReadKeys } from "../src/encoding/steps/vocabulary.ts"
 import { buildDatasets, settingsFlags, type DatasetItem } from "../src/evaluation/encoding/steps/datasets.ts"
 import { retryDataset } from "../src/evaluation/encoding/steps/evaluate.ts"
-import { goldenOutlines, goldenSections, goldenTerms, sectionOf } from "../src/evaluation/encoding/steps/golden.ts"
+import {
+  goldenOutlines,
+  goldenSections,
+  goldenTerms,
+  ruleContent,
+  sectionOf
+} from "../src/evaluation/encoding/steps/golden.ts"
 import { replayStage, replayStages, written } from "../src/evaluation/encoding/steps/replay.ts"
 import {
   clippedInput,
@@ -571,7 +577,8 @@ switch (stage) {
           cacheStage,
           provisions: goldenProvisions,
           documents: goldenDocuments,
-          retries: Number(values.retries)
+          retries: Number(values.retries),
+          otherRules: golden.rules.map(ruleContent)
         }),
       score: (item, output) =>
         scoreStructuring(item, output, goldenSides, termAlignment(allGoldenTerms, output?.terms ?? allGoldenTerms)),

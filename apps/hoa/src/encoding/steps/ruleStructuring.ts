@@ -42,7 +42,8 @@ const normBase = {
   ...base,
   beneficiary: termKey.nullable(),
   noExceptions: provisionKey.nullable(),
-  overrides: ruleSelection
+  // A norm that overrides nothing may say so with null, which means no overrides.
+  overrides: ruleSelection.nullable().transform((selection) => selection ?? [])
 }
 
 /** The structure of one rule, by its outline's kind. */

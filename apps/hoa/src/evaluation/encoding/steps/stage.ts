@@ -523,14 +523,20 @@ async function structureBatch(batch: Batch, context: Context, problemsBlock?: st
   }
 }
 
-/** The validator's problems with each structured rule, read with the batch's vocabulary and every rule of the run. */
+/**
+ * The validator's problems with each structured rule, read with the batch's vocabulary, every rule of the run and the
+ * context's other rules (those of batches outside a partial run, which a rule may target).
+ */
 function checkStructured(
   structured: readonly Structured[],
   vocabulary: readonly TermContent[],
   provisions: readonly T.Provision[],
-  documents: readonly T.GoverningDocument[]
+  documents: readonly T.GoverningDocument[],
+  otherRules: readonly RuleContent[] = []
 ) {
-  const rules = structured.flatMap((item) => (item.rule ? [item.rule] : []))
+  const own = structured.flatMap((item) => (item.rule ? [item.rule] : []))
+  const keys = new Set(structured.map((item) => item.outline.key))
+  const rules = [...own, ...otherRules.filter((rule) => !keys.has(rule.key))]
   const found = recordProblems({ terms: vocabulary, rules, provisions, documents })
   return new Map(
     structured.map((item) => [
@@ -553,30 +559,40 @@ export async function runRuleStructuring(
     documents: readonly T.GoverningDocument[]
     /** Retries of the rules that still have problems (at most two). */
     retries: number
+    /** Rules outside the run's batches that its rules may target (the golden's, for a run over part of a dataset). */
+    otherRules?: readonly RuleContent[]
   }
 ): Promise<StepRun<StructuringOutput>> {
   const calls: ModelCall[] = []
   const problems: StepProblem[] = []
   const done = new Map<string, { batch: Batch; structured: Structured[]; proposed: TermContent[] }>()
-  for (const item of items) {
+  // Batches are independent, so their calls run in parallel, as the build runs them; each round of retries waits for
+  // the round before, since a rule's check reads every rule of the run.
+  await inParallel(items, context.concurrency ?? 8, async (item) => {
     const batch: Batch = { id: item.id, ...item.input }
     const first = await structureBatch(batch, context)
     calls.push(first.call)
     problems.push(...first.issues)
     const proposed = (first.answer?.proposedTerms ?? []).map(proposedPropertyTerm)
     done.set(item.id, { batch, structured: first.structured, proposed })
-  }
+  })
   const vocabularyOf = (entry: { batch: Batch; proposed: TermContent[] }) => [
     ...entry.batch.vocabulary,
     ...entry.proposed
   ]
   const allStructured = () => [...done.values()].flatMap((entry) => entry.structured)
+  const check = (entry: { batch: Batch; proposed: TermContent[] }) =>
+    checkStructured(allStructured(), vocabularyOf(entry), context.provisions, context.documents, context.otherRules)
   for (let round = 1; round <= Math.min(context.retries, 2); round += 1) {
-    for (const [itemId, entry] of done) {
-      const found = checkStructured(allStructured(), vocabularyOf(entry), context.provisions, context.documents)
+    const checked = new Map([...done].map(([itemId, entry]) => [itemId, check(entry)]))
+    await inParallel([...done], context.concurrency ?? 8, async ([itemId, entry]) => {
+      const found = checked.get(itemId)
+      if (!found) {
+        return
+      }
       const failing = entry.structured.filter((item) => (found.get(item.outline.key) ?? []).length > 0)
       if (failing.length === 0) {
-        continue
+        return
       }
       const records: ProblemRecord[] = failing.map((item) => ({
         unitId: item.outline.unitId,
@@ -599,11 +615,11 @@ export async function runRuleStructuring(
       const replaced = new Map(retry.structured.map((item) => [item.outline.key, item]))
       entry.structured = entry.structured.map((item) => replaced.get(item.outline.key) ?? item)
       entry.proposed.push(...(retry.answer?.proposedTerms ?? []).map(proposedPropertyTerm))
-    }
+    })
   }
   const outputs = new Map<string, StructuringOutput | null>()
   for (const [itemId, entry] of done) {
-    const found = checkStructured(allStructured(), vocabularyOf(entry), context.provisions, context.documents)
+    const found = check(entry)
     outputs.set(itemId, {
       rules: entry.structured.map((item) => ({
         key: item.outline.key,
