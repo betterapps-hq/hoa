@@ -5,6 +5,7 @@ import { crossReferenceLines, exceptionLines } from "@/encoding/steps/consolidat
 import { definingProvisions } from "@/encoding/steps/definedTerms"
 import { keysIn } from "@/encoding/steps/drafts"
 import type { Outline } from "@/encoding/steps/outline"
+import { definedTermsInput } from "@/encoding/steps/pipeline"
 import { relatedOutlines, structuringBatches } from "@/encoding/steps/ruleStructuring"
 import { vocabularyGroups } from "@/encoding/steps/vocabulary"
 import type { TermOrigin, VocabularyEntry } from "@/encoding/steps/vocabularyMerge"
@@ -16,7 +17,6 @@ import {
   definedNamesOf,
   expectedDefinedTerms,
   expectedVocabulary,
-  goldenDefinitions,
   goldenDocuments,
   goldenOutlines,
   goldenSections,
@@ -197,7 +197,7 @@ export function buildDatasets(context: GoldenContext) {
   // One item per document: a document without definitions runs on its candidates alone. Either way it's expected to
   // define the terms its defining provisions (the same ones the step is given) define under a name it defines.
   const definedTermItems: DefinedTermsItem[] = goldenDocuments(golden).flatMap(({ key, provisions }) => {
-    const { definitions, candidates } = goldenDefinitions(provisions)
+    const { definitions, candidates } = definedTermsInput(documentLine(golden, key), provisions)
     const own = definingProvisions(definitions, candidates)
     const definedElsewhere = new Set(
       allDefinitions.filter((provision) => documentOf(provision.key) !== key).map((provision) => provision.key)

@@ -271,7 +271,7 @@ describe("RulebookPage", () => {
       kind: "rulebook-build",
       subjectId: "rb",
       status: "running",
-      stage: "encode",
+      stage: "structure-rules",
       done: 3,
       total: 8,
       promptVersions: {},
@@ -290,7 +290,7 @@ describe("RulebookPage", () => {
             finishedAt: null
           },
           {
-            stage: "encode",
+            stage: "structure-rules",
             status: "current",
             isOptional: false,
             done: 3,

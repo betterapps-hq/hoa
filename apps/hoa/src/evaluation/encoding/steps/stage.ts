@@ -1,55 +1,41 @@
 import { z } from "zod"
-import { applyConsolidation } from "@/encoding/consolidate"
-import { recordProblems } from "@/encoding/steps/check"
-import { consolidationAnswer, consolidationVariables } from "@/encoding/steps/consolidation"
-import {
-  checkDefinedTerms,
-  citableProvisions,
-  definedTermsAnswer,
-  definedTermsOf,
-  definedTermsVariables
-} from "@/encoding/steps/definedTerms"
+import { outlineSchema } from "@/encoding/stepOutputs"
+import { checkDefinedTerms, citableProvisions } from "@/encoding/steps/definedTerms"
 import { proposedPropertyTerm } from "@/encoding/steps/drafts"
-import { resolveOutlines, type Outline } from "@/encoding/steps/outline"
 import {
-  checkFinding,
-  findingKeys,
-  keyedOutline,
-  outlinesOf,
-  reasonsOf,
-  ruleFindingAnswer,
-  ruleFindingVariables,
-  settingsFlagsOf,
-  withHeadingReasons,
-  type RuleFindingAnswer
-} from "@/encoding/steps/ruleFinding"
-import { outlineOfRecord, retryBatches, retryProblemsText, type ProblemRecord } from "@/encoding/steps/ruleRetry"
-import {
-  draftsOf,
-  parseDrafts,
-  ruleStructuringAnswer,
-  ruleStructuringVariables,
-  type RuleStructuringAnswer
-} from "@/encoding/steps/ruleStructuring"
-import { runStepPrompt, type StepAi } from "@/encoding/steps/run"
-import {
-  checkSharedVocabulary,
-  sharedVocabularyAnswer,
-  sharedVocabularyTerms,
-  sharedVocabularyVariables,
-  type GroupVocabulary
-} from "@/encoding/steps/vocabulary"
-import {
-  applyVocabularyMerge,
-  mergeClusters,
-  mergeExactKeys,
-  vocabularyMergeAnswer,
-  vocabularyMergeVariables,
-  type VocabularyEntry
-} from "@/encoding/steps/vocabularyMerge"
+  applyConsolidationAnswer,
+  buildGroupVocabulary,
+  checkFindings,
+  checkStructured,
+  consolidateRules,
+  findDefinedTerms,
+  findingOf,
+  findingRerunProblems,
+  findRules,
+  freezeVocabulary,
+  knownTermsOf,
+  mergeVocabulary,
+  resolveFindings,
+  retryBatch,
+  retryRecords,
+  structureBatch,
+  structureFirstPass,
+  unresolvedProblem,
+  vocabularyEntries,
+  vocabularyRerunProblems,
+  zodProblems,
+  type FoundSection,
+  type ItemProblem,
+  type Structured,
+  type StructuringBatch
+} from "@/encoding/steps/pipeline"
+import { outlineOfRecord, retryBatches, retryProblemsText } from "@/encoding/steps/ruleRetry"
+import type { StepAi } from "@/encoding/steps/run"
+import { checkSharedVocabulary, type GroupVocabulary } from "@/encoding/steps/vocabulary"
+import { mergeExactKeys } from "@/encoding/steps/vocabularyMerge"
 import type { ModelCall } from "@/jobs/steps"
 import type * as T from "@/schema/types"
-import { domain, ruleDraft, ruleSelection, termDraft, type RuleContent, type TermContent } from "@/schema/zod"
+import { ruleDraft, termDraft, type RuleContent, type TermContent } from "@/schema/zod"
 import type {
   ConsolidationItem,
   DefinedTermsItem,
@@ -68,11 +54,12 @@ import type {
   VocabularyOutput
 } from "./scores"
 
-// Runs one drafted step over dataset items (evaluation.md, Running one step), as the reordered pipeline would: each
-// item's input becomes the step's prompt variables, the answer goes through the step's code (keys built, checks,
-// merges), a failing item is rerun once with its problems (B, E and C; F's retry is its own mode), and the output
-// takes the shape the item's expected output has, so the step's scores compare them. Every call is recorded; an answer
-// that fails Zod is kept with its issues and counted. `cacheStage` keeps repeats apart in the content cache.
+// Runs one drafted step over dataset items (evaluation.md, Running one step), as the build runs it: each item's input
+// becomes the step's prompt variables, the answer goes through the step's code (keys built, checks, merges), a failing
+// item is rerun once with its problems (B, E and C; F's retry is its own mode), and the output takes the shape the
+// item's expected output has, so the step's scores compare them. The per-item work is the build's own
+// (src/encoding/steps/pipeline.ts). Every call is recorded; an answer that fails Zod is kept with its issues and
+// counted. `cacheStage` keeps repeats apart in the content cache.
 
 export type StepProblem = { itemId: string; code: string; message: string }
 
@@ -84,39 +71,6 @@ export type StepRun<Output> = {
   /** What the next step reads (outlines, a vocabulary, rules), for chaining. */
   handoff: Handoff
 }
-
-const outlineTargets = z.object({
-  rules: z.array(z.string()),
-  provisions: z.array(z.string()),
-  documents: z.array(z.string())
-})
-
-/** An outline as a step run stores it. */
-export const outlineSchema: z.ZodType<Outline> = z.object({
-  key: z.string(),
-  provisionKey: z.string(),
-  unitId: z.string(),
-  summary: z.string(),
-  domain,
-  citations: z.array(z.string()),
-  interpretation: z.boolean(),
-  reads: z.array(z.object({ about: z.string(), fact: z.string() })),
-  readKeys: z.array(z.string()),
-  kind: z.enum(["norm", "discretion", "sanction", "limit"]),
-  modality: z.string().nullable(),
-  bearer: z.string().nullable(),
-  appliesTo: z.string().nullable(),
-  requestTypes: z.array(z.string()),
-  check: z.enum(["test", "table", "document", "deadline", "approval", "judgment"]).nullable(),
-  decidedBy: z.string().nullable(),
-  targets: outlineTargets.nullable(),
-  except: outlineTargets.nullable(),
-  sanction: z.object({ type: z.string(), imposedBy: z.string(), against: z.array(z.string()) }).nullable(),
-  resolved: z
-    .object({ rules: z.array(z.string()), documents: z.array(z.string()), except: z.array(z.string()) })
-    .nullable(),
-  selector: ruleSelection.options[1].nullable()
-})
 
 const origin = z.union([
   z.enum(["core", "defined", "previous", "frozen", "proposed"]),
@@ -162,17 +116,8 @@ async function inParallel<T>(items: readonly T[], limit: number, work: (item: T)
   await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker))
 }
 
-const zodProblems = (itemId: string, issues: readonly { message: string; path: PropertyKey[] }[]) =>
-  issues.slice(0, 20).map((issue) => ({ itemId, code: "zod", message: `${issue.path.join(".")}: ${issue.message}` }))
-
-/** The `<problems>` block of a rerun: one problem per line, `record: path: message [code]`. */
-const problemsText = (problems: readonly { recordKey: string; code: string; message: string; path?: unknown[] }[]) =>
-  problems
-    .map(
-      (problem) =>
-        `${problem.recordKey}: ${(problem.path ?? []).join(".") || "-"}: ${problem.message} [${problem.code}]`
-    )
-    .join("\n")
+const ofItem = (itemId: string, problems: readonly ItemProblem[]): StepProblem[] =>
+  problems.map(({ code, message }) => ({ itemId, code, message }))
 
 /** B's check of an item's terms, with the provisions the item gives it as citable. */
 export const definedTermsProblems = (item: DefinedTermsItem, terms: readonly TermContent[]) =>
@@ -182,46 +127,29 @@ export async function runDefinedTerms(
   items: readonly DefinedTermsItem[],
   context: Context
 ): Promise<StepRun<VocabularyOutput>> {
-  const outputs = new Map<string, VocabularyOutput | null>()
-  const calls: ModelCall[] = []
-  const problems: StepProblem[] = []
+  const found = new Map<string, Awaited<ReturnType<typeof findDefinedTerms>>>()
   // Documents are independent, so their calls run in parallel, each with its own reruns.
   await inParallel(items, context.concurrency ?? 8, async (item) => {
-    let problemsBlock: string | undefined
-    for (let attempt = 0; attempt <= (context.reruns ?? 0); attempt += 1) {
-      const result = await runStepPrompt({
-        ...context,
-        step: "definedTerms",
+    found.set(
+      item.id,
+      await findDefinedTerms({
+        ai: context.ai,
+        cacheStage: context.cacheStage,
         itemId: item.id,
-        schema: definedTermsAnswer,
-        variables: definedTermsVariables({ ...item.input, problems: problemsBlock })
+        input: item.input,
+        reruns: context.reruns ?? 0
       })
-      calls.push(result.call)
-      if (!result.isValid) {
-        outputs.set(item.id, null)
-        problemsBlock = problemsText(
-          result.issues.map((issue) => ({ recordKey: "answer", code: "zod", message: issue.message, path: issue.path }))
-        )
-        if (attempt === (context.reruns ?? 0)) {
-          problems.push(...zodProblems(item.id, result.issues))
-        }
-        continue
-      }
-      const { terms, problems: built } = definedTermsOf(result.object)
-      const check = [...built, ...definedTermsProblems(item, terms)]
-      outputs.set(item.id, { terms })
-      if (check.length === 0 || attempt === (context.reruns ?? 0)) {
-        problems.push(...check.map((problem) => ({ itemId: item.id, code: problem.code, message: problem.message })))
-        break
-      }
-      problemsBlock = problemsText(check)
-    }
+    )
+  })
+  const results = items.flatMap((item) => {
+    const result = found.get(item.id)
+    return result ? [{ item, result }] : []
   })
   return {
-    outputs,
-    calls,
-    problems,
-    handoff: { definedTerms: [...outputs.values()].flatMap((output) => output?.terms ?? []) }
+    outputs: new Map(results.map(({ item, result }) => [item.id, result.terms ? { terms: result.terms } : null])),
+    calls: results.flatMap(({ result }) => result.calls),
+    problems: results.flatMap(({ item, result }) => ofItem(item.id, result.problems)),
+    handoff: { definedTerms: results.flatMap(({ result }) => result.terms ?? []) }
   }
 }
 
@@ -234,114 +162,58 @@ export async function runRuleFinding(
   }
 ): Promise<StepRun<FindingOutput>> {
   const calls: ModelCall[] = []
-  const problems: StepProblem[] = []
-  const found = new Map<string, { item: RuleFindingItem; answer: RuleFindingAnswer; outlines: Outline[] }>()
+  const answered = new Map<string, FoundSection>()
+  const failed = new Map<string, ItemProblem[]>()
+  // A rerun that fails Zod keeps the section's first answer, as the build does.
   const run = async (item: RuleFindingItem, problemsBlock?: string) => {
-    const schema = ruleFindingAnswer(findingKeys(item.input.knownTerms))
-    const result = await runStepPrompt({
-      ...context,
-      step: "ruleFinding",
+    const result = await findRules({
+      ai: context.ai,
+      cacheStage: context.cacheStage,
       itemId: item.id,
-      schema,
-      variables: ruleFindingVariables({ ...item.input, problems: problemsBlock })
+      input: item.input,
+      definedTerms: context.definedTerms,
+      problems: problemsBlock
     })
     calls.push(result.call)
-    if (!result.isValid) {
-      return { issues: zodProblems(item.id, result.issues) }
+    if (result.answer) {
+      answered.set(item.id, {
+        itemId: item.id,
+        unit: item.input.unit,
+        finding: findingOf(result.answer, item.input.unit, context.definedTerms)
+      })
+      failed.delete(item.id)
+    } else {
+      failed.set(item.id, result.problems)
     }
-    const answer = withHeadingReasons(result.object, item.input.unit.provisions)
-    const outlines = outlinesOf(answer, item.input.unit.id).map((outline) =>
-      keyedOutline(outline, context.definedTerms)
-    )
-    found.set(item.id, { item, answer, outlines })
-    return { issues: [] }
   }
-  const check = (entry: { item: RuleFindingItem; answer: RuleFindingAnswer }) =>
-    checkFinding({
-      answer: entry.answer,
-      unitProvisions: entry.item.input.unit.provisions.map((provision) => provision.key),
-      provisions: context.provisions,
-      outlines: [...found.values()].flatMap((value) => value.outlines)
-    }).filter((problem) => problem.code !== "no-reads")
-  const failed = new Map<string, StepProblem[]>()
-  // Sections are independent, so their calls run in parallel, as the build runs them.
-  await inParallel(items, context.concurrency ?? 8, async (item) => {
-    const { issues } = await run(item)
-    if (issues.length > 0) {
-      failed.set(item.id, issues)
-    }
-  })
+  const sections = () => items.flatMap((item) => answered.get(item.id) ?? [])
+  // Sections are independent, so their calls run in parallel, as the build runs them; the check across sections waits
+  // for every first answer, then the failing sections rerun in parallel.
+  await inParallel(items, context.concurrency ?? 8, (item) => run(item))
   if ((context.reruns ?? 0) > 0) {
-    for (const item of items) {
-      const entry = found.get(item.id)
-      const issues = entry ? check(entry) : null
-      if (issues === null || issues.length > 0) {
-        const block = issues
-          ? problemsText(
-              issues.map((problem) => ({
-                recordKey: problem.provisionKey,
-                code: problem.code,
-                message: problem.message
-              }))
-            )
-          : problemsText(
-              (failed.get(item.id) ?? []).map((problem) => ({
-                recordKey: "answer",
-                code: problem.code,
-                message: problem.message
-              }))
-            )
-        failed.delete(item.id)
-        const rerun = await run(item, block)
-        if (rerun.issues.length > 0) {
-          failed.set(item.id, rerun.issues)
-        }
-      }
-    }
-  }
-  for (const issues of failed.values()) {
-    problems.push(...issues)
-  }
-  const all = [...found.values()].flatMap((entry) => entry.outlines)
-  const resolved = resolveOutlines(all, context.provisions)
-  const outputs = new Map<string, FindingOutput | null>(items.map((item) => [item.id, null]))
-  for (const entry of found.values()) {
-    const { item, answer, outlines } = entry
-    problems.push(
-      ...checkFinding({
-        answer,
-        unitProvisions: item.input.unit.provisions.map((provision) => provision.key),
-        provisions: context.provisions,
-        outlines: all
-      }).map((problem) => ({ itemId: item.id, code: problem.code, message: problem.message }))
+    const checked = checkFindings(sections(), context.provisions)
+    const due = items.filter((item) => !answered.has(item.id) || (checked.get(item.id) ?? []).length > 0)
+    await inParallel(due, context.concurrency ?? 8, (item) =>
+      run(
+        item,
+        findingRerunProblems(answered.has(item.id) ? (checked.get(item.id) ?? []) : null, failed.get(item.id) ?? [])
+      )
     )
-    const own = new Set(outlines.map((outline) => outline.key))
-    const keyed = resolved.outlines.filter((outline) => own.has(outline.key))
-    const reasons = reasonsOf(answer, all)
-    outputs.set(item.id, {
-      provisions: answer.provisions.map((provision) => ({
-        key: provision.key,
-        noRule: reasons.get(provision.key) ?? null,
-        outlines: keyed.filter((outline) => outline.provisionKey === provision.key)
-      }))
-    })
   }
-  problems.push(
-    ...resolved.unresolved.map((target) => ({
-      itemId: target.key,
-      code: "unresolved-target",
-      message: `${target.target} resolves to no rule (consolidation's cross-references)`
-    }))
-  )
+  const resolved = resolveFindings(sections(), context.provisions)
+  const outputs = new Map<string, FindingOutput | null>(items.map((item) => [item.id, null]))
+  for (const section of resolved.sections) {
+    outputs.set(section.itemId, { provisions: section.provisions })
+  }
   return {
     outputs,
     calls,
-    problems,
-    handoff: {
-      outlines: resolved.outlines,
-      unresolved: resolved.unresolved,
-      settingsFlags: [...found.values()].flatMap((entry) => settingsFlagsOf(entry.answer))
-    }
+    problems: [
+      ...[...failed].flatMap(([itemId, problems]) => ofItem(itemId, problems)),
+      ...resolved.sections.flatMap((section) => ofItem(section.itemId, section.problems)),
+      ...resolved.unresolved.map(unresolvedProblem)
+    ],
+    handoff: { outlines: resolved.outlines, unresolved: resolved.unresolved, settingsFlags: resolved.settingsFlags }
   }
 }
 
@@ -350,71 +222,44 @@ export async function runSharedVocabulary(
   context: Context
 ): Promise<StepRun<VocabularyOutput>> {
   const calls: ModelCall[] = []
-  const problems: StepProblem[] = []
   const groups = new Map<string, GroupVocabulary>()
-  const known = items[0] ? [...items[0].input.definedTerms, ...items[0].input.previous] : []
+  const failed = new Map<string, ItemProblem[]>()
+  const known = items[0] ? knownTermsOf(items[0].input) : []
+  // A rerun that fails Zod keeps the group's first answer, as the build does.
   const run = async (item: SharedVocabularyItem, problemsBlock?: string) => {
-    const result = await runStepPrompt({
-      ...context,
-      step: "sharedVocabulary",
+    const result = await buildGroupVocabulary({
+      ai: context.ai,
+      cacheStage: context.cacheStage,
       itemId: item.id,
-      schema: sharedVocabularyAnswer,
-      variables: sharedVocabularyVariables({ ...item.input, problems: problemsBlock })
+      input: item.input,
+      problems: problemsBlock
     })
     calls.push(result.call)
-    if (!result.isValid) {
-      groups.delete(item.id)
-      return zodProblems(item.id, result.issues)
+    if (result.group) {
+      groups.set(item.id, result.group)
+      failed.delete(item.id)
+    } else {
+      failed.set(item.id, result.problems)
     }
-    groups.set(item.id, {
-      groupId: item.id,
-      outlines: item.input.outlines,
-      ...sharedVocabularyTerms(result.object, known)
-    })
-    return []
   }
-  const zodFailures = new Map<string, StepProblem[]>()
+  const ordered = () => items.flatMap((item) => groups.get(item.id) ?? [])
   // Groups are independent, so their calls run in parallel, as the build runs them; the check across groups waits for
   // every first answer, then the failing groups rerun in parallel.
-  await inParallel(items, context.concurrency ?? 8, async (item) => {
-    zodFailures.set(item.id, await run(item))
-  })
+  await inParallel(items, context.concurrency ?? 8, (item) => run(item))
   if ((context.reruns ?? 0) > 0) {
-    const checked = checkSharedVocabulary([...groups.values()], known)
-    await inParallel(items, context.concurrency ?? 8, async (item) => {
-      const found = checked.get(item.id) ?? []
-      const failures = zodFailures.get(item.id) ?? []
-      if (found.length > 0 || failures.length > 0) {
-        const block = problemsText(
-          found.length > 0
-            ? found
-            : failures.map((problem) => ({ recordKey: "answer", code: problem.code, message: problem.message }))
-        )
-        zodFailures.set(item.id, await run(item, block))
-      }
-    })
-  }
-  for (const failures of zodFailures.values()) {
-    problems.push(...failures)
-  }
-  for (const [itemId, found] of checkSharedVocabulary([...groups.values()], known)) {
-    problems.push(...found.map((problem) => ({ itemId, code: problem.code, message: problem.message })))
-  }
-  const outputs = new Map<string, VocabularyOutput | null>(items.map((item) => [item.id, groups.get(item.id) ?? null]))
-  const entries: VocabularyEntry[] = [
-    ...(items[0]?.input.definedTerms ?? []).map((term) => ({ term, serves: [], origin: "defined" as const })),
-    ...(items[0]?.input.previous ?? []).map((term) => ({ term, serves: [], origin: "previous" as const })),
-    ...[...groups.values()].flatMap((group, index) =>
-      group.terms.map((term) => ({
-        term,
-        serves: group.serves.get(term.key) ?? [],
-        origin: `group ${index + 1}` as const
-      }))
+    const checked = checkSharedVocabulary(ordered(), known)
+    const due = items.filter((item) => failed.has(item.id) || (checked.get(item.id) ?? []).length > 0)
+    await inParallel(due, context.concurrency ?? 8, (item) =>
+      run(item, vocabularyRerunProblems(checked.get(item.id) ?? [], failed.get(item.id) ?? []))
     )
+  }
+  const problems = [
+    ...[...failed].flatMap(([itemId, found]) => ofItem(itemId, found)),
+    ...[...checkSharedVocabulary(ordered(), known)].flatMap(([itemId, found]) => ofItem(itemId, found))
   ]
-  const merged = mergeExactKeys(entries)
+  const merged = items[0] ? vocabularyEntries(items[0].input, ordered()) : []
   return {
-    outputs,
+    outputs: new Map(items.map((item) => [item.id, groups.get(item.id) ?? null])),
     calls,
     problems,
     handoff: {
@@ -436,120 +281,29 @@ export async function runVocabularyMerge(
   for (const item of items) {
     // Exact keys merge again first, so what C handed over is merged by the current rules.
     const entries = mergeExactKeys(item.input.entries)
-    const clusters = mergeClusters(entries)
-    if (clusters.length === 0) {
-      outputs.set(item.id, { merges: [], renames: [] })
-      handoff = { terms: entries.map((entry) => entry.term) }
-      continue
+    const merged = await mergeVocabulary({ ai: context.ai, cacheStage: context.cacheStage, itemId: item.id, entries })
+    if (merged) {
+      calls.push(merged.call)
+      problems.push(...ofItem(item.id, merged.problems))
     }
-    const { variables, ids } = vocabularyMergeVariables(entries, clusters)
-    const result = await runStepPrompt({
-      ...context,
-      step: "vocabularyMerge",
-      itemId: item.id,
-      schema: vocabularyMergeAnswer,
-      variables
-    })
-    calls.push(result.call)
-    if (!result.isValid) {
-      problems.push(...zodProblems(item.id, result.issues))
-      outputs.set(item.id, null)
-      continue
-    }
-    const applied = applyVocabularyMerge({ entries, ids, answer: result.object })
-    problems.push(
-      ...applied.problems.map((problem) => ({ itemId: item.id, code: problem.code, message: problem.message }))
+    // An answer that fails Zod merges nothing, as in the build.
+    const frozen = freezeVocabulary(entries, merged?.answer ?? null)
+    problems.push(...ofItem(item.id, frozen.problems))
+    outputs.set(
+      item.id,
+      merged && !merged.answer
+        ? null
+        : {
+            merges: frozen.merges,
+            renames: frozen.renames.map(({ key, origin: from }) => ({ key, origin: from }))
+          }
     )
-    outputs.set(item.id, {
-      merges: applied.merges,
-      renames: applied.renames.map(({ key, origin: from }) => ({ key, origin: from }))
-    })
-    handoff = { terms: applied.terms, serves: Object.fromEntries(applied.serves) }
+    handoff = { terms: frozen.terms, serves: Object.fromEntries(frozen.serves) }
   }
   return { outputs, calls, problems, handoff }
 }
 
-type Batch = {
-  id: string
-  outlines: Outline[]
-  related: Outline[]
-  vocabulary: TermContent[]
-  documents: RuleStructuringItem["input"]["documents"]
-  provisions: T.Provision[]
-  settingsFlags: RuleStructuringItem["input"]["settingsFlags"]
-}
-
-type Structured = { outline: Outline; draft: Record<string, unknown>; rule: RuleContent | null; issues: string[] }
-
-/** One F call over a batch (a first pass, or a retry with the failing rules as problems). */
-async function structureBatch(batch: Batch, context: Context, problemsBlock?: string) {
-  const result = await runStepPrompt({
-    ...context,
-    step: "ruleStructuring",
-    itemId: batch.id,
-    schema: ruleStructuringAnswer,
-    variables: ruleStructuringVariables({ ...batch, problems: problemsBlock })
-  })
-  if (!result.isValid) {
-    return { call: result.call, answer: null, issues: zodProblems(batch.id, result.issues), structured: [] }
-  }
-  const answer: RuleStructuringAnswer = result.object
-  const merged = draftsOf({ outlines: batch.outlines, rules: answer.rules, effectiveFrom: () => "2000-01-01" })
-  const parsed = parseDrafts(merged.drafts)
-  const structured: Structured[] = merged.drafts.map(({ outline, draft }, index) => ({
-    outline,
-    draft,
-    rule: parsed[index]?.rule ?? null,
-    issues: [
-      ...(parsed[index]?.issues ?? []).map((issue) => `zod: ${issue.path.join(".")}: ${issue.message}`),
-      ...merged.problems
-        .filter((problem) => problem.key === outline.key)
-        .map((problem) => `${problem.code}: ${problem.message}`)
-    ]
-  }))
-  return {
-    call: result.call,
-    answer,
-    issues: [
-      ...merged.problems.map((problem) => ({ itemId: batch.id, code: problem.code, message: problem.message })),
-      ...answer.outlineIssues.map((issue) => ({
-        itemId: batch.id,
-        code: "outline-issue",
-        message: `${issue.provision}: ${issue.issue}`
-      })),
-      ...answer.unfixable.map((item) => ({ itemId: batch.id, code: "unfixable", message: `${item.key}: ${item.note}` }))
-    ],
-    structured
-  }
-}
-
-/**
- * The validator's problems with each structured rule, read with the batch's vocabulary, every rule of the run and the
- * context's other rules (those of batches outside a partial run, which a rule may target).
- */
-function checkStructured(
-  structured: readonly Structured[],
-  vocabulary: readonly TermContent[],
-  provisions: readonly T.Provision[],
-  documents: readonly T.GoverningDocument[],
-  otherRules: readonly RuleContent[] = []
-) {
-  const own = structured.flatMap((item) => (item.rule ? [item.rule] : []))
-  const keys = new Set(structured.map((item) => item.outline.key))
-  const rules = [...own, ...otherRules.filter((rule) => !keys.has(rule.key))]
-  const found = recordProblems({ terms: vocabulary, rules, provisions, documents })
-  return new Map(
-    structured.map((item) => [
-      item.outline.key,
-      [
-        ...item.issues.map((issue) => ({ code: issue.split(":")[0] ?? "zod", message: issue, path: [] })),
-        ...found
-          .filter((problem) => problem.recordKey === item.outline.key)
-          .map((problem) => ({ code: problem.code, message: problem.message, path: problem.path }))
-      ]
-    ])
-  )
-}
+const evaluationDate = () => "2000-01-01"
 
 export async function runRuleStructuring(
   items: readonly RuleStructuringItem[],
@@ -565,67 +319,58 @@ export async function runRuleStructuring(
 ): Promise<StepRun<StructuringOutput>> {
   const calls: ModelCall[] = []
   const problems: StepProblem[] = []
-  const done = new Map<string, { batch: Batch; structured: Structured[]; proposed: TermContent[] }>()
+  const done = new Map<string, { batch: StructuringBatch; structured: Structured[]; proposed: TermContent[] }>()
+  const call = { ai: context.ai, cacheStage: context.cacheStage, effectiveFrom: evaluationDate }
   // Batches are independent, so their calls run in parallel, as the build runs them; each round of retries waits for
   // the round before, since a rule's check reads every rule of the run.
   await inParallel(items, context.concurrency ?? 8, async (item) => {
-    const batch: Batch = { id: item.id, ...item.input }
-    let first = await structureBatch(batch, context)
-    calls.push(first.call)
-    // An answer that fails Zod as a whole (an empty tool call, a malformed field) is rerun once with its problems, as
-    // B, C and E are; the problems make it a new call rather than the cached one.
-    if (!first.answer && context.retries > 0) {
-      const block = problemsText(first.issues.map(({ code, message }) => ({ recordKey: "answer", code, message })))
-      first = await structureBatch(batch, context, block)
-      calls.push(first.call)
-    }
-    problems.push(...first.issues)
+    const batch: StructuringBatch = { ...item.input, id: item.id }
+    const first = await structureFirstPass({ ...call, batch, reruns: context.retries > 0 ? 1 : 0 })
+    calls.push(...first.calls)
+    problems.push(...ofItem(item.id, first.issues))
     const proposed = (first.answer?.proposedTerms ?? []).map(proposedPropertyTerm)
     done.set(item.id, { batch, structured: first.structured, proposed })
   })
-  const vocabularyOf = (entry: { batch: Batch; proposed: TermContent[] }) => [
+  /** The batches done, in the items' order whatever order their calls finished in. */
+  const entries = () =>
+    items.flatMap((item) => {
+      const entry = done.get(item.id)
+      return entry ? [{ itemId: item.id, entry }] : []
+    })
+  const vocabularyOf = (entry: { batch: StructuringBatch; proposed: TermContent[] }) => [
     ...entry.batch.vocabulary,
     ...entry.proposed
   ]
-  const allStructured = () => [...done.values()].flatMap((entry) => entry.structured)
-  const check = (entry: { batch: Batch; proposed: TermContent[] }) =>
-    checkStructured(allStructured(), vocabularyOf(entry), context.provisions, context.documents, context.otherRules)
+  const allStructured = () => entries().flatMap(({ entry }) => entry.structured)
+  const check = (entry: { batch: StructuringBatch; proposed: TermContent[] }) =>
+    checkStructured({
+      structured: allStructured(),
+      vocabulary: vocabularyOf(entry),
+      provisions: context.provisions,
+      documents: context.documents,
+      otherRules: context.otherRules
+    })
   for (let round = 1; round <= Math.min(context.retries, 2); round += 1) {
-    const checked = new Map([...done].map(([itemId, entry]) => [itemId, check(entry)]))
-    await inParallel([...done], context.concurrency ?? 8, async ([itemId, entry]) => {
+    const checked = new Map(entries().map(({ itemId, entry }) => [itemId, check(entry)]))
+    await inParallel(entries(), context.concurrency ?? 8, async ({ itemId, entry }) => {
       const found = checked.get(itemId)
       if (!found) {
         return
       }
-      const failing = entry.structured.filter((item) => (found.get(item.outline.key) ?? []).length > 0)
-      if (failing.length === 0) {
+      const records = retryRecords(entry.structured, (key) => found.get(key) ?? [])
+      if (records.length === 0) {
         return
       }
-      const records: ProblemRecord[] = failing.map((item) => ({
-        unitId: item.outline.unitId,
-        key: item.outline.key,
-        record: item.draft,
-        problems: (found.get(item.outline.key) ?? []).map((problem) => ({
-          code: problem.code,
-          class: problem.code,
-          message: problem.message,
-          path: problem.path
-        }))
-      }))
-      const retry = await structureBatch(
-        { ...entry.batch, id: `${itemId}:retry-${round}`, outlines: failing.map((item) => item.outline) },
-        context,
-        retryProblemsText(records)
-      )
+      const retry = await retryBatch({ ...call, batch: entry.batch }, records, round)
       calls.push(retry.call)
-      problems.push(...retry.issues)
+      problems.push(...ofItem(`${itemId}:retry-${round}`, retry.issues))
       const replaced = new Map(retry.structured.map((item) => [item.outline.key, item]))
       entry.structured = entry.structured.map((item) => replaced.get(item.outline.key) ?? item)
       entry.proposed.push(...(retry.answer?.proposedTerms ?? []).map(proposedPropertyTerm))
     })
   }
   const outputs = new Map<string, StructuringOutput | null>()
-  for (const [itemId, entry] of done) {
+  for (const { itemId, entry } of entries()) {
     const found = check(entry)
     outputs.set(itemId, {
       rules: entry.structured.map((item) => ({
@@ -644,7 +389,13 @@ export async function runRuleStructuring(
     problems,
     handoff: {
       rules: allStructured().flatMap((item) => (item.rule ? [item.rule] : [])),
-      terms: [...new Map([...done.values()].flatMap(vocabularyOf).map((term) => [term.key, term])).values()]
+      terms: [
+        ...new Map(
+          entries()
+            .flatMap(({ entry }) => vocabularyOf(entry))
+            .map((term) => [term.key, term])
+        ).values()
+      ]
     }
   }
 }
@@ -668,7 +419,7 @@ export async function runRuleRetry(
     ]
     const vocabulary = unique(records.flatMap((record) => byKey.get(record.key)?.input.vocabulary ?? []))
     const provisions = unique(records.flatMap((record) => byKey.get(record.key)?.input.provisions ?? []))
-    const batch: Batch = {
+    const batch: StructuringBatch = {
       id: firstItem.id,
       outlines: records.map(outlineOfRecord),
       related: [],
@@ -677,9 +428,15 @@ export async function runRuleRetry(
       provisions,
       settingsFlags: []
     }
-    const result = await structureBatch(batch, context, retryProblemsText(records))
+    const result = await structureBatch({
+      ai: context.ai,
+      cacheStage: context.cacheStage,
+      batch,
+      effectiveFrom: evaluationDate,
+      problems: retryProblemsText(records)
+    })
     calls.push(result.call)
-    problems.push(...result.issues)
+    problems.push(...ofItem(batch.id, result.issues))
     for (const record of records) {
       const item = byKey.get(record.key)
       const structured = result.structured.find((entry) => entry.outline.key === record.key)
@@ -711,20 +468,19 @@ export async function runConsolidation(
   const problems: StepProblem[] = []
   const outputs = new Map<string, ConsolidationOutput | null>()
   for (const item of items) {
-    const result = await runStepPrompt({
-      ...context,
-      step: "consolidation",
+    const result = await consolidateRules({
+      ai: context.ai,
+      cacheStage: context.cacheStage,
       itemId: item.id,
-      schema: consolidationAnswer(item.input.rules),
-      variables: consolidationVariables(item.input)
+      input: item.input
     })
     calls.push(result.call)
     if (!result.isValid) {
-      problems.push(...zodProblems(item.id, result.issues))
+      problems.push(...ofItem(item.id, zodProblems(result.issues)))
       outputs.set(item.id, null)
       continue
     }
-    const applied = applyConsolidation(
+    const applied = applyConsolidationAnswer(
       {
         organization: { id: "evaluation" },
         documents: item.input.documents.map((document) => ({ ...document, issuedBy: null, governs: null })),
@@ -737,9 +493,7 @@ export async function runConsolidation(
       },
       result.object
     )
-    problems.push(
-      ...applied.problems.map((problem) => ({ itemId: item.id, code: problem.code, message: problem.message }))
-    )
+    problems.push(...ofItem(item.id, applied.problems))
     outputs.set(item.id, {
       overrides: result.object.overrides.flatMap((entry) =>
         entry.overrides.map((target) => ({ rule: entry.rule, target }))

@@ -48,6 +48,28 @@ saved build run or an earlier step run (`pnpm eval:step`; [evaluation.md](evalua
 
 Tested one step at a time: revise a prompt, run it alone, judge every miss, then move to the next step.
 
+### R.7 design: the steps in the build
+
+The build keeps its first and last stages (check, structure, analyze; merge, consolidate, save) and replaces vocabulary,
+plan, encode, verify and repair with the steps. Each model call is its own durable step (output in R2, as today), and
+every cross-item check is a code step between rounds, so a replay reads the same answers in the same order.
+
+| Stage | Steps | Does |
+| --- | --- | --- |
+| `defined-terms` | `defined-terms:{documentId}` (model) | B per document with definitions or candidates; one rerun with its problems; terms merge across documents by key |
+| `plan` | `plan` | sections within the token budget, as today, with B's terms |
+| `find-rules` | `find-rules:{unitId}`, `find-rules:check`, `find-rules:{unitId}:rerun`, `find-rules:resolve` | E per section; the cross-section check (targets, keys) after every first answer; one rerun of each failing section; then outlines keyed against B's terms, targets resolved, no-rule reasons, settings flags, interpretation questions and referenced documents |
+| `vocabulary` | `vocabulary:{groupId}`, `vocabulary:check`, `vocabulary:{groupId}:rerun` | C per group of sections (token and outline budgets); the check across groups; one rerun of each failing group |
+| `vocabulary-merge` | `vocabulary-merge` (model, skipped with no clusters) | exact keys merge, clusters go to C-merge, the vocabulary freezes with what each term serves |
+| `structure-rules` | `structure-rules:{batchId}`, `structure-rules:check:{round}`, `structure-rules:{batchId}:retry-{round}` | F per batch of outlines with their related rules; a batch whose whole answer fails Zod is rerun once with its problems; up to two retry rounds of the rules that fail the validator |
+| `merge` | `merge` | one draft per section (E's no-rule reasons, questions, referenced documents) and per batch (F's rules, proposed terms, clauses) through `mergeDrafts`, with the frozen vocabulary |
+| `consolidate` | `consolidate` (model) | `hoa-consolidation` over the merged rules with cross-references, exceptions that override nothing and alternative readings; `applyConsolidation` with no term merges |
+
+The six step prompts join the build's pinned prompts. The step code the evaluations run (`src/evaluation/encoding/steps/
+stage.ts`) and the build share the per-item functions in `src/encoding/steps/`, so a chained `pnpm eval:step` and a
+build make the same calls. The naive encoder's encode, verify and repair code stays only where the evaluation tools
+replay saved runs.
+
 ### Settled for R.5: a requirement is fact-checked only
 
 The schema lets a requirement (a norm with modality requirement and no bearer) carry a judgment check, but neither E

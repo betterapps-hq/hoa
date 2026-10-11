@@ -21,7 +21,8 @@ export type StepAi = {
   cache?: (stage: string) => PromptCache | undefined
 }
 
-const traceNames = Object.fromEntries(
+/** Each step prompt's trace name, by the prompt's name in Langfuse. */
+export const stepPromptTraceNames: Readonly<Record<string, string>> = Object.fromEntries(
   (Object.keys(stepPrompts) as StepPromptName[]).map((name) => [stepPrompts[name].name, stepTraceNames[name]])
 )
 
@@ -58,7 +59,7 @@ export async function runStepPrompt<N extends StepPromptName, T>(input: {
     schema: input.schema,
     sharedDefinitions: true
   })
-  const call = modelCallOf(input.itemId, result, traceNames)
+  const call = modelCallOf(input.itemId, result, stepPromptTraceNames)
   return result.isValid
     ? { isValid: true, object: result.object, call }
     : { isValid: false, answer: result.answer, issues: result.issues, call }

@@ -1,6 +1,6 @@
+import { z } from "zod"
 import { pipelinePrompts } from "@/ai/pipelinePrompts"
-import { runCheckedObjectPrompt, runObjectPrompt, type PromptRunOptions } from "@/ai/runPrompt"
-import { draftFields, ownedTerms, termExtractionAnswer, traceNames } from "@/encoding/build"
+import { runCheckedObjectPrompt, runObjectPrompt, type CodeFields, type PromptRunOptions } from "@/ai/runPrompt"
 import { applyConsolidation, consolidation } from "@/encoding/consolidate"
 import { findTermCandidates } from "@/encoding/definedTerms"
 import { mergeTerms } from "@/encoding/merge"
@@ -14,15 +14,65 @@ import {
 import { problemsToRepairAlone, verifyUnit } from "@/encoding/repair"
 import type { StepAi } from "@/encoding/steps/run"
 import { modelCallOf, type ModelCall } from "@/jobs/steps"
-import { encodingDraft, encodingPatch } from "@/schema/zod"
+import { encodingDraft, encodingPatch, termDraft } from "@/schema/zod"
 import type { SavedRun } from "./savedRun"
 
-// Runs one of today's build stages alone from a saved run (evaluation.md, Running one step): its inputs are the run's
-// saved step outputs, frozen, and its prompt the version the run used (or one pinned instead). With the content cache,
-// a replay of an unchanged stage costs nothing and must give exactly the output the run saved: `reproduced` says
-// whether it did, comparing the outputs as the runner writes them.
+// Runs one of the naive encoder's build stages alone from a run it saved (evaluation.md, Running one step): its inputs
+// are the run's saved step outputs, frozen, and its prompt the version the run used (or one pinned instead). With the
+// content cache, a replay of an unchanged stage costs nothing and must give exactly the output the run saved:
+// `reproduced` says whether it did, comparing the outputs as the runner writes them. The naive encoder's prompts and
+// the code that filled in what they leave out live here now that the build runs the step pipeline.
 
 export const replayStages = ["vocabulary", "encode", "repair", "consolidate"] as const
+
+/** hoa-term-extraction's answer (encoding.md, Prompts and models). */
+const termExtractionAnswer = z.object({ terms: z.array(termDraft), notes: z.array(z.string()).default([]) })
+
+const traceNames: Record<string, string> = {
+  [pipelinePrompts.termExtraction.name]: "term-extraction",
+  [pipelinePrompts.provisionEncoding.name]: "provision-encoding",
+  [pipelinePrompts.encodingRepair.name]: "encoding-repair",
+  [pipelinePrompts.rulebookConsolidation.name]: "rulebook-consolidation"
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+const mapRecords = (value: unknown, change: (item: Record<string, unknown>) => Record<string, unknown>) =>
+  Array.isArray(value) ? value.map((item) => (isRecord(item) ? change(item) : item)) : value
+
+/** The document key of a rule's main citation, read from an unchecked answer. */
+function mainDocumentKey(rule: Record<string, unknown>) {
+  const [first] = Array.isArray(rule.citations) ? rule.citations : []
+  const key = isRecord(first) && typeof first.provisionKey === "string" ? first.provisionKey : ""
+  return key.slice(0, Math.max(0, key.indexOf(":")))
+}
+
+/** Terms belong to the organization; the model doesn't say so. */
+const ownedTerms = (organization: string): CodeFields => ({
+  names: ["organizationId"],
+  fill: (answer) =>
+    isRecord(answer)
+      ? { ...answer, terms: mapRecords(answer.terms, (term) => ({ ...term, organizationId: organization })) }
+      : answer
+})
+
+/** A draft's terms belong to the organization, and its rules take effect with their main citation's document. */
+function draftFields(organization: string, effectiveFrom: (documentKey: string) => string): CodeFields {
+  const terms = ownedTerms(organization)
+  return {
+    names: ["effectiveFrom", ...terms.names],
+    fill: (answer) => {
+      const owned = terms.fill(answer)
+      return isRecord(owned)
+        ? {
+            ...owned,
+            rules: mapRecords(owned.rules, (rule) => ({ ...rule, effectiveFrom: effectiveFrom(mainDocumentKey(rule)) }))
+          }
+        : owned
+    }
+  }
+}
 export type ReplayStage = (typeof replayStages)[number]
 
 /** The organization the evaluation runner builds for. */

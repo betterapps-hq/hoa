@@ -14,34 +14,42 @@ export function provisionHref(provisionKey: string, documents: readonly BuildDoc
   return document ? citationHref(document.documentId, provisionKey) : null
 }
 
-/** What one result says, in a sentence. A section is named by its first provision. */
+/** The provision a batch of rules is named by: its first rule's main citation. */
+const batchProvision = (batchId: string) => batchId.split("#")[0] ?? batchId
+
+/** What one result says, in a sentence. A section, or a group of them, is named by its first provision. */
 export function resultSentence(result: BuildResult, documents: readonly BuildDocument[]) {
   switch (result.kind) {
     case "terms": {
-      const title = documents.find((document) => document.documentId === result.documentId)?.title ?? "a document"
-      return result.isReused
-        ? `Kept ${counted(result.labels.length, "defined term", "defined terms")} from ${title}: its definitions haven’t changed`
-        : `Found ${counted(result.labels.length, "defined term", "defined terms")} in ${title}`
+      const title = documents.find((document) => document.key === result.documentKey)?.title ?? "a document"
+      return `Found ${counted(result.labels.length, "defined term", "defined terms")} in ${title}`
     }
-    case "rules":
-      return result.rules.length === 0
-        ? `No rules from ${citationLabel(result.unitId)}`
-        : `Drafted ${counted(result.rules.length, "rule", "rules")} from ${citationLabel(result.unitId)}`
-    case "checked":
-      return result.problems === 0
-        ? `Checked ${citationLabel(result.unitId)}: no problems`
-        : `Checked ${citationLabel(result.unitId)}: ${counted(result.problems, "problem", "problems")} to fix`
-    case "repaired":
-      if (result.problemsLeft === null) {
-        return `A fix for ${citationLabel(result.unitId)} didn’t help, so its draft stays as it was`
-      }
-      return result.problemsLeft === 0
-        ? `Fixed the problems in ${citationLabel(result.unitId)}`
-        : `Fixed what it could in ${citationLabel(result.unitId)}: ${counted(result.problemsLeft, "problem", "problems")} left for review`
+    case "outlines": {
+      const section = citationLabel(result.unitId)
+      const found = result.rules.length === 0 ? "no rules" : counted(result.rules.length, "rule", "rules")
+      return result.isRerun ? `Looked at ${section} again: ${found}` : `Found ${found} in ${section}`
+    }
     case "checked-together":
       return result.problems === 0
-        ? "Checked every section together: no problems between them"
-        : `Checked every section together: ${counted(result.problems, "problem", "problems")} in ${counted(result.unitsWithProblems, "section", "sections")}`
+        ? "Checked every section’s rules together: no problems"
+        : `Checked every section’s rules together: ${counted(result.problems, "problem", "problems")} in ${counted(result.unitsWithProblems, "section", "sections")} to look at again`
+    case "vocabulary":
+      return result.labels.length === 0
+        ? `Built the vocabulary for the rules from ${citationLabel(result.unitId)}: no new terms`
+        : `Built the vocabulary for the rules from ${citationLabel(result.unitId)}: ${counted(result.labels.length, "term", "terms")}`
+    case "rules": {
+      const from = citationLabel(batchProvision(result.batchId))
+      if (result.round > 0) {
+        return `Redrafted ${counted(result.rules.length, "rule", "rules")} from ${from} that had problems`
+      }
+      return result.rules.length === 0
+        ? `No rules drafted from ${from}`
+        : `Drafted ${counted(result.rules.length, "rule", "rules")} from ${from}`
+    }
+    case "rules-checked":
+      return result.rulesWithProblems === 0
+        ? "Checked the drafted rules together: no problems"
+        : `Checked the drafted rules together: ${counted(result.rulesWithProblems, "rule", "rules")} with problems to fix`
     case "combined":
       return result.conflicts === 0
         ? "Combined every section into one draft"

@@ -97,8 +97,12 @@ describe("keys", () => {
     })
     const build = rulebookBuildKeys("hoa", "job")
     expect(build.step("structure:doc")).toBe("hoas/hoa/jobs/job/structure/doc.json")
-    expect(build.step("encode:declaration:article-4")).toBe("hoas/hoa/jobs/job/encode/declaration:article-4.json")
-    expect(build.step("repair:declaration:article-4:2")).toBe("hoas/hoa/jobs/job/repair/declaration:article-4:2.json")
+    expect(build.step("find-rules:declaration:article-4")).toBe(
+      "hoas/hoa/jobs/job/find-rules/declaration:article-4.json"
+    )
+    expect(build.step("find-rules:declaration:article-4:rerun")).toBe(
+      "hoas/hoa/jobs/job/find-rules/declaration:article-4:rerun.json"
+    )
     expect(build.step("merge")).toBe("hoas/hoa/jobs/job/merge/result.json")
   })
 })

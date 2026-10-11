@@ -27,7 +27,7 @@ Work happens on the `feat/rules-schema` branch, committed locally at each milest
 | 7 Review UX | Done: the project kind picker, `ReviewReport` (recommendation labels, action lists with entities and suggestions, the writer's markers as `RuleReference`s, the provisional notice), findings by outcome, "What we read from your packet", the rule matrix (`ReviewMatrix`, its model, filters, cards below 480 pixels), the finding sheet and the entity header in both roles. Browser-checked on a real fence review and a garage enclosure review (below) |
 | 8 Datasets and evaluation | Partly done: evaluation.md rewritten, per-step encoding datasets (`pnpm eval:datasets`), the encoding and review scorers, and the `entity-facts` corrections dataset; open: review datasets in Langfuse, the committed samples (8.10 to 8.12) and production evaluators (8.8, deferred) |
 | 9 Cutover and cleanup | 9.1 done and the prompt registry lists only current prompts; 9.3 to 9.6 open |
-| Reordered encoding pipeline | Defined terms done (`hoa-defined-terms` v6); find the rules done (`hoa-rule-finding` v5); shared vocabulary done (`hoa-vocabulary-group` v2); merge done (`hoa-vocabulary-merge` v1); structuring done (`hoa-rule-structuring` v4); consolidation runs (`hoa-consolidation` v2) but the golden is too small to measure it; not wired into the build |
+| Reordered encoding pipeline | Defined terms done (`hoa-defined-terms` v6); find the rules done (`hoa-rule-finding` v5); shared vocabulary done (`hoa-vocabulary-group` v2); merge done (`hoa-vocabulary-merge` v1); structuring done (`hoa-rule-structuring` v4); consolidation runs (`hoa-consolidation` v2) but the golden is too small to measure it; wired into the build (R.7), not yet run end to end on the sample documents |
 
 ## Decisions
 

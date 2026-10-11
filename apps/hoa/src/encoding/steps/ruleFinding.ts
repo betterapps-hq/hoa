@@ -431,16 +431,6 @@ export function withHeadingReasons(
   }
 }
 
-/** The reasons code keeps: a no-rule reason on a provision some outline cites is dropped (the decisions' step 4). */
-export function reasonsOf(answer: RuleFindingAnswer, outlines: readonly Outline[]) {
-  const cited = new Set(outlines.flatMap((item) => [item.provisionKey, ...item.citations]))
-  return new Map(
-    answer.provisions.flatMap((entry) =>
-      entry.noRule && !cited.has(entry.key) ? [[entry.key, entry.noRule.reason] as const] : []
-    )
-  )
-}
-
 /** hoa-rule-finding's variables for one section; the build-wide ones are the same for every call. */
 export function ruleFindingVariables(input: {
   unit: EncodingUnit

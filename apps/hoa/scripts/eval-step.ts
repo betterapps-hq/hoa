@@ -5,7 +5,7 @@ import { z } from "zod"
 import { createAiContext } from "../src/ai/aiContext.server.ts"
 import { findTermCandidates } from "../src/encoding/definedTerms.ts"
 import { crossReferenceLines, exceptionLines } from "../src/encoding/steps/consolidation.ts"
-import { relatedOutlines, structuringBatches } from "../src/encoding/steps/ruleStructuring.ts"
+import { structuringBatchesOf } from "../src/encoding/steps/pipeline.ts"
 import type { StepAi } from "../src/encoding/steps/run.ts"
 import { vocabularyGroups, withReadKeys } from "../src/encoding/steps/vocabulary.ts"
 import { buildDatasets, settingsFlags, type DatasetItem } from "../src/evaluation/encoding/steps/datasets.ts"
@@ -66,13 +66,14 @@ import { encodingRuns, fileCache, fixtures, readJson, writeJson } from "./evalFi
 import { defaultRetryQuota, defaultRuns, goldenContext, labeledRuns, pairs } from "./stepDatasets.ts"
 import { readFinder, withFinder } from "./stepFinder.ts"
 
-// Runs one encoding step alone (evaluation.md, Running one step), so a drafted prompt is tested on its own before it's
-// wired into the build, and a step of today's build can be replayed. A drafted step runs over its dataset's items
-// (inputs built from the golden, so the step is measured against perfect upstream input), or over the frozen output of
-// an earlier run: a build run's saved steps (--from <run under .fixtures/eval/encoding>) for B, E and the retry, or an
-// earlier step run (--from <run under .fixtures/eval/steps>) for the next step in the chain. A replayed build stage
-// (vocabulary, encode, repair, consolidate) reads a build run's saved steps and checks that the content cache gives back
-// exactly what the run saved. Each run writes run.json, outputs/, handoff.json, report.md (calls, cost, time, cached
+// Runs one encoding step alone (evaluation.md, Running one step), with the build's own per-item code
+// (src/encoding/steps/pipeline.ts), so a prompt is tested on its own and a chain of step runs makes the build's calls;
+// a stage of the naive encoder can be replayed. A step runs over its dataset's items (inputs built from the golden, so
+// the step is measured against perfect upstream input), or over the frozen output of an earlier run: a build run's
+// saved steps (--from <run under .fixtures/eval/encoding>) for B, E and the retry, or an earlier step run (--from <run
+// under .fixtures/eval/steps>) for the next step in the chain. A replayed stage of the naive encoder (vocabulary,
+// encode, repair, consolidate) reads one of its saved runs and checks that the content cache gives back exactly what
+// the run saved. Each run writes run.json, outputs/, handoff.json, report.md (calls, cost, time, cached
 // tokens, problems by class, scores beside the old runs') and compare/ to .fixtures/eval/steps/<run id>/.
 // --rescore <run under .fixtures/eval/steps> calls no model: it scores that run's saved outputs again, against the
 // dataset as it is now (rebuilt from the golden) and with the current scorers and checks, into a new run folder, with
@@ -90,7 +91,7 @@ import { readFinder, withFinder } from "./stepFinder.ts"
 // --reruns reruns a failing item of B, E or C once with its problems (as the pipeline does); --retries runs F's retry
 // on the rules still failing, at most twice.
 // Steps: defined-terms, rule-finding, shared-vocabulary, vocabulary-merge, rule-structuring, rule-retry,
-// consolidation; and the build's vocabulary, encode, repair, consolidate.
+// consolidation; and the naive encoder's vocabulary, encode, repair, consolidate.
 const { values } = parseArgs({
   options: {
     stage: { type: "string" },
@@ -542,27 +543,22 @@ switch (stage) {
     // From a C-merge (or C) run: E's outlines with the term keys that serve them, and the whole frozen vocabulary.
     const chained =
       fromStep?.outlines && fromStep.terms
-        ? structuringBatches(withReadKeys(fromStep.outlines, new Map(Object.entries(fromStep.serves ?? {})))).map(
-            (batch) => {
-              const cited = new Set(batch.flatMap((outline) => [outline.provisionKey, ...outline.citations]))
-              const keys = new Set(batch.map((outline) => outline.key))
-              return {
-                id: `rule-structuring:${batch[0]?.key ?? ""}`,
-                step: "rule-structuring",
-                tags: { document: "all", split: "all", topics: [], features: [] },
-                input: {
-                  batchId: batch[0]?.key ?? "",
-                  outlines: batch,
-                  related: relatedOutlines(batch, fromStep.outlines ?? []),
-                  vocabulary: (fromStep.terms ?? []).map((term) => ({ ...term })),
-                  documents: goldenDocuments.map(({ key, kind, title, edition }) => ({ key, kind, title, edition })),
-                  provisions: goldenProvisions.filter((provision) => cited.has(provision.key)),
-                  settingsFlags: (fromStep.settingsFlags ?? []).filter((flag) => cited.has(flag.provisionKey))
-                },
-                expected: { rules: golden.rules.filter((rule) => keys.has(rule.key)).map((rule) => ({ ...rule })) }
-              }
+        ? structuringBatchesOf({
+            outlines: withReadKeys(fromStep.outlines, new Map(Object.entries(fromStep.serves ?? {}))),
+            vocabulary: fromStep.terms.map((term) => ({ ...term })),
+            documents: goldenDocuments.map(({ key, kind, title, edition }) => ({ key, kind, title, edition })),
+            provisions: goldenProvisions,
+            settingsFlags: fromStep.settingsFlags ?? []
+          }).map(({ id, ...batch }) => {
+            const keys = new Set(batch.outlines.map((outline) => outline.key))
+            return {
+              id: `rule-structuring:${id}`,
+              step: "rule-structuring",
+              tags: { document: "all", split: "all", topics: [], features: [] },
+              input: { batchId: id, ...batch },
+              expected: { rules: golden.rules.filter((rule) => keys.has(rule.key)).map((rule) => ({ ...rule })) }
             }
-          )
+          })
         : null
     await runDrafted({
       items: chained ?? datasets["rule-structuring"],

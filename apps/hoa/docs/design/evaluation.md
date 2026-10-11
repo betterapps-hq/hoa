@@ -77,9 +77,9 @@ error is fixed in the sample with a cited reason, as any expected-data change.
 
 ## Encoding step datasets
 
-The redesigned encoding steps (B defined terms, E find the rules, C shared vocabulary, C-merge, F structure the rules
-and its retry, consolidation; prompt code in `src/encoding/steps/`) each have a local dataset, so a prompt is tested on
-its own before it's wired into the build. `pnpm eval:datasets` (no model call) builds the items from every golden in
+The build's encoding steps (B defined terms, E find the rules, C shared vocabulary, C-merge, F structure the rules and
+its retry, consolidation; code in `src/encoding/steps/`, shared with the build) each have a local dataset, so a prompt
+is tested on its own. `pnpm eval:datasets` (no model call) builds the items from every golden in
 `samples/*/rules.json` and writes them to `.fixtures/eval/datasets/<step>/` (git-ignored: items quote the documents);
 rerun it when a golden changes. These datasets never go to Langfuse. Each item has a stable id, the step's input as the
 step receives it, the expected output derived from the golden, and slice tags: document, split (dev, test, or `other`

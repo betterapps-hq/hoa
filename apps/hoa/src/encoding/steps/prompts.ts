@@ -4,8 +4,8 @@ import type { PromptDefinition } from "@/ai/prompts"
 // shared vocabulary over E's outlines, C-merge, F structure the rules (its retry is the same prompt with problems),
 // and consolidation. Each is a Langfuse chat prompt: a system message the build never varies, then a user message with
 // the variables in XML tags, build-wide ones first (`sharedVariables`), so both the system message and the user
-// message's shared part are cached (runPrompt.ts). Until they're wired into the build they run alone through
-// `pnpm eval:step` (evaluation.md, Running one step), and then join pipelinePrompts. A version whose variables differ
+// message's shared part are cached (runPrompt.ts). The build pins them in resolve-prompts (`rulebookBuildPrompts`), and
+// each also runs alone through `pnpm eval:step` (evaluation.md, Running one step). A version whose variables differ
 // from these is refused when it loads (promptLoader.ts).
 
 export const stepPrompts = {

@@ -27,7 +27,8 @@ const consolidated: ConsolidateOutput = {
   rulebook,
   problems: [{ code: "invalid-override", recordKey: "rules:1#max-height", message: "can't take a list" }],
   issues: [{ code: "type-mismatch", message: "isn't a party", recordKey: "settings", path: ["clauses", "deciders"] }],
-  call: null
+  call: null,
+  answerProblems: []
 }
 
 describe("draftContent", () => {

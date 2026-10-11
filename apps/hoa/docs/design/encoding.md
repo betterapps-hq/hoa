@@ -1,8 +1,9 @@
 # Encoding governing documents
 
 > **Built: the pipeline through save-draft and publishing, and the rules UX.** The rules it produces follow
-> [schema.md](schema.md). The tasks that build it are in [implementation-plan.md](implementation-plan.md). A redesigned
-> step pipeline (`src/encoding/steps/`) is in testing, one step at a time, and isn't wired into the build yet
+> [schema.md](schema.md). The tasks that build it are in [implementation-plan.md](implementation-plan.md). The build runs
+> the reordered step pipeline (`src/encoding/steps/`, [implementation-plan.md, R.7
+> design](implementation-plan.md#r7-design-the-steps-in-the-build)); each step is measured alone
 > ([evaluation.md, Encoding step datasets](evaluation.md#encoding-step-datasets)).
 
 How an organization's governing documents become a rulebook: a single rules file, validated by the Zod schema, that an
@@ -25,29 +26,34 @@ and every Workflow step name starts with it.
 | 1b | `check` | `check` | Problems with the uploads' own records, which stop the build before any model call | Code |
 | 2 | `structure` | `structure:{documentId}` | Provisions with keys, labels, intro, text, wrap-up and page anchors | Code; a model only for documents the parser can't number |
 | 3 | `analyze` | `analyze:{documentId}` | Cross-references and named documents | Code |
-| 4 | `vocabulary` | `vocabulary:{documentId}` | The organization's terms from definitions and defined-term usage | Model, one call per document with definitions |
-| 5 | `plan` | `plan` | Encoding units: provision subtrees, small neighbours packed, within a token budget, with their context | Code |
-| 6 | `encode` | `encode:{unitId}` | An encoding draft per unit | Model, one call per unit, in parallel |
-| 7 | `verify` | `verify:{unitId}`, `verify:merged` (`audit:{unitId}` not built) | Zod and checker problems per draft, then per unit in the merged set | Code |
-| 8 | `repair` | `repair:{unitId}:{round}` | A patch per repair, applied to the draft and verified again; round 1 as each unit is verified, round 2 after the merge | Model, only for units with problems |
+| 4 | `defined-terms` | `defined-terms:{documentKey}` | The terms each document defines (B), merged across documents by key | Model, one call per document with definitions or candidates, rerun once with its problems |
+| 5 | `plan` | `plan` | Sections: provision subtrees, small neighbours packed, within a token budget, with their context | Code |
+| 6 | `find-rules` | `find-rules:{unitId}`, `find-rules:check`, `find-rules:{unitId}:rerun`, `find-rules:resolve` | Rule outlines per section (E), checked across sections, their targets resolved; no-rule reasons, settings flags, interpretation questions, named documents | Model, one call per section, in parallel; one rerun of each failing section |
+| 7 | `vocabulary` | `vocabulary:{groupId}`, `vocabulary:check`, `vocabulary:{groupId}:rerun` | The terms each group of sections' outlines read (C), with the outlines each serves | Model, one call per group, in parallel; one rerun of each failing group |
+| 7b | `vocabulary-merge` | `vocabulary-merge` (skipped with no clusters) | Near-duplicates merged and collisions renamed (C-merge); the vocabulary frozen | Model, one call, then code |
+| 8 | `structure-rules` | `structure-rules:{batchId}`, `structure-rules:check:{round}`, `structure-rules:{batchId}:retry-{round}` | Each outline's structure (F), merged with its outline into a rule draft; up to two retry rounds of the rules the validator faults | Model, one call per batch, in parallel |
 | 9 | `merge` | `merge` | One vocabulary, one rule set, settings, questions, coverage | Code |
-| 10 | `consolidate` | `consolidate` | Duplicates, cross-unit overrides, conflicts and questions | Model over summaries, then code |
+| 10 | `consolidate` | `consolidate` | Duplicates, overrides across sections, conflicts and questions | Model over rule lines, then code |
 | 11 | `save-draft` | `save-draft`, `save-draft:scores`, `save-draft:finish`, then `follow-up:ids`, `follow-up` | The draft rulebook in D1, with carried-forward review decisions; the build's scores in Langfuse; a further build when the documents changed while this one ran | Code |
 | 12 | Review | | Approved, edited and rejected records | Administrator |
 | 13 | Publish | | The rules file in R2, with its hash | Code, in a server function |
 
 Model results are cached per organization (`hoas/{hoaId}/cache/{stage}/{hash}.json`), so rebuilding after one
-document changes only pays for units whose text or context changed. A unit's context includes its vocabulary slice, so
-the vocabulary is reused while a document's definitions read the same ([Vocabulary](#4-vocabulary)).
+document changes only pays for the calls whose prompt changed.
 
 The stages are one module, `buildRulebook` ([src/encoding/build.ts](../../src/encoding/build.ts)), with its step runner,
 models, cache, page records and previous rulebook injected: the `RulebookBuild` Workflow runs each stage step as a
-Workflow step whose output goes to R2, and `pnpm eval:encoding` runs the same module in process.
+Workflow step whose output goes to R2, and `pnpm eval:encoding` runs the same module in process. Each model call is its
+own step, and every check across items a code step between rounds, so a replay reads the same answers in the same
+order. The per-item work (each call with its parse and check, the problems a rerun is given, the handoff to the next
+step) is in `src/encoding/steps/pipeline.ts`, which `pnpm eval:step` runs too, so a chain of step runs makes the build's
+calls.
 
 ### 1. Resolve prompts
 
-Pin every prompt the build uses (`hoa-term-extraction`, `hoa-provision-encoding`, `hoa-encoding-repair`,
-`hoa-rulebook-consolidation`, `hoa-structure-repair`, and `hoa-provision-audit` once built) on the job.
+Pin every prompt the build uses (`hoa-structure-repair`, `hoa-defined-terms`, `hoa-rule-finding`,
+`hoa-vocabulary-group`, `hoa-vocabulary-merge`, `hoa-rule-structuring` and `hoa-consolidation`) on the job. The naive
+encoder's prompts stay defined for the evaluation tools that replay its saved runs.
 
 ### 1b. Check
 
@@ -96,151 +102,84 @@ A reference grammar finds "Section 7.4(a)", "Article 4", "subsection (b) above",
 the citing provision's position). Unresolved document names become **referenced documents** (`edition: null`) so rules
 can enforce them by key and coverage can list them. References feed each encoding unit's context.
 
-The values each provision states (numbers, durations, parties, conditions) aren't extracted here: the audit in
-[Verify](#7-verify) reads them with a model and code checks them ([Recognition](#recognition)).
+The values each provision states (numbers, durations, parties, conditions) aren't extracted here
+([Recognition](#recognition)).
 
-### 4. Vocabulary
+### 4. Defined terms
 
-One call per document that has a definitions article or section, using `hoa-term-extraction`. Code prepares:
-
-- the definitions provisions' text;
-- **candidates**: defined-term usage found by code: quoted and capitalized definitions (`"Unit" means`), capitalized
-  multi-word phrases used at least three times outside sentence starts ("Common Area", "Class \"B\" Control Period"),
-  with counts and three sample sentences each;
-- the core terms (keys, kinds, labels), so the model refines a core term (`lot` labeled "Unit") instead of duplicating
-  it.
-
-It returns term drafts (`EncodedTerm`: things, properties, values, categories, units) with labels from the document's
-wording and the provisions that define them. Code merges terms across documents by key. The output is the shared
-vocabulary every encoding unit starts from; units add terms of their own.
-
-**Reuse.** The answer is stored per organization under a hash of the organization, the document's key, the
-term-extraction prompt version and the text of its definitions provisions (the `vocabulary` cache). A rebuild whose
-definitions read the same reuses it without a call, even when the candidates (found in the rest of the document) or the
-title changed, so the units' vocabulary slices, and with them their prompts, stay the same and hit the content cache.
-Changed definitions, or a new prompt version, extract again.
+B (`hoa-defined-terms`), one call per document with definitions or defined-term candidates. Code gives it the
+definitions and every provision a candidate is defined in, and the **candidates**: defined-term usage found by code
+(quoted and capitalized definitions, capitalized multi-word phrases used at least three times, with samples). The model
+writes no term key: code builds each from the preferred label, resolves references, and checks the terms (citations
+only to the provisions it was given, keys unique, references resolving); a document whose terms have problems is rerun
+once with them, in the same step. The terms merge across documents by key.
 
 ### 5. Plan
 
-Code divides each document into **encoding units** of at most 3,000 estimated tokens of provision text
+Code divides each document into **sections** of at most 3,000 estimated tokens of provision text
 (`unitTokenBudget`, [Cost and scale](#cost-and-scale)). An article that fits stays whole; a larger one splits by
 section, and a large section by its items. Neighbouring pieces of one document, articles included, then pack together
-in order up to the budget, so a run of short articles is one unit, not one each; no subtree that fits is divided, and
-no unit mixes documents. A unit's id is its first provision's key. Every unit gets:
+in order up to the budget, so a run of short articles is one section, not one each; no subtree that fits is divided,
+and no section mixes documents. A section's id is its first provision's key. Every section gets its provisions, the
+intros and wrap-ups of its ancestors and the headings above it, the text of every provision it references (step 3),
+truncated to 1,500 tokens each, B's terms its text mentions, and the request types.
 
-- its provisions (key, label, heading, intro, text, wrap-up, children);
-- for a packed unit, the references and vocabulary slice of all its provisions together;
-- the intros and wrap-ups of its ancestors, and the headings above it;
-- the text of every provision it references (step 3), truncated to 1,500 tokens each;
-- the **vocabulary slice**: every term whose labels appear in the unit's text or references (matched on normalized
-  labels and plurals, then fuzzily for OCR noise, see [Recognition](#recognition)), every property of those things, and
-  the core terms;
-- the request types (core request things with their flow);
-- the keys of rules already proposed for provisions it references, when they're known from the previous rulebook.
+### 6. Find the rules
 
-### 6. Encode
+E (`hoa-rule-finding`), one call per section, in parallel: every provision gets rule outlines (what each rule is, who
+bears it, what it applies to, what it reads in plain words, and the rules, provisions or documents it overrides,
+enforces or limits), settings flags, or a no-rule reason. Once every first answer is in, `find-rules:check` checks each
+section with every section's outlines known (each provision answered once, keys unique, citations real, targets named,
+a provision with nothing covered by some outline), and each failing section is rerun once with its problems. Then
+`find-rules:resolve` keys the outlines' subjects and parties against B's terms, resolves their targets across sections
+(a target that resolves to nothing goes to consolidation), and keeps each section's no-rule reasons (dropped where an
+outline cites the provision), settings flags, interpretation questions (one option per reading) and named documents.
+Known terms from a reviewed rulebook will feed the call; there are none yet.
 
-One call per unit, in parallel, with `hoa-provision-encoding`. The prompt's static text, kept in Langfuse, is the
-encoding conventions (the brief the hand-run used: keys, labels, modality, approval versus discretion, requirements,
-selectors, recurring duties, party-valued properties, remedies, sanctions, the no-rule reasons) and the schema's rules
-sections. The template puts the core terms and request types, which every unit shares, right after it and before the
-unit's own variables, and the call marks that shared prefix for Anthropic's prompt cache, which also caches the
-`respond` tool's schema sent before it ([ai.md, Prompt caching](../ai.md#prompt-caching)).
+### 7. Shared vocabulary
 
-The answer is an `EncodingDraft`, validated by Zod through the `respond` tool:
+C (`hoa-vocabulary-group`), one call per group of sections (packed within token and outline budgets): the properties,
+value sets, values, units and missing things the group's outlines read, each with the outlines it serves. Code builds
+the keys, `vocabulary:check` checks the groups together, and each failing group is rerun once with its problems. Exact
+keys merge across groups; clusters of near-duplicates and same-key collisions go to one C-merge call
+(`hoa-vocabulary-merge`, the optional `vocabulary-merge` stage, skipped when there are none), whose merges, renames and
+contexts code applies. The vocabulary is then frozen, with what each term serves.
 
-```ts
-type EncodingDraft = {
-  provisions: { key: ProvisionKey; noRule: { reason: NoRuleReason; note: string | null } | null }[] // every provision in the unit
-  terms: EncodedTerm[] // new organization terms and refinements of core terms
-  rules: RuleDraft[] // schema.zod.ts ruleDraft
-  questions: { kind: "interpretation" | "conflict"; question: string; citations: Citation[]; about: {...}; options: {...}[] }[]
-  clauses: Partial<Settings["clauses"]> // precedence, time, liability, cure, sanctionPreconditions found here
-  referencedDocuments: { key: string; kind: DocumentKind; title: string }[]
-  notes: string[] // judgment calls, and "SCHEMA GAP:" notes
-}
-```
+### 8. Structure the rules
 
-The model doesn't return provision text: it returns keys, and code attaches the stored text. So a citation's quote is
-always the provision itself.
-
-### 7. Verify
-
-Code, run on every draft and again whenever an administrator edits a record:
-
-- **Zod** on the draft schema (`ruleDraft`, the term and question schemas).
-- **References:** every term key resolves (the vocabulary, the unit's new terms, core); every rule key in `overrides`,
-  `enforces`, `limits` and `except` resolves; every provision key cited exists; every document key resolves.
-- **Invariants** from [schema.md, Invariants](schema.md#invariants): keys start with the main citation, modality and
-  check agree, remedies exactly where required, sanctions enforce obligations or prohibitions in a shared request
-  type, parties where parties are required, approval checks and `approved` conditions name parties, `recurs` only with
-  `compliance-period`, clause `except` lists name sanctions.
-- **Coverage:** every provision in the unit has a rule, a term or clause citing it, or a no-rule reason; a cited
-  provision with a no-rule reason is a problem.
-- **Audit (not built):** every number, duration, party and condition the audit read from a provision appears in a
-  record citing it, or the provision's no-rule note explains it (`unencoded-value`, `unencoded-party`,
-  `unencoded-condition`; [Recognition](#recognition)).
-- **Typing:** path steps are properties of the thing before them; comparisons and arithmetic follow the typing rules;
-  values belong to their sets.
-
-These are the checks in the hand-run's `check-ccrs.ts`, moved into the app as `validateRulebook` (one function used by
-the build, the editor and the tests).
-
-### 8. Repair
-
-A unit with problems goes back to the model with `hoa-encoding-repair`: the draft, the problem list (each with its
-path in the draft), and the vocabulary slice. The model answers with a **patch** (`encodingPatch`), not the whole
-draft: the provision entries, terms, rules, referenced documents and clauses it changes or adds, in full and by key
-(each replaces the draft's record with its key, or is added), questions with the id they replace, the keys and clause
-names it removes, and notes to add. Code applies the patch to the unit's answer (`src/encoding/patch.ts`; to the answer
-as given when it failed Zod) and verifies the result again. A patch that fails Zod, or a result with more problems than
-before (or that breaks a valid draft), is set aside and the draft stays; keys the patch names that the draft doesn't
-have are noted on the build.
-
-**When.** Round 1 runs for each unit as soon as its own encode is verified, while other units are still encoding: it
-repairs every problem of an answer that fails Zod, and otherwise every problem but references to terms and rules the
-draft doesn't define, which another unit may define. Those wait for [merge](#9-merge): once every unit is through
-round 1, `verify:merged` checks the merged set, and round 2 repairs what it still shows (references no unit defines,
-conflicts across units) and drafts still failing Zod. Two rounds at most; a problem left after that becomes an issue on
-the record it belongs to, which blocks approval until an administrator fixes it. A draft that still fails Zod is left
-out and recorded as a failure on the job. Every step's name and output depend only on earlier step outputs, so a
-Workflow replay takes the same path whatever order the calls finished in; drafts merge in the units' order.
-
-Code, not the model, sets each rule's `effectiveFrom` (from its main citation's document edition) and each term's
-`organizationId`: those fields are left out of the schema the model sees.
+F (`hoa-rule-structuring`), one call per batch of about 15 outlines (a provision's stay together), with the outlines of
+other batches they target or that cite the provisions shown, the frozen vocabulary and the settings flags: each
+outline's checks, conditions, remedies, cure, sanction bodies and final overrides, and the settings clauses. Code
+merges each structure with its outline into a rule draft, sets its `effectiveFrom` from its main citation's document
+edition, and checks it with Zod; a batch whose whole answer fails Zod is rerun once with its problems, in the same step.
+Once every batch is in, `structure-rules:check:{round}` runs the validator over every rule (references, invariants,
+typing; [schema.md, Invariants](schema.md#invariants)), and the rules with problems go back to F with them, at most two
+rounds. A rule still failing Zod is left out and recorded as a failure on the job; a validator problem left becomes an
+issue on the rule.
 
 ### 9. Merge
 
-Code combines every unit's draft, as the hand-run's `build-rules-file.ts` did:
+Code combines one draft per section (E's no-rule reasons, questions and named documents) and one per batch (F's rules,
+proposed terms and clauses) with the frozen vocabulary, as the hand-run's `build-rules-file.ts` did:
 
 - **Terms** by key. The same key with the same kind merges labels and citations; different kinds, or two definitions,
-  become a `conflict` issue on both. Near-duplicate terms (labels that match fuzzily, with the same kind) are listed for
-  consolidation.
+  become a `conflict` issue on both.
 - **Rules** by key; a duplicate key gets `-2` (an aspect allows no other suffix) and a `conflict` issue.
 - **Clauses:** liability entries and precedence citations concatenate; other clauses must agree or raise a conflict.
 - **Referenced documents** by key.
 - **Coverage report:** provisions without a rule, term, clause or reason.
 
-Then the whole set is verified again, so cross-unit references are checked.
+Then the whole set is verified again, so references across sections are checked.
 
 ### 10. Consolidate
 
-One call with `hoa-rulebook-consolidation`, over **summaries**, not full rules: each rule's key, kind, modality,
-statement, request types, subject and main citation; each near-duplicate term pair; the documents and their kinds. That
-stays well under a context window even for the sample's 307 rules (about 25,000 tokens). It returns:
-
-```ts
-type Consolidation = {
-  duplicates: { keep: RuleKey; drop: RuleKey[] }[] // the same requirement stated twice
-  overrides: { rule: RuleKey; overrides: RuleKey[] }[] // exceptions stated in another unit
-  conflicts: { rules: RuleKey[]; description: string }[] // become conflict questions
-  termMerges: { keep: TermKey; merge: TermKey[] }[]
-}
-```
-
-Code applies it: merges duplicates (keeping every citation), adds overrides, validates them against precedence
-(`override-not-allowed`), merges terms (rewriting every reference) and turns conflicts into questions. Then it verifies
-again.
+One call with `hoa-consolidation`, over rule lines (key, kind, request types, subject, main citation, existing
+overrides and statement, marked when the rule is one reading of an ambiguous passage), the cross-references between
+sections (and the targets E named that resolved to nothing), the exceptions that override nothing yet with the norms
+they may be about, and the similar pairs code found. It returns duplicates, overrides and conflicts; code applies them
+(`applyConsolidation`): merges duplicates keeping every citation, adds overrides that precedence allows
+(`override-not-allowed`), and turns conflicts into questions. Term merges were C-merge's, so there are none. Then it
+verifies again.
 
 ### 11. Save draft
 
@@ -305,7 +244,7 @@ The partial unique indexes (one `building`, one `draft` rulebook per organizatio
 | --- | --- |
 | `hoas/{hoaId}/governing/{documentId}/…` | Source, OCR, pages, layout, figures |
 | `hoas/{hoaId}/rulebooks/{rulebookId}/rules.json` | The published rules file, immutable |
-| `hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json` | Every build step's output, by step name: `structure/{documentId}`, `encode/{unitId}`, `repair/{unitId}:{round}`, and `{stage}/result` for steps without an item (`plan`, `merge`, `consolidate`) |
+| `hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json` | Every build step's output, by step name: `structure/{documentId}`, `find-rules/{unitId}`, `find-rules/{unitId}:rerun`, `structure-rules/{batchId}:retry-{round}`, and `{stage}/result` for steps without an item (`plan`, `merge`, `consolidate`) |
 | `hoas/{hoaId}/cache/{stage}/{hash}.json` | Model results |
 
 A review records the rulebook id and the file's SHA-256, so it can always be reproduced against the exact file.
@@ -346,19 +285,21 @@ organization with 2 documents or 20, 50 rules or 2,000, sees the same page.
 **The build's progress** (`BuildProgress`). A build takes up to an hour, so the status shows all of it up front, not
 one stage's bar at a time. The job records every stage it will report when it starts (`jobs.progress_json`,
 `src/jobs/progress.ts`), and each report marks the stages before it done and its own current, with its count and
-times. The page groups the stages into steps in plain words: Reading documents, Finding defined terms, Drafting rules
-("47 of 64 sections"), Checking drafts, Fixing problems (marked "If needed", and "Not needed" when the second repair
-round has nothing to do), Combining and checking for conflicts, Saving the draft. A stage the page has no words for is
+times. The page groups the stages into steps in plain words: Reading documents, Finding defined terms, Finding rules
+("47 of 64 sections"), Building the vocabulary (merging it only if needed), Drafting rules ("3 of 20 batches of
+rules"), Combining and checking for conflicts, Saving the draft. A stage the page has no words for is
 a step of its own, so the list stays true to the build's stages. Above the list: one line ("Drafting rules, step 3 of
 7, about 35–50 minutes left"), one bar for the whole build, and the time left and so far. The estimate starts from the
-plan (sections, calls per section with repairs, concurrency and the time an Opus call takes) and follows the build's
-own pace once sections are done; it says "Working out how long this takes" until the plan is known. The bar never
+sections (each stage's calls, `concurrency` at a time, with its reruns or retries, and the time each step's call takes)
+and follows the build's own pace once finding or drafting the rules has done some of its work; it says "Working out
+how long this takes" until the sections are known. The bar never
 reads full before the build ends. The steps fold away to the one line.
 
 **Results as they arrive** (`BuildFeed`). Under the steps, a quiet feed shows what the build has produced, newest
-first, the latest four and "Show all": the terms the vocabulary found (or kept, when its definitions didn't change),
-the rules each section drafted (title and citation, which opens the reader in a sheet), the problems checking found
-and how many each fix left, and the conflicts merging and consolidation found. Nothing in it is reviewable; review
+first, the latest four and "Show all": the terms each document defines and each group of sections' vocabulary, the
+rules each section outlines and each batch drafts (title and citation, which opens the reader in a sheet), what the
+checks across sections and rules found and what was looked at again or redrafted, and the conflicts merging and
+consolidation found. Nothing in it is reviewable; review
 happens in the draft. `getBuildResults` (administrators, the organization's own builds) lists the build's step outputs
 in R2 and reads only those written since the page's cursor; the page polls it every four seconds. Polling, not
 server-sent events: a stream would hold a Worker request open for the hour a build runs and still have to poll R2
@@ -443,10 +384,12 @@ draft and every review action are checked on the server (`requireAdministrator`)
 | Prompt | Trace name | Model | Variables | Output |
 | --- | --- | --- | --- | --- |
 | `hoa-structure-repair` | `structure-repair` | `OPENROUTER_MODEL` | `documentTitle`, `pageText`, `parserOutline`, `problems` | `{ markers: { offset: number; marker: string; level: number }[] }` |
-| `hoa-term-extraction` | `term-extraction` | `anthropic/claude-opus-5.5`, high effort | `document`, `definitions`, `candidates`, `coreTerms` | `{ terms: EncodedTerm[]; notes: string[] }` |
-| `hoa-provision-encoding` | `provision-encoding` | `anthropic/claude-opus-5.5`, high effort | `document`, `provisions`, `context`, `references`, `terms`, `coreTerms`, `requestTypes` | `EncodingDraft` |
-| `hoa-encoding-repair` | `encoding-repair` | `anthropic/claude-opus-5.5`, high effort | `draft`, `problems`, `terms`, `coreTerms` | `EncodingPatch`: the records changed, added or removed |
-| `hoa-rulebook-consolidation` | `rulebook-consolidation` | `anthropic/claude-opus-5.5`, high effort | `rules`, `termPairs`, `documents` | `Consolidation` |
+| `hoa-defined-terms` | `term-extraction` | the version's `config.model` | `coreTerms`, `document`, `definitions`, `candidates`, `problems` | Things, categories, criteria terms and refinements, with labels; code builds the keys |
+| `hoa-rule-finding` | `rule-finding` | the version's `config.model` | `coreTerms`, `requestTypes`, `knownTerms`, `documents`, `definitions`, `context`, `references`, `provisions`, `problems` | Per provision: outlines, settings flags or a no-rule reason; interpretation questions; named documents |
+| `hoa-vocabulary-group` | `vocabulary-group` | the version's `config.model` | `coreTerms`, `requestTypes`, `definedTerms`, `previousVocabulary`, `documents`, `outlines`, `provisions`, `problems` | Terms reused and added, each with the outlines it serves |
+| `hoa-vocabulary-merge` | `vocabulary-merge` | the version's `config.model` | `clusters` | Merges, renames and contexts by line id |
+| `hoa-rule-structuring` | `rule-structuring` | the version's `config.model` | `coreTerms`, `requestTypes`, `vocabulary`, `documents`, `provisions`, `outlines`, `relatedRules`, `settingsFlags`, `problems` | Each outline's structure, settings clauses, proposed properties, outline issues |
+| `hoa-consolidation` | `rulebook-consolidation` | the version's `config.model` | `documents`, `crossReferences`, `exceptions`, `rulePairs`, `rules` | Duplicates, overrides and conflicts |
 | `hoa-provision-audit` (not built) | `provision-audit` | `anthropic/claude-haiku-5.5` (`config.model`) | `document`, `provisions` | `{ items: { provisionKey, kind: "number" \| "duration" \| "party" \| "condition", quote, value }[] }` |
 
 The statement link syntax is described on the output schema's `statement` field, because Langfuse would read double
@@ -513,8 +456,10 @@ build, so it can become evaluation data, as the review's corrections become `ent
   (`rules.json`). `pnpm eval:encoding` builds from the sample documents and `pnpm eval:encoding:score` scores the run
   against the golden, per split, recording to the Langfuse dataset `encoding-evaluation` with `--record`
   ([evaluation.md](evaluation.md#datasets)).
-- **Scores per build**, sent to Langfuse on the build's trace: Zod-valid units, checker problems before and after
-  repair, coverage, rules per kind, requirement and approval counts, text conditions, `SCHEMA GAP` notes.
+- **Scores per build**, sent to Langfuse on the build's trace: sections, outlined and valid rules, rules retried,
+  reruns per stage, checker problems before and after the retry, coverage, rules per kind, requirement and approval
+  counts, text conditions, `SCHEMA GAP` notes. The build's report has each stage's items, calls, reruns and problems,
+  and each outlined rule's validity and retry rounds.
 - **Experiment scores against gold:** in code, modality agreement, check agreement on test cases (both rules of a pair
   evaluated on generated facts by the engine: the strongest signal, since it compares meaning, not wording) and term
   recall; rule recall and precision by provision and pairwise quality are judged by the coding agent from the
@@ -526,7 +471,8 @@ build, so it can become evaluation data, as the review's corrections become `ent
 
 ## Cost and scale
 
-Measured on a build of two documents (the sample Declaration and Design Guidelines) before the changes below: 64 units,
+Measured on the naive encoder's build of two documents (the sample Declaration and Design Guidelines) before the
+changes below: 64 units,
 130 to 180 calls to Opus 5.5 at high effort, 45 to 70 minutes and $77 to $108. An encode call read about 45,000 tokens
 and wrote about 22,000 (half of them reasoning); a repair read about 62,000 and wrote about 20,000, because it wrote the
 whole draft again, so repairs cost as much as encoding. No call read the prompt cache. Consolidation is one call of
@@ -536,7 +482,7 @@ about 30,000 tokens. Every model stage stays on Opus 5.5 at high effort until th
   up to it ([Plan](#5-plan)). An encode at that size already writes about 22,000 tokens; doubling it would bring
   answers toward the 40,000 tokens that come close to a build step's 15-minute timeout, and a longer answer has more to
   repair. Packing cuts the calls for documents of many short sections without growing the largest answers.
-- **Concurrency.** `ENCODING_CONCURRENCY` (default 16, [setup.md](../setup.md)) caps the encode and repair calls in
+- **Concurrency.** `ENCODING_CONCURRENCY` (default 16, [setup.md](../setup.md)) caps each stage's model calls in
   flight together. OpenRouter sets no request limit on paid models; the limits that matter are the upstream providers'
   (OpenRouter spreads Opus over several) and Anthropic's per-minute output tokens: 16 calls each writing about 22,000
   tokens over three to five minutes is roughly 70,000 to 120,000 output tokens a minute, well within them, and

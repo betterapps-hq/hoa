@@ -1,3 +1,4 @@
+import { stepPrompts } from "@/encoding/steps/prompts"
 import type { PromptDefinition } from "./prompts"
 
 // The pipeline's prompts (docs/design/encoding.md, application-review.md and ocr.md, "Prompts and models"). Their text
@@ -7,11 +8,12 @@ import type { PromptDefinition } from "./prompts"
 export const pipelinePrompts = {
   /** Also receives the image as an attachment. */
   visualDescription: { name: "hoa-visual-description", variables: ["documentKind", "contextText", "ocrText"] },
-  // The rulebook build (encoding.md).
+  // The rulebook build (encoding.md): the structure repair here, the steps' prompts in src/encoding/steps/prompts.ts.
   structureRepair: {
     name: "hoa-structure-repair",
     variables: ["documentTitle", "pageText", "parserOutline", "problems"]
   },
+  // The naive encoder's, which the evaluation tools still replay from its saved runs.
   termExtraction: {
     name: "hoa-term-extraction",
     variables: ["document", "definitions", "candidates", "coreTerms"],
@@ -55,13 +57,15 @@ export const pipelinePrompts = {
   projectTypeSuggestion: { name: "hoa-project-type-suggestion", variables: ["rulebook", "projectTypes"] }
 } as const satisfies Record<string, PromptDefinition>
 
-/** The prompts a rulebook build pins in resolve-prompts. */
+/** The prompts a rulebook build pins in resolve-prompts: the structure repair, then the steps'. */
 export const rulebookBuildPrompts = [
   pipelinePrompts.structureRepair,
-  pipelinePrompts.termExtraction,
-  pipelinePrompts.provisionEncoding,
-  pipelinePrompts.encodingRepair,
-  pipelinePrompts.rulebookConsolidation
+  stepPrompts.definedTerms,
+  stepPrompts.ruleFinding,
+  stepPrompts.sharedVocabulary,
+  stepPrompts.vocabularyMerge,
+  stepPrompts.ruleStructuring,
+  stepPrompts.consolidation
 ] as const
 
 /** The prompts an application review pins in resolve-prompts: OCR's visual descriptions, then the review's own. */

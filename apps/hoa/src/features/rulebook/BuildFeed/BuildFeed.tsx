@@ -23,7 +23,7 @@ const listedCount = 8
 
 /**
  * What the running build has produced so far, newest first (encoding.md, UX, Results as they arrive): terms found,
- * rules drafted per section, problems found and fixed, conflicts. Read-only: the review happens in the draft. Polls
+ * rules found per section and drafted per batch, problems found and fixed, conflicts. Read-only: the review happens in the draft. Polls
  * every 4 seconds for what's new since the last poll.
  */
 export function BuildFeed({ jobId, loadResults, isRunning }: BuildFeedProps) {
@@ -75,7 +75,7 @@ export function BuildFeed({ jobId, loadResults, isRunning }: BuildFeedProps) {
 }
 
 function ResultDetail({ result, documents }: { result: BuildResult; documents: readonly BuildDocument[] }) {
-  if (result.kind === "terms" && result.labels.length > 0) {
+  if ((result.kind === "terms" || result.kind === "vocabulary") && result.labels.length > 0) {
     const more = result.labels.length - listedCount
     return (
       <span className="text-muted-foreground">
@@ -84,7 +84,7 @@ function ResultDetail({ result, documents }: { result: BuildResult; documents: r
       </span>
     )
   }
-  if (result.kind === "rules" && result.rules.length > 0) {
+  if ((result.kind === "outlines" || result.kind === "rules") && result.rules.length > 0) {
     const more = result.rules.length - listedCount
     return (
       <ul className="flex flex-col gap-0.5 text-muted-foreground">

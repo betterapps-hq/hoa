@@ -120,9 +120,9 @@ step with a retryable error. Per-job outputs are written to
 
 - **Permanent errors fail fast.** Steps throw `NonRetryableError` for file validation failures, Azure 4xx responses
   other than 429, and unsupported content.
-- **Fan-outs don't fail the whole job.** Per-file OCR in a review, per-unit encoding, per-group fact reading and
+- **Fan-outs don't fail the whole job.** Per-file OCR in a review, the build's per-section and per-batch calls, per-group fact reading and
   per-rule judgment checks run under `Promise.allSettled`; a failed item is recorded in the job's `failures` and handled as
-  [encoding.md](encoding.md#8-repair) and [application-review.md](application-review.md#stages) describe. A job with failures ends as
+  [encoding.md](encoding.md#8-structure-the-rules) and [application-review.md](application-review.md#stages) describe. A job with failures ends as
   `completed-with-errors`.
 - **Everything else fails the job.** The workflow body catches the error and, in a final step, sets the job to `failed`
   with `error: { stage, message, isRetryable }`, and updates its subject: a document or rulebook becomes `failed`, an

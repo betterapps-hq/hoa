@@ -164,7 +164,7 @@ describe("isRefusedBuild", () => {
   it("is a failed check that retrying can't change", () => {
     expect(isRefusedBuild(job)).toBe(true)
     expect(isRefusedBuild({ ...job, error: { ...job.error, isRetryable: true } })).toBe(false)
-    expect(isRefusedBuild({ ...job, error: { ...job.error, stage: "encode" } })).toBe(false)
+    expect(isRefusedBuild({ ...job, error: { ...job.error, stage: "find-rules" } })).toBe(false)
     expect(isRefusedBuild(null)).toBe(false)
   })
 })

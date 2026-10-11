@@ -1,15 +1,7 @@
+import invariant from "tiny-invariant"
 import { z } from "zod"
 import { pipelinePrompts } from "@/ai/pipelinePrompts"
-import type { PromptLoader } from "@/ai/promptLoader"
-import type { PromptDefinition } from "@/ai/prompts"
-import {
-  runCheckedObjectPrompt,
-  runObjectPrompt,
-  type CodeFields,
-  type ModelFactory,
-  type PromptCache,
-  type PromptRunMetrics
-} from "@/ai/runPrompt"
+import { runObjectPrompt } from "@/ai/runPrompt"
 import {
   documentsOf,
   knownDocumentsOf,
@@ -18,81 +10,103 @@ import {
 } from "@/documents/documentStructure"
 import { modelCallOf, type ModelCall, type StepRunner } from "@/jobs/steps"
 import type { Page } from "@/ocr/page"
-import { canonicalJson, sha256Hex } from "@/rulebook/canonical"
 import { carryNoRules, type PreviousReview } from "@/rulebook/carryForward"
-import type { Edition, GoverningDocument, Provision, ProvisionKey } from "@/schema/types"
-import { encodingDraft, encodingPatch, termDraft } from "@/schema/zod"
+import type { Edition, GoverningDocument, ProvisionKey, RuleKey } from "@/schema/types"
+import type { EncodingDraftContent, TermContent } from "@/schema/zod"
 import { draftContent, type BuildFailure } from "./buildRecords"
 import { checkStructure } from "./check"
 import { cleanPages } from "./clean"
-import { applyConsolidation, consolidation } from "./consolidate"
-import { findTermCandidates } from "./definedTerms"
 import { mergeDrafts, mergeTerms, type MergeInput } from "./merge"
-import { applyPatch } from "./patch"
 import { planUnits, type EncodingUnit } from "./plan"
-import {
-  encodingRepairVariables,
-  provisionBlock,
-  provisionEncodingVariables,
-  rulebookConsolidationVariables,
-  structureRepairVariables,
-  termExtractionVariables
-} from "./promptVariables"
+import { structureRepairVariables } from "./promptVariables"
 import { structureDocument, type StructuredDocument } from "./provisions"
 import { analyzeReferences, citedProvisions } from "./references"
-import { groupByUnit, problemsToRepairAlone, verifyUnit, type UnitProblem } from "./repair"
 import { checkSources, sourceProblemSchema, SourcesRejectedError } from "./sourceCheck"
 import {
   analysisOutput,
   consolidateOutput,
-  encodeOutput,
+  definedTermsOutput,
   encodingUnit,
+  findingCheckOutput,
+  findingsOutput,
+  findRulesOutput,
+  groupVocabularyOutput,
   mergeOutput,
-  repairOutput,
+  structureCheckOutput,
   structureOutput,
-  unitProblems,
-  unitState,
-  vocabularyOutput,
-  type RepairOutput,
-  type UnitState
+  structureRulesOutput,
+  vocabularyCheckOutput,
+  vocabularyMergeOutput,
+  type StructureRulesOutput
 } from "./stepOutputs"
+import { proposedPropertyTerm } from "./steps/drafts"
+import {
+  applyConsolidationAnswer,
+  buildGroupVocabulary,
+  checkFindings,
+  checkStructured,
+  consolidateRules,
+  consolidationInputOf,
+  definedTermsInput,
+  findDefinedTerms,
+  findingAnswerOf,
+  findingOf,
+  findingRerunProblems,
+  findRules,
+  freezeVocabulary,
+  hasClusters,
+  mergeVocabulary,
+  readingsOf,
+  resolveFindings,
+  retryBatch,
+  retryRecords,
+  structureFirstPass,
+  structuringBatchesOf,
+  vocabularyEntries,
+  vocabularyRerunProblems,
+  zodProblems,
+  type DocumentLine,
+  type ItemProblem,
+  type Structured,
+  type StructuringBatch,
+  type VocabularyGroupInput
+} from "./steps/pipeline"
+import type { RuleFindingAnswer } from "./steps/ruleFinding"
+import { clausesOf, type RuleStructuringAnswer } from "./steps/ruleStructuring"
+import { stepPromptTraceNames, type StepAi } from "./steps/run"
+import { checkSharedVocabulary, vocabularyGroups, withReadKeys, type GroupVocabulary } from "./steps/vocabulary"
+import type { VocabularyMergeAnswer } from "./steps/vocabularyMerge"
 import { repairStructure, structureRepairAnswer } from "./structureRepair"
 
-// The rulebook build (encoding.md, Stages 2 to 11): structure, analyze, vocabulary, plan, encode, verify, repair, merge
-// and consolidate, then the draft's records. Everything it needs is injected: a step runner (Workflow steps in the app,
-// plain calls in scripts and tests), the models and cache, each upload's page records and structure, and the earlier
-// review that carries forward.
+// The rulebook build (encoding.md, Stages): structure and analyze the uploads, then the reordered step pipeline
+// (implementation-plan.md, R.7 design): B defined terms, the plan, E find the rules, C shared vocabulary, C-merge, F
+// structure the rules, merge and consolidation, then the draft's records. Each model call is its own durable step and
+// every check across items a code step between rounds, so a replay reads the same answers in the same order. The
+// per-item work is shared with the step evaluations (steps/pipeline.ts). Everything the build needs is injected: a step
+// runner (Workflow steps in the app, plain calls in scripts and tests), the models and cache, each upload's page records
+// and structure, and the earlier review that carries forward.
 
 /** The job stages the build reports, in order (encoding.md, Stages). */
 export const buildStages = [
   "check",
   "structure",
   "analyze",
-  "vocabulary",
+  "defined-terms",
   "plan",
-  "encode",
-  "verify",
-  "repair",
+  "find-rules",
+  "vocabulary",
+  "vocabulary-merge",
+  "structure-rules",
   "merge",
   "consolidate"
 ] as const
 export type BuildStage = (typeof buildStages)[number]
 
-/** Stages that may have nothing to do: the second repair round runs only for what the merged set shows. */
-export const optionalBuildStages: readonly BuildStage[] = ["repair"]
+/** Stages that may have nothing to do: C-merge runs only when the vocabulary has clusters to decide. */
+export const optionalBuildStages: readonly BuildStage[] = ["vocabulary-merge"]
 
 /** What the build's model calls need: the prompt loader, models, versions pinned in resolve-prompts and the cache. */
-export type BuildAi = {
-  loadPrompt: PromptLoader
-  createModel: ModelFactory
-  /** `OPENROUTER_MODEL`, for prompts whose version names no model. */
-  modelId: string
-  environment: string
-  /** The job id: one build is one Langfuse session. */
-  sessionId: string
-  promptVersions: Readonly<Record<string, number>>
-  cache?: (stage: BuildStage) => PromptCache
-}
+export type BuildAi = StepAi
 
 /** An uploaded document to build from. */
 export type BuildSource = {
@@ -116,82 +130,37 @@ export type BuildInput = {
   /** When the records are proposed. */
   now: string
   progress?: (stage: BuildStage, done: number, total: number) => Promise<void>
-  /** Encodes only the units this keeps (evaluation slices); the rest of the documents is left out of the draft. */
+  /** Finds rules only in the sections this keeps (evaluation slices); the rest of the documents is left out. */
   selectUnits?: (unit: EncodingUnit) => boolean
-  /** Encoding and repair calls in flight at once: `ENCODING_CONCURRENCY` (encoding.md, Cost and scale). */
+  /** Model calls in flight at once: `ENCODING_CONCURRENCY` (encoding.md, Cost and scale). */
   concurrency: number
 }
 
-/** hoa-term-extraction's answer (encoding.md, Prompts and models). */
-export const termExtractionAnswer = z.object({ terms: z.array(termDraft), notes: z.array(z.string()).default([]) })
+/** One stage's work: items, model calls, problems its check found before reruns, and what was left after. */
+export type StageReport = {
+  stage: BuildStage
+  items: number
+  calls: number
+  /** Calls beyond one per item: reruns with problems, and F's retries. */
+  reruns: number
+  problems: number
+  problemsLeft: number
+}
 
-export const traceNames: Record<string, string> = {
+/** Each outlined rule after F: whether it passed Zod, how many retry rounds it took, and the issues it was left with. */
+export type RuleReport = {
+  key: RuleKey
+  batchId: string
+  isValid: boolean
+  retries: number
+  /** Its issues in the consolidated draft; null when it isn't in the draft. */
+  problems: number | null
+}
+
+const traceNames: Record<string, string> = {
   [pipelinePrompts.structureRepair.name]: "structure-repair",
-  [pipelinePrompts.termExtraction.name]: "term-extraction",
-  [pipelinePrompts.provisionEncoding.name]: "provision-encoding",
-  [pipelinePrompts.encodingRepair.name]: "encoding-repair",
-  [pipelinePrompts.rulebookConsolidation.name]: "rulebook-consolidation"
+  ...stepPromptTraceNames
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
-const mapRecords = (value: unknown, change: (item: Record<string, unknown>) => Record<string, unknown>) =>
-  Array.isArray(value) ? value.map((item) => (isRecord(item) ? change(item) : item)) : value
-
-/** The document key of a rule's main citation, read from an unchecked answer. */
-function mainDocumentKey(rule: Record<string, unknown>) {
-  const [first] = Array.isArray(rule.citations) ? rule.citations : []
-  const key = isRecord(first) && typeof first.provisionKey === "string" ? first.provisionKey : ""
-  return key.slice(0, Math.max(0, key.indexOf(":")))
-}
-
-/** Terms belong to the organization; the model doesn't say so. */
-export const ownedTerms = (organizationId: string): CodeFields => ({
-  names: ["organizationId"],
-  fill: (answer) =>
-    isRecord(answer) ? { ...answer, terms: mapRecords(answer.terms, (term) => ({ ...term, organizationId })) } : answer
-})
-
-/** A draft's terms belong to the organization, and its rules take effect with their main citation's document. */
-export function draftFields(organizationId: string, effectiveFrom: (documentKey: string) => string): CodeFields {
-  const terms = ownedTerms(organizationId)
-  return {
-    names: ["effectiveFrom", ...terms.names],
-    fill: (answer) => {
-      const owned = terms.fill(answer)
-      return isRecord(owned)
-        ? {
-            ...owned,
-            rules: mapRecords(owned.rules, (rule) => ({ ...rule, effectiveFrom: effectiveFrom(mainDocumentKey(rule)) }))
-          }
-        : owned
-    }
-  }
-}
-
-const callOf = (itemId: string, metrics: PromptRunMetrics) => modelCallOf(itemId, metrics, traceNames)
-
-/**
- * What a document's vocabulary is reused by: the organization, the document, the term-extraction version and the text
- * of its definitions. The candidates code finds elsewhere in the document are left out, so a change outside the
- * definitions keeps the vocabulary, and with it every unchanged unit's prompt.
- */
-const definitionsKey = (
-  organizationId: string,
-  documentKey: string,
-  promptVersion: number | undefined,
-  definitions: readonly Provision[]
-) =>
-  sha256Hex(
-    canonicalJson({
-      reuse: "vocabulary-by-definitions",
-      organizationId,
-      documentKey,
-      promptVersion: promptVersion ?? null,
-      definitions: definitions.map((provision) => provisionBlock(provision))
-    })
-  )
 
 /** Runs `run` over `items`, at most `limit` at a time, settling each like `Promise.allSettled`. */
 export async function settleEach<T, R>(items: readonly T[], limit: number, run: (item: T) => Promise<R>) {
@@ -216,24 +185,57 @@ export async function settleEach<T, R>(items: readonly T[], limit: number, run: 
 
 const messageOf = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
-/** Builds a draft rulebook from uploaded documents (encoding.md, Stages 2 to 11). */
+const documentKeyOf = (provisionKey: string) => provisionKey.slice(0, Math.max(0, provisionKey.indexOf(":")))
+
+const stillInvalid = (problems: readonly ItemProblem[]) =>
+  `The answer still fails Zod: ${problems[0]?.message ?? "no answer"}`
+
+type BatchState = {
+  batch: StructuringBatch
+  structured: Structured[]
+  proposed: TermContent[]
+  clauses: EncodingDraftContent["clauses"]
+  notes: string[]
+}
+
+/** F's answer as its step stores it: the drafts it makes with the batch's outlines, and what the draft needs. */
+function storedStructure(
+  pass: { answer: RuleStructuringAnswer | null; issues: ItemProblem[]; structured: Structured[] },
+  calls: ModelCall[]
+): StructureRulesOutput {
+  return {
+    rules: pass.structured.map(({ outline, draft, rule, issues }) => ({ key: outline.key, draft, rule, issues })),
+    proposedTerms: (pass.answer?.proposedTerms ?? []).map(proposedPropertyTerm),
+    clauses: pass.answer ? clausesOf(pass.answer) : {},
+    notes: pass.answer?.notes ?? [],
+    problems: pass.issues,
+    calls
+  }
+}
+
+/** A stored F answer's rules with their outlines again. */
+const structuredOf = (batch: StructuringBatch, output: StructureRulesOutput): Structured[] =>
+  output.rules.flatMap((item) => {
+    const outline = batch.outlines.find((found) => found.key === item.key)
+    return outline ? [{ outline, draft: item.draft, rule: item.rule, issues: item.issues }] : []
+  })
+
+/** Builds a draft rulebook from uploaded documents (encoding.md, Stages). */
 export async function buildRulebook(input: BuildInput) {
-  const { ai, step, organizationId } = input
+  const { ai, step, organizationId, concurrency } = input
   const progress = async (stage: BuildStage, done: number, total: number) => input.progress?.(stage, done, total)
   const failures: BuildFailure[] = []
   const calls: ModelCall[] = []
   const notes: string[] = []
-
-  const promptOptions = (prompt: PromptDefinition, stage: BuildStage) => ({
-    loadPrompt: ai.loadPrompt,
-    createModel: ai.createModel,
-    defaultModelId: ai.modelId,
-    promptVersion: ai.promptVersions[prompt.name],
-    traceName: traceNames[prompt.name] ?? prompt.name,
-    environment: ai.environment,
-    sessionId: ai.sessionId,
-    cache: ai.cache?.(stage)
-  })
+  const stages: StageReport[] = []
+  /** Reports progress per item: `done` of `total`, counting on from `start` (a stage's reruns follow its first pass). */
+  const counter = (stage: BuildStage, total: number, start = 0) => {
+    let done = start
+    return async () => {
+      done += 1
+      await progress(stage, done, total)
+    }
+  }
 
   // 1b. Check: what later steps validate about the uploads themselves, before any model call.
   await progress("check", 0, input.sources.length)
@@ -257,14 +259,22 @@ export async function buildRulebook(input: BuildInput) {
         if (!check.needsRepair) {
           return { documents, check, isRepaired: false, calls: [] }
         }
+        const prompt = pipelinePrompts.structureRepair
         const result = await runObjectPrompt({
-          ...promptOptions(pipelinePrompts.structureRepair, "structure"),
-          prompt: pipelinePrompts.structureRepair,
+          loadPrompt: ai.loadPrompt,
+          createModel: ai.createModel,
+          defaultModelId: ai.modelId,
+          promptVersion: ai.promptVersions[prompt.name],
+          traceName: traceNames[prompt.name] ?? prompt.name,
+          environment: ai.environment,
+          sessionId: ai.sessionId,
+          cache: ai.cache?.("structure"),
+          prompt,
           schema: structureRepairAnswer,
           variables: structureRepairVariables(source.title, clean, documents, check)
         })
         const repaired = repairStructure(clean, options, { documents, check }, result.object.markers)
-        return { ...repaired, calls: [callOf(source.documentId, result)] }
+        return { ...repaired, calls: [modelCallOf(source.documentId, result, traceNames)] }
       },
       "model"
     )
@@ -297,261 +307,532 @@ export async function buildRulebook(input: BuildInput) {
     }
   }
   const governing = [...uploaded, ...referenced.values()]
+  const documentLines: DocumentLine[] = governing.map(({ key, kind, title, edition }) => ({
+    key,
+    kind,
+    title,
+    edition
+  }))
   const effectiveFrom = new Map(
     uploaded.flatMap((document) => (document.edition ? [[document.key, document.edition.effectiveFrom]] : []))
   )
-
-  // 4. Vocabulary: one call per document with definitions; terms merge across documents by key. A document whose
-  // definitions read as they did in an earlier build reuses that build's terms, so its units' prompts stay the same and
-  // hit the content cache.
-  const withDefinitions = structured.filter(({ documents }) =>
-    documents.some((document) => document.provisions.some((provision) => provision.kind === "definition"))
-  )
-  await progress("vocabulary", 0, withDefinitions.length)
-  const extracted = []
-  for (const { source, documents } of withDefinitions) {
-    const output = await step(
-      `vocabulary:${source.documentId}`,
-      vocabularyOutput,
-      async () => {
-        const provisions = documents.flatMap((document) => document.provisions)
-        const definitions = provisions.filter((provision) => provision.kind === "definition")
-        const options = promptOptions(pipelinePrompts.termExtraction, "vocabulary")
-        const reuse = ai.cache?.("vocabulary")
-        const reuseKey = await definitionsKey(organizationId, source.structure.key, options.promptVersion, definitions)
-        const previous = termExtractionAnswer.safeParse(await reuse?.get(reuseKey))
-        if (previous.success) {
-          return { ...previous.data, isReused: true, calls: [] }
-        }
-        const result = await runObjectPrompt({
-          ...options,
-          prompt: pipelinePrompts.termExtraction,
-          schema: termExtractionAnswer,
-          codeFields: ownedTerms(organizationId),
-          variables: termExtractionVariables(
-            { key: source.structure.key, kind: source.structure.kind, title: source.title },
-            definitions,
-            findTermCandidates(provisions)
-          )
-        })
-        await reuse?.put(reuseKey, result.object)
-        return { ...result.object, isReused: false, calls: [callOf(source.documentId, result)] }
-      },
-      "model"
-    )
-    calls.push(...output.calls)
-    notes.push(...output.notes)
-    extracted.push(...output.terms)
-  }
-  const vocabulary = mergeTerms(organizationId, extracted).terms
-
-  // 5. Plan: encoding units within the token budget, with their context.
-  await progress("plan", 0, 1)
-  const units = await step("plan", encodingUnit.array(), async () =>
-    planUnits({ documents: allStructured, references, vocabulary }).filter((unit) => input.selectUnits?.(unit) ?? true)
-  )
-  // Every provision resolves citations; coverage counts only the encoded units' provisions (all of them in the app).
+  /** A rule takes effect with its main citation's document edition. */
+  const dateOf = (provisionKey: ProvisionKey) =>
+    effectiveFrom.get(documentKeyOf(provisionKey)) ?? input.now.slice(0, 10)
   const provisions = allStructured.flatMap((document) => document.provisions)
-  const encodedKeys = new Set(units.flatMap((unit) => unit.provisions.map((provision) => provision.key)))
-  const unitContext = { organizationId, documents: governing, provisions, vocabulary }
-  const inScope = <I extends { code: string; recordKey: string }>(issues: readonly I[]) =>
-    issues.filter((issue) => issue.code !== "coverage" || encodedKeys.has(issue.recordKey))
-  const documentOf = (key: string) => governing.find((document) => document.key === key)
-  const fields = (unit: EncodingUnit) =>
-    draftFields(
-      organizationId,
-      (key) => effectiveFrom.get(key) ?? effectiveFrom.get(unit.documentKey) ?? input.now.slice(0, 10)
-    )
-  const verifyAnswer = (unit: EncodingUnit, answer: unknown): UnitState => ({
-    unitId: unit.id,
-    answer,
-    ...verifyUnit(
-      answer,
-      unit.provisions.map((provision) => provision.key),
-      unitContext
-    )
+
+  // 4. Defined terms (B): one call per document with definitions or defined-term candidates, rerun once with its
+  // problems; the terms merge across documents by key.
+  const defining = allStructured.flatMap((document) => {
+    const line = documentLines.find((found) => found.key === document.key)
+    const item = line ? definedTermsInput(line, document.provisions) : null
+    return item && (item.definitions.length > 0 || item.candidates.length > 0) ? [item] : []
   })
-
-  // 6 to 8. Encode, verify and repair: each unit is encoded, verified alone, and repaired at once when it has problems
-  // of its own, while other units are still encoding; at most `concurrency` model calls are in flight. Then the drafts
-  // are merged and verified together, and round 2 repairs what only the merged set shows. A unit whose encode fails
-  // after retries is recorded and left out.
-  const { concurrency } = input
-  const states = new Map<string, UnitState>()
-  const repairs = new Map<string, number>()
-  /** The valid drafts in the units' order, whatever order their calls finished in, so the merge is deterministic. */
-  const drafts = () =>
-    new Map(
-      units.flatMap((unit) => {
-        const draft = states.get(unit.id)?.draft
-        return draft ? [[unit.id, draft] as const] : []
-      })
-    )
-
-  /** One repair round of one unit: the model's patch, applied to the unit's answer and verified again. */
-  const repairUnit = (unit: EncodingUnit, state: UnitState, problems: readonly UnitProblem[], round: number) =>
-    step(
-      `repair:${unit.id}:${round}`,
-      repairOutput,
-      async () => {
-        const result = await runCheckedObjectPrompt({
-          ...promptOptions(pipelinePrompts.encodingRepair, "repair"),
-          prompt: pipelinePrompts.encodingRepair,
-          schema: encodingPatch,
-          codeFields: fields(unit),
-          variables: encodingRepairVariables(state.draft ?? state.answer, problems, unit.terms)
-        })
-        const call = callOf(`${unit.id}:${round}`, result)
-        const which = `The repair of ${unit.id} (round ${round})`
-        if (!result.isValid) {
-          const [issue] = result.issues
-          return {
-            state: null,
-            call,
-            notes: [`${which} sent a patch that fails Zod: ${issue?.message ?? "no answer"}.`]
-          }
-        }
-        const applied = applyPatch(state.draft ?? state.answer, result.object)
-        return {
-          state: verifyAnswer(unit, applied.answer),
-          call,
-          notes: applied.unmatched.map((item) => `${which} names ${item}, which the draft doesn't have.`)
-        }
-      },
+  await progress("defined-terms", 0, defining.length)
+  const definedDone = counter("defined-terms", defining.length)
+  const definedResults = await settleEach(defining, concurrency, async (item) => {
+    const output = await step(
+      `defined-terms:${item.document.key}`,
+      definedTermsOutput,
+      () => findDefinedTerms({ ai, cacheStage: "defined-terms", itemId: item.document.key, input: item, reruns: 1 }),
       "model"
     )
-
-  /**
-   * The state a repair leaves: a repair that breaks a valid draft, leaves it with more problems, or sent a patch that
-   * fails Zod is set aside, and the draft stays with its problems, which become issues.
-   */
-  const settleRepair = (unit: EncodingUnit, before: UnitState, output: RepairOutput, round: number) => {
-    calls.push(output.call)
-    notes.push(...output.notes)
-    repairs.set(unit.id, round)
-    const repaired = output.state
-    const isBetter =
-      repaired !== null &&
-      (before.draft === null || (repaired.draft !== null && repaired.problems.length <= before.problems.length))
-    return isBetter ? repaired : before
-  }
-
-  let finished = 0
-  await progress("encode", 0, units.length)
-  const unitResults = await settleEach(units, concurrency, async (unit) => {
-    const encoded = await step(
-      `encode:${unit.id}`,
-      encodeOutput,
-      async () => {
-        const document = documentOf(unit.documentKey)
-        if (!document) {
-          throw new Error(`Unit ${unit.id} belongs to no document.`)
-        }
-        const result = await runCheckedObjectPrompt({
-          ...promptOptions(pipelinePrompts.provisionEncoding, "encode"),
-          prompt: pipelinePrompts.provisionEncoding,
-          schema: encodingDraft,
-          codeFields: fields(unit),
-          variables: provisionEncodingVariables(unit, document)
-        })
-        return { answer: result.isValid ? result.object : result.answer, call: callOf(unit.id, result) }
-      },
-      "model"
-    )
-    const verified = await step(`verify:${unit.id}`, unitState, async () => verifyAnswer(unit, encoded.answer))
-    const problems = problemsToRepairAlone(verified)
-    let repair: { output: RepairOutput } | { error: unknown } | null = null
-    if (problems.length > 0) {
-      try {
-        repair = { output: await repairUnit(unit, verified, problems, 1) }
-      } catch (error) {
-        repair = { error }
-      }
-    }
-    finished += 1
-    await progress("encode", finished, units.length)
-    return { encoded, verified, repair }
-  })
-
-  // The units' results in the units' order, so calls, notes and failures read the same on every replay.
-  const verifiedAlone: UnitState[] = []
-  units.forEach((unit, index) => {
-    const result = unitResults[index]
-    if (result?.status !== "fulfilled") {
-      failures.push({ stage: "encode", itemId: unit.id, message: messageOf(result?.reason) })
-      return
-    }
-    const { encoded, verified, repair } = result.value
-    calls.push(encoded.call)
-    verifiedAlone.push(verified)
-    if (repair === null) {
-      states.set(unit.id, verified)
-    } else if ("output" in repair) {
-      states.set(unit.id, settleRepair(unit, verified, repair.output, 1))
-    } else {
-      states.set(unit.id, verified)
-      failures.push({ stage: "repair", itemId: `${unit.id}:1`, message: messageOf(repair.error) })
-    }
-  })
-  const problemsBefore = verifiedAlone.reduce((sum, state) => sum + state.problems.length, 0)
-  const validAfterEncode = verifiedAlone.filter((state) => state.draft !== null).length
-
-  const mergeInput = (): MergeInput => ({
-    organizationId,
-    documents: governing,
-    provisions,
-    vocabulary,
-    units: [...drafts()].map(([unitId, draft]) => ({ unitId, draft }))
-  })
-  await progress("verify", 0, 1)
-  const merged = new Map(
-    await step("verify:merged", unitProblems, async () => {
-      const result = mergeDrafts(mergeInput())
-      return [...groupByUnit(result.issues, result.sources, drafts())]
-    })
-  )
-
-  // Round 2: what only the merged set shows (references no unit defines, conflicts across units), and drafts that
-  // still fail Zod.
-  const due = units.flatMap((unit) => {
-    const state = states.get(unit.id)
-    if (!state) {
-      return []
-    }
-    const problems = state.draft ? (merged.get(unit.id) ?? []) : state.problems
-    return problems.length > 0 ? [{ unit, state, problems }] : []
-  })
-  let repaired = 0
-  await progress("repair", 0, due.length)
-  const roundTwo = await settleEach(due, concurrency, async ({ unit, state, problems }) => {
-    const output = await repairUnit(unit, state, problems, 2)
-    repaired += 1
-    await progress("repair", repaired, due.length)
+    await definedDone()
     return output
   })
-  due.forEach(({ unit, state }, index) => {
-    const result = roundTwo[index]
-    if (result?.status === "fulfilled") {
-      states.set(unit.id, settleRepair(unit, state, result.value, 2))
-    } else {
-      failures.push({ stage: "repair", itemId: `${unit.id}:2`, message: messageOf(result?.reason) })
+  const extracted: TermContent[] = []
+  const definedReport: StageReport = {
+    stage: "defined-terms",
+    items: defining.length,
+    calls: 0,
+    reruns: 0,
+    problems: 0,
+    problemsLeft: 0
+  }
+  defining.forEach((item, index) => {
+    const result = definedResults[index]
+    if (result?.status !== "fulfilled") {
+      failures.push({ stage: "defined-terms", itemId: item.document.key, message: messageOf(result?.reason) })
+      return
+    }
+    const { terms, problems, found, calls: made } = result.value
+    calls.push(...made)
+    definedReport.calls += made.length
+    definedReport.reruns += made.length - 1
+    definedReport.problems += found
+    definedReport.problemsLeft += problems.length
+    extracted.push(...(terms ?? []))
+    if (terms === null) {
+      failures.push({ stage: "defined-terms", itemId: item.document.key, message: stillInvalid(problems) })
     }
   })
-  for (const unit of units) {
-    const state = states.get(unit.id)
-    const [problem] = state?.draft === null ? state.problems : []
-    if (problem) {
-      failures.push({ stage: "repair", itemId: unit.id, message: `The draft still fails Zod: ${problem.message}` })
+  stages.push(definedReport)
+  const definedTerms = mergeTerms(organizationId, extracted).terms
+
+  // 5. Plan: sections within the token budget, with their context and B's terms.
+  await progress("plan", 0, 1)
+  const units = await step("plan", encodingUnit.array(), async () =>
+    planUnits({ documents: allStructured, references, vocabulary: definedTerms }).filter(
+      (unit) => input.selectUnits?.(unit) ?? true
+    )
+  )
+  // Every provision resolves citations; coverage counts only the planned sections' provisions (all of them in the app).
+  const encodedKeys = new Set(units.flatMap((unit) => unit.provisions.map((provision) => provision.key)))
+  const sectionByProvision = new Map(
+    units.flatMap((unit) => unit.provisions.map((provision) => [provision.key, unit.id] as const))
+  )
+  const sectionOf = (key: ProvisionKey) => sectionByProvision.get(key)
+  const inScope = <I extends { code: string; recordKey: string }>(issues: readonly I[]) =>
+    issues.filter((issue) => issue.code !== "coverage" || encodedKeys.has(issue.recordKey))
+
+  // 6. Find the rules (E): one call per section; the check across sections once every first answer is in; one rerun
+  // of each failing section; then the outlines keyed, their targets resolved, and each section's part of the draft.
+  // A reviewed rulebook's things, parties and categories will feed E's known terms; there are none yet.
+  const knownTerms: TermContent[] = []
+  const findOutput = findRulesOutput(findingAnswerOf(knownTerms))
+  const definitions = provisions.filter((provision) => provision.kind === "definition")
+  const findingInput = (unit: EncodingUnit) => ({ unit, documents: documentLines, definitions, knownTerms })
+  const findRulesOf = (unit: EncodingUnit, name: string, problems?: string) =>
+    step(
+      name,
+      findOutput,
+      () =>
+        findRules({
+          ai,
+          cacheStage: "find-rules",
+          itemId: unit.id,
+          input: findingInput(unit),
+          definedTerms,
+          problems
+        }),
+      "model"
+    )
+  const findingReport: StageReport = {
+    stage: "find-rules",
+    items: units.length,
+    calls: 0,
+    reruns: 0,
+    problems: 0,
+    problemsLeft: 0
+  }
+  const answers = new Map<string, RuleFindingAnswer>()
+  const invalid = new Map<string, ItemProblem[]>()
+  const settleFinding = (
+    unit: EncodingUnit,
+    result: PromiseSettledResult<z.infer<typeof findOutput>> | undefined,
+    itemId: string
+  ) => {
+    if (result?.status !== "fulfilled") {
+      failures.push({ stage: "find-rules", itemId, message: messageOf(result?.reason) })
+      return
+    }
+    calls.push(result.value.call)
+    findingReport.calls += 1
+    if (result.value.answer) {
+      answers.set(unit.id, result.value.answer)
+      invalid.delete(unit.id)
+    } else {
+      // A rerun that fails Zod keeps the section's first answer.
+      invalid.set(unit.id, result.value.problems)
     }
   }
-  for (const draft of drafts().values()) {
-    notes.push(...draft.notes)
+  await progress("find-rules", 0, units.length)
+  const firstDone = counter("find-rules", units.length)
+  const firstAnswers = await settleEach(units, concurrency, async (unit) => {
+    const output = await findRulesOf(unit, `find-rules:${unit.id}`)
+    await firstDone()
+    return output
+  })
+  units.forEach((unit, index) => settleFinding(unit, firstAnswers[index], unit.id))
+  const sections = () =>
+    units.flatMap((unit) => {
+      const answer = answers.get(unit.id)
+      return answer ? [{ itemId: unit.id, unit, finding: findingOf(answer, unit, definedTerms) }] : []
+    })
+  const checked = new Map(
+    await step("find-rules:check", findingCheckOutput, async () => [...checkFindings(sections(), provisions)])
+  )
+  const rerun = units.filter((unit) => invalid.has(unit.id) || (checked.get(unit.id) ?? []).length > 0)
+  findingReport.problems =
+    [...checked.values()].reduce((sum, found) => sum + found.length, 0) +
+    [...invalid.values()].reduce((sum, found) => sum + found.length, 0)
+  const rerunDone = counter("find-rules", units.length + rerun.length, units.length)
+  const reruns = await settleEach(rerun, concurrency, async (unit) => {
+    const problems = findingRerunProblems(
+      answers.has(unit.id) ? (checked.get(unit.id) ?? []) : null,
+      invalid.get(unit.id) ?? []
+    )
+    const output = await findRulesOf(unit, `find-rules:${unit.id}:rerun`, problems)
+    await rerunDone()
+    return output
+  })
+  rerun.forEach((unit, index) => settleFinding(unit, reruns[index], `${unit.id}:rerun`))
+  findingReport.reruns = reruns.filter((result) => result.status === "fulfilled").length
+  for (const [unitId, problems] of invalid) {
+    if (!answers.has(unitId)) {
+      failures.push({ stage: "find-rules", itemId: unitId, message: stillInvalid(problems) })
+    }
+  }
+  const findings = await step("find-rules:resolve", findingsOutput, async () => {
+    const resolved = resolveFindings(sections(), provisions)
+    return {
+      outlines: resolved.outlines,
+      unresolved: resolved.unresolved,
+      settingsFlags: resolved.settingsFlags,
+      sections: resolved.sections.map((section) => ({
+        unitId: section.itemId,
+        draft: section.draft,
+        problems: section.problems
+      }))
+    }
+  })
+  findingReport.problemsLeft =
+    findings.sections.reduce((sum, section) => sum + section.problems.length, 0) + findings.unresolved.length
+  stages.push(findingReport)
+
+  // 7. Shared vocabulary (C): one call per group of sections (token and outline budgets); the check across groups
+  // once every first answer is in; one rerun of each failing group.
+  // A reviewed rulebook's vocabulary will feed C's previous terms; there are none yet.
+  const previous: TermContent[] = []
+  const outlineCounts = new Map<string, number>()
+  for (const outline of findings.outlines) {
+    outlineCounts.set(outline.unitId, (outlineCounts.get(outline.unitId) ?? 0) + 1)
+  }
+  const groups = vocabularyGroups(units, (unit) => outlineCounts.get(unit.id) ?? 0).flatMap((group) => {
+    const ids = new Set(group.units.map((unit) => unit.id))
+    const outlines = findings.outlines.filter((outline) => ids.has(outline.unitId))
+    const cited = new Set(outlines.flatMap((outline) => [outline.provisionKey, ...outline.citations]))
+    const groupInput: VocabularyGroupInput = {
+      outlines,
+      provisions: provisions.filter((provision) => cited.has(provision.key)),
+      definedTerms,
+      previous,
+      documents: documentLines
+    }
+    // A group whose sections have no rules reads nothing.
+    return outlines.length > 0 ? [{ id: group.id, input: groupInput }] : []
+  })
+  const vocabularyOf = (group: (typeof groups)[number], name: string, problems?: string) =>
+    step(
+      name,
+      groupVocabularyOutput,
+      async () => {
+        const result = await buildGroupVocabulary({
+          ai,
+          cacheStage: "vocabulary",
+          itemId: group.id,
+          input: group.input,
+          problems
+        })
+        return {
+          group: result.group && {
+            terms: result.group.terms,
+            serves: Object.fromEntries(result.group.serves),
+            problems: [...result.group.problems]
+          },
+          notes: result.notes,
+          problems: result.problems,
+          call: result.call
+        }
+      },
+      "model"
+    )
+  const vocabularyReport: StageReport = {
+    stage: "vocabulary",
+    items: groups.length,
+    calls: 0,
+    reruns: 0,
+    problems: 0,
+    problemsLeft: 0
+  }
+  const built = new Map<string, GroupVocabulary>()
+  const failedGroups = new Map<string, ItemProblem[]>()
+  const groupNotes = new Map<string, string[]>()
+  const settleGroup = (
+    group: (typeof groups)[number],
+    result: PromiseSettledResult<z.infer<typeof groupVocabularyOutput>> | undefined,
+    itemId: string
+  ) => {
+    if (result?.status !== "fulfilled") {
+      failures.push({ stage: "vocabulary", itemId, message: messageOf(result?.reason) })
+      return
+    }
+    const { group: answer, notes: groupNoted, problems, call } = result.value
+    calls.push(call)
+    vocabularyReport.calls += 1
+    if (answer) {
+      built.set(group.id, {
+        groupId: group.id,
+        outlines: group.input.outlines,
+        terms: answer.terms,
+        serves: new Map(Object.entries(answer.serves)),
+        problems: answer.problems
+      })
+      groupNotes.set(group.id, groupNoted)
+      failedGroups.delete(group.id)
+    } else {
+      // A rerun that fails Zod keeps the group's first answer.
+      failedGroups.set(group.id, problems)
+    }
+  }
+  await progress("vocabulary", 0, groups.length)
+  const groupDone = counter("vocabulary", groups.length)
+  const firstGroups = await settleEach(groups, concurrency, async (group) => {
+    const output = await vocabularyOf(group, `vocabulary:${group.id}`)
+    await groupDone()
+    return output
+  })
+  groups.forEach((group, index) => settleGroup(group, firstGroups[index], group.id))
+  const builtGroups = () => groups.flatMap((group) => built.get(group.id) ?? [])
+  const knownToVocabulary = [...definedTerms, ...previous]
+  const groupProblems = new Map(
+    await step("vocabulary:check", vocabularyCheckOutput, async () => [
+      ...checkSharedVocabulary(builtGroups(), knownToVocabulary)
+    ])
+  )
+  const rerunGroups = groups.filter(
+    (group) => failedGroups.has(group.id) || (groupProblems.get(group.id) ?? []).length > 0
+  )
+  vocabularyReport.problems =
+    [...groupProblems.values()].reduce((sum, found) => sum + found.length, 0) +
+    [...failedGroups.values()].reduce((sum, found) => sum + found.length, 0)
+  const groupRerunDone = counter("vocabulary", groups.length + rerunGroups.length, groups.length)
+  const groupReruns = await settleEach(rerunGroups, concurrency, async (group) => {
+    const problems = vocabularyRerunProblems(groupProblems.get(group.id) ?? [], failedGroups.get(group.id) ?? [])
+    const output = await vocabularyOf(group, `vocabulary:${group.id}:rerun`, problems)
+    await groupRerunDone()
+    return output
+  })
+  rerunGroups.forEach((group, index) => settleGroup(group, groupReruns[index], `${group.id}:rerun`))
+  vocabularyReport.reruns = groupReruns.filter((result) => result.status === "fulfilled").length
+  for (const [groupId, problems] of failedGroups) {
+    if (!built.has(groupId)) {
+      failures.push({ stage: "vocabulary", itemId: groupId, message: stillInvalid(problems) })
+    }
+  }
+  vocabularyReport.problemsLeft = [...checkSharedVocabulary(builtGroups(), knownToVocabulary).values()].reduce(
+    (sum, found) => sum + found.length,
+    0
+  )
+  stages.push(vocabularyReport)
+  for (const group of groups) {
+    notes.push(...(groupNotes.get(group.id) ?? []))
   }
 
-  // 9. Merge: every valid draft into one rulebook, verified as a whole.
+  // 8. C-merge: exact keys merge, clusters of near-duplicates and collisions go to one call, and the vocabulary
+  // freezes with what each term serves. With no clusters there's nothing to decide and no call.
+  const entries = vocabularyEntries({ definedTerms, previous }, builtGroups())
+  const mergeReport: StageReport = {
+    stage: "vocabulary-merge",
+    items: 0,
+    calls: 0,
+    reruns: 0,
+    problems: 0,
+    problemsLeft: 0
+  }
+  let mergeAnswer: VocabularyMergeAnswer | null = null
+  if (hasClusters(entries)) {
+    mergeReport.items = 1
+    await progress("vocabulary-merge", 0, 1)
+    try {
+      const output = await step(
+        "vocabulary-merge",
+        vocabularyMergeOutput,
+        async () => {
+          const merged = await mergeVocabulary({ ai, cacheStage: "vocabulary-merge", itemId: "vocabulary", entries })
+          invariant(merged, "The vocabulary has clusters to merge.")
+          return merged
+        },
+        "model"
+      )
+      calls.push(output.call)
+      mergeReport.calls = 1
+      mergeAnswer = output.answer
+      if (!output.answer) {
+        // The vocabulary freezes without merges, and the build goes on.
+        mergeReport.problems = output.problems.length
+        failures.push({ stage: "vocabulary-merge", itemId: "vocabulary", message: stillInvalid(output.problems) })
+      }
+    } catch (error) {
+      failures.push({ stage: "vocabulary-merge", itemId: "vocabulary", message: messageOf(error) })
+    }
+    await progress("vocabulary-merge", 1, 1)
+  } else {
+    await progress("vocabulary-merge", 0, 0)
+  }
+  const frozen = freezeVocabulary(entries, mergeAnswer)
+  mergeReport.problems += frozen.problems.length
+  mergeReport.problemsLeft = frozen.problems.length
+  stages.push(mergeReport)
+  const vocabulary = frozen.terms
+
+  // 9. Structure the rules (F): one call per batch of outlines with their related rules; a batch whose whole answer
+  // fails Zod is rerun once with its problems; then up to two retry rounds of the rules the validator still faults.
+  const batches = structuringBatchesOf({
+    outlines: withReadKeys(findings.outlines, frozen.serves),
+    vocabulary,
+    documents: documentLines,
+    provisions,
+    settingsFlags: findings.settingsFlags
+  })
+  const structuring = {
+    ai,
+    cacheStage: "structure-rules",
+    effectiveFrom: (outline: { provisionKey: string }) => dateOf(outline.provisionKey)
+  }
+  const structureReport: StageReport = {
+    stage: "structure-rules",
+    items: batches.length,
+    calls: 0,
+    reruns: 0,
+    problems: 0,
+    problemsLeft: 0
+  }
+  const states = new Map<string, BatchState>()
+  const retried = new Map<RuleKey, number>()
+  await progress("structure-rules", 0, batches.length)
+  const batchDone = counter("structure-rules", batches.length)
+  const firstPasses = await settleEach(batches, concurrency, async (batch) => {
+    const output = await step(
+      `structure-rules:${batch.id}`,
+      structureRulesOutput,
+      async () => {
+        const pass = await structureFirstPass({ ...structuring, batch, reruns: 1 })
+        return storedStructure(pass, pass.calls)
+      },
+      "model"
+    )
+    await batchDone()
+    return output
+  })
+  batches.forEach((batch, index) => {
+    const result = firstPasses[index]
+    if (result?.status !== "fulfilled") {
+      failures.push({ stage: "structure-rules", itemId: batch.id, message: messageOf(result?.reason) })
+      return
+    }
+    calls.push(...result.value.calls)
+    structureReport.calls += result.value.calls.length
+    states.set(batch.id, {
+      batch,
+      structured: structuredOf(batch, result.value),
+      proposed: result.value.proposedTerms,
+      clauses: result.value.clauses,
+      notes: result.value.notes
+    })
+  })
+  const done = () => batches.flatMap((batch) => states.get(batch.id) ?? [])
+  let retryTotal = batches.length
+  for (let round = 1; round <= 2; round += 1) {
+    // A rule's check reads every rule of the build, so each round waits for the one before.
+    const failing = await step(`structure-rules:check:${round}`, structureCheckOutput, async () => {
+      const all = done().flatMap((state) => state.structured)
+      return done().flatMap((state) => {
+        const found = checkStructured({
+          structured: all,
+          vocabulary: [...state.batch.vocabulary, ...state.proposed],
+          provisions,
+          documents: governing
+        })
+        const rules = state.structured.flatMap((item) => {
+          const problems = found.get(item.outline.key) ?? []
+          return problems.length > 0 ? [{ key: item.outline.key, problems }] : []
+        })
+        return rules.length > 0 ? [{ batchId: state.batch.id, rules }] : []
+      })
+    })
+    if (round === 1) {
+      structureReport.problems = failing.reduce(
+        (sum, entry) => sum + entry.rules.reduce((count, rule) => count + rule.problems.length, 0),
+        0
+      )
+    }
+    if (failing.length === 0) {
+      break
+    }
+    const retryDone = counter("structure-rules", retryTotal + failing.length, retryTotal)
+    retryTotal += failing.length
+    const retries = await settleEach(failing, concurrency, async (entry) => {
+      const state = states.get(entry.batchId)
+      invariant(state, `Batch ${entry.batchId} was structured.`)
+      const records = retryRecords(
+        state.structured,
+        (key) => entry.rules.find((rule) => rule.key === key)?.problems ?? []
+      )
+      const output = await step(
+        `structure-rules:${entry.batchId}:retry-${round}`,
+        structureRulesOutput,
+        async () => {
+          const retry = await retryBatch({ ...structuring, batch: state.batch }, records, round)
+          return storedStructure(retry, [retry.call])
+        },
+        "model"
+      )
+      await retryDone()
+      return output
+    })
+    failing.forEach((entry, index) => {
+      const result = retries[index]
+      const state = states.get(entry.batchId)
+      if (result?.status !== "fulfilled" || !state) {
+        failures.push({
+          stage: "structure-rules",
+          itemId: `${entry.batchId}:retry-${round}`,
+          message: messageOf(result?.status === "rejected" ? result.reason : "The batch wasn't structured.")
+        })
+        return
+      }
+      calls.push(...result.value.calls)
+      structureReport.calls += result.value.calls.length
+      const replaced = new Map(structuredOf(state.batch, result.value).map((item) => [item.outline.key, item]))
+      for (const key of replaced.keys()) {
+        retried.set(key, round)
+      }
+      state.structured = state.structured.map((item) => replaced.get(item.outline.key) ?? item)
+      state.proposed.push(...result.value.proposedTerms)
+      state.notes.push(...result.value.notes)
+    })
+  }
+  structureReport.reruns = structureReport.calls - states.size
+  stages.push(structureReport)
+  for (const state of done()) {
+    const structuredKeys = new Set(state.structured.map((item) => item.outline.key))
+    for (const outline of state.batch.outlines.filter((found) => !structuredKeys.has(found.key))) {
+      failures.push({ stage: "structure-rules", itemId: outline.key, message: "The rule got no structure." })
+    }
+    for (const item of state.structured.filter((found) => found.rule === null)) {
+      failures.push({
+        stage: "structure-rules",
+        itemId: item.outline.key,
+        message: `The rule still fails Zod: ${item.issues[0] ?? "no structure"}`
+      })
+    }
+  }
+
+  // 10. Merge: one draft per section (E's no-rule reasons, questions and named documents) and per batch (F's rules,
+  // proposed terms and clauses) into one rulebook with the frozen vocabulary, verified as a whole.
+  const drafts = [
+    ...findings.sections.map((section) => ({ unitId: section.unitId, draft: section.draft })),
+    ...done().map((state) => ({
+      unitId: state.batch.id,
+      draft: {
+        provisions: [],
+        terms: state.proposed,
+        rules: state.structured.flatMap((item) => (item.rule ? [item.rule] : [])),
+        questions: [],
+        clauses: state.clauses,
+        referencedDocuments: [],
+        notes: state.notes
+      }
+    }))
+  ]
+  for (const { draft } of drafts) {
+    notes.push(...draft.notes)
+  }
+  const mergeInput: MergeInput = { organizationId, documents: governing, provisions, vocabulary, units: drafts }
   await progress("merge", 0, 1)
   const mergedRulebook = await step("merge", mergeOutput, async () => {
-    const { rulebook, conflicts, coverage, termPairs, issues } = mergeDrafts(mergeInput())
+    const { rulebook, conflicts, coverage, termPairs, issues } = mergeDrafts(mergeInput)
     const uncovered = coverage.uncovered.filter((key) => encodedKeys.has(key))
     return {
       rulebook,
@@ -562,48 +843,86 @@ export async function buildRulebook(input: BuildInput) {
     }
   })
 
-  // 10. Consolidate: duplicates, cross-unit overrides, conflicts and term merges, proposed over summaries.
+  // 11. Consolidate: duplicates, overrides across sections and conflicts, over rule lines with the cross-references,
+  // the exceptions that override nothing yet and the alternative readings; term merges were C-merge's.
   await progress("consolidate", 0, 1)
   const consolidated = await step(
     "consolidate",
     consolidateOutput,
     async () => {
       const { rulebook } = mergedRulebook
+      const unchanged = { rulebook, problems: [], issues: mergedRulebook.issues, call: null, answerProblems: [] }
       if (rulebook.rules.length < 2) {
-        return { rulebook, problems: [], issues: mergedRulebook.issues, call: null }
+        return unchanged
       }
-      const result = await runObjectPrompt({
-        ...promptOptions(pipelinePrompts.rulebookConsolidation, "consolidate"),
-        prompt: pipelinePrompts.rulebookConsolidation,
-        schema: consolidation,
-        variables: rulebookConsolidationVariables(
-          rulebook.rules,
-          rulebook.terms,
-          mergedRulebook.termPairs,
-          rulebook.documents
-        )
+      const readings = [
+        ...readingsOf(rulebook.questions),
+        ...findings.outlines.filter((outline) => outline.interpretation).map((outline) => outline.key)
+      ]
+      const result = await consolidateRules({
+        ai,
+        cacheStage: "consolidate",
+        itemId: "rulebook",
+        input: consolidationInputOf({
+          rulebook,
+          references,
+          sectionOf,
+          unresolved: findings.unresolved,
+          readings: [...new Set(readings)]
+        })
       })
-      const applied = applyConsolidation(rulebook, result.object)
-      return { ...applied, issues: inScope(applied.issues), call: callOf("rulebook", result) }
+      if (!result.isValid) {
+        return { ...unchanged, call: result.call, answerProblems: zodProblems(result.issues) }
+      }
+      const applied = applyConsolidationAnswer(rulebook, result.object)
+      return { ...applied, issues: inScope(applied.issues), call: result.call, answerProblems: [] }
     },
     "model"
   )
   if (consolidated.call) {
     calls.push(consolidated.call)
   }
+  if (consolidated.answerProblems.length > 0) {
+    failures.push({ stage: "consolidate", itemId: "rulebook", message: stillInvalid(consolidated.answerProblems) })
+  }
+  stages.push({
+    stage: "consolidate",
+    items: consolidated.call ? 1 : 0,
+    calls: consolidated.call ? 1 : 0,
+    reruns: 0,
+    problems: consolidated.problems.length + consolidated.answerProblems.length,
+    problemsLeft: consolidated.issues.length
+  })
 
-  const previous = (await input.previous?.()) ?? { rulebooks: [], provisions: [] }
+  const previousReview = (await input.previous?.()) ?? { rulebooks: [], provisions: [] }
   const content = await draftContent({
     merged: mergedRulebook,
     consolidated,
     now: input.now,
-    previous: previous.rulebooks
+    previous: previousReview.rulebooks
   })
   const reviewedProvisions = await carryNoRules(
     consolidated.rulebook.provisions,
-    previous.provisions,
+    previousReview.provisions,
     new Set(mergedRulebook.coverage.uncovered)
   )
+  const inDraft = new Set(consolidated.rulebook.rules.map((rule) => rule.key))
+  const rules: RuleReport[] = batches.flatMap((batch) =>
+    batch.outlines.map((outline) => {
+      const item = states.get(batch.id)?.structured.find((found) => found.outline.key === outline.key)
+      return {
+        key: outline.key,
+        batchId: batch.id,
+        isValid: Boolean(item?.rule),
+        retries: retried.get(outline.key) ?? 0,
+        problems: inDraft.has(outline.key)
+          ? consolidated.issues.filter((issue) => issue.recordKey === outline.key).length
+          : null
+      }
+    })
+  )
+  // What F left: the issues its rules have in the draft, and a rule that isn't in it counts as one.
+  structureReport.problemsLeft = rules.reduce((sum, rule) => sum + (rule.problems ?? 1), 0)
   return {
     /** The uploads' documents with their provisions, and the documents they name, for save-draft. */
     documents: structured.map(({ source }) => ({
@@ -621,19 +940,7 @@ export async function buildRulebook(input: BuildInput) {
       conflicts: mergedRulebook.conflicts,
       consolidation: consolidated.problems
     },
-    report: {
-      units: units.map((unit) => ({
-        id: unit.id,
-        provisions: unit.provisions.length,
-        isValid: Boolean(states.get(unit.id)?.draft),
-        repairRounds: repairs.get(unit.id) ?? 0,
-        problems: states.get(unit.id)?.problems.length ?? null
-      })),
-      validAfterEncode,
-      problemsBefore,
-      calls,
-      notes
-    }
+    report: { stages, rules, calls, notes }
   }
 }
 

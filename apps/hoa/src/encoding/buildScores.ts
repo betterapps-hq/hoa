@@ -1,7 +1,8 @@
-import type { BuildResult } from "./build"
+import type { BuildResult, BuildStage } from "./build"
 
 // The build's scores (encoding.md, Quality): sent to Langfuse on the build's root span, so every build and evaluation
-// run can be compared on validity, repair, coverage, what it encoded and the gaps it found.
+// run can be compared on the rules it outlined and structured validly, the reruns and retries it needed, coverage,
+// what it encoded and the gaps it found.
 
 export type BuildScore = { name: string; value: number; comment?: string }
 
@@ -21,17 +22,22 @@ export function buildScores(result: Pick<BuildResult, "content" | "issues" | "re
   const { content, report } = result
   const { rules } = content
   const count = (predicate: (rule: (typeof rules)[number]) => boolean) => rules.filter(predicate).length
-  const units = report.units.length
+  const stage = (name: BuildStage) => report.stages.find((item) => item.stage === name)
   const problemsAfter =
     result.issues.validator.length + result.issues.conflicts.length + result.issues.consolidation.length
   const covered = content.coverage.provisions - content.coverage.uncovered.length
   return [
-    { name: "units", value: units },
-    { name: "units-valid-after-encode", value: report.validAfterEncode },
-    { name: "units-valid", value: report.units.filter((unit) => unit.isValid).length },
-    { name: "units-repaired", value: report.units.filter((unit) => unit.repairRounds > 0).length },
-    { name: "problems-before-repair", value: report.problemsBefore },
-    { name: "problems-after-repair", value: problemsAfter },
+    { name: "sections", value: stage("find-rules")?.items ?? 0 },
+    { name: "outlines", value: report.rules.length },
+    { name: "rules-valid", value: report.rules.filter((rule) => rule.isValid).length },
+    { name: "rules-retried", value: report.rules.filter((rule) => rule.retries > 0).length },
+    {
+      name: "reruns",
+      value: report.stages.reduce((sum, item) => sum + item.reruns, 0),
+      comment: report.stages.map((item) => `${item.stage} ${item.reruns}`).join(", ")
+    },
+    { name: "problems-before-retry", value: stage("structure-rules")?.problems ?? 0 },
+    { name: "problems-after-retry", value: problemsAfter },
     {
       name: "coverage",
       value: content.coverage.provisions === 0 ? 1 : covered / content.coverage.provisions,

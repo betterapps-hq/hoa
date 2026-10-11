@@ -1,30 +1,41 @@
+import { z } from "zod"
 import {
   consolidateOutput,
-  encodeOutput,
+  definedTermsOutput,
+  findingCheckOutput,
+  groupVocabularyOutput,
   mergeOutput,
-  repairOutput,
-  unitProblems,
-  unitState,
-  vocabularyOutput
+  structureCheckOutput,
+  structureRulesOutput
 } from "@/encoding/stepOutputs"
 
 // A running build's results so far (encoding.md, UX, Results as they arrive): what each finished step produced, read
 // from the step outputs the build writes to storage, newest since a cursor. Nothing here is reviewable: review happens
 // in the draft. The page polls this every few seconds.
 
+/** A rule as a result lists it: its key, a title (an outline's summary until it's structured) and its main citation. */
+type RuleLine = { key: string; title: string; provisionKey: string | null }
+
 /** One step's result, as the page shows it. `at` is when the step's output was written. */
 export type BuildResult = { id: string; at: string } & (
-  | { kind: "terms"; documentId: string; labels: string[]; isReused: boolean }
+  | { kind: "terms"; documentKey: string; labels: string[] }
+  | {
+      kind: "outlines"
+      unitId: string
+      rules: RuleLine[]
+      /** A second look at a section with its problems. */
+      isRerun: boolean
+    }
+  | { kind: "checked-together"; unitsWithProblems: number; problems: number }
+  | { kind: "vocabulary"; unitId: string; labels: string[] }
   | {
       kind: "rules"
-      unitId: string
-      rules: { key: string; title: string; provisionKey: string | null }[]
-      /** Whether the answer passed Zod; a failing one goes to repair. */
-      isValid: boolean
+      batchId: string
+      rules: RuleLine[]
+      /** 0 for the first pass, else the retry round of the rules that still had problems. */
+      round: number
     }
-  | { kind: "checked"; unitId: string; problems: number }
-  | { kind: "repaired"; unitId: string; round: number; problemsLeft: number | null }
-  | { kind: "checked-together"; unitsWithProblems: number; problems: number }
+  | { kind: "rules-checked"; round: number; rulesWithProblems: number }
   | { kind: "combined"; conflicts: number }
   | { kind: "consolidated"; problems: number; conflicts: number }
 )
@@ -39,60 +50,53 @@ export type ResultsBucket = {
   get(key: string): Promise<{ text(): Promise<string> } | null>
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
-/** The rules an encode answer drafted, read leniently: an answer that failed Zod still shows what it has. */
-function draftedRules(answer: unknown) {
-  const rules = isRecord(answer) && Array.isArray(answer.rules) ? answer.rules : []
-  return rules.flatMap((rule) => {
-    if (!isRecord(rule) || typeof rule.key !== "string") {
-      return []
-    }
-    const [first] = Array.isArray(rule.citations) ? rule.citations : []
-    const provisionKey = isRecord(first) && typeof first.provisionKey === "string" ? first.provisionKey : null
-    return [{ key: rule.key, title: typeof rule.title === "string" ? rule.title : rule.key, provisionKey }]
-  })
-}
+/** E's answer read leniently, for the rules a section outlines: whatever else its format holds is left aside. */
+const foundRules = z.object({
+  answer: z
+    .object({
+      provisions: z.array(
+        z.object({ key: z.string(), outlines: z.array(z.object({ aspect: z.string(), summary: z.string() })) })
+      )
+    })
+    .nullable()
+})
 
 const conflictQuestions = (questions: readonly { kind: string }[]) =>
   questions.filter((question) => question.kind === "conflict").length
+
+const preferredLabels = (terms: readonly { labels: readonly { text: string }[] }[]) =>
+  terms.flatMap((term) => term.labels.slice(0, 1).map((label) => label.text))
+
+/** A rule's main citation from its draft, read leniently: a draft that failed Zod still shows what it has. */
+function mainCitation(draft: Record<string, unknown>) {
+  const [first] = Array.isArray(draft.citations) ? draft.citations : []
+  return typeof first === "object" &&
+    first !== null &&
+    "provisionKey" in first &&
+    typeof first.provisionKey === "string"
+    ? first.provisionKey
+    : null
+}
+
+/** The item without a suffix the build adds to a rerun or a retry, and what the suffix says. */
+function suffixed(item: string, pattern: RegExp) {
+  const match = pattern.exec(item)
+  return match ? { base: item.slice(0, match.index), value: match[1] ?? "" } : { base: item, value: null }
+}
 
 /** A step's result from its output, or null for a step the page doesn't show or an output it can't read. */
 function resultOf(stage: string, item: string, at: string, value: unknown): BuildResult | null {
   const id = `${stage}:${item}`
   switch (stage) {
-    case "vocabulary": {
-      const parsed = vocabularyOutput.safeParse(value)
+    case "defined-terms": {
+      const parsed = definedTermsOutput.safeParse(value)
       return parsed.success
-        ? {
-            id,
-            at,
-            kind: "terms",
-            documentId: item,
-            labels: parsed.data.terms.flatMap((term) => term.labels.slice(0, 1).map((label) => label.text)),
-            isReused: parsed.data.isReused
-          }
+        ? { id, at, kind: "terms", documentKey: item, labels: preferredLabels(parsed.data.terms ?? []) }
         : null
     }
-    case "encode": {
-      const parsed = encodeOutput.safeParse(value)
-      if (!parsed.success) {
-        return null
-      }
-      const rules = draftedRules(parsed.data.answer)
-      return {
-        id,
-        at,
-        kind: "rules",
-        unitId: item,
-        rules,
-        isValid: unitState.shape.draft.safeParse(parsed.data.answer).success
-      }
-    }
-    case "verify": {
-      if (item === "merged") {
-        const parsed = unitProblems.safeParse(value)
+    case "find-rules": {
+      if (item === "check") {
+        const parsed = findingCheckOutput.safeParse(value)
         return parsed.success
           ? {
               id,
@@ -103,23 +107,53 @@ function resultOf(stage: string, item: string, at: string, value: unknown): Buil
             }
           : null
       }
-      const parsed = unitState.safeParse(value)
-      return parsed.success ? { id, at, kind: "checked", unitId: item, problems: parsed.data.problems.length } : null
+      const parsed = foundRules.safeParse(value)
+      if (item === "resolve" || !parsed.success) {
+        return null
+      }
+      const { base, value: rerun } = suffixed(item, /:(rerun)$/)
+      const rules = (parsed.data.answer?.provisions ?? []).flatMap((provision) =>
+        provision.outlines.map((outline) => ({
+          key: `${provision.key}#${outline.aspect}`,
+          title: outline.summary,
+          provisionKey: provision.key
+        }))
+      )
+      return { id, at, kind: "outlines", unitId: base, rules, isRerun: rerun !== null }
     }
-    case "repair": {
-      const parsed = repairOutput.safeParse(value)
-      const separator = item.lastIndexOf(":")
-      const round = Number(item.slice(separator + 1))
-      return parsed.success && separator > 0 && Number.isInteger(round)
-        ? {
-            id,
-            at,
-            kind: "repaired",
-            unitId: item.slice(0, separator),
-            round,
-            problemsLeft: parsed.data.state?.problems.length ?? null
-          }
-        : null
+    case "vocabulary": {
+      const parsed = groupVocabularyOutput.safeParse(value)
+      if (item === "check" || !parsed.success) {
+        return null
+      }
+      const { base } = suffixed(item, /:(rerun)$/)
+      return { id, at, kind: "vocabulary", unitId: base, labels: preferredLabels(parsed.data.group?.terms ?? []) }
+    }
+    case "structure-rules": {
+      const check = suffixed(item, /^check:(\d+)$/)
+      if (check.value !== null) {
+        const parsed = structureCheckOutput.safeParse(value)
+        return parsed.success
+          ? {
+              id,
+              at,
+              kind: "rules-checked",
+              round: Number(check.value),
+              rulesWithProblems: parsed.data.reduce((sum, batch) => sum + batch.rules.length, 0)
+            }
+          : null
+      }
+      const parsed = structureRulesOutput.safeParse(value)
+      if (!parsed.success) {
+        return null
+      }
+      const { base, value: round } = suffixed(item, /:retry-(\d+)$/)
+      const rules = parsed.data.rules.map((rule) => ({
+        key: rule.key,
+        title: typeof rule.draft.title === "string" ? rule.draft.title : rule.key,
+        provisionKey: mainCitation(rule.draft)
+      }))
+      return { id, at, kind: "rules", batchId: base, rules, round: round === null ? 0 : Number(round) }
     }
     case "merge": {
       const parsed = mergeOutput.safeParse(value)
@@ -143,7 +177,7 @@ function resultOf(stage: string, item: string, at: string, value: unknown): Buil
 }
 
 /** Stages whose outputs the page shows. */
-const shownStages = new Set(["vocabulary", "encode", "verify", "repair", "merge", "consolidate"])
+const shownStages = new Set(["defined-terms", "find-rules", "vocabulary", "structure-rules", "merge", "consolidate"])
 
 export type BuildResultsPage = {
   /** The results written at or after the cursor, oldest first; the page drops ones it already has by id. */

@@ -11,11 +11,12 @@ const stepWords: Record<string, { label: string; counted?: [string, string] }> =
   check: { label: "Reading documents" },
   structure: { label: "Reading documents" },
   analyze: { label: "Reading documents" },
-  vocabulary: { label: "Finding defined terms" },
-  plan: { label: "Drafting rules" },
-  encode: { label: "Drafting rules", counted: ["section", "sections"] },
-  verify: { label: "Checking drafts" },
-  repair: { label: "Fixing problems", counted: ["section", "sections"] },
+  "defined-terms": { label: "Finding defined terms", counted: ["document", "documents"] },
+  plan: { label: "Finding rules" },
+  "find-rules": { label: "Finding rules", counted: ["section", "sections"] },
+  vocabulary: { label: "Building the vocabulary" },
+  "vocabulary-merge": { label: "Building the vocabulary" },
+  "structure-rules": { label: "Drafting rules", counted: ["batch of rules", "batches of rules"] },
   merge: { label: "Combining and checking for conflicts" },
   consolidate: { label: "Combining and checking for conflicts" },
   "save-draft": { label: "Saving the draft" }
@@ -75,49 +76,65 @@ export function buildSteps(progress: JobProgress): BuildStep[] {
 export type Range = { low: number; high: number }
 
 /**
- * How long one Opus encoding call takes, in minutes: about 22,000 tokens written at high effort (encoding.md, Cost and
- * scale). The estimate starts from it and is corrected by the build's own pace once sections are done.
+ * How long one model call of each stage takes, in minutes (implementation-log.md, the step runs). The estimate starts
+ * from them and is corrected by the build's own pace once sections are done.
  */
-const callMinutes: Range = { low: 3, high: 5 }
-/** Calls per section while drafting: the encode, and a first repair for some (measured: 130 to 180 calls for 64). */
-const draftCallsPerSection: Range = { low: 1.3, high: 1.8 }
-/** Sections the second repair round takes up, of all of them. */
-const secondRepairShare: Range = { low: 0, high: 0.4 }
+const callMinutes: Record<string, Range> = {
+  "defined-terms": { low: 1, high: 2 },
+  "find-rules": { low: 1, high: 3 },
+  vocabulary: { low: 2, high: 4 },
+  "vocabulary-merge": { low: 1, high: 2 },
+  "structure-rules": { low: 1, high: 2 },
+  consolidate: { low: 1, high: 3 }
+}
+/** Rounds of reruns or retries a stage may add after its first calls. */
+const extraRounds: Record<string, number> = {
+  "defined-terms": 1,
+  "find-rules": 1,
+  vocabulary: 1,
+  "structure-rules": 2
+}
+/** Sections C groups together at most, and outlines a batch of F holds, for the counts not known yet. */
+const sectionsPerGroup = 4
+const sectionsPerBatch = 3
 
 const scale = (range: Range, by: number): Range => ({ low: range.low * by, high: range.high * by })
 const add = (a: Range, b: Range): Range => ({ low: a.low + b.low, high: a.high + b.high })
 const middle = (range: Range) => (range.low + range.high) / 2
 
-/** Minutes for `calls` model calls at most `concurrency` at a time. */
-function callTime(calls: Range, concurrency: number): Range {
-  return {
-    low: Math.ceil(calls.low / concurrency) * callMinutes.low,
-    high: Math.ceil(calls.high / concurrency) * callMinutes.high
-  }
+/** Minutes for a stage's `calls` model calls at most `concurrency` at a time, with its reruns at most. */
+function callTime(stage: string, calls: number, concurrency: number): Range {
+  const minutes = callMinutes[stage] ?? { low: 1, high: 3 }
+  const rounds = Math.ceil(calls / concurrency)
+  return { low: rounds * minutes.low, high: (rounds + (extraRounds[stage] ?? 0)) * minutes.high }
 }
 
-type Workload = JobProgress["workload"] & { sections: number | null }
+type Workload = JobProgress["workload"] & { sections: number | null; batches: number | null }
 
 /** What a stage takes before it starts, in minutes; null while it depends on a count not known yet. */
 function expectedMinutes(stage: string, workload: Workload): Range | null {
-  const { concurrency, documents, sections } = workload
+  const { concurrency, documents, sections, batches } = workload
   switch (stage) {
     case "structure":
       return { low: 0.2 * documents, high: documents }
+    case "defined-terms":
+      return callTime(stage, documents, concurrency)
+    case "find-rules":
+      return sections === null ? null : callTime(stage, sections, concurrency)
     case "vocabulary":
-      return scale(callMinutes, documents)
-    case "encode":
-      return sections === null ? null : callTime(scale(draftCallsPerSection, sections), concurrency)
-    case "repair":
-      return sections === null ? null : callTime(scale(secondRepairShare, sections), concurrency)
+      return sections === null ? null : callTime(stage, Math.ceil(sections / sectionsPerGroup), concurrency)
+    case "structure-rules": {
+      const count = batches ?? (sections === null ? null : Math.ceil(sections / sectionsPerBatch))
+      return count === null ? null : callTime(stage, count, concurrency)
+    }
+    case "vocabulary-merge":
     case "consolidate":
-      return { low: 2, high: 5 }
+      return callTime(stage, 1, concurrency)
     case "save-draft":
       return { low: 0.3, high: 1 }
     case "resolve-prompts":
     case "analyze":
     case "plan":
-    case "verify":
     case "merge":
       return { low: 0.1, high: 0.5 }
     default:
@@ -127,13 +144,13 @@ function expectedMinutes(stage: string, workload: Workload): Range | null {
 
 const minutesBetween = (from: string, to: number) => Math.max(0, (to - Date.parse(from)) / 60_000)
 
-/** Model stages after drafting, whose expected time follows the build's own pace. */
-const pacedStages = new Set(["repair", "consolidate"])
+/** Model stages after finding the rules, whose expected time follows the build's own pace. */
+const pacedStages = new Set(["vocabulary", "vocabulary-merge", "structure-rules", "consolidate"])
 
 export type BuildEstimate = {
   /** Minutes since the build started. */
   elapsed: number
-  /** Minutes left, as a range; null until the plan says how many sections there are. */
+  /** Minutes left, as a range; null until finding the rules says how many sections there are. */
   remaining: Range | null
   /** How far along the whole build is, from 0 to at most 0.95: the bar is never full before the build ends. */
   fraction: number
@@ -141,8 +158,8 @@ export type BuildEstimate = {
 
 /**
  * The time left for the whole build: each upcoming stage's expected time, the current stage's remaining time at its
- * own pace once it has done some of its work, and, once drafting has a pace, the later model stages scaled by how its
- * pace compares with the expectation.
+ * own pace once it has done some of its work, and, once finding or drafting the rules has a pace (drafting's, once it
+ * has one), the later model stages scaled by how that pace compares with the expectation.
  */
 export function estimateBuild(job: Pick<Job, "createdAt" | "progress">, now: number): BuildEstimate {
   const elapsed = minutesBetween(job.createdAt, now)
@@ -150,18 +167,31 @@ export function estimateBuild(job: Pick<Job, "createdAt" | "progress">, now: num
   if (!progress) {
     return { elapsed, remaining: null, fraction: 0 }
   }
-  const encode = progress.steps.find((step) => step.stage === "encode")
-  const workload: Workload = { ...progress.workload, sections: encode && encode.total > 0 ? encode.total : null }
-
-  let pace = 1
-  const expectedEncode = expectedMinutes("encode", workload)
-  if (encode?.startedAt && encode.done > 0 && expectedEncode) {
-    const spent = encode.finishedAt
-      ? minutesBetween(encode.startedAt, Date.parse(encode.finishedAt))
-      : minutesBetween(encode.startedAt, now)
-    const projected = (spent / encode.done) * encode.total
-    pace = Math.min(3, Math.max(0.5, projected / middle(expectedEncode)))
+  const stepOf = (stage: string) => progress.steps.find((step) => step.stage === stage)
+  const counted = (stage: string) => {
+    const step = stepOf(stage)
+    return step && step.total > 0 ? step.total : null
   }
+  const workload: Workload = {
+    ...progress.workload,
+    sections: counted("find-rules"),
+    batches: counted("structure-rules")
+  }
+
+  /** How a stage's pace compares with its expectation, once it has done some of its work. */
+  const paceOf = (stage: string) => {
+    const step = stepOf(stage)
+    const expected = expectedMinutes(stage, workload)
+    if (!step?.startedAt || step.done === 0 || !expected) {
+      return null
+    }
+    const spent = step.finishedAt
+      ? minutesBetween(step.startedAt, Date.parse(step.finishedAt))
+      : minutesBetween(step.startedAt, now)
+    const projected = (spent / step.done) * step.total
+    return Math.min(3, Math.max(0.5, projected / middle(expected)))
+  }
+  const pace = paceOf("structure-rules") ?? paceOf("find-rules") ?? 1
 
   let remaining: Range | null = { low: 0, high: 0 }
   for (const step of progress.steps) {
@@ -226,7 +256,7 @@ export function elapsedText(minutes: number) {
   return `${rest === 0 ? hourText : `${hourText} ${rest} ${rest === 1 ? "minute" : "minutes"}`} so far`
 }
 
-/** "Drafting rules, step 3 of 7, about 35–50 minutes left": the build in one line. */
+/** "Finding rules, step 3 of 7, about 35–50 minutes left": the build in one line. */
 export function summaryText(steps: readonly BuildStep[], remaining: Range | null) {
   const current = steps.find((step) => step.status === "current") ?? steps.find((step) => step.status === "upcoming")
   const position = current ? `${current.label}, step ${steps.indexOf(current) + 1} of ${steps.length}` : "Finishing"

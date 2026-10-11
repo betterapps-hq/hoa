@@ -31,7 +31,8 @@ import {
 
 export type RulebookBuildParams = { hoaId: string; rulebookId: string; jobId: string }
 
-// An encoding call writes up to about 40,000 tokens and took five minutes on the sample (implementation-log.md).
+// A model step may make a call and its rerun; the naive encoder's calls wrote up to about 40,000 tokens and took five
+// minutes on the sample (implementation-log.md).
 const buildModelStep = { ...modelStep, timeout: "15 minutes" } as const
 
 function errorText(error: unknown) {
@@ -91,7 +92,7 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
     const db = createDatabase(this.env.DB)
     const bucket = this.env.FILES
     const now = () => new Date().toISOString()
-    // Step names must be unique: the second repair round reports the same stage and counts as the first can.
+    // Step names must be unique: a stage's reruns report the same stage and counts as its first pass can.
     const reported = new Map<string, number>()
     const progress = (stage: string, done: number, total: number) => {
       const name = `progress:${stage}:${done}:${total}`
@@ -191,7 +192,7 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
           traceName: "rulebook-build",
           sessionId: jobId,
           input: { rulebookId, documents: loaded.sources.map((source) => source.structure.key) },
-          output: { units: result.report.units.length, failures: result.failures },
+          output: { rules: result.content.rules.length, failures: result.failures },
           scores: buildScores(result),
           recorder: ai.scores
         })

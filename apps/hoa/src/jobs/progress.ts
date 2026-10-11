@@ -8,10 +8,10 @@ import { z } from "zod"
 export const jobStepStatus = z.enum(["upcoming", "current", "done", "skipped"])
 
 export const jobStep = z.object({
-  /** The stage id the job reports (`structure`, `encode`, ...). */
+  /** The stage id the job reports (`structure`, `find-rules`, ...). */
   stage: z.string(),
   status: jobStepStatus,
-  /** A stage that may have nothing to do, such as the second repair round: skipped when it has nothing. */
+  /** A stage that may have nothing to do, such as merging the vocabulary: skipped when it has nothing. */
   isOptional: z.boolean(),
   done: z.number().int(),
   total: z.number().int(),

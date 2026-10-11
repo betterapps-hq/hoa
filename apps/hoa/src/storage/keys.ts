@@ -47,8 +47,8 @@ export const rulebookKeys = (hoaId: string, rulebookId: string) => {
 }
 
 /**
- * A job's step output by step name: `encode:declaration:article-4` is `encode/declaration:article-4.json`, and a step
- * without an item, such as `merge`, is `merge/result.json`.
+ * A job's step output by step name: `find-rules:declaration:article-4` is `find-rules/declaration:article-4.json`, and a
+ * step without an item, such as `merge`, is `merge/result.json`.
  */
 export function jobStepKey(hoaId: string, jobId: string, name: string) {
   const [stage = name, ...item] = name.split(":")

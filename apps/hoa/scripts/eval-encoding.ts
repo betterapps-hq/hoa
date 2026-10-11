@@ -19,13 +19,14 @@ import { sampleDocuments } from "./sampleDocuments.ts"
 // Evaluation round 1's runner (implementation-plan.md, E1.2): runs the rulebook build in process, without a Workflow,
 // on the cached page records in .fixtures/ocr/ (git-ignored: they name individuals, so nothing here prints their text),
 // with the real models, traced to Langfuse as the app traces a build (session id = run id). Writes the merged draft,
-// every step's output (the per-unit drafts are under steps/encode and steps/repair), the issues and a short report to
-// .fixtures/eval/encoding/<run id>/: draft.json, issues.json, run.json (the units, calls and prompt versions the
-// scorer reads) and build.md. `pnpm eval:encoding:score <run id>` scores it against the golden encoding. Usage, from
+// every step's output (each section's rule finding under steps/find-rules, each batch's rules under
+// steps/structure-rules), the issues and a short report to .fixtures/eval/encoding/<run id>/: draft.json, issues.json,
+// run.json (the rules, calls and prompt versions the scorer reads) and build.md. The scorer reads each outlined rule
+// as a unit: valid when it passed Zod after F's retries, its retry rounds as repair rounds. `pnpm eval:encoding:score <run id>` scores it against the golden encoding. Usage, from
 // apps/hoa:
 //   pnpm eval:encoding [--split dev|test|all] [--documents declaration,design-guidelines] [--units <key>,<key>]
 //     [--prompts <prompt name>=<version>,...]
-// The split is by provision key (encodingSplits.ts). --units keeps only units holding or under the given provision
+// The split is by provision key (encodingSplits.ts). --units keeps only sections holding or under the given provision
 // keys or in the given documents. --prompts pins versions no label points at yet (a staged candidate); the other
 // prompts are resolved by label, as a build does.
 const { values } = parseArgs({
@@ -131,7 +132,7 @@ await recordScores({
   traceName: "rulebook-build",
   sessionId: runId,
   input: { split: values.split, documents: values.documents, units: values.units ?? null, promptVersions },
-  output: { units: result.report.units.length, failures: result.failures },
+  output: { rules: result.content.rules.length, failures: result.failures },
   scores,
   recorder: ai.scores
 })
@@ -150,19 +151,26 @@ writeJson(join(out, "run.json"), {
   units: values.units ?? null,
   promptVersions,
   report: {
-    units: result.report.units,
-    validAfterEncode: result.report.validAfterEncode,
-    problemsBefore: result.report.problemsBefore,
+    units: result.report.rules.map((rule) => ({
+      id: rule.key,
+      provisions: 1,
+      isValid: rule.isValid,
+      repairRounds: rule.retries,
+      problems: rule.problems
+    })),
+    validAfterEncode: result.report.rules.filter((rule) => rule.isValid && rule.retries === 0).length,
+    problemsBefore: result.report.stages.find((stage) => stage.stage === "structure-rules")?.problems ?? 0,
     calls: result.report.calls
-  }
+  },
+  stages: result.report.stages
 })
 
 const { calls } = result.report
 const sum = (values: (number | null)[]) => values.reduce<number>((total, value) => total + (value ?? 0), 0)
 const cost = sum(calls.map((call) => call.costUsd))
-const rows = result.report.units.map(
-  (unit) =>
-    `| ${unit.id} | ${unit.provisions} | ${unit.isValid ? "yes" : "no"} | ${unit.repairRounds} | ${unit.problems ?? "-"} |`
+const rows = result.report.stages.map(
+  (stage) =>
+    `| ${stage.stage} | ${stage.items} | ${stage.calls} | ${stage.reruns} | ${stage.problems} | ${stage.problemsLeft} |`
 )
 const report = [
   `# Encoding run ${runId}`,
@@ -174,8 +182,8 @@ const report = [
   "",
   `Duration ${durationSeconds.toFixed(0)} s; ${calls.length} model calls (${calls.filter((call) => call.isCached).length} cached); cost $${cost.toFixed(4)}; ${sum(calls.map((call) => call.inputTokens))} input tokens (${sum(calls.map((call) => call.cachedInputTokens))} read from the prompt cache, ${sum(calls.map((call) => call.cacheWriteTokens))} written to it) and ${sum(calls.map((call) => call.outputTokens))} output tokens.`,
   "",
-  "| Unit | Provisions | Valid | Repair rounds | Problems left |",
-  "| --- | --- | --- | --- | --- |",
+  "| Stage | Items | Calls | Reruns and retries | Problems found | Problems left |",
+  "| --- | --- | --- | --- | --- | --- |",
   ...rows,
   "",
   "| Score | Value |",

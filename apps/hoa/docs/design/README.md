@@ -60,8 +60,9 @@ acceptable.
    ▼                                                    ─> judgments ─> evaluate ─> decide ─> write ─> save-review
  RulebookBuild workflow                                   ▲
    resolve-prompts ─> check ─> structure ─> analyze       │ reviews against
-   ─> vocabulary ─> plan ─> encode ─> verify ─> repair    │
-   ─> merge ─> consolidate ─> save-draft                  │
+   ─> defined-terms ─> plan ─> find-rules ─> vocabulary   │
+   ─> vocabulary-merge ─> structure-rules ─> merge        │
+   ─> consolidate ─> save-draft                           │
    │ administrator reviews, then publishRulebook          │
    ▼                                                      │
  published rules file ────────────────────────────────────┘
@@ -69,8 +70,8 @@ acceptable.
                                                         ▼
                                                       committee decides, from the same review
 
- In testing: the reordered build steps (defined terms, find the rules, shared vocabulary, merge, structure each
- rule, consolidation) in src/encoding/steps/, not yet wired into RulebookBuild
+ The build's steps (defined terms, find the rules, shared vocabulary, merge, structure each rule, consolidation)
+ are in src/encoding/steps/, shared with the step evaluations
 
  R2: files, OCR output, page records, published rules files, job step outputs, reviews
  D1: HOAs, document records, provisions, jobs, rulebooks with their rules, terms and questions, project types,

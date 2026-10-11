@@ -8,18 +8,41 @@ describe("rulebook build prompts", () => {
   it("are registered with the variables the code fills in", () => {
     expect(Object.fromEntries(rulebookBuildPrompts.map((prompt) => [prompt.name, prompt.variables]))).toEqual({
       "hoa-structure-repair": ["documentTitle", "pageText", "parserOutline", "problems"],
-      "hoa-term-extraction": ["document", "definitions", "candidates", "coreTerms"],
-      "hoa-provision-encoding": [
-        "document",
-        "provisions",
+      "hoa-defined-terms": ["coreTerms", "document", "definitions", "candidates", "problems"],
+      "hoa-rule-finding": [
+        "coreTerms",
+        "requestTypes",
+        "knownTerms",
+        "documents",
+        "definitions",
         "context",
         "references",
-        "terms",
-        "coreTerms",
-        "requestTypes"
+        "provisions",
+        "problems"
       ],
-      "hoa-encoding-repair": ["draft", "problems", "terms", "coreTerms"],
-      "hoa-rulebook-consolidation": ["rules", "termPairs", "documents"]
+      "hoa-vocabulary-group": [
+        "coreTerms",
+        "requestTypes",
+        "definedTerms",
+        "previousVocabulary",
+        "documents",
+        "outlines",
+        "provisions",
+        "problems"
+      ],
+      "hoa-vocabulary-merge": ["clusters"],
+      "hoa-rule-structuring": [
+        "coreTerms",
+        "requestTypes",
+        "vocabulary",
+        "documents",
+        "provisions",
+        "outlines",
+        "relatedRules",
+        "settingsFlags",
+        "problems"
+      ],
+      "hoa-consolidation": ["documents", "crossReferences", "exceptions", "rulePairs", "rules"]
     })
   })
 

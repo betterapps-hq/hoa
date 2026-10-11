@@ -26,14 +26,14 @@ const records: RulebookRecords = {
 
 describe("describeBuildProblem", () => {
   const job = newJob({ hoaId: "hoa", kind: "rulebook-build", subjectId: "r", now: "" })
-  const failure = { stage: "encode", itemId: "declaration:article-4", message: "Bad schema" }
+  const failure = { stage: "find-rules", itemId: "declaration:article-4", message: "Bad schema" }
 
   it("explains a failed build or failed items, and nothing for a clean one", () => {
     expect(describeBuildProblem(null)).toBeNull()
     expect(describeBuildProblem({ ...job, status: "completed" })).toBeNull()
     expect(describeBuildProblem({ ...job, status: "failed" })).toBe("The build failed.")
     expect(describeBuildProblem({ ...job, status: "completed-with-errors", failures: [failure, failure] })).toBe(
-      "2 items failed (encode): Bad schema"
+      "2 items failed (find-rules): Bad schema"
     )
   })
 })
