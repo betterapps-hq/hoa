@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import type { Rule } from "@/schema/types"
+import { sampleRulesFile } from "@/tests/sampleRulesFile"
 import { caseIndexes, checkAgreement, type KeyTranslation, outcomeClass } from "./checkAgreement"
 import { golden, goldenRule, renamedRule, renamedTerms } from "./pair.test-data"
 import { alignTerms } from "./terms"
@@ -61,6 +62,39 @@ describe("checkAgreement", () => {
     }
     const result = checkAgreement({ reference, pipeline: reference, keys: noHeight, settings: golden.settings })
     expect(result?.isComparable).toBe(false)
+  })
+
+  it("agrees on a share written as a quotient or as a product, never probing a zero base", () => {
+    const sample = sampleRulesFile()
+    const rule = sample.rules.find((item) => item.key === "declaration:9.2#member-vote")
+    if (rule?.kind !== "norm" || rule.check?.type !== "test" || rule.check.test.type !== "compare") {
+      throw new Error("9.2#member-vote is a share test")
+    }
+    const { left, op, right } = rule.check.test
+    if (left.type !== "quotient") {
+      throw new Error("9.2#member-vote divides")
+    }
+    const [part, whole] = left.of
+    const product: Rule = {
+      ...rule,
+      check: {
+        type: "test",
+        test: { type: "compare", left: part!, op, right: { type: "product", of: [whole!, right] } }
+      }
+    }
+    const terms = [...sample.terms, ...sample.proposedCore]
+    const side = (item: Rule) => ({ rule: item, terms, documents: sample.documents })
+    const result = checkAgreement({
+      reference: side(rule),
+      pipeline: side(product),
+      keys: same,
+      settings: sample.settings
+    })
+    expect(result?.cases).toBeGreaterThan(5)
+    // With no zero base probed, they differ only where the base is unknown: the quotient can't divide by what may be
+    // zero, while the product's range still decides (no votes in favor are never more than half).
+    expect(result?.examples.every((example) => example.reference === "missing-information")).toBe(true)
+    expect((result?.cases ?? 0) - (result?.agreeing ?? 0)).toBeLessThanOrEqual(3)
   })
 
   it("skips pairs the engine doesn't evaluate on their own", () => {

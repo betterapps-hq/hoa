@@ -67,7 +67,12 @@ const unique = <V>(values: readonly V[]) => {
 const valueChoice = (value: T.FactValue): Choice => ({ kind: "value", value })
 
 /** The values a property is set to: around each constant it's compared with, else spread over its type. */
-function factChoices(property: TermContent | undefined, constants: readonly T.Operand[], vocabulary: SideVocabulary) {
+function factChoices(
+  property: TermContent | undefined,
+  constants: readonly T.Operand[],
+  vocabulary: SideVocabulary,
+  base = false
+) {
   if (property?.kind !== "property") {
     return []
   }
@@ -128,7 +133,16 @@ function factChoices(property: TermContent | undefined, constants: readonly T.Op
     .with({ type: "schedule" }, () => [])
     .exhaustive()
   const absent: Choice[] = property.valueType.type === "boolean" ? [] : [{ kind: "absent" }]
-  return unique([...values, ...absent])
+  if (!base) {
+    return unique([...values, ...absent])
+  }
+  // A share of nothing ("80% of the occupied residences" when none are) has no answer the text gives, so a base is
+  // never zero, nor absent where silence means none.
+  const zero = (choice: Choice) =>
+    choice.kind === "value" &&
+    (choice.value.type === "number" || choice.value.type === "quantity") &&
+    choice.value.value === 0
+  return unique([...values.filter((choice) => !zero(choice)), ...(property.ifUnstated === "absent" ? [] : absent)])
 }
 
 /** The vocabulary with a lookup of each value set's values. */
@@ -147,7 +161,9 @@ type SideVocabulary = ReturnType<typeof sideVocabulary>
 function choicesOf(probe: Probe, vocabulary: SideVocabulary): Choice[] {
   return match(probe)
     .returnType<Choice[]>()
-    .with({ kind: "fact" }, (fact) => factChoices(vocabulary.get(fact.path.at(-1) ?? ""), fact.constants, vocabulary))
+    .with({ kind: "fact" }, (fact) =>
+      factChoices(vocabulary.get(fact.path.at(-1) ?? ""), fact.constants, vocabulary, fact.base)
+    )
     .with({ kind: "approval" }, ({ parties }) => [
       ...parties.map((party) => ({ kind: "approval" as const, status: "approved" as const, party })),
       ...parties.slice(0, 1).map((party) => ({ kind: "approval" as const, status: "denied" as const, party }))
@@ -221,6 +237,7 @@ function jointProbes(
     if (translated && existing) {
       if (existing.probe.kind === "fact" && translated.kind === "fact") {
         existing.probe.constants.push(...translated.constants)
+        existing.probe.base = Boolean(existing.probe.base || translated.base)
       } else if (existing.probe.kind === "approval" && translated.kind === "approval") {
         existing.probe.parties = [...new Set([...existing.probe.parties, ...translated.parties])]
       }
@@ -367,7 +384,9 @@ function sideRequest(context: SideContext, probes: readonly JointProbe[], indexe
       entities.set(id, { id, type, label: id, ref: null })
     }
   }
-  addEntity("subject", appliesTo)
+  // A subject that is a kind of the request type (a Claim, a category of dispute) is that request: the engine finds its
+  // request by type and decides the category from its criteria.
+  addEntity("subject", is(context.requestType) ? context.requestType : appliesTo)
   addEntity(roots.request, context.requestType)
   addEntity(roots.lot, "lot")
   addEntity(roots.community, "community")

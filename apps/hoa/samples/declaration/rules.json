@@ -39408,7 +39408,7 @@
       "broader": [],
       "labels": [
         {
-          "text": "creating Neighborhoods or re-designating their boundaries",
+          "text": "re-designating Neighborhood boundaries",
           "role": "preferred",
           "plural": null,
           "citation": null,
@@ -61482,6 +61482,136 @@
       "kind": "thing",
       "nature": "party",
       "request": null
+    },
+    {
+      "key": "vote-subject.neighborhood-creation",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "creating Neighborhoods",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(a)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "vote-subject",
+      "broader": []
+    },
+    {
+      "key": "vote.disapproval-meeting-called-on",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "meeting to consider disapproval called on",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:3.3(a)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "date"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "common-area.damaged-on",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "improvements damaged or destroyed on",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:7.3(c)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "common-area",
+      "valueType": {
+        "type": "date"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
     }
   ],
   "proposedCore": [
@@ -66153,7 +66283,7 @@
       "key": "declaration:3.3(a)/p2#petition-meeting",
       "domain": "governance",
       "title": "Call a disapproval meeting on petition",
-      "statement": "On receiving a petition, as the By-Laws require for special meetings, the {{board}} must call a {{meeting}} of the {{members}} to consider disapproving a Board change to the {{use-restrictions}} or a Board designation of {{voting-group:plural}}; otherwise it needn't call one.",
+      "statement": "On receiving a petition, as the By-Laws require for special meetings, before a Board change to the {{use-restrictions}} or a Board designation of {{voting-group:plural}} takes effect, the {{board}} must call a {{meeting}} of the {{members}} to consider disapproving it; otherwise it needn't call one.",
       "citations": [
         {
           "provisionKey": "declaration:3.3(a)/p2",
@@ -66166,9 +66296,58 @@
           "region": null
         }
       ],
-      "requestTypes": ["compliance-period"],
-      "appliesTo": "community",
-      "appliesWhen": null,
+      "requestTypes": ["meeting"],
+      "appliesTo": "vote",
+      "appliesWhen": {
+        "type": "all",
+        "of": [
+          {
+            "type": "in",
+            "left": {
+              "type": "ref",
+              "path": ["vote.subject"]
+            },
+            "values": [
+              {
+                "type": "value",
+                "term": "vote-subject.use-restrictions-amendment"
+              },
+              {
+                "type": "value",
+                "term": "vote-subject.voting-group-designation"
+              }
+            ]
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.by"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "board"
+            }
+          },
+          {
+            "type": "exists",
+            "path": ["vote.disapproval-petition-received-on"]
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.disapproval-petition-received-on"]
+            },
+            "op": "<",
+            "right": {
+              "type": "ref",
+              "path": ["vote.effective-on"]
+            }
+          }
+        ]
+      },
       "scope": null,
       "authority": null,
       "effectiveFrom": "2001-12-04",
@@ -66176,13 +66355,24 @@
       "modality": "obligation",
       "bearer": "board",
       "beneficiary": "members",
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "For every petition received, as the By-Laws require for special meetings, to consider disapproving a Board change to the Use Restrictions or a Board designation of Voting Groups, did the Board call a meeting of the Members?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "any",
+          "of": [
+            {
+              "type": "exists",
+              "path": ["vote.disapproval-meeting-called-on"]
+            },
+            {
+              "type": "exists",
+              "path": ["vote.disapproval-meeting-held-on"]
+            }
+          ]
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -67768,19 +67958,25 @@
       "requestTypes": ["violation"],
       "appliesTo": "vehicle-repair",
       "appliesWhen": {
-        "type": "not",
-        "of": {
-          "type": "compare",
-          "left": {
-            "type": "ref",
-            "path": ["vehicle-repair.location"]
-          },
-          "op": "=",
-          "right": {
+        "type": "in",
+        "left": {
+          "type": "ref",
+          "path": ["vehicle-repair.location"]
+        },
+        "values": [
+          {
             "type": "value",
-            "term": "location.enclosed-garage"
+            "term": "location.driveway"
+          },
+          {
+            "type": "value",
+            "term": "location.unit-exterior"
+          },
+          {
+            "type": "value",
+            "term": "location.dwelling"
           }
-        }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -71428,24 +71624,41 @@
       "requestTypes": ["violation"],
       "appliesTo": "lot",
       "appliesWhen": {
-        "type": "not",
-        "of": {
-          "type": "in",
-          "left": {
-            "type": "ref",
-            "path": ["lot.landscaping-installed-by"]
-          },
-          "values": [
-            {
-              "type": "value",
-              "term": "declarant"
-            },
-            {
-              "type": "value",
-              "term": "builder"
+        "type": "all",
+        "of": [
+          {
+            "type": "not",
+            "of": {
+              "type": "in",
+              "left": {
+                "type": "ref",
+                "path": ["lot.landscaping-installed-by"]
+              },
+              "values": [
+                {
+                  "type": "value",
+                  "term": "declarant"
+                },
+                {
+                  "type": "value",
+                  "term": "builder"
+                }
+              ]
             }
-          ]
-        }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["lot.owner-took-title-on"]
+            },
+            "op": "=",
+            "right": {
+              "type": "ref",
+              "path": ["lot.first-conveyed-on"]
+            }
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -73130,16 +73343,53 @@
       "requestTypes": ["assessment"],
       "appliesTo": "assessment",
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["assessment.type"]
-        },
-        "op": "=",
-        "right": {
-          "type": "value",
-          "term": "assessment-type.neighborhood"
-        }
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["assessment.type"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "assessment-type.neighborhood"
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["assessment.board-assigned-costs"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          },
+          {
+            "type": "not",
+            "of": {
+              "type": "in",
+              "left": {
+                "type": "ref",
+                "path": ["assessment.cost-assignment-basis"]
+              },
+              "values": [
+                {
+                  "type": "value",
+                  "term": "cost-assignment-basis.owner-agreement"
+                },
+                {
+                  "type": "value",
+                  "term": "cost-assignment-basis.neighborhood-association-agreement"
+                }
+              ]
+            }
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -73153,7 +73403,7 @@
       "noExceptions": null,
       "check": {
         "type": "judgment",
-        "question": "Where no specific agreement applies, were the Area of Common Responsibility costs assigned to this Neighborhood the same as those assigned to similarly situated Neighborhoods?",
+        "question": "Were the Area of Common Responsibility costs assigned to this Neighborhood the same as those assigned to similarly situated Neighborhoods?",
         "evidence": []
       },
       "remedy": null,
@@ -74016,8 +74266,8 @@
     {
       "key": "declaration:6.4(a)/p2#designated-by",
       "domain": "governance",
-      "title": "Only the Declarant, and later the Board, re-designates Neighborhoods",
-      "statement": "Creating {{neighborhood:plural}}, re-designating their boundaries or combining them, by Supplemental Declaration or amendment, must be done by the {{declarant}} while it or an {{affiliate}} owns property in Exhibits \"A\" or \"B\", and after that by the {{board}}.",
+      "title": "Only the Declarant creates Neighborhoods; later the Board re-designates or combines them",
+      "statement": "Creating {{neighborhood:plural}}, re-designating their boundaries or combining them, by Supplemental Declaration or amendment, must be done by the {{declarant}} while it or an {{affiliate}} owns property in Exhibits \"A\" or \"B\"; after that the {{board}} may re-designate their boundaries or combine them, but not create them.",
       "citations": [
         {
           "provisionKey": "declaration:6.4(a)/p2",
@@ -74034,6 +74284,10 @@
           "path": ["vote.subject"]
         },
         "values": [
+          {
+            "type": "value",
+            "term": "vote-subject.neighborhood-creation"
+          },
           {
             "type": "value",
             "term": "vote-subject.neighborhood-designation"
@@ -74138,6 +74392,21 @@
                   "right": {
                     "type": "value",
                     "term": "board"
+                  }
+                },
+                {
+                  "type": "not",
+                  "of": {
+                    "type": "compare",
+                    "left": {
+                      "type": "ref",
+                      "path": ["vote.subject"]
+                    },
+                    "op": "=",
+                    "right": {
+                      "type": "value",
+                      "term": "vote-subject.neighborhood-creation"
+                    }
                   }
                 }
               ]
@@ -74254,16 +74523,33 @@
       "requestTypes": ["assessment"],
       "appliesTo": "assessment",
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["assessment.type"]
-        },
-        "op": "=",
-        "right": {
-          "type": "value",
-          "term": "assessment-type.neighborhood"
-        }
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["assessment.type"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "assessment-type.neighborhood"
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["assessment.service-admin-charge"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -75891,17 +76177,56 @@
             }
           },
           "test": {
-            "type": "compare",
-            "left": {
-              "type": "ref",
-              "path": ["insurance-policy.limit-per-occurrence"]
-            },
-            "op": ">=",
-            "right": {
-              "type": "quantity",
-              "value": 1000000,
-              "unit": "usd"
-            }
+            "type": "all",
+            "of": [
+              {
+                "type": "compare",
+                "left": {
+                  "type": "ref",
+                  "path": ["insurance-policy.limit-per-occurrence"]
+                },
+                "op": ">=",
+                "right": {
+                  "type": "quantity",
+                  "value": 1000000,
+                  "unit": "usd"
+                }
+              },
+              {
+                "type": "some",
+                "where": null,
+                "test": {
+                  "type": "compare",
+                  "left": {
+                    "type": "ref",
+                    "path": []
+                  },
+                  "op": "=",
+                  "right": {
+                    "type": "value",
+                    "term": "organization"
+                  }
+                },
+                "path": ["insurance-policy.beneficiaries"]
+              },
+              {
+                "type": "some",
+                "where": null,
+                "test": {
+                  "type": "compare",
+                  "left": {
+                    "type": "ref",
+                    "path": []
+                  },
+                  "op": "=",
+                  "right": {
+                    "type": "value",
+                    "term": "members"
+                  }
+                },
+                "path": ["insurance-policy.beneficiaries"]
+              }
+            ]
           },
           "from": "community",
           "path": ["community.insurance-policies"]
@@ -77733,7 +78058,7 @@
       "key": "declaration:7.3(c)/p2#not-restore-vote",
       "domain": "governance",
       "title": "Not rebuilding needs 75 percent of Class A votes",
-      "statement": "A decision not to repair or rebuild damaged {{common-area}} improvements needs {{class-a-member:plural}} holding at least 75 percent of all Class \"A\" votes; otherwise they must be repaired or rebuilt in a timely manner.",
+      "statement": "A decision not to repair or rebuild damaged {{common-area}} improvements needs {{class-a-member:plural}} holding at least 75 percent of all Class \"A\" votes.",
       "citations": [
         {
           "provisionKey": "declaration:7.3(c)/p2",
@@ -87248,6 +87573,11 @@
           "provisionKey": "declaration:10.1",
           "highlight": null,
           "region": null
+        },
+        {
+          "provisionKey": "declaration:10.11",
+          "highlight": null,
+          "region": null
         }
       ],
       "requestTypes": [],
@@ -87266,27 +87596,45 @@
       "check": {
         "type": "test",
         "test": {
-          "type": "some",
-          "where": null,
-          "test": {
-            "type": "in",
-            "left": {
-              "type": "ref",
-              "path": []
-            },
-            "values": [
-              {
-                "type": "value",
-                "term": "declarant"
+          "type": "all",
+          "of": [
+            {
+              "type": "some",
+              "where": null,
+              "test": {
+                "type": "in",
+                "left": {
+                  "type": "ref",
+                  "path": []
+                },
+                "values": [
+                  {
+                    "type": "value",
+                    "term": "declarant"
+                  },
+                  {
+                    "type": "value",
+                    "term": "affiliate"
+                  }
+                ]
               },
-              {
-                "type": "value",
-                "term": "affiliate"
+              "from": "community",
+              "path": ["community.exhibit-property-owned-by"]
+            },
+            {
+              "type": "compare",
+              "left": {
+                "type": "ref",
+                "from": "community",
+                "path": ["community.declarant-reserved-rights-in-force"]
+              },
+              "op": "=",
+              "right": {
+                "type": "boolean",
+                "value": true
               }
-            ]
-          },
-          "from": "community",
-          "path": ["community.exhibit-property-owned-by"]
+            }
+          ]
         }
       },
       "remedy": null,
@@ -87603,6 +87951,11 @@
           "provisionKey": "declaration:10.2/p1",
           "highlight": null,
           "region": null
+        },
+        {
+          "provisionKey": "declaration:10.11",
+          "highlight": null,
+          "region": null
         }
       ],
       "requestTypes": [],
@@ -87621,27 +87974,45 @@
       "check": {
         "type": "test",
         "test": {
-          "type": "some",
-          "where": null,
-          "test": {
-            "type": "in",
-            "left": {
-              "type": "ref",
-              "path": []
-            },
-            "values": [
-              {
-                "type": "value",
-                "term": "declarant"
+          "type": "all",
+          "of": [
+            {
+              "type": "some",
+              "where": null,
+              "test": {
+                "type": "in",
+                "left": {
+                  "type": "ref",
+                  "path": []
+                },
+                "values": [
+                  {
+                    "type": "value",
+                    "term": "declarant"
+                  },
+                  {
+                    "type": "value",
+                    "term": "affiliate"
+                  }
+                ]
               },
-              {
-                "type": "value",
-                "term": "affiliate"
+              "from": "community",
+              "path": ["community.exhibit-property-owned-by"]
+            },
+            {
+              "type": "compare",
+              "left": {
+                "type": "ref",
+                "from": "community",
+                "path": ["community.declarant-reserved-rights-in-force"]
+              },
+              "op": "=",
+              "right": {
+                "type": "boolean",
+                "value": true
               }
-            ]
-          },
-          "from": "community",
-          "path": ["community.exhibit-property-owned-by"]
+            }
+          ]
         }
       },
       "remedy": null,
@@ -88069,18 +88440,7 @@
       ],
       "requestTypes": ["assessment"],
       "appliesTo": "assessment",
-      "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["assessment.type"]
-        },
-        "op": "=",
-        "right": {
-          "type": "value",
-          "term": "assessment-type.use-fee"
-        }
-      },
+      "appliesWhen": null,
       "scope": null,
       "authority": null,
       "effectiveFrom": "2001-12-04",
@@ -89308,7 +89668,7 @@
       "effectiveFrom": "2001-12-04",
       "kind": "norm",
       "modality": "obligation",
-      "bearer": "claimant",
+      "bearer": "person",
       "beneficiary": "declarant",
       "decidedBy": null,
       "overrides": [],
@@ -90095,6 +90455,10 @@
               "values": [
                 {
                   "type": "value",
+                  "term": "declarant"
+                },
+                {
+                  "type": "value",
                   "term": "governmental-entity"
                 }
               ]
@@ -90186,6 +90550,10 @@
                 "path": ["work.performed-by"]
               },
               "values": [
+                {
+                  "type": "value",
+                  "term": "declarant"
+                },
                 {
                   "type": "value",
                   "term": "governmental-entity"
@@ -98609,7 +98977,22 @@
       ],
       "requestTypes": ["architectural-application", "violation"],
       "appliesTo": "work",
-      "appliesWhen": null,
+      "appliesWhen": {
+        "type": "not",
+        "of": {
+          "type": "in",
+          "left": {
+            "type": "ref",
+            "path": ["work.kind"]
+          },
+          "values": [
+            {
+              "type": "value",
+              "term": "work-kind.interior"
+            }
+          ]
+        }
+      },
       "scope": null,
       "authority": null,
       "effectiveFrom": "2025-11-12",
@@ -105705,7 +106088,7 @@
           "region": null
         }
       ],
-      "requestTypes": [],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "fence-run",
       "appliesWhen": null,
       "scope": null,
@@ -105723,7 +106106,7 @@
         "question": "Did the Owner examine the plot plans for driver or pedestrian sight line restrictions?",
         "evidence": ["site-plan"]
       },
-      "remedy": null,
+      "remedy": "change-detail",
       "recurs": null,
       "cure": null,
       "provenance": {
@@ -109359,16 +109742,38 @@
       "requestTypes": ["architectural-application", "violation"],
       "appliesTo": "railing",
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["railing.area", "outdoor-living-area.kind"]
-        },
-        "op": "=",
-        "right": {
-          "type": "value",
-          "term": "outdoor-living-kind.porch"
-        }
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["railing.area", "outdoor-living-area.kind"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "outdoor-living-kind.porch"
+            }
+          },
+          {
+            "type": "in",
+            "left": {
+              "type": "ref",
+              "path": ["railing.area", "outdoor-living-area.side-of-home"]
+            },
+            "values": [
+              {
+                "type": "value",
+                "term": "side-of-home.front"
+              },
+              {
+                "type": "value",
+                "term": "side-of-home.back"
+              }
+            ]
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -109487,6 +109892,23 @@
               "type": "value",
               "term": "railing-material.metal"
             }
+          },
+          {
+            "type": "in",
+            "left": {
+              "type": "ref",
+              "path": ["railing.area", "outdoor-living-area.side-of-home"]
+            },
+            "values": [
+              {
+                "type": "value",
+                "term": "side-of-home.front"
+              },
+              {
+                "type": "value",
+                "term": "side-of-home.back"
+              }
+            ]
           }
         ]
       },
@@ -109584,6 +110006,23 @@
               {
                 "type": "value",
                 "term": "railing-material.composite"
+              }
+            ]
+          },
+          {
+            "type": "in",
+            "left": {
+              "type": "ref",
+              "path": ["railing.area", "outdoor-living-area.side-of-home"]
+            },
+            "values": [
+              {
+                "type": "value",
+                "term": "side-of-home.front"
+              },
+              {
+                "type": "value",
+                "term": "side-of-home.back"
               }
             ]
           }
@@ -110495,6 +110934,78 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:7.3(c)/p2#timely-repair",
+      "domain": "maintenance",
+      "title": "Damaged Common Area improvements repaired in a timely manner",
+      "statement": "Unless a decision is made not to restore them, the {{organization}} must repair or reconstruct damaged {{common-area}} improvements in a timely manner.",
+      "citations": [
+        {
+          "provisionKey": "declaration:7.3(c)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "requestTypes": ["compliance-period"],
+      "appliesTo": "common-area",
+      "appliesWhen": {
+        "type": "all",
+        "of": [
+          {
+            "type": "exists",
+            "path": ["common-area.damaged-on"]
+          },
+          {
+            "type": "not",
+            "of": {
+              "type": "compare",
+              "left": {
+                "type": "ref",
+                "path": ["common-area.restoration-declined"]
+              },
+              "op": "=",
+              "right": {
+                "type": "boolean",
+                "value": true
+              }
+            }
+          }
+        ]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "members",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Have the damaged improvements been repaired or reconstructed in a timely manner?",
+        "evidence": ["photo", "inspection-report"]
+      },
+      "remedy": null,
+      "recurs": {
+        "type": "ref",
+        "from": "community",
+        "path": ["community.fiscal-year-start"]
+      },
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
       },
       "review": {
         "status": "proposed",

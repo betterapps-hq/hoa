@@ -302,10 +302,11 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   on the change, so a passing vote means the change is disapproved.
 - "A meeting called for such purpose" (3.3(b)) is part of the adoption's check: the request's meeting.purpose is
   vote-subject.use-restrictions-adoption, as 8.1/p4#meeting-window reads the purpose.
-- 3.3's Board duty to call a meeting when Members petition to disapprove a change is a Board judgment in a compliance
-  period. Its duty to send each Owner the changed Use Restrictions is a deadline on the adopting vote in meeting
-  requests (3.3(c)#distribute-copy): vote.distributed-on at least a day before vote.effective-on, since the copies go
-  out "prior to" the change becoming effective.
+- 3.3's Board duty to call a meeting when Members petition to disapprove a change is a Board obligation on the change's
+  vote in meeting requests (3.3(a)/p2#petition-meeting), applying when vote.disapproval-petition-received-on is before
+  vote.effective-on and testing that the meeting was called or held. Its duty to send each Owner the changed Use
+  Restrictions is a deadline on the adopting vote in meeting requests (3.3(c)#distribute-copy): vote.distributed-on at
+  least a day before vote.effective-on, since the copies go out "prior to" the change becoming effective.
 - When a change takes effect is two requirements on the vote that adopts it, in meeting requests: no earlier than 30
   days after the copies go to the Owners (3.3(c)#effective-date, a deadline from the new vote.distributed-on to
   vote.effective-on, for Board changes and Members' adoptions alike), and, when a disapproval petition arrives before
@@ -620,9 +621,10 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   pending a petitioned meeting all apply to it. The Class "A" disapproval is 3.3(a)/p2#member-disapproval on
   vote-subject.voting-group-designation-disapproval. Each of those rules also cites 6.4(b)/p2.
 - Who may create, re-designate or combine Neighborhoods (6.4(a)/p2) is one requirement on the vote, like 3.1(a)/p2, with
-  its own vote-subject.neighborhood-designation beside combine-neighborhoods; who exercises the membership of an Owner
-  that isn't an individual (6.2/p1) is a requirement on the Unit, applying when a Unit owned by a non-individual Owner
-  (lot.owned-by-non-individual) cast a vote, and testing the representative's capacity
+  its own vote-subject.neighborhood-creation and .neighborhood-designation (re-designating boundaries) beside
+  combine-neighborhoods, so the Board's branch, after the Declarant's period, excludes creation; who exercises the
+  membership of an Owner that isn't an individual (6.2/p1) is a requirement on the Unit, applying when a Unit owned by a
+  non-individual Owner (lot.owned-by-non-individual) cast a vote, and testing the representative's capacity
   (lot.entity-representative-capacity) or a designation filed with the Secretary
   (lot.entity-representative-designation-filed).
 - Co-Owners' joint and several liability is a liability matter, not a rule.
@@ -632,7 +634,8 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   reach the matter voted on; it was explanatory as a grant, but it decides whether a vote counts.
 - 6.4(a)/p3's administrative charge is two Board obligations in assessment requests on Neighborhood Assessments, since
   either can fail alone: the charge is reasonable (#admin-charge-reasonable), and it's the same per Unit for every
-  Neighborhood receiving the same service (#admin-charge-uniform).
+  Neighborhood receiving the same service (#admin-charge-uniform); both apply only when assessment.service-admin-charge
+  holds.
 - The Association needn't maintain landscaping an Owner or resident planted (7.2(c)): a permission overriding its
   landscaping duty on the planting (7.2(c)#owner-planted-excluded, in compliance periods). The care judgment's question
   still leaves plantings out, since an overriding rule counts only on the subject it applies to, a planting rather than
@@ -668,6 +671,9 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   (7.3(b)/p2#deductible-allocation), its question excepting a deductible assessed against a negligent Owner.
 - That no Mortgagee takes part in deciding whether to restore damaged Common Area (7.3(c)/p2) is a requirement on the
   not-restore vote in meeting requests, testing vote.mortgagee-participated (7.3(c)/p2#no-mortgagee-participation).
+- 7.3(c)/p2's duty to repair or rebuild damaged Common Area improvements in a timely manner is the Association's yearly
+  compliance-period judgment (7.3(c)/p2#timely-repair), on Common Area with common-area.damaged-on unless
+  common-area.restoration-declined holds, like #clear-debris; #not-restore-vote states only the 75 percent vote.
 - The Board's power to modify or cancel service contracts stops at services the Governing Documents require (7.8/p2): a
   Board obligation with no request type (7.8/p2#required-services), a limit on a power like 7.2/p3's.
 - "If reasonably available, or if not reasonably available, the most nearly equivalent coverages" (7.3(a)) is an
@@ -835,9 +841,8 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   prior and written while it or an Affiliate owns property, then by the Board; the Board's consent is read as prior (it
   replaces the Declarant's in the same "without consent" prohibition) but not necessarily written. The written-consent
   document and utility-work.board-consents are gone.
-- 11.3(a)/p3's consents exclude Work performed by a governmental entity, a condition on work.performed-by, so the
-  feature has to state who performed an Owner's utility work, which is unknown when unstated; the Declarant's exception
-  stays in the statement, since the rules bind an Owner.
+- 11.3(a)/p3's consents exclude Work performed by the Declarant or a governmental entity, a condition on
+  work.performed-by, so the feature has to state who performed an Owner's utility work, which is unknown when unstated.
 - The 10.3 permissions override with a selector: every rule under use-restrictions:a(x) and every Design Guidelines
   rule, but only on the sales facility or sign itself (an overriding rule counts only on subjects it applies to), which
   matches "in such number, of such size, and in such locations as Declarant deems appropriate" better than the single
@@ -874,23 +879,25 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   violation whose inspection entered the Unit, with the entry as an entity.
 - Entries and work by the Declarant and utility easement holders (10.9(b), 10.9(c), 11.3(a)/p2, 11.3(d)) have the same
   kind of conditions; they're rules with no request type, since none carries those entries yet.
-- 10.10's notice to the Declarant and any Builder before retaining an expert for a design or construction claim is a
-  claimant obligation in dispute requests (dispute-kind.design-construction): a deadline putting
-  dispute.declarant-builder-notified-on no later than dispute.expert-retained-on.
+- 10.10's notice to the Declarant and any Builder before retaining an expert for a design or construction claim is an
+  obligation on any Person ("No Person shall") in dispute requests (dispute-kind.design-construction): a deadline
+  putting dispute.declarant-builder-notified-on no later than dispute.expert-retained-on.
 - 10.7/p2's non-use clause is cited by 8.6/p2#due-date alongside 7.8/p2.
 - 10.7's limits are rules with no request type, since the fees and contracts are between users, the Declarant and
   service providers, not charges the Association levies: the Declarant's user fees must be reasonable and within any
   legal maximum (10.7/p1#reasonable-fee, #maximum-charge, two rules since either can fail alone), an Owner who asks for
   particular services pays the provider directly unless the Association assesses the cost (10.7/p2#requester-pays), and
   the Declarant's contracts with providers must be bona fide and commercially reasonable (10.7/p2#bona-fide-contracts).
-- 10.3's "shall not be subject to fees or rental charges" is an Association obligation in assessment requests on use
-  fees (10.3#no-fees), judged by the Board.
+- 10.3's "shall not be subject to fees or rental charges" is an Association obligation on every assessment
+  (10.3#no-fees), not only use fees, testing that it doesn't charge the Declarant, its Affiliates or authorized Builders
+  for the facilities (assessment.charges-declarant-facility-use).
 - 10.12's and 11.9's applicable-law clauses are obligations judged by the Board with no request type
   (10.12#applicable-law on the Declarant, 11.9#applicable-law on whoever exercises an Article 11 easement), like
   11.3(a)/p2#permits: law outranks the Declaration already, but each clause is a duty a reviewer can find unmet.
 - 10.11 is read as ending the Article 10 rights at the earlier of December 4, 2031 or a Recorded statement that sales
   have ceased (community.declarant-reserved-rights-in-force), though "shall not terminate until" could also be read as a
-  minimum duration only.
+  minimum duration only. The Declarant's withdrawal and site-designation powers (10.1#while-owns, 10.2/p1#while-owns)
+  test it beside the Exhibit property ownership and cite 10.11.
 - The 30 years in 10.11 run from the Declaration's Recording, taken as 2001-12-04 from its edition; the scan doesn't
   show the recording stamp.
 - The vote requirements for 9.2, 10.6, 12.2 and 12.3 are on a vote entity, as the Declaration amendment example is. The
@@ -1282,7 +1289,7 @@ Judgment calls:
   approval and an application doesn't carry the verification.
 - In 5.8.2, a fence in a utility easement where a recorded plat or document prohibits it is a judged obligation in
   applications and violations (remedy redesign); the Owner's cost of a utility's removal is an obligation with no
-  request type; and examining plot plans for sight lines is a recommendation with no request type.
+  request type; and examining plot plans for sight lines is a recommendation in applications (remedy change-detail).
 
 ## Request types
 
@@ -1466,3 +1473,40 @@ now also apply to a Board designation of Voting Groups and cite 6.4(b)/p2, and w
   the assessment was due by lot.owner-took-title-on and unpaid then (assessment.paid-on absent or later), and tests that
   it's paid, replacing the deadline from the original due date, which made the grantee answer for lateness before the
   transfer; 8.8/p3#new-owner-not-liable still overrides it.
+
+**Rule-structuring review 2 (2026-10-11, runs 2026-10-11T15-53-10 and 2026-10-11T15-54-33 of rule-structuring v2).**
+
+- Use Restrictions (a)(ii): enclosed-garage applies to storage or repair on any part of the Unit except an enclosed
+  garage (vehicle-repair.location in driveway, unit-exterior or dwelling), not anywhere but an enclosed garage; the
+  street and the Common Area aren't part of a Unit.
+- 4.3(b)/p8: landscaping-90-days binds the initial home purchaser, so it applies only while lot.owner-took-title-on is
+  lot.first-conveyed-on.
+- 5.3/p1: similar-neighborhoods applies to Board-assigned costs (assessment.board-assigned-costs) with no specific
+  agreement (assessment.cost-assignment-basis not an Owner or Neighborhood Association agreement), the facts
+  #cost-assignment-basis uses; its question no longer carries the condition.
+- 6.4(a)/p3: admin-charge-reasonable applies only when assessment.service-admin-charge holds, as #admin-charge-uniform
+  does.
+- 7.3(a)(ii): general-liability also tests that the policy insures the Association and its Members, both among
+  insurance-policy.beneficiaries, as 7.3(b)(ii)#common-area-beneficiaries does; insurance-policy.insured names one
+  party, so it can't hold both.
+- 6.4(a)/p2: after the Declarant's period the Board may re-designate boundaries and combine Neighborhoods (with the
+  Owners' consent), not create them: the new vote-subject.neighborhood-creation splits creation from
+  .neighborhood-designation, now labelled re-designating boundaries, and #designated-by's Board branch excludes it.
+- 3.3(a)/p2: petition-meeting is a fact, not a judgment: a Board obligation on the Board's change or Voting Group
+  designation in meeting requests, applying when vote.disapproval-petition-received-on is before vote.effective-on, and
+  testing that the meeting was called (the new vote.disapproval-meeting-called-on) or held, since the duty is to call
+  it.
+- 7.3(c)/p2: the new #timely-repair holds the Association's duty to repair or rebuild in a timely manner, a yearly
+  compliance-period judgment like #clear-debris, on Common Area with the new common-area.damaged-on unless restoration
+  was declined; #not-restore-vote's statement keeps only the vote.
+- 10.3: no-fees applies to every assessment, since the bar covers all fees and rental charges, not only use fees.
+- 11.3(a)/p3: declarant-consent and board-consent exclude the Declarant's own utility work as well as a governmental
+  entity's ("Persons other than Declarant").
+- Design Guidelines 3.1.2: approval-required applies to exterior changes only, not to interior Work
+  (work-kind.interior).
+- Design Guidelines 7.14.8: materials, metal-black and match-home apply to front and back porches only, the provision's
+  own subject, through the railing's outdoor-living-area.side-of-home.
+- Outline level: 10.10#notice-before-expert binds any Person ("No Person shall"), not the claimant; 10.1#while-owns and
+  10.2/p1#while-owns also test community.declarant-reserved-rights-in-force and cite 10.11, which ends the Article 10
+  rights; Design Guidelines 5.8.2#check-sight-lines runs in architectural-application requests, as recommendations do,
+  with remedy change-detail.

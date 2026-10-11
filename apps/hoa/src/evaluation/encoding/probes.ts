@@ -10,7 +10,8 @@ import type { Vocabulary } from "@/schema/vocabulary"
 export type Place = { from: T.Root; path: T.TermKey[] }
 
 export type Probe =
-  | ({ kind: "fact"; constants: T.Operand[] } & Place)
+  /** base: the place is a divisor, or a quantity a fraction is taken of, so a zero there has no meaningful answer. */
+  | ({ kind: "fact"; constants: T.Operand[]; base?: boolean } & Place)
   | { kind: "approval"; parties: T.TermKey[] }
   | { kind: "document"; document: T.TermKey; signedBy: T.TermKey[] }
   | { kind: "judgment" }
@@ -23,6 +24,14 @@ const isConstant = (operand: T.Operand): operand is Constant =>
 
 const subjectRoot: Place = { from: "subject", path: [] }
 
+/** The places that are a share's base: a quotient's divisors, or what a product multiplies by a constant. */
+function shareBases(type: string, of: readonly T.Operand[], places: readonly Place[][]) {
+  if (type === "quotient") {
+    return places.slice(1).flat()
+  }
+  return type === "product" && of.some(isConstant) ? places.flat() : []
+}
+
 /** A path as seen from the scope it's evaluated in: a subject path continues the scope's own path. */
 const placeOf = (scope: Place, path: T.Path): Place =>
   path.from === undefined || path.from === "subject"
@@ -33,7 +42,7 @@ function probeCollector(vocabulary: Vocabulary) {
   const probes = new Map<string, Probe>()
   const add = (probe: Probe) => {
     const key = match(probe)
-      .with({ kind: "fact" }, (fact) => `fact ${fact.from} ${fact.path.join("/")}`)
+      .with({ kind: "fact" }, (fact) => placeKey(fact))
       .with({ kind: "document" }, (document) => `document ${document.document}`)
       .with({ kind: "text" }, (text) => `text ${text.text}`)
       .otherwise((other) => other.kind)
@@ -52,15 +61,20 @@ function probeCollector(vocabulary: Vocabulary) {
     }
   }
   const seenCategories = new Set<T.TermKey>()
+  /** Places that are a quotient's divisor or a product's factor beside a constant (the base of a share). */
+  const bases = new Set<string>()
+  const placeKey = (place: Place) => `fact ${place.from} ${place.path.join("/")}`
 
   /** The places an operand reads; constants compared with it are attached by the caller. */
   function operand(scope: Place, value: T.Operand): Place[] {
     return match(value)
       .returnType<Place[]>()
       .with({ type: "ref" }, (ref) => [placeOf(scope, ref)])
-      .with({ type: P.union("sum", "greatest", "least", "difference", "product", "quotient") }, ({ of }) =>
-        of.flatMap((item) => operand(scope, item))
-      )
+      .with({ type: P.union("sum", "greatest", "least", "difference", "product", "quotient") }, (arithmetic) => {
+        const places = arithmetic.of.map((item) => operand(scope, item))
+        shareBases(arithmetic.type, arithmetic.of, places).forEach((place) => bases.add(placeKey(place)))
+        return places.flat()
+      })
       .with({ type: "shift" }, (shift) => operand(scope, shift.of))
       .with({ type: "count" }, (count) => {
         const items = placeOf(scope, count)
@@ -151,7 +165,14 @@ function probeCollector(vocabulary: Vocabulary) {
       .exhaustive()
   }
 
-  return { condition, check, probes: () => [...probes.values()] }
+  return {
+    condition,
+    check,
+    probes: () =>
+      [...probes.values()].map((probe) =>
+        probe.kind === "fact" && bases.has(placeKey(probe)) ? { ...probe, base: true } : probe
+      )
+  }
 }
 
 /** Everything a rule's applicability and check read, merged by place. */
