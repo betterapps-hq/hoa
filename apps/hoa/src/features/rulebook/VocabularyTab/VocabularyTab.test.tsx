@@ -16,7 +16,7 @@ const termsShown = () =>
 describe("VocabularyTab", () => {
   it("lists the terms to review with their kind, definition and where they're used", async () => {
     const { user, openRule } = renderInWorkspace(<VocabularyTab />)
-    expect(screen.getByText(/^1039 terms/)).toBeInTheDocument()
+    expect(screen.getByText(/^1036 terms/)).toBeInTheDocument()
     expect(termsShown()).toHaveLength(25)
     await user.type(screen.getByRole("searchbox", { name: "Search terms" }), "premises leased")
     const term = termsShown().find((item) => within(item).queryByText(/^A property of lease registration/))
@@ -33,7 +33,7 @@ describe("VocabularyTab", () => {
     for (const query of ["leased premisses", "premis lea"]) {
       await user.clear(box)
       await user.type(box, query)
-      expect(screen.getByText(/^5 of 1039 terms/)).toBeInTheDocument()
+      expect(screen.getByText(/^5 of 1036 terms/)).toBeInTheDocument()
       expect(within(termsShown()[0]!).getByRole("button", { name: "Actions for Leased premises" })).toBeInTheDocument()
       expect(screen.getByText(/^A property of lease registration/)).toBeInTheDocument()
     }

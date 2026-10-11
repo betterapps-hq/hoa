@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { afterAll, describe, expect, it } from "vitest"
 import { z } from "zod"
 import { clippedInput, repeatSpread, spreadText } from "./report"
-import { confirmedGaps, readJudgments, readStepRun, stepItemFile } from "./stepRuns"
+import { confirmedGaps, judgedTermPairs, readJudgments, readStepRun, stepItemFile } from "./stepRuns"
 
 // A step run's folder read back for --rescore, and what its comparison files show of an item's input.
 
@@ -74,7 +74,7 @@ describe("repeats and judgments", () => {
   })
 
   it("reads the golden gaps the coding agent confirmed, and none when a run has no judgments", () => {
-    expect(readJudgments(folder)).toEqual({ goldenGaps: [] })
+    expect(readJudgments(folder)).toEqual({ goldenGaps: [], termPairs: [] })
     write("judgments.json", {
       goldenGaps: [
         { item: "defined-terms:rules", label: "Garden Plot", confirmed: true, why: "1.4 defines it" },
@@ -82,5 +82,17 @@ describe("repeats and judgments", () => {
       ]
     })
     expect(confirmedGaps(readJudgments(folder), "defined-terms:rules")).toEqual(["Garden Plot"])
+  })
+
+  it("reads the term pairs judged for one item", () => {
+    write("judgments.json", {
+      termPairs: [
+        { item: "shared-vocabulary:a", golden: "deck.height", pipeline: "deck.height-above-ground", why: "same" },
+        { item: "shared-vocabulary:b", golden: "gate.color", pipeline: "gate.finish", why: "same" }
+      ]
+    })
+    expect(judgedTermPairs(readJudgments(folder), "shared-vocabulary:a")).toEqual([
+      { golden: "deck.height", pipeline: "deck.height-above-ground" }
+    ])
   })
 })

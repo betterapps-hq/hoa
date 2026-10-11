@@ -49,6 +49,7 @@ import {
 } from "../src/evaluation/encoding/steps/stage.ts"
 import {
   confirmedGaps,
+  judgedTermPairs,
   readJudgments,
   readStepRun,
   stepItemFile,
@@ -335,7 +336,7 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
   const calls = runs.flatMap((run) => run.calls)
   const problems = runs.flatMap((run) => run.problems)
   mkdirSync(join(out, "compare"), { recursive: true })
-  if (judgments.goldenGaps.length > 0) {
+  if (judgments.goldenGaps.length > 0 || judgments.termPairs.length > 0) {
     writeJson(join(out, "judgments.json"), judgments)
   }
   runs.forEach((run, index) => {
@@ -465,10 +466,15 @@ switch (stage) {
     break
   }
   case "shared-vocabulary": {
-    // From an E run: its outlines, grouped as the dataset groups the golden's sections.
+    // From an E run: its outlines, grouped as the dataset groups the golden's, so each group is scored against its own
+    // expected terms.
     const outlines = fromStep?.outlines ?? null
+    const goldenOutlinesOf = (unit: { id: string }) =>
+      datasets["shared-vocabulary"]
+        .flatMap((item) => item.input.outlines)
+        .filter((outline) => outline.unitId === unit.id).length
     const items = outlines
-      ? vocabularyGroups(sections).flatMap((group) => {
+      ? vocabularyGroups(sections, goldenOutlinesOf).flatMap((group) => {
           const golden = datasets["shared-vocabulary"].find((item) => item.id === `shared-vocabulary:${group.id}`)
           const ids = new Set(group.units.map((unit) => unit.id))
           const own = outlines.filter((outline) => ids.has(outline.unitId))
@@ -479,7 +485,7 @@ switch (stage) {
             outlines: own,
             provisions: goldenProvisions.filter((provision) => cited.has(provision.key)),
             definedTerms,
-            previous: [],
+            previous: golden?.input.previous ?? [],
             documents: goldenSet.golden.documents.map(({ key, kind, title, edition }) => ({
               key,
               kind,
@@ -495,7 +501,7 @@ switch (stage) {
       calls: 0,
       source: fromStep ? `step run ${values.from}` : "the golden dataset",
       run: (selected, cacheStage) => runSharedVocabulary(selected, { ai: stepAi(), cacheStage, reruns }),
-      score: scoreVocabulary,
+      score: (item, output) => scoreVocabulary(item, output, judgedTermPairs(judgments, item.id)),
       previous: fromStep ?? { outlines: goldenOutlines(golden, sections), settingsFlags: settingsFlags(golden) },
       output: termsOutput
     })

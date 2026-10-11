@@ -168,6 +168,16 @@ run folder's `judgments.json`
 rescores the run: `golden-gaps` counts the confirmed ones (0 until judged), and they no longer count as extra things. A
 confirmed gap is also a golden error to fix with a cited reason, as any expected-data change.
 
+**C's naming differences.** C's terms align with the golden's by key, else by label with an aligned parent, so a term
+that means the same fact under another name counts as missing. The coding agent judges each missing term against the
+output and records the same-meaning ones in `judgments.json` as
+`{ "termPairs": [{ "item": "<item id>", "golden": "<golden key>", "pipeline": "<output key>", "why": "<reason>" }] }`;
+a rescore aligns them (same kind, and an aligned parent, still required). A broader or narrower fact isn't a pair.
+
+C's input names an outline's subjects and parties as E hands them over: by key where the core, B's terms or the known
+terms (the golden's proposed core terms, which E is given too) have them, else by the golden term's preferred label, so
+C adds the terms the golden expects of it rather than reading a golden key as a term that exists.
+
 ## Review cases
 
 `pnpm eval:review [--case <id>,...]` runs the review (`reviewApplication`, the code the `ApplicationReview` Workflow

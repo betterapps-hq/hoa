@@ -21,6 +21,7 @@ import {
   goldenOutlines,
   goldenSections,
   goldenTerms,
+  outlinesAsFound,
   ruleContent,
   termContent,
   sectionOf
@@ -269,13 +270,15 @@ export function buildDatasets(context: GoldenContext) {
   for (const outline of outlines) {
     outlinesPerUnit.set(outline.unitId, (outlinesPerUnit.get(outline.unitId) ?? 0) + 1)
   }
+  // C is given B's terms and, as E is, the request types and things a last rulebook added to the core.
+  const givenToVocabulary = new Set([...definedTerms, ...knownTerms].map((term) => term.key))
   const vocabularyItems: SharedVocabularyItem[] = vocabularyGroups(
     sections,
     (unit) => outlinesPerUnit.get(unit.id) ?? 0
   ).map((group) => {
     const ids = new Set(group.units.map((unit) => unit.id))
     const groupOutlines = outlines.filter((outline) => ids.has(outline.unitId))
-    const expected = expectedVocabulary(golden, groupOutlines, new Set(definedTerms.map((term) => term.key)))
+    const expected = expectedVocabulary(golden, groupOutlines, givenToVocabulary)
     const cited = new Set(groupOutlines.flatMap((outline) => [outline.provisionKey, ...outline.citations]))
     const groupRules = rules.filter((rule) => groupOutlines.some((outline) => outline.key === rule.key))
     return {
@@ -293,10 +296,10 @@ export function buildDatasets(context: GoldenContext) {
       },
       input: {
         groupId: group.id,
-        outlines: groupOutlines,
+        outlines: outlinesAsFound(groupOutlines, golden, givenToVocabulary),
         provisions: golden.provisions.filter((provision) => cited.has(provision.key)),
         definedTerms,
-        previous: [],
+        previous: knownTerms,
         documents
       },
       expected: { terms: expected.terms, serves: Object.fromEntries(expected.serves) }

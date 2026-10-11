@@ -1389,3 +1389,13 @@ similar treatment, upkeep), and 10 new judged rules hold a quality split off a f
   King County or another governmental entity when work.needs-outside-permit holds. 5.8.1's boundary verification is a
   deadline: verified on or before the fence's construction started. 5.8.2's recorded prohibition and the Owner's cost of
   a utility's removal apply to a fence-run.within-utility-easement.
+
+**Shared-vocabulary review (2026-10-11, run 2026-10-11T13-32-59-shared-vocabulary).**
+
+- 3.1, 4.6, 4.8, 7.2, 7.6, 8.3, 8.10, 8.11, 11.8, 15.3, 17.2, 17.4 to 17.7: The 24 releases, assumptions of risk,
+  indemnities and liability shields outside Article 14 now apply to dispute, not claim. None of their provisions uses
+  the defined "Claim", whose criteria (Bound Parties, the Governing Documents, no excluded matter) would wrongly narrow
+  them.
+- 4.2(c): The Reviewer is the party with jurisdiction, the Declarant or the DRC, so architectural-application.reviewer
+  is a party among declarant and committee; the reviewer value set and its two values are gone, and 4.3(b)/p6 compares
+  with the parties.

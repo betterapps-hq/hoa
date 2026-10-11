@@ -28193,8 +28193,8 @@
       "kind": "property",
       "of": "architectural-application",
       "valueType": {
-        "type": "choice",
-        "set": "reviewer"
+        "type": "party",
+        "among": ["declarant", "committee"]
       },
       "many": false,
       "ifUnstated": "unknown",
@@ -28215,7 +28215,7 @@
           },
           "value": {
             "type": "value",
-            "term": "reviewer.drc"
+            "term": "committee"
           },
           "citations": [
             {
@@ -28264,7 +28264,7 @@
           },
           "value": {
             "type": "value",
-            "term": "reviewer.drc"
+            "term": "committee"
           },
           "citations": [
             {
@@ -28313,7 +28313,7 @@
           },
           "value": {
             "type": "value",
-            "term": "reviewer.declarant"
+            "term": "declarant"
           },
           "citations": [
             {
@@ -28372,155 +28372,6 @@
         },
         {
           "provisionKey": "declaration:4.2(c)",
-          "highlight": null,
-          "region": null
-        }
-      ],
-      "provenance": {
-        "by": "extraction",
-        "at": "2026-10-09T12:00:00Z"
-      },
-      "review": {
-        "status": "proposed",
-        "by": null,
-        "at": null,
-        "note": null
-      },
-      "issues": []
-    },
-    {
-      "key": "reviewer",
-      "organizationId": "org-sample",
-      "kind": "value-set",
-      "complete": true,
-      "labels": [
-        {
-          "text": "Reviewer",
-          "role": "preferred",
-          "plural": null,
-          "citation": null,
-          "provenance": {
-            "by": "extraction",
-            "at": "2026-10-09T12:00:00Z"
-          }
-        }
-      ],
-      "scopeNote": "Which of the two entities 4.2(c) calls the Reviewer (the committee party) has jurisdiction over one application.",
-      "definition": null,
-      "context": null,
-      "citations": [
-        {
-          "provisionKey": "declaration:4.2(c)",
-          "highlight": null,
-          "region": null
-        }
-      ],
-      "provenance": {
-        "by": "extraction",
-        "at": "2026-10-09T12:00:00Z"
-      },
-      "review": {
-        "status": "proposed",
-        "by": null,
-        "at": null,
-        "note": null
-      },
-      "issues": []
-    },
-    {
-      "key": "reviewer.declarant",
-      "organizationId": "org-sample",
-      "kind": "value",
-      "set": "reviewer",
-      "broader": [],
-      "labels": [
-        {
-          "text": "Declarant",
-          "role": "preferred",
-          "plural": null,
-          "citation": null,
-          "provenance": {
-            "by": "extraction",
-            "at": "2026-10-09T12:00:00Z"
-          }
-        },
-        {
-          "text": "Declarant's designee",
-          "role": "alternative",
-          "plural": null,
-          "citation": null,
-          "provenance": {
-            "by": "extraction",
-            "at": "2026-10-09T12:00:00Z"
-          }
-        }
-      ],
-      "scopeNote": "The Declarant, or Persons it designates, acting solely in the Declarant's interest (4.2(a)).",
-      "definition": null,
-      "context": null,
-      "citations": [
-        {
-          "provisionKey": "declaration:4.2(a)",
-          "highlight": null,
-          "region": null
-        }
-      ],
-      "provenance": {
-        "by": "extraction",
-        "at": "2026-10-09T12:00:00Z"
-      },
-      "review": {
-        "status": "proposed",
-        "by": null,
-        "at": null,
-        "note": null
-      },
-      "issues": []
-    },
-    {
-      "key": "reviewer.drc",
-      "organizationId": "org-sample",
-      "kind": "value",
-      "set": "reviewer",
-      "broader": [],
-      "labels": [
-        {
-          "text": "Design Review Committee",
-          "role": "preferred",
-          "plural": null,
-          "citation": null,
-          "provenance": {
-            "by": "extraction",
-            "at": "2026-10-09T12:00:00Z"
-          }
-        },
-        {
-          "text": "DRC",
-          "role": "alternative",
-          "plural": null,
-          "citation": null,
-          "provenance": {
-            "by": "extraction",
-            "at": "2026-10-09T12:00:00Z"
-          }
-        },
-        {
-          "text": "the Association acting through the DRC",
-          "role": "alternative",
-          "plural": null,
-          "citation": null,
-          "provenance": {
-            "by": "extraction",
-            "at": "2026-10-09T12:00:00Z"
-          }
-        }
-      ],
-      "scopeNote": "At least three and at most seven persons the Board appoints, removes and replaces; includes its subcommittees (4.2(b)).",
-      "definition": null,
-      "context": null,
-      "citations": [
-        {
-          "provisionKey": "declaration:4.2(b)",
           "highlight": null,
           "region": null
         }
@@ -63751,7 +63602,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -68641,7 +68492,7 @@
             "op": "=",
             "right": {
               "type": "value",
-              "term": "reviewer.drc"
+              "term": "committee"
             }
           },
           {
@@ -69978,7 +69829,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -70321,7 +70172,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -72861,7 +72712,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": {
         "type": "compare",
         "left": {
@@ -80938,7 +80789,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": {
         "type": "compare",
         "left": {
@@ -80995,7 +80846,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": {
         "type": "compare",
         "left": {
@@ -82132,7 +81983,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": {
         "type": "compare",
         "left": {
@@ -83644,7 +83495,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -83777,7 +83628,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -88827,7 +88678,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -88885,7 +88736,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -90650,7 +90501,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -90711,7 +90562,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": {
         "type": "compare",
         "left": {
@@ -90777,7 +90628,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -92177,7 +92028,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -92293,7 +92144,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -92351,7 +92202,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -92409,7 +92260,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -92470,7 +92321,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": {
         "type": "compare",
         "left": {
@@ -92536,7 +92387,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -92594,7 +92445,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -92652,7 +92503,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -92710,7 +92561,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -92768,7 +92619,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "claim",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,

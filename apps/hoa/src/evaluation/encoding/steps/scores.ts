@@ -484,11 +484,16 @@ export function scoreFinding(
 
 export type VocabularyOutput = { terms: TermContent[] }
 
-export function scoreVocabulary(item: SharedVocabularyItem, output: VocabularyOutput | null): ItemScore {
+/** C's terms against the golden's, with the pairs the coding agent judged the same under another name. */
+export function scoreVocabulary(
+  item: SharedVocabularyItem,
+  output: VocabularyOutput | null,
+  paired: readonly TermPair[] = []
+): ItemScore {
   if (output === null) {
     return missing("no vocabulary")
   }
-  const matches = alignTerms(item.expected.terms, output.terms)
+  const matches = alignTerms(item.expected.terms, output.terms, paired)
   const recall = (kinds: readonly string[]) => {
     const wanted = item.expected.terms.filter((term) => kinds.includes(term.kind))
     return share(wanted.filter((term) => matches.has(term.key)).length, wanted.length)

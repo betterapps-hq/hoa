@@ -59,11 +59,15 @@ export function readStepRun<Output>(
 /**
  * The coding agent's judgments of a step run (judgments.json in its folder, evaluation.md, Running one step): for B,
  * the golden-gap candidates it read, each confirmed when the step's citable text genuinely defines the term the golden
- * lacks. A rescore reads the judgments of the run it rescores and copies them to the new folder.
+ * lacks; for C, the golden terms it found an output term means under another name. A rescore reads the judgments of
+ * the run it rescores and copies them to the new folder.
  */
 export const stepJudgments = z.object({
   goldenGaps: z
     .array(z.object({ item: z.string(), label: z.string().min(1), confirmed: z.boolean(), why: z.string() }))
+    .default([]),
+  termPairs: z
+    .array(z.object({ item: z.string(), golden: z.string(), pipeline: z.string(), why: z.string() }))
     .default([])
 })
 export type StepJudgments = z.output<typeof stepJudgments>
@@ -77,3 +81,7 @@ export function readJudgments(folder: string): StepJudgments {
 /** The preferred labels of the golden gaps confirmed for one item. */
 export const confirmedGaps = (judgments: StepJudgments, itemId: string) =>
   judgments.goldenGaps.filter((gap) => gap.item === itemId && gap.confirmed).map((gap) => gap.label)
+
+/** The term pairs judged for one item. */
+export const judgedTermPairs = (judgments: StepJudgments, itemId: string) =>
+  judgments.termPairs.filter((pair) => pair.item === itemId).map(({ golden, pipeline }) => ({ golden, pipeline }))

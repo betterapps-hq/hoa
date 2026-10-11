@@ -109,6 +109,34 @@ export function goldenOutlines(golden: T.RulesFile, sections: readonly EncodingU
 }
 
 /**
+ * Golden outlines' parties and subjects as E hands them to C (`keyedOutline`): the key where the core or a given term
+ * has it, else the golden term's preferred label, for C to add, as E leaves a label no term has yet. A golden key C
+ * isn't given would read as a term that exists.
+ */
+export function outlinesAsFound(
+  outlines: readonly Outline[],
+  golden: T.RulesFile,
+  given: ReadonlySet<string>
+): Outline[] {
+  const vocabulary = createVocabulary(goldenTerms(golden))
+  const named = (key: string) => (coreKeys.has(key) || given.has(key) ? key : vocabulary.label(key))
+  const name = (key: string | null) => (key === null ? null : named(key))
+  return outlines.map((outline) => ({
+    ...outline,
+    bearer: name(outline.bearer),
+    appliesTo: name(outline.appliesTo),
+    decidedBy: name(outline.decidedBy),
+    sanction: outline.sanction
+      ? {
+          ...outline.sanction,
+          imposedBy: named(outline.sanction.imposedBy),
+          against: outline.sanction.against.map(named)
+        }
+      : null
+  }))
+}
+
+/**
  * B's golden input for one document: the candidates code finds, and every provision that defines a term in full: the
  * definitions, and each provision a candidate is defined in. A definition outside a definitions article (a qualifying
  * resident in a use section, a list of permitted kinds) then reaches the model whole, not as a one-sentence sample.

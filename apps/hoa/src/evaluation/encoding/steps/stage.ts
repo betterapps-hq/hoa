@@ -49,7 +49,7 @@ import {
 } from "@/encoding/steps/vocabularyMerge"
 import type { ModelCall } from "@/jobs/steps"
 import type * as T from "@/schema/types"
-import { domain, ruleDraft, termDraft, type RuleContent, type TermContent } from "@/schema/zod"
+import { domain, ruleDraft, ruleSelection, termDraft, type RuleContent, type TermContent } from "@/schema/zod"
 import type {
   ConsolidationItem,
   DefinedTermsItem,
@@ -115,14 +115,7 @@ export const outlineSchema: z.ZodType<Outline> = z.object({
   resolved: z
     .object({ rules: z.array(z.string()), documents: z.array(z.string()), except: z.array(z.string()) })
     .nullable(),
-  selector: z
-    .object({
-      documents: z.array(z.string()),
-      provisions: z.array(z.string()),
-      adoptedAfter: z.null(),
-      except: z.array(z.string())
-    })
-    .nullable()
+  selector: ruleSelection.options[1].nullable()
 })
 
 const origin = z.union([
