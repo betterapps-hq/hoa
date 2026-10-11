@@ -70,7 +70,7 @@ export const stepPrompts = {
   },
   /** Consolidation over rule lines with their overrides, cross-references and similar pairs; no term merges. */
   consolidation: {
-    name: "hoa-rulebook-consolidation",
+    name: "hoa-consolidation",
     variables: ["documents", "crossReferences", "rulePairs", "rules"],
     chat: true
   }

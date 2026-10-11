@@ -31,7 +31,7 @@ against the rules); the reordered step pipeline below replaces the need.
 The current work. The build is reordered into steps that each do one thing and can each be tested alone, before any
 of them is wired into the build: B defined terms (`hoa-defined-terms`), E find the rules (`hoa-rule-finding`), C shared
 vocabulary over E's outlines (`hoa-vocabulary-group`), C-merge (`hoa-vocabulary-merge`), F structure each rule with
-its retry (`hoa-rule-structuring`), and consolidation (`hoa-rulebook-consolidation`). The code is in
+its retry (`hoa-rule-structuring`), and consolidation (`hoa-consolidation`; the naive encoder keeps `hoa-rulebook-consolidation`). The code is in
 `src/encoding/steps/`. Each step has a local dataset from the goldens (`pnpm eval:datasets`) and runs alone over it, a
 saved build run or an earlier step run (`pnpm eval:step`; [evaluation.md](evaluation.md#encoding-step-datasets)).
 
