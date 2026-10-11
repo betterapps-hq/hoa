@@ -21,9 +21,21 @@ export const readJson = (path: string): unknown => JSON.parse(readFileSync(path,
 export function fileCache(stage: string): PromptCache {
   const path = (key: string) => join(encodingRuns, "cache", stage, `${key}.json`)
   return {
-    get: async (key) => (existsSync(path(key)) ? readJson(path(key)) : undefined),
+    // An entry that isn't JSON (an empty answer stored as "undefined") is a miss: the call runs again.
+    get: async (key) => {
+      if (!existsSync(path(key))) {
+        return undefined
+      }
+      try {
+        return readJson(path(key))
+      } catch {
+        return undefined
+      }
+    },
     put: async (key, value) => {
-      writeJson(path(key), value)
+      if (value !== undefined) {
+        writeJson(path(key), value)
+      }
     }
   }
 }
