@@ -40,7 +40,7 @@ saved build run or an earlier step run (`pnpm eval:step`; [evaluation.md](evalua
 | R.1 | Step answer formats, variables, checks and scorers; `pnpm eval:datasets` and `pnpm eval:step`. | Done. |
 | R.2 | B defined terms. | Done: `hoa-defined-terms` v6 on Opus at high effort. |
 | R.3 | E find the rules. | Done: `hoa-rule-finding` v5 (with `hoa-guide-rule-kinds` v5) on Opus at high effort, checked on four held-out organizations. |
-| R.4 | C shared vocabulary and C-merge. | Built, not yet tested: each clears its dataset on `pnpm eval:step`. |
+| R.4 | C shared vocabulary and C-merge. | Done: `hoa-vocabulary-group` v2 and `hoa-vocabulary-merge` v1 (implementation-log.md, 2026-10-11). Open: C-merge's clusters miss duplicates whose labels differ. |
 | R.5 | F structure the rules, with its retry. | Built, not yet tested: clears its dataset on `pnpm eval:step`. |
 | R.6 | Consolidation. | Built, not yet tested: clears its dataset on `pnpm eval:step`. |
 | R.7 | Wire the steps into `RulebookBuild` in place of vocabulary, plan, encode, verify and repair; `pnpm eval:step` chained runs match the build's. | A build of the sample documents runs end to end on the steps. |
