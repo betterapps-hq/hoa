@@ -183,6 +183,19 @@ export async function settleEach<T, R>(items: readonly T[], limit: number, run: 
   return results
 }
 
+/**
+ * `settleEach` with the first item run alone: a stage's calls share a long cached prefix (instructions, core terms,
+ * the vocabulary), and calls started together each pay to write it, so one call writes it and the rest read it.
+ */
+export async function settleWarm<T, R>(items: readonly T[], limit: number, run: (item: T) => Promise<R>) {
+  const [first, ...rest] = items
+  if (first === undefined) {
+    return []
+  }
+  const warmed = await settleEach([first], 1, run)
+  return [...warmed, ...(await settleEach(rest, limit, run))]
+}
+
 const messageOf = (reason: unknown) => (reason instanceof Error ? reason.message : String(reason))
 
 const documentKeyOf = (provisionKey: string) => provisionKey.slice(0, Math.max(0, provisionKey.indexOf(":")))
@@ -330,7 +343,7 @@ export async function buildRulebook(input: BuildInput) {
   })
   await progress("defined-terms", 0, defining.length)
   const definedDone = counter("defined-terms", defining.length)
-  const definedResults = await settleEach(defining, concurrency, async (item) => {
+  const definedResults = await settleWarm(defining, concurrency, async (item) => {
     const output = await step(
       `defined-terms:${item.document.key}`,
       definedTermsOutput,
@@ -438,7 +451,7 @@ export async function buildRulebook(input: BuildInput) {
   }
   await progress("find-rules", 0, units.length)
   const firstDone = counter("find-rules", units.length)
-  const firstAnswers = await settleEach(units, concurrency, async (unit) => {
+  const firstAnswers = await settleWarm(units, concurrency, async (unit) => {
     const output = await findRulesOf(unit, `find-rules:${unit.id}`)
     await firstDone()
     return output
@@ -577,7 +590,7 @@ export async function buildRulebook(input: BuildInput) {
   }
   await progress("vocabulary", 0, groups.length)
   const groupDone = counter("vocabulary", groups.length)
-  const firstGroups = await settleEach(groups, concurrency, async (group) => {
+  const firstGroups = await settleWarm(groups, concurrency, async (group) => {
     const output = await vocabularyOf(group, `vocabulary:${group.id}`)
     await groupDone()
     return output
@@ -692,7 +705,7 @@ export async function buildRulebook(input: BuildInput) {
   const retried = new Map<RuleKey, number>()
   await progress("structure-rules", 0, batches.length)
   const batchDone = counter("structure-rules", batches.length)
-  const firstPasses = await settleEach(batches, concurrency, async (batch) => {
+  const firstPasses = await settleWarm(batches, concurrency, async (batch) => {
     const output = await step(
       `structure-rules:${batch.id}`,
       structureRulesOutput,
