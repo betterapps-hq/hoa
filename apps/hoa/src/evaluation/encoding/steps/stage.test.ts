@@ -565,16 +565,13 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
         scoreStructuring(item, run.outputs.get(item.id) ?? null, sides, termAlignment(terms, terms))
       )
       const metrics = scores.map((score) => score.metrics)
-      // F's format has no judgment check for a requirement: a batch holding one of the golden's such rules can't be
-      // answered as the golden is (a SCHEMA GAP of the format); every other batch comes back whole and valid.
-      const gap = new Set(
-        golden.rules
-          .filter((rule) => rule.kind === "norm" && rule.modality === "requirement" && rule.check?.type === "judgment")
-          .map((rule) => rule.key)
-      )
-      const blocked = items.filter((item) => item.expected.rules.some((rule) => gap.has(rule.key)))
-      expect(blocked.flatMap((item) => item.expected.rules.filter((rule) => gap.has(rule.key)))).toHaveLength(gap.size)
-      for (const item of items.filter((found) => !blocked.includes(found))) {
+      // A requirement is fact-checked only, as F's format allows, so every batch comes back whole and valid.
+      expect(
+        golden.rules.filter(
+          (rule) => rule.kind === "norm" && rule.modality === "requirement" && rule.check?.type === "judgment"
+        )
+      ).toEqual([])
+      for (const item of items) {
         const metric = scores[items.indexOf(item)]?.metrics ?? {}
         expect([item.id, metric.structured, metric["valid-before-repair"]]).toEqual([item.id, 1, 1])
       }

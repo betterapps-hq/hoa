@@ -18,11 +18,11 @@ const rulesShown = () =>
 describe("RuleTable", () => {
   it("lists the draft's rules to review a page at a time, with their statements in words", () => {
     renderInWorkspace(<RuleTable />)
-    expect(screen.getByText(/679 rules, all to review/)).toBeInTheDocument()
+    expect(screen.getByText(/678 rules, all to review/)).toBeInTheDocument()
     expect(screen.queryByText(/\{\{/)).not.toBeInTheDocument()
     expect(screen.queryByText("Architectural")).not.toBeInTheDocument()
     expect(rulesShown()).toHaveLength(25)
-    expect(screen.getByText("1 to 25 of 679")).toBeInTheDocument()
+    expect(screen.getByText("1 to 25 of 678")).toBeInTheDocument()
   })
 
   it("narrows by words at once, and by kind, area and request type behind Filters", async () => {
@@ -82,7 +82,7 @@ describe("RuleTable", () => {
     })
     expect(screen.getAllByText("Approved")).toHaveLength(25)
     await user.click(screen.getByRole("button", { name: "Next 25 rules" }))
-    expect(screen.getByText("26 to 50 of 679")).toBeInTheDocument()
+    expect(screen.getByText("26 to 50 of 678")).toBeInTheDocument()
   })
 
   it("shows the kind and area columns on request, and sorts by them", async () => {

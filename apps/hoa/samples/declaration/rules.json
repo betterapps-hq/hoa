@@ -59246,6 +59246,1982 @@
       "kind": "thing",
       "nature": "document",
       "request": null
+    },
+    {
+      "key": "occupancy-permission-request",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "occupancy permission request",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        },
+        {
+          "text": "written request for the Board's permission",
+          "role": "alternative",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "a written request to the Board for permission for an occupant to stay in a Residence whose sole Qualifying Permanent Resident no longer occupies it",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:3.1(a)(i)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "thing",
+      "nature": "document",
+      "request": null
+    },
+    {
+      "key": "lot.owned-by-non-individual",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "owned by an Owner that isn't an individual",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        },
+        {
+          "text": "owned by a corporation or other entity",
+          "role": "alternative",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "the Unit's Owner is a corporation, partnership, trust or other Person that isn't an individual",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.2/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "lot",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "lot.entity-representative-capacity",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "capacity of the individual who exercised the Owner's membership",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.2/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "lot",
+      "valueType": {
+        "type": "choice",
+        "set": "entity-representative-capacity"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "entity-representative-capacity",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "capacity of a non-individual Owner's representative",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.2/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value-set",
+      "complete": false
+    },
+    {
+      "key": "entity-representative-capacity.officer",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "officer",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.2/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "entity-representative-capacity",
+      "broader": []
+    },
+    {
+      "key": "entity-representative-capacity.director",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "director",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.2/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "entity-representative-capacity",
+      "broader": []
+    },
+    {
+      "key": "entity-representative-capacity.partner",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "partner",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.2/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "entity-representative-capacity",
+      "broader": []
+    },
+    {
+      "key": "entity-representative-capacity.trustee",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "trustee",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.2/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "entity-representative-capacity",
+      "broader": []
+    },
+    {
+      "key": "lot.entity-representative-designation-filed",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "Owner designated the individual in a written instrument given to the Secretary",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.2/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "lot",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "vote-subject.director-election",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "election of directors",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(b)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "vote-subject",
+      "broader": []
+    },
+    {
+      "key": "vote.separate-slate-per-voting-group",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "Members in each Voting Group voted on a separate slate of candidates",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(b)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "community.directors-per-voting-group",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "directors each Voting Group is entitled to elect",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "the number of directors each Voting Group is entitled to elect, one entry per Voting Group",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(b)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "community",
+      "valueType": {
+        "type": "count"
+      },
+      "many": true,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "community.covenant-term-limited-by-law",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "period for enforcing covenants running with the land limited by law",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:1.2/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "community",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "vote.recorded-on",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "instrument Recorded on",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:1.2/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "date"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "vote.extension-on",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "date of the Declaration's next automatic extension",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:1.2/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "date"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "easement-holder",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "holder of an easement",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "the holder of an easement this Declaration created",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:1.2/p3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "thing",
+      "nature": "party",
+      "request": null
+    },
+    {
+      "key": "vote.terminates-easements",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "terminates an easement the Declaration created",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:1.2/p3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "approval.declarant-consent-required",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "action covered by the Declarant's Recorded consent requirement",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "the action the Board consented to or approved is one the Declarant's Recorded document requires the Declarant also to consent to or approve",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:article-2/class-b-control-period(d)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "approval",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "vote.disapproval-meeting-held-on",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "meeting to consider disapproval held on",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:3.3(a)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "date"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "vote.disapproved-at-meeting",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "disapproved at the meeting to consider disapproval",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:3.3(a)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "community.design-guidelines-upd-permit-conflict",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "Residential Design Guidelines or an amendment in conflict with the UPD Permit",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:4.3(a)/p3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "community",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "assessment.board-assigned-costs",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "includes Area of Common Responsibility costs the Board assigned to the Neighborhood",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:5.3/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "assessment",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "assessment.cost-assignment-basis",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "basis of the Board's cost assignment",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:5.3/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "assessment",
+      "valueType": {
+        "type": "choice",
+        "set": "cost-assignment-basis"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "cost-assignment-basis",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "basis of a Board cost assignment",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:5.3/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value-set",
+      "complete": false
+    },
+    {
+      "key": "cost-assignment-basis.owner-agreement",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "agreement with the Owners in the Neighborhood",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:5.3/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "cost-assignment-basis",
+      "broader": []
+    },
+    {
+      "key": "cost-assignment-basis.neighborhood-association-agreement",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "agreement with a Neighborhood Association",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:5.3/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "cost-assignment-basis",
+      "broader": []
+    },
+    {
+      "key": "cost-assignment-basis.board-resolution",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "Board resolution based on a perceived need or a failure to comply with the Community-Wide Standard",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:5.3/p1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "cost-assignment-basis",
+      "broader": []
+    },
+    {
+      "key": "lot.membership-transferred-apart-from-title",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "membership assigned, pledged or transferred apart from title to the Unit",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "a Member's rights or obligations were assigned, transferred, pledged, conveyed or alienated other than on a transfer of ownership of the Unit and to its transferee",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.2/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "lot",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "vote.class-b-votes",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "votes cast or counted for the Class \"B\" Member",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.3(b)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "count"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "neighborhood-association-documents",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "governing documents of the Neighborhood Association",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "the governing documents of a Neighborhood Association whose Members are also Members of the Association",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.3(c)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "thing",
+      "nature": "document",
+      "request": null
+    },
+    {
+      "key": "voting-group-designation",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "Supplemental Declaration establishing Voting Groups",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "the Supplemental Declaration the Board Records to establish Voting Groups",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(b)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "thing",
+      "nature": "document",
+      "request": null
+    },
+    {
+      "key": "vote.mortgagee-participated",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "a Mortgagee, as such, took part in the decision",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:7.3(c)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "assessment.working-capital-credited",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "working capital contribution credited as an advance payment",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:8.10",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "assessment",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "assessment.reserve-contribution-credited",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "reserve contribution credited as an advance payment",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:8.11",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "assessment",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "declarant-rights-grantee.holds-annexation-right",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "holds the Declarant's right to subject additional property",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:9.1/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "declarant-rights-grantee",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "declarant-rights-grantee.exhibit-property-developer",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "developer of at least a portion of the property described in Exhibit \"A\" or \"B\"",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:9.1/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "declarant-rights-grantee",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "declarant-rights-grantee.annexation-right-transferred-on",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "right to subject additional property transferred on",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:9.1/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "declarant-rights-grantee",
+      "valueType": {
+        "type": "date"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "declarant-rights-transfer",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "instrument transferring the Declarant's rights",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        },
+        {
+          "text": "Recorded assignment",
+          "role": "alternative",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "a written instrument the Declarant executes transferring or assigning any of its rights to another Person",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:9.1/p2",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:10.8",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "thing",
+      "nature": "document",
+      "request": null
+    },
+    {
+      "key": "property-withdrawal.approval-required-by",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "approval required by",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "King County and the other Jurisdictions whose approval the withdrawal requires",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:10.1",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "property-withdrawal",
+      "valueType": {
+        "type": "party",
+        "among": ["king-county", "governmental-entity"]
+      },
+      "many": true,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "declarant-rights-grantee.limited-permission-only",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "permitted to exercise a Declarant right only on a one-time or limited basis",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "the Declarant permitted the Person to exercise a right on a one-time or limited basis without intending to transfer it entirely",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:10.8",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "declarant-rights-grantee",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "declarant-rights-grantee.transfer-exceeds-declarant-rights",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "transfer reduces an obligation or enlarges a right beyond the Declarant's",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:10.8",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "declarant-rights-grantee",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "declarant-rights-grantee.transfer-upd-permit-conflict",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "transfer inconsistent with the UPD Permit",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:10.8",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "declarant-rights-grantee",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "vote-subject.voting-group-designation",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "designation of Voting Groups",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(b)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "vote-subject",
+      "broader": []
+    },
+    {
+      "key": "vote-subject.voting-group-designation-disapproval",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "disapproval of a Board designation of Voting Groups",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(b)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "vote-subject",
+      "broader": []
+    },
+    {
+      "key": "meeting.voting-group-designation-proposed",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "considers a proposed designation of Voting Groups",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(b)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "meeting",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
     }
   ],
   "proposedCore": [
@@ -60097,16 +62073,34 @@
       "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["vote.subject"]
-        },
-        "op": "=",
-        "right": {
-          "type": "value",
-          "term": "vote-subject.declaration-termination"
-        }
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.subject"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "vote-subject.declaration-termination"
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "from": "community",
+              "path": ["community.covenant-term-limited-by-law"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -60115,13 +62109,30 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "If the law limits how long covenants running with the land can be enforced, was the instrument terminating the Declaration, signed by the Owners Article 21 requires, Recorded within the year preceding the extension it prevents?",
-        "evidence": []
+        "type": "deadline",
+        "act": {
+          "type": "ref",
+          "path": ["vote.recorded-on"]
+        },
+        "anchor": {
+          "type": "ref",
+          "path": ["vote.extension-on"]
+        },
+        "earliest": {
+          "value": -1,
+          "unit": "year",
+          "at": null
+        },
+        "latest": {
+          "value": -1,
+          "unit": "calendar-day",
+          "at": null
+        },
+        "onMiss": []
       },
       "remedy": null,
       "recurs": null,
@@ -60251,16 +62262,33 @@
       "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["vote.subject"]
-        },
-        "op": "=",
-        "right": {
-          "type": "value",
-          "term": "vote-subject.declaration-termination"
-        }
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.subject"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "vote-subject.declaration-termination"
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.terminates-easements"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -60269,13 +62297,15 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Does the termination leave in force every easement the Declaration created, except those whose holders consented to their termination?",
-        "evidence": []
+        "type": "approval",
+        "by": ["easement-holder"],
+        "needs": "all",
+        "prior": false,
+        "written": false
       },
       "remedy": null,
       "recurs": null,
@@ -60363,6 +62393,18 @@
             },
             "from": "community",
             "path": ["community.units-owned-by"]
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["approval.declarant-consent-required"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
           }
         ]
       },
@@ -60373,13 +62415,19 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Did the Declarant also consent to or approve the action the Board consented to or approved, if the Declarant's Recorded document covers that action?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "approved",
+          "by": ["declarant"],
+          "needs": "all",
+          "prior": false,
+          "written": false,
+          "path": ["approval.covers"]
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -61038,7 +63086,7 @@
       "key": "declaration:3.1(a)(i)/p2#written-request",
       "domain": "use",
       "title": "Ask for the surviving-occupant permission in writing",
-      "statement": "A request for the {{board}}'s permission for an occupant to stay in a {{residence}} without a {{qualifying-permanent-resident}} must be a written request giving the names and ages of all proposed residents and occupants, and any other information the Board reasonably requires.",
+      "statement": "A request for the {{board}}'s permission for an occupant to stay in a {{residence}} without a {{qualifying-permanent-resident}} must be a written {{occupancy-permission-request}} giving the names and ages of all proposed residents and occupants, and any other information the Board reasonably requires.",
       "citations": [
         {
           "provisionKey": "declaration:3.1(a)(i)/p2",
@@ -61067,13 +63115,18 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Was the request for the Board's permission a written request giving the names and ages of all proposed residents and occupants of the Residence, and the other information the Board reasonably required?",
-        "evidence": ["occupant-age-proof"]
+        "type": "document",
+        "document": "occupancy-permission-request",
+        "per": "subject",
+        "mustState": [
+          "the names of all proposed residents and occupants of the Residence",
+          "the ages of all proposed residents and occupants of the Residence"
+        ],
+        "signedBy": []
       },
       "remedy": null,
       "recurs": null,
@@ -62984,10 +65037,15 @@
       "key": "declaration:3.3(a)#notice-of-change",
       "domain": "governance",
       "title": "Notice of a Use Restrictions change five business days ahead",
-      "statement": "The {{board}} must conspicuously publish notice of a proposed change to the {{use-restrictions}} at least five business days before the Board {{meeting}} that will consider it.",
+      "statement": "The {{board}} must conspicuously publish notice of a proposed change to the {{use-restrictions}}, or of a proposed designation of {{voting-group:plural}}, at least five business days before the Board {{meeting}} that will consider it.",
       "citations": [
         {
           "provisionKey": "declaration:3.3(a)",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:6.4(b)/p2",
           "highlight": null,
           "region": null
         }
@@ -62995,16 +65053,33 @@
       "requestTypes": ["meeting"],
       "appliesTo": "meeting",
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["meeting.use-restrictions-change-proposed"]
-        },
-        "op": "=",
-        "right": {
-          "type": "boolean",
-          "value": true
-        }
+        "type": "any",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["meeting.use-restrictions-change-proposed"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["meeting.voting-group-designation-proposed"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -63053,10 +65128,15 @@
       "key": "declaration:3.3(a)#members-heard",
       "domain": "governance",
       "title": "Members heard before a Use Restrictions change",
-      "statement": "Before the {{board}} acts on a change to the {{use-restrictions}}, {{members}} must have a reasonable opportunity to be heard at a Board {{meeting}}.",
+      "statement": "Before the {{board}} acts on a change to the {{use-restrictions}} or a designation of {{voting-group:plural}}, {{members}} must have a reasonable opportunity to be heard at a Board {{meeting}}.",
       "citations": [
         {
           "provisionKey": "declaration:3.3(a)",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:6.4(b)/p2",
           "highlight": null,
           "region": null
         }
@@ -63064,16 +65144,33 @@
       "requestTypes": ["meeting"],
       "appliesTo": "meeting",
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["meeting.use-restrictions-change-proposed"]
-        },
-        "op": "=",
-        "right": {
-          "type": "boolean",
-          "value": true
-        }
+        "type": "any",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["meeting.use-restrictions-change-proposed"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["meeting.voting-group-designation-proposed"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -63087,7 +65184,7 @@
       "noExceptions": null,
       "check": {
         "type": "judgment",
-        "question": "Did Members have a reasonable opportunity to be heard at a Board meeting before the Board acted on the change?",
+        "question": "Did Members have a reasonable opportunity to be heard at a Board meeting before the Board acted on the change or designation?",
         "evidence": []
       },
       "remedy": null,
@@ -63109,10 +65206,15 @@
       "key": "declaration:3.3(a)/p2#member-disapproval",
       "domain": "governance",
       "title": "Disapproving a Board change needs more than 50 percent, after the Class \"B\" Control Period",
-      "statement": "A disapproval of a Board change to the {{use-restrictions}} needs a {{meeting}} after the Class \"B\" Control Period, before the change takes effect, and the votes of {{members}} holding more than 50 percent of the Class \"A\" votes.",
+      "statement": "A disapproval of a Board change to the {{use-restrictions}}, or of a Board designation of {{voting-group:plural}}, needs a {{meeting}} after the Class \"B\" Control Period, before the change or designation takes effect, and the votes of {{members}} holding more than 50 percent of the Class \"A\" votes.",
       "citations": [
         {
           "provisionKey": "declaration:3.3(a)/p2",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:6.4(b)/p2",
           "highlight": null,
           "region": null
         }
@@ -63120,16 +65222,21 @@
       "requestTypes": ["meeting"],
       "appliesTo": "vote",
       "appliesWhen": {
-        "type": "compare",
+        "type": "in",
         "left": {
           "type": "ref",
           "path": ["vote.subject"]
         },
-        "op": "=",
-        "right": {
-          "type": "value",
-          "term": "vote-subject.use-restrictions-disapproval"
-        }
+        "values": [
+          {
+            "type": "value",
+            "term": "vote-subject.use-restrictions-disapproval"
+          },
+          {
+            "type": "value",
+            "term": "vote-subject.voting-group-designation-disapproval"
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -63769,10 +65876,15 @@
       "key": "declaration:3.3(a)/p2#petition-meeting",
       "domain": "governance",
       "title": "Call a disapproval meeting on petition",
-      "statement": "On receiving a petition, as the By-Laws require for special meetings, the {{board}} must call a {{meeting}} of the {{members}} to consider disapproving a Board change to the {{use-restrictions}}; otherwise it needn't call one.",
+      "statement": "On receiving a petition, as the By-Laws require for special meetings, the {{board}} must call a {{meeting}} of the {{members}} to consider disapproving a Board change to the {{use-restrictions}} or a Board designation of {{voting-group:plural}}; otherwise it needn't call one.",
       "citations": [
         {
           "provisionKey": "declaration:3.3(a)/p2",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:6.4(b)/p2",
           "highlight": null,
           "region": null
         }
@@ -63792,7 +65904,7 @@
       "noExceptions": null,
       "check": {
         "type": "judgment",
-        "question": "For every petition received, as the By-Laws require for special meetings, to consider disapproving a Board change to the Use Restrictions, did the Board call a meeting of the Members?",
+        "question": "For every petition received, as the By-Laws require for special meetings, to consider disapproving a Board change to the Use Restrictions or a Board designation of Voting Groups, did the Board call a meeting of the Members?",
         "evidence": []
       },
       "remedy": null,
@@ -63814,7 +65926,7 @@
       "key": "declaration:3.3(a)/p2#suspended-pending-meeting",
       "domain": "governance",
       "title": "A petition holds a Board change until the disapproval meeting",
-      "statement": "If a petition for a {{meeting}} to consider disapproving a {{board}} change to the {{use-restrictions}} is received before the change's effective date, the change doesn't take effect until after the meeting is held, and then only as the meeting's outcome allows.",
+      "statement": "If a petition for a {{meeting}} to consider disapproving a {{board}} change to the {{use-restrictions}}, or a Board designation of {{voting-group:plural}}, is received before its effective date, the change or designation doesn't take effect until after the meeting is held, and then only as the meeting's outcome allows.",
       "citations": [
         {
           "provisionKey": "declaration:3.3(a)/p2",
@@ -63822,6 +65934,11 @@
             "start": 615,
             "end": 718
           },
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:6.4(b)/p2",
+          "highlight": null,
           "region": null
         }
       ],
@@ -63831,16 +65948,21 @@
         "type": "all",
         "of": [
           {
-            "type": "compare",
+            "type": "in",
             "left": {
               "type": "ref",
               "path": ["vote.subject"]
             },
-            "op": "=",
-            "right": {
-              "type": "value",
-              "term": "vote-subject.use-restrictions-amendment"
-            }
+            "values": [
+              {
+                "type": "value",
+                "term": "vote-subject.use-restrictions-amendment"
+              },
+              {
+                "type": "value",
+                "term": "vote-subject.voting-group-designation"
+              }
+            ]
           },
           {
             "type": "compare",
@@ -63875,13 +65997,43 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Did the Board's change take effect only after the meeting the petition called for was held, and only if that meeting didn't disapprove it?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "all",
+          "of": [
+            {
+              "type": "compare",
+              "left": {
+                "type": "ref",
+                "path": ["vote.effective-on"]
+              },
+              "op": ">",
+              "right": {
+                "type": "ref",
+                "path": ["vote.disapproval-meeting-held-on"]
+              }
+            },
+            {
+              "type": "not",
+              "of": {
+                "type": "compare",
+                "left": {
+                  "type": "ref",
+                  "path": ["vote.disapproved-at-meeting"]
+                },
+                "op": "=",
+                "right": {
+                  "type": "boolean",
+                  "value": true
+                }
+              }
+            }
+          ]
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -63902,10 +66054,15 @@
       "key": "declaration:3.3(c)#distribute-copy",
       "domain": "governance",
       "title": "Send each Owner the changed Use Restrictions",
-      "statement": "Before any new or changed {{use-restrictions}} under 3.3 take effect, the {{board}} must send a copy of them to each {{owner}}.",
+      "statement": "Before any new or changed {{use-restrictions}} under 3.3, or a designation of {{voting-group:plural}}, take effect, the {{board}} must send a copy of them to each {{owner}}.",
       "citations": [
         {
           "provisionKey": "declaration:3.3(c)",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:6.4(b)/p2",
           "highlight": null,
           "region": null
         }
@@ -63925,7 +66082,7 @@
       "noExceptions": null,
       "check": {
         "type": "judgment",
-        "question": "Before each new or changed Use Restriction adopted under Section 3.3 took effect, did the Board send a copy of it to each Owner?",
+        "question": "Before each new or changed Use Restriction adopted under Section 3.3, and each designation of Voting Groups, took effect, did the Board send a copy of it to each Owner?",
         "evidence": []
       },
       "remedy": null,
@@ -63947,7 +66104,7 @@
       "key": "declaration:3.3(c)#effective-date",
       "domain": "governance",
       "title": "A Use Restrictions change takes effect at least 30 days after distribution",
-      "statement": "A new or changed {{use-restrictions}} adopted under Section 3.3 takes effect no earlier than 30 days after the {{board}} sends a copy of it to the {{owner:plural}}.",
+      "statement": "A new or changed {{use-restrictions}} adopted under Section 3.3, or a designation of {{voting-group:plural}}, takes effect no earlier than 30 days after the {{board}} sends a copy of it to the {{owner:plural}}.",
       "citations": [
         {
           "provisionKey": "declaration:3.3(c)",
@@ -63955,6 +66112,11 @@
             "start": 151,
             "end": 229
           },
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:6.4(b)/p2",
+          "highlight": null,
           "region": null
         }
       ],
@@ -63974,6 +66136,10 @@
           {
             "type": "value",
             "term": "vote-subject.use-restrictions-adoption"
+          },
+          {
+            "type": "value",
+            "term": "vote-subject.voting-group-designation"
           }
         ]
       },
@@ -67699,13 +69865,15 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Is the delegation in writing, and does it specify the delegated responsibilities?",
-        "evidence": []
+        "type": "document",
+        "document": "design-review-delegation",
+        "per": "subject",
+        "mustState": ["the delegated responsibilities"],
+        "signedBy": []
       },
       "remedy": null,
       "recurs": null,
@@ -68158,13 +70326,26 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Do the Residential Design Guidelines and every amendment to them comply with the UPD Permit?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "not",
+          "of": {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["community.design-guidelines-upd-permit-conflict"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -70544,16 +72725,33 @@
       "requestTypes": ["assessment"],
       "appliesTo": "assessment",
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["assessment.type"]
-        },
-        "op": "=",
-        "right": {
-          "type": "value",
-          "term": "assessment-type.neighborhood"
-        }
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["assessment.type"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "assessment-type.neighborhood"
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["assessment.board-assigned-costs"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -70562,13 +72760,32 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Were the Area of Common Responsibility costs assigned to the Neighborhood's Owners under an agreement with those Owners or a Neighborhood Association, or by a Board resolution based upon a perceived need or a failure to comply with the Community-Wide Standard?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "in",
+          "left": {
+            "type": "ref",
+            "path": ["assessment.cost-assignment-basis"]
+          },
+          "values": [
+            {
+              "type": "value",
+              "term": "cost-assignment-basis.owner-agreement"
+            },
+            {
+              "type": "value",
+              "term": "cost-assignment-basis.neighborhood-association-agreement"
+            },
+            {
+              "type": "value",
+              "term": "cost-assignment-basis.board-resolution"
+            }
+          ]
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -70826,7 +73043,7 @@
       "key": "declaration:6.2/p1#entity-representative",
       "domain": "governance",
       "title": "Who exercises a non-individual Owner's membership",
-      "statement": "The membership rights of an {{owner}} that isn't an individual may be exercised only by its officer, director, partner or trustee, or by an individual it designates in a written instrument given to the Association's Secretary.",
+      "statement": "The membership rights of an {{owner}} that isn't an individual may be exercised only by its officer, director, partner or trustee, or by an individual it designates in a written instrument given to the Association's {{secretary}}.",
       "citations": [
         {
           "provisionKey": "declaration:6.2/p1",
@@ -70836,7 +73053,35 @@
       ],
       "requestTypes": ["meeting"],
       "appliesTo": "lot",
-      "appliesWhen": null,
+      "appliesWhen": {
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["lot.owned-by-non-individual"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["lot.votes-cast"]
+            },
+            "op": ">",
+            "right": {
+              "type": "number",
+              "value": 0
+            }
+          }
+        ]
+      },
       "scope": null,
       "authority": null,
       "effectiveFrom": "2001-12-04",
@@ -70844,13 +73089,53 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "If the Unit's Owner isn't an individual (a corporation, for example), were its membership rights, such as its vote, exercised by an officer, director, partner or trustee, or by an individual the Owner designated in a written instrument given to the Association's Secretary?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "any",
+          "of": [
+            {
+              "type": "in",
+              "left": {
+                "type": "ref",
+                "path": ["lot.entity-representative-capacity"]
+              },
+              "values": [
+                {
+                  "type": "value",
+                  "term": "entity-representative-capacity.officer"
+                },
+                {
+                  "type": "value",
+                  "term": "entity-representative-capacity.director"
+                },
+                {
+                  "type": "value",
+                  "term": "entity-representative-capacity.partner"
+                },
+                {
+                  "type": "value",
+                  "term": "entity-representative-capacity.trustee"
+                }
+              ]
+            },
+            {
+              "type": "compare",
+              "left": {
+                "type": "ref",
+                "path": ["lot.entity-representative-designation-filed"]
+              },
+              "op": "=",
+              "right": {
+                "type": "boolean",
+                "value": true
+              }
+            }
+          ]
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -70881,7 +73166,22 @@
       ],
       "requestTypes": [],
       "appliesTo": "lot",
-      "appliesWhen": null,
+      "appliesWhen": {
+        "type": "not",
+        "of": {
+          "type": "in",
+          "left": {
+            "type": "ref",
+            "path": ["lot.owned-by"]
+          },
+          "values": [
+            {
+              "type": "value",
+              "term": "declarant"
+            }
+          ]
+        }
+      },
       "scope": null,
       "authority": null,
       "effectiveFrom": "2001-12-04",
@@ -70889,13 +73189,26 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Were the Member's rights and obligations transferred only upon transfer of ownership of the Unit, and only to its transferee?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "not",
+          "of": {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["lot.membership-transferred-apart-from-title"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -71065,13 +73378,23 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Was no vote cast or counted for the Class \"B\" Member?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "compare",
+          "left": {
+            "type": "ref",
+            "path": ["vote.class-b-votes"]
+          },
+          "op": "=",
+          "right": {
+            "type": "number",
+            "value": 0
+          }
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -71207,13 +73530,18 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Do the Neighborhood Association's governing documents provide for the voting representative to cast this Unit's vote as it was cast?",
-        "evidence": []
+        "type": "document",
+        "document": "neighborhood-association-documents",
+        "per": "request",
+        "mustState": [
+          "Members' voting rights may be exercised by a voting representative",
+          "the representation extends to the matter on which the Unit's vote was cast"
+        ],
+        "signedBy": []
       },
       "remedy": null,
       "recurs": null,
@@ -71880,18 +74208,36 @@
         }
       ],
       "requestTypes": ["meeting"],
-      "appliesTo": "community",
+      "appliesTo": "vote",
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["community.voting-groups"]
-        },
-        "op": ">",
-        "right": {
-          "type": "number",
-          "value": 1
-        }
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.subject"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "vote-subject.director-election"
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "from": "community",
+              "path": ["community.voting-groups"]
+            },
+            "op": ">",
+            "right": {
+              "type": "number",
+              "value": 1
+            }
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -71900,13 +74246,23 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "In the election of directors, did the Members in each Voting Group vote on a separate slate of candidates?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "compare",
+          "left": {
+            "type": "ref",
+            "path": ["vote.separate-slate-per-voting-group"]
+          },
+          "op": "=",
+          "right": {
+            "type": "boolean",
+            "value": true
+          }
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -71956,13 +74312,27 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Was each Voting Group entitled to elect the same number of directors?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "compare",
+          "left": {
+            "type": "greatest-of",
+            "path": ["community.directors-per-voting-group"],
+            "value": [],
+            "where": null
+          },
+          "op": "=",
+          "right": {
+            "type": "least-of",
+            "path": ["community.directors-per-voting-group"],
+            "value": [],
+            "where": null
+          }
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -72013,70 +74383,18 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Were the Voting Groups established by a Recorded Supplemental Declaration that identifies each Voting Group, by legal description or other means, so that the Units within each can easily be determined?",
-        "evidence": []
-      },
-      "remedy": null,
-      "recurs": null,
-      "cure": null,
-      "provenance": {
-        "by": "extraction",
-        "at": "2026-10-11T12:00:00Z"
-      },
-      "review": {
-        "status": "proposed",
-        "by": null,
-        "at": null,
-        "note": null
-      },
-      "issues": []
-    },
-    {
-      "key": "declaration:6.4(b)/p2#use-restrictions-process",
-      "domain": "governance",
-      "title": "Voting Groups follow the Use Restrictions process",
-      "statement": "Establishing {{voting-group:plural}} needs the same process as enacting {{use-restrictions}} under 3.3, including the {{class-a-member:plural}}' right to disapprove.",
-      "citations": [
-        {
-          "provisionKey": "declaration:6.4(b)/p2",
-          "highlight": null,
-          "region": null
-        }
-      ],
-      "requestTypes": [],
-      "appliesTo": "community",
-      "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "from": "community",
-          "path": ["community.voting-groups"]
-        },
-        "op": ">",
-        "right": {
-          "type": "number",
-          "value": 1
-        }
-      },
-      "scope": null,
-      "authority": null,
-      "effectiveFrom": "2001-12-04",
-      "kind": "norm",
-      "modality": "requirement",
-      "bearer": null,
-      "beneficiary": null,
-      "decidedBy": "board",
-      "overrides": [],
-      "noExceptions": null,
-      "check": {
-        "type": "judgment",
-        "question": "Were the Voting Groups established through the process Section 3.3 sets for enacting Use Restrictions, including notice, an opportunity for Members to be heard, and the Class \"A\" Members' disapproval rights?",
-        "evidence": []
+        "type": "document",
+        "document": "voting-group-designation",
+        "per": "request",
+        "mustState": [
+          "identifies each Voting Group by legal description or other means, so the Units within each can easily be determined",
+          "evidence that it was Recorded, such as its recording number and date"
+        ],
+        "signedBy": []
       },
       "remedy": null,
       "recurs": null,
@@ -79847,13 +82165,26 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Did no Mortgagee, as such, take part in deciding whether to repair or reconstruct the damaged Common Area improvements?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "not",
+          "of": {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.mortgagee-participated"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -83456,13 +85787,26 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Was no working capital contribution paid under Section 8.10 counted as an advance payment of this assessment?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "not",
+          "of": {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["assessment.working-capital-credited"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -83589,13 +85933,26 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Was no reserve contribution paid under Section 8.11 counted as an advance payment of this assessment?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "not",
+          "of": {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["assessment.reserve-contribution-credited"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -83967,7 +86324,18 @@
       ],
       "requestTypes": [],
       "appliesTo": "declarant-rights-grantee",
-      "appliesWhen": null,
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["declarant-rights-grantee.holds-annexation-right"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
       "scope": null,
       "authority": null,
       "effectiveFrom": "2001-12-04",
@@ -83975,13 +86343,47 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "If this Person holds the Declarant's right to subject additional property, is it the developer of at least a portion of the property described in Exhibit \"A\" or \"B\", and was the right transferred before it expired?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "all",
+          "of": [
+            {
+              "type": "compare",
+              "left": {
+                "type": "ref",
+                "path": ["declarant-rights-grantee.exhibit-property-developer"]
+              },
+              "op": "=",
+              "right": {
+                "type": "boolean",
+                "value": true
+              }
+            },
+            {
+              "type": "compare",
+              "left": {
+                "type": "ref",
+                "path": ["declarant-rights-grantee.annexation-right-transferred-on"]
+              },
+              "op": "<",
+              "right": {
+                "type": "shift",
+                "of": {
+                  "type": "date",
+                  "value": "2001-12-04"
+                },
+                "by": {
+                  "value": 20,
+                  "unit": "year"
+                }
+              }
+            }
+          ]
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -84012,7 +86414,18 @@
       ],
       "requestTypes": [],
       "appliesTo": "declarant-rights-grantee",
-      "appliesWhen": null,
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["declarant-rights-grantee.holds-annexation-right"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
       "scope": null,
       "authority": null,
       "effectiveFrom": "2001-12-04",
@@ -84020,13 +86433,18 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "If this Person holds the Declarant's right to subject additional property, was the transfer memorialized in a written, Recorded instrument the Declarant executed?",
-        "evidence": []
+        "type": "document",
+        "document": "declarant-rights-transfer",
+        "per": "subject",
+        "mustState": [
+          "the transfer or assignment of the Declarant's right to subject additional property",
+          "evidence that it was Recorded, such as its recording number and date"
+        ],
+        "signedBy": ["declarant"]
       },
       "remedy": null,
       "recurs": null,
@@ -84493,7 +86911,7 @@
       "key": "declaration:10.1#development-scheme",
       "domain": "governance",
       "title": "Withdrawal can't unreasonably violate the development scheme",
-      "statement": "A {{property-withdrawal}} must not unreasonably violate the overall scheme of development for the {{master-plan}}.",
+      "statement": "The {{declarant}}'s {{property-withdrawal}} must not unreasonably violate the overall scheme of development for the {{master-plan}}.",
       "citations": [
         {
           "provisionKey": "declaration:10.1",
@@ -84508,8 +86926,8 @@
       "authority": null,
       "effectiveFrom": "2001-12-04",
       "kind": "norm",
-      "modality": "requirement",
-      "bearer": null,
+      "modality": "obligation",
+      "bearer": "declarant",
       "beneficiary": null,
       "decidedBy": "board",
       "overrides": [],
@@ -84618,13 +87036,84 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Did the withdrawal receive every approval King County or other Jurisdictions require for it?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "all",
+          "of": [
+            {
+              "type": "any",
+              "of": [
+                {
+                  "type": "not",
+                  "of": {
+                    "type": "some",
+                    "where": null,
+                    "test": {
+                      "type": "in",
+                      "left": {
+                        "type": "ref",
+                        "path": []
+                      },
+                      "values": [
+                        {
+                          "type": "value",
+                          "term": "king-county"
+                        }
+                      ]
+                    },
+                    "path": ["property-withdrawal.approval-required-by"]
+                  }
+                },
+                {
+                  "type": "approved",
+                  "by": ["king-county"],
+                  "needs": "all",
+                  "prior": false,
+                  "written": false,
+                  "path": []
+                }
+              ]
+            },
+            {
+              "type": "any",
+              "of": [
+                {
+                  "type": "not",
+                  "of": {
+                    "type": "some",
+                    "where": null,
+                    "test": {
+                      "type": "in",
+                      "left": {
+                        "type": "ref",
+                        "path": []
+                      },
+                      "values": [
+                        {
+                          "type": "value",
+                          "term": "governmental-entity"
+                        }
+                      ]
+                    },
+                    "path": ["property-withdrawal.approval-required-by"]
+                  }
+                },
+                {
+                  "type": "approved",
+                  "by": ["governmental-entity"],
+                  "needs": "all",
+                  "prior": false,
+                  "written": false,
+                  "path": []
+                }
+              ]
+            }
+          ]
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -85806,7 +88295,21 @@
       ],
       "requestTypes": [],
       "appliesTo": "declarant-rights-grantee",
-      "appliesWhen": null,
+      "appliesWhen": {
+        "type": "not",
+        "of": {
+          "type": "compare",
+          "left": {
+            "type": "ref",
+            "path": ["declarant-rights-grantee.limited-permission-only"]
+          },
+          "op": "=",
+          "right": {
+            "type": "boolean",
+            "value": true
+          }
+        }
+      },
       "scope": null,
       "authority": null,
       "effectiveFrom": "2001-12-04",
@@ -85814,13 +88317,18 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Was the transfer or assignment of the Declarant's rights to this Person made in a Recorded instrument the Declarant signed, or is it only a permission to exercise a right on a one-time or limited basis that the Declarant didn't intend to transfer entirely?",
-        "evidence": []
+        "type": "document",
+        "document": "declarant-rights-transfer",
+        "per": "subject",
+        "mustState": [
+          "the Declarant's rights and obligations transferred or assigned",
+          "evidence that it was Recorded, such as its recording number and date"
+        ],
+        "signedBy": ["declarant"]
       },
       "remedy": null,
       "recurs": null,
@@ -85859,13 +88367,26 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Does the transfer to this Person leave every obligation no smaller, and every right no larger, than the Declarant has under the Declaration or the By-Laws?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "not",
+          "of": {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["declarant-rights-grantee.transfer-exceeds-declarant-rights"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -85904,13 +88425,26 @@
       "modality": "requirement",
       "bearer": null,
       "beneficiary": null,
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Is the transfer of the Declarant's rights to this Person consistent with the UPD Permit?",
-        "evidence": []
+        "type": "test",
+        "test": {
+          "type": "not",
+          "of": {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["declarant-rights-grantee.transfer-upd-permit-conflict"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          }
+        }
       },
       "remedy": null,
       "recurs": null,
@@ -96055,8 +98589,8 @@
       "authority": null,
       "effectiveFrom": "2025-11-12",
       "kind": "norm",
-      "modality": "requirement",
-      "bearer": null,
+      "modality": "obligation",
+      "bearer": "applicant",
       "beneficiary": null,
       "decidedBy": "committee",
       "overrides": [],
@@ -96066,7 +98600,7 @@
         "question": "Is the application complete, with every item the guidelines require for the proposed Work?",
         "evidence": ["application-form", "plans"]
       },
-      "remedy": null,
+      "remedy": "change-detail",
       "recurs": null,
       "cure": null,
       "provenance": {
@@ -96437,8 +98971,8 @@
     {
       "key": "guidelines:3.3.2#no-authority",
       "domain": "architectural",
-      "title": "No approval of applications that may violate other documents or law",
-      "statement": "The {{committee}} has no authority to approve an {{architectural-application}} that, in its determination, may violate the community's other Governing Documents or applicable laws or regulations; its approval doesn't assure compliance with King County Code.",
+      "title": "Applications must not propose what may violate other documents or law",
+      "statement": "An {{architectural-application}} must not propose anything that, in the {{committee}}'s determination, may violate the community's other Governing Documents or applicable laws or regulations, since the Reviewer has no authority to approve it; approval doesn't assure compliance with King County Code.",
       "citations": [
         {
           "provisionKey": "guidelines:3.3.2",
@@ -96453,8 +98987,8 @@
       "authority": null,
       "effectiveFrom": "2025-11-12",
       "kind": "norm",
-      "modality": "requirement",
-      "bearer": null,
+      "modality": "obligation",
+      "bearer": "applicant",
       "beneficiary": null,
       "decidedBy": "committee",
       "overrides": [],
@@ -96464,7 +98998,7 @@
         "question": "Is the application free of anything that, in the Reviewer's determination, may violate the community's other Governing Documents or applicable laws or regulations?",
         "evidence": ["application-form", "plans"]
       },
-      "remedy": null,
+      "remedy": "redesign",
       "recurs": null,
       "cure": null,
       "provenance": {

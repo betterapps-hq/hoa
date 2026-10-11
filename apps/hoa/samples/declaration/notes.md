@@ -18,8 +18,9 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   adds a party to other rules' approval checks, so it's one requirement on the Board's approval
   (article-2/class-b-control-period(d)#declarant-consent), applying once the document is Recorded
   (community.declarant-consent-recorded) and while one of them owns a Unit (community.units-owned-by, which counts
-  Units, not Exhibit property), with a Board judgment on whether the Declarant also consented, since the document may
-  cover only some actions. It has no request type, since no meeting decides the Declarant's consent.
+  Units, not Exhibit property), for the actions its document covers (approval.declarant-consent-required, since the
+  document may cover only some), testing that the Declarant also approved what the Board's approval covers
+  (approval.covers). It has no request type, since no meeting decides the Declarant's consent.
 - RENAMED: lot.declarant-owned, lot.owned-by-declarant -> lot.owned-by (party; byParty(ref("lot.owned-by"), "declarant",
   "affiliate")).
 - RENAMED: lot.owned-by-association -> lot.owned-by (party; = organization).
@@ -174,11 +175,13 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   imposed by any Owner and one by the Declarant, enforcing the whole Declaration, like 4.3(b)/p7's aggrieved-owner
   action; the Association's own suit is 7.4(a)/p2(iii).
 - The 20-year term and 10-year renewals apply only if the law limits how long covenants can be enforced, so the
-  termination window (1.2/p2#termination-window) is a requirement on a termination vote whose judgment question carries
-  that condition, rather than a text condition.
+  termination window (1.2/p2#termination-window) is a requirement on a termination vote applying while
+  community.covenant-term-limited-by-law holds: a deadline from the instrument's Recording (vote.recorded-on) within the
+  year before the extension it prevents (vote.extension-on).
 - 1.2/p3's perpetuities clause sets when a void provision expires and states no requirement; its easement sentence is a
-  requirement on a termination vote (1.2/p3#easement-holder-consent), judged because the easement holder varies (the
-  Declarant, the Association, Owners, utilities) and no approval test can name it.
+  requirement on a termination vote that ends an easement the Declaration created (vote.terminates-easements), an
+  approval check by easement-holder, a role party like annexed-property-owner that names whoever holds it (the
+  Declarant, the Association, Owners, utilities).
 
 ## Article 3 and Exhibit C, the Use Restrictions
 
@@ -269,9 +272,11 @@ schema can't express faithfully yet; the closest faithful form is encoded.
 - 3.1(a)/p2's amendment power is two requirements on a vote with its own subject: who may amend (the Declarant while it
   or an Affiliate owns Exhibit A or B property, then the Board, by vote.by) and King County's prior approval; that the
   amendment is needed for the Act is left to the amending body, as it "deems".
-- The written request for the surviving-occupant permission (3.1(a)(i)/p2) is a requirement on the residence, and the
-  duty to disclose the 55-or-older intent to prospective tenants, purchasers and occupants (3.1(a)(iii)) an obligation
-  on the Owner; the Board judges both, in violations.
+- The written request for the surviving-occupant permission (3.1(a)(i)/p2) is a requirement on the residence, a document
+  check on an occupancy-permission-request stating every proposed resident's and occupant's name and age; what else the
+  Board reasonably requires stays in the statement, as in article-18#notice-contents. The duty to disclose the
+  55-or-older intent to prospective tenants, purchasers and occupants (3.1(a)(iii)) is an obligation on the Owner the
+  Board judges, in violations.
 - 3.1(a)(vi)/p2's enforcement is a legal-action sanction enforcing the 3.1(a) rules that run in violations, the census
   and proof of age being its means; 3.1(a)(vi)/p3's indemnity is an obligation on the Owner in dispute requests.
 - Reporting a change in occupancy "immediately" (3.1(a)(v)) is encoded as the 10-day deadline after which fines run, the
@@ -302,8 +307,10 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   days after the copies go to the Owners (3.3(c)#effective-date, a deadline from the new vote.distributed-on to
   vote.effective-on, for Board changes and Members' adoptions alike), and, when a disapproval petition arrives before
   the effective date, not until after the petitioned meeting and as its outcome allows
-  (3.3(a)/p2#suspended-pending-meeting, a Board judgment applying when vote.disapproval-petition-received-on is before
-  vote.effective-on). The edition's effectiveFrom is still the date the change took effect.
+  (3.3(a)/p2#suspended-pending-meeting, applying when vote.disapproval-petition-received-on is before vote.effective-on,
+  and testing that vote.effective-on follows vote.disapproval-meeting-held-on and that vote.disapproved-at-meeting
+  doesn't hold). Both, with the rest of 3.3's process, also govern a Board designation of Voting Groups (6.4(b)/p2,
+  below). The edition's effectiveFrom is still the date the change took effect.
 - 3.5's limits apply only to Use Restrictions and Board Rules adopted under 3.3, not to the initial Exhibit C (3.5's
   intro and 3.5/p2), so (a) to (e) override no Exhibit C rule; they're obligations of the Association on the rules it
   adopts (below). 3.5(f) is a grandfathering permission whose selector covers the use-restrictions and board-rules
@@ -392,8 +399,9 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   work.started-on, applying only to Work with an approved condition (the committee's prior written approval, as 4.1/p1
   requires), so guideline versions adopted after construction began don't reach previously approved Work, while
   unapproved Work and new Work, which has its own start date, meet the guidelines as amended. Its last sentence, that
-  the guidelines and every amendment comply with the UPD Permit, is a requirement the Board judges with no request type
-  (4.3(a)/p3#upd-permit-compliance), the guidelines' counterpart of 3.5(i).
+  the guidelines and every amendment comply with the UPD Permit, is a requirement with no request type testing
+  community.design-guidelines-upd-permit-conflict (4.3(a)/p3#upd-permit-compliance), the guidelines' counterpart of
+  3.5(i).
 - The variance power (4.5) is a discretion rule over the guidelines document, in applications only, applying when the
   application asks for a variance (architectural-application.variance-requested), so ordinary failed guideline findings
   stay not-met rather than all going to the committee; it never reaches the Declaration's rules, as 4.5(b) requires. Its
@@ -406,9 +414,9 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   Board's consent; vote is the only thing that carries an act of adoption, but neither runs in a request type, since no
   meeting decides a Declarant's or the DRC's amendment or the Board's consent (Request types, below).
 - A Declarant delegation of its Article 4 rights takes effect only in writing and specifying the delegated
-  responsibilities (4.2(a)/p2): one requirement on a new design-review-delegation document, judged by the Board, with no
-  request type, since no request carries a delegation. architectural-application.delegated-to-drc still says which
-  matters were delegated.
+  responsibilities (4.2(a)/p2): one requirement on a new design-review-delegation document, a document check that it
+  states the delegated responsibilities, with no request type, since no request carries a delegation.
+  architectural-application.delegated-to-drc still says which matters were delegated.
 - The 4.7 estoppel is a permission with the Article 4 and guidelines selector, applying to Work whose condition the
   Association had notice of on or before the latest certificate's date; lot.approval-certificate-on is absent when
   unstated, which raises absent-in-exception by design, since most Units have no certificate.
@@ -498,7 +506,10 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   requirement; its duty to make the guidelines available is a yearly compliance-period judgment.
 - 5.3/p1's charging of designated Neighborhood costs, the grounds for the Board's assignment of costs, and like
   treatment of similarly situated Neighborhoods run in assessment requests on Neighborhood Assessments, like 8.2/p2's
-  levy rules; the Owners' duty to pay them is 8.6/p2's payment rule.
+  levy rules; the Owners' duty to pay them is 8.6/p2's payment rule. The grounds for the Board's assignment are a fact,
+  assessment.cost-assignment-basis (an agreement with the Owners or a Neighborhood Association, or a Board resolution),
+  on assessments with assessment.board-assigned-costs; whether a perceived need exists is the Board's own perception, so
+  only its resolution is checked.
 
 ## Articles 6 to 8
 
@@ -594,17 +605,28 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   override when the By-Laws are loaded.
 - 6.3(a)'s one vote per Unit, the exempt-property rule and 8.8/p2's no vote for Association-owned Units are requirements
   on lot.votes-cast in meeting requests, with the meeting feature supplying each Unit as an entity.
-- 6.4(b) is the limit on the number of Voting Groups plus three requirements on the community in meeting requests:
-  Voting Groups only after the Class "B" Control Period, and separate slates and equal numbers of directors per Voting
-  Group, the last two judged by the Board and applying only with more than one Voting Group.
+- 6.4(b) is the limit on the number of Voting Groups plus three requirements in meeting requests, applying only with
+  more than one Voting Group: Voting Groups only after the Class "B" Control Period; separate slates, a test on
+  vote.separate-slate-per-voting-group for a director election (vote-subject.director-election); and equal numbers of
+  directors, comparing the greatest and least of community.directors-per-voting-group.
+- 6.4(b)/p2's Recorded Supplemental Declaration identifying each Voting Group is a document check on a
+  voting-group-designation (6.4(b)/p2#recorded-designation). Its "same process as enacting Use Restrictions" is carried
+  by the 3.3 rules themselves rather than a rule of its own: a Board designation is a vote with
+  vote-subject.voting-group-designation and a meeting with meeting.voting-group-designation-proposed. So the notice, the
+  Members' hearing, the petitioned meeting, sending each Owner a copy, the 30-day effective date and the suspension
+  pending a petitioned meeting all apply to it. The Class "A" disapproval is 3.3(a)/p2#member-disapproval on
+  vote-subject.voting-group-designation-disapproval. Each of those rules also cites 6.4(b)/p2.
 - Who may create, re-designate or combine Neighborhoods (6.4(a)/p2) is one requirement on the vote, like 3.1(a)/p2, with
   its own vote-subject.neighborhood-designation beside combine-neighborhoods; who exercises the membership of an Owner
-  that isn't an individual (6.2/p1) is a requirement on the Unit the Board judges.
+  that isn't an individual (6.2/p1) is a requirement on the Unit, applying when a Unit owned by a non-individual Owner
+  (lot.owned-by-non-individual) cast a vote, and testing the representative's capacity
+  (lot.entity-representative-capacity) or a designation filed with the Secretary
+  (lot.entity-representative-designation-filed).
 - Co-Owners' joint and several liability is a liability matter, not a rule.
 - 6.3(c)/p2's voting representative is a requirement on the Unit in meeting requests (6.3(c)/p2#voting-representative),
-  applying when a representative cast the Unit's vote (lot.vote-cast-by-representative) and judged by the Board against
-  the Neighborhood Association's documents, which aren't loaded; it was explanatory as a grant, but it decides whether a
-  vote counts.
+  applying when a representative cast the Unit's vote (lot.vote-cast-by-representative), a document check that the
+  Neighborhood Association's governing documents (neighborhood-association-documents) provide for the representative and
+  reach the matter voted on; it was explanatory as a grant, but it decides whether a vote counts.
 - 6.4(a)/p3's administrative charge is two Board obligations in assessment requests on Neighborhood Assessments, since
   either can fail alone: the charge is reasonable (#admin-charge-reasonable), and it's the same per Unit for every
   Neighborhood receiving the same service (#admin-charge-uniform).
@@ -640,7 +662,7 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   a Common or Neighborhood Expense, is an Association obligation in assessment requests
   (7.3(b)/p2#deductible-allocation), its question excepting a deductible assessed against a negligent Owner.
 - That no Mortgagee takes part in deciding whether to restore damaged Common Area (7.3(c)/p2) is a requirement on the
-  not-restore vote in meeting requests, judged by the Board (7.3(c)/p2#no-mortgagee-participation).
+  not-restore vote in meeting requests, testing vote.mortgagee-participated (7.3(c)/p2#no-mortgagee-participation).
 - The Board's power to modify or cancel service contracts stops at services the Governing Documents require (7.8/p2): a
   Board obligation with no request type (7.8/p2#required-services), a limit on a power like 7.2/p3's.
 - "If reasonably available, or if not reasonably available, the most nearly equivalent coverages" (7.3(a)) is an
@@ -720,7 +742,8 @@ schema can't express faithfully yet; the closest faithful form is encoded.
 - 8.7(a)/p2's duty to keep paying on the last year's basis when the Board fails to fix assessments is an Owner
   obligation on a carried-forward assessment (assessment.carried-forward), with 8.6/p2#due-date's deadline and cure.
 - Working capital and reserve contributions not being advance payments of assessments (8.10, 8.11) are requirements on
-  Base, Neighborhood, Special and Specific Assessments, judged by the Board (8.10#not-advance-payment,
+  Base, Neighborhood, Special and Specific Assessments, testing that the contribution wasn't credited as an advance
+  payment (assessment.working-capital-credited, assessment.reserve-contribution-credited; 8.10#not-advance-payment,
   8.11#not-advance-payment); their being nonrefundable bars a claim for a refund, an obligation on the Claimant in
   dispute requests like 17.4#no-interruption-refund (8.10#nonrefundable, 8.11#nonrefundable). The lien surviving a sale
   (8.8/p3, now cited by 8.8/p1#lien) restates what the lien rule already applies.
@@ -747,11 +770,11 @@ schema can't express faithfully yet; the closest faithful form is encoded.
 - Judgments about the Association's own duties (maintaining the Area of Common Responsibility, continuous operation,
   nearest-equivalent insurance, the transfer fee approximating cost) are decided by the board, the only deciding body
   the schema has for them.
-- 6.3(b)'s "shall not vote" is a requirement on every vote (6.3(b)#class-b-no-vote), judged because no vote fact counts
-  Class "B" votes; appointing directors under the By-Laws, the Declarant acting as the Class "B" Member, and becoming
-  Class "A" Members when Class "B" ends grant powers or describe status.
+- 6.3(b)'s "shall not vote" is a requirement on every vote (6.3(b)#class-b-no-vote) testing that vote.class-b-votes is
+  0; appointing directors under the By-Laws, the Declarant acting as the Class "B" Member, and becoming Class "A"
+  Members when Class "B" ends grant powers or describe status.
 - 6.2/p2's transfer of membership only with title has no request type, since no request records a transfer of
-  membership.
+  membership. It tests lot.membership-transferred-apart-from-title for Units the Declarant doesn't own.
 - 7.1(c)'s "may adopt such reasonable rules" and 7.2/p3's "may maintain ... if the Board determines" limit those powers,
   so each is an obligation; the bare powers in 7.1(a), 7.2/p2 and 7.4(d) are explanatory.
 - 7.2/p6's Limited Common Area sentence is 12.1#cost-allocation, which now cites it; its Common Expense sentence and
@@ -909,11 +932,15 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   Four's introduction precedes Article 9 and isn't in this range.
 - The Declarant's powers in 9.1, 9.3, 10.1, 10.2, 10.5 and 10.8 are recorded through what the acts need to take effect:
   Exhibit B property, the 20-year expiry (a deadline from the Declaration's 2001-12-04 Recording) and the owner's
-  consent for an annexation; the owner's signed consent for added covenants; the Declarant's ownership, the development
-  scheme, the owner's consent and county approval for a withdrawal; the Declarant's ownership for a public site; the
-  Declarant's, then the Board's, written consent to Record covenants (1.3/p2 stays its duplicate); and a Recorded,
-  non-enlarging, UPD-consistent instrument for a transfer of Declarant rights. The Association's duties to effect a
-  withdrawal or permit a designated site's use are obligations. None has a request type yet.
+  consent for an annexation; the owner's signed consent for added covenants; the Declarant's ownership, the owner's
+  consent and the required King County or other governmental approvals for a withdrawal
+  (property-withdrawal.approval-required-by), with the development scheme a judged obligation on the Declarant; the
+  Declarant's ownership for a public site; the Declarant's, then the Board's, written consent to Record covenants
+  (1.3/p2 stays its duplicate); and, for a transfer of Declarant rights, a Recorded declarant-rights-transfer the
+  Declarant signs (unless only a limited permission), with the transfer neither exceeding the Declarant's rights nor
+  conflicting with the UPD Permit, and for the annexation right a developer of Exhibit property before the right
+  expires. The Association's duties to effect a withdrawal or permit a designated site's use are obligations. None has a
+  request type yet.
 - TERMS, Declarant acts (9.1, 9.3, 10.1, 10.2, 10.5): properties of supplemental-declaration (recorded-by, recorded-on,
   annexes, adds-covenants, property-owned-by, exhibit-b-property), property-withdrawal with its owner party,
   site-designation and covenant-instrument; annexed-property-owner now also covers the Declarant's Supplemental
@@ -1158,10 +1185,11 @@ Judgment calls:
 - Owners' obligations and prohibitions in violations carry Declaration 4.8/p1's cure (the time the written request
   gives), as the Declaration's Article 4 rules do.
 - 3.1.5's "In general, applications are reviewed within 30 days" is a recommendation on the DRC, measured to the
-  decision date; "Applications must be completed before they are reviewed" is a requirement the DRC judges, the items
-  themselves coming from the guidelines' document rules.
-- 3.3.2 (no authority to approve what may violate other documents or law) and 3.3.3 (final approval waits for King
-  County) are requirements: what the approval needs to take effect.
+  decision date; "Applications must be completed before they are reviewed" is a judged obligation on the applicant the
+  DRC decides, the items themselves coming from the guidelines' document rules.
+- 3.3.2 (no authority to approve what may violate other documents or law) is a judged obligation on the applicant the
+  Reviewer decides, since a limit on the Reviewer's approvals would carry the same judgment with no remedy; 3.3.3 (final
+  approval waits for King County) is a requirement.
 - 3.4.2's responsibility for the accuracy of submitted plans is an obligation the DRC judges (3.4.2#accurate-plans),
   against the recorded plot plan; its photo recommendation has its own rule.
 - 3.4.4's "advised in writing prior to inspection" is a deadline of 0 days before the entry, so notice the same day
@@ -1389,6 +1417,15 @@ similar treatment, upkeep), and 10 new judged rules hold a quality split off a f
   King County or another governmental entity when work.needs-outside-permit holds. 5.8.1's boundary verification is a
   deadline: verified on or before the fence's construction started. 5.8.2's recorded prohibition and the Owner's cost of
   a utility's removal apply to a fence-run.within-utility-easement.
+
+**Judged requirements (2026-10-11).** A requirement is fact-checked only: no pipeline step can produce a judged
+requirement, and a judgment check is only for a quality no fact settles. Of the 28 requirements that carried a judgment
+check, 24 now carry a fact check (16 tests, 6 document checks, a deadline and an approval) with the properties they
+read. 3 that ask a true judgment became judged obligations on the party bearing the duty: an application's completeness
+and its freedom from possible violations of other documents or law (guidelines 3.1.5, 3.3.2), on the applicant and
+decided by the Reviewer; and a withdrawal that doesn't unreasonably violate the development scheme (10.1), on the
+Declarant. 1, 6.4(b)/p2's "same process as enacting Use Restrictions", is folded into the seven 3.3 process rules, which
+now also apply to a Board designation of Voting Groups and cite 6.4(b)/p2, and was removed. The change adds 45 terms.
 
 **Shared-vocabulary review (2026-10-11, run 2026-10-11T13-32-59-shared-vocabulary).**
 
