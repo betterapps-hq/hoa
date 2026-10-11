@@ -25,16 +25,17 @@ import { sampleDocuments } from "./sampleDocuments.ts"
 // as a unit: valid when it passed Zod after F's retries, its retry rounds as repair rounds. `pnpm eval:encoding:score <run id>` scores it against the golden encoding. Usage, from
 // apps/hoa:
 //   pnpm eval:encoding [--split dev|test|all] [--documents declaration,design-guidelines] [--units <key>,<key>]
-//     [--prompts <prompt name>=<version>,...]
+//     [--prompts <prompt name>=<version>,...] [--yes]
 // The split is by provision key (encodingSplits.ts). --units keeps only sections holding or under the given provision
 // keys or in the given documents. --prompts pins versions no label points at yet (a staged candidate); the other
-// prompts are resolved by label, as a build does.
+// prompts are resolved by label, as a build does. Without --yes it prints what it would run and stops.
 const { values } = parseArgs({
   options: {
     split: { type: "string", default: "dev" },
     documents: { type: "string", default: "declaration" },
     units: { type: "string" },
-    prompts: { type: "string" }
+    prompts: { type: "string" },
+    yes: { type: "boolean", default: false }
   }
 })
 
@@ -81,13 +82,22 @@ const step: StepRunner = async (name, schema, run) => {
 }
 
 const startedAt = performance.now()
+// Pinned prompts aren't resolved by label: a staged candidate may have no label yet.
+const pinned = pinnedVersions(values.prompts)
 const promptVersions = {
-  ...(await resolvePromptVersions(ai.loadPrompt, rulebookBuildPrompts)),
-  ...pinnedVersions(values.prompts)
+  ...(await resolvePromptVersions(
+    ai.loadPrompt,
+    rulebookBuildPrompts.filter((prompt) => !(prompt.name in pinned))
+  )),
+  ...pinned
 }
 console.warn(
   `Run ${runId}: ${documents.map((document) => document.fixture).join(", ")}; prompts ${JSON.stringify(promptVersions)}`
 )
+if (!values.yes) {
+  console.warn("Dry run: pass --yes to run the build with the real models (each run needs the person's approval).")
+  process.exit(0)
+}
 const result = await buildRulebook({
   organizationId: "evaluation",
   sources: documents.map((document) => {
