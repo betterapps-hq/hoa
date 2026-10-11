@@ -1199,7 +1199,29 @@ in an evaluation request, and they keep the findings that come back.
 - **Shared law.** Today each organization uploads the statutes it relies on, like any governing document. Sharing law
   across organizations would mean recording each law's jurisdiction (federal, state, county, city) and each
   organization's location, so the laws that apply are found by address, and linking each organization's terms to the
-  law's.
+  law's. Some law applies by facts about the organization rather than the lot: Washington's flag and political sign
+  sections (RCW 64.38.033 and .034) cover associations created before July 1, 2018, and a sign's protection runs
+  before an election. `governs` tests each lot, so this needs core terms for the community (when it was formed,
+  election dates) that a statute's `governs` can read with `from: "community"`.
+- **How a record was made, and how sure.** `Provenance` says only that extraction proposed a record. The
+  [taxonomy-first pipeline](taxonomy-ingestion.md) routes by confidence: small classifiers first, the large model for
+  what they're unsure of. Records would carry the method (classifier, large model, person), the model and its
+  confidence, so review can start with the least certain and a benchmark can trace each record to what produced it.
+  Facts already carry a confidence.
+- **Several documents in one file.** Some uploads are one PDF holding several documents (a declaration and its bylaws,
+  say). An edition's `files` give only a page count, so a document can't say which pages are its own. Each file entry
+  would need its first and last page.
+- **Rule topics.** `domain` has seven broad values. Clustering rule sections across ten organizations found about 40
+  recurring kinds of rule (fences, signs, leasing, liens), which sorting, per-project application forms and comparing
+  organizations all need. A rule would name a topic from a shared catalog kept as data, like the core terms. Wait for
+  the reviewed taxonomy ([taxonomy-ingestion.md](taxonomy-ingestion.md), step 2) before fixing the catalog.
+- **Shared concepts for organization terms.** Each organization names things its own way ("fence run", "fencing", "wall
+  or fence"). One application form or comparison across organizations needs each organization's term linked to a
+  shared concept, with SKOS's match relations (exact, close, broader, narrower). This moves part of "reusing rules
+  across organizations" from out of scope into the schema.
+- **Questions for application forms.** A form asks "How tall will the fence be?", while the property's label is
+  "height". Either property terms carry an optional question, or the form generates one from the label; decide with
+  the form builder.
 - **Master and sub-associations.** How precedence works between a master association's documents and a
   sub-association's.
 - **Computations beyond checks.** Election results (cumulative voting), allocating assessments across lots, and budget

@@ -2,8 +2,8 @@
 
 OCR runs **when a document is uploaded**, as a processing step of its own, separate from every AI model call. Each
 uploaded file is sent to **Azure AI Document Intelligence** (the prebuilt **Layout** model) once, and its page text and
-structure are stored as page records. Every later stage (finding sections, extracting rules, checking citations,
-reviewing applications) works on those records, never on the original file. Model calls receive page text with page
+structure are stored as page records. Every later stage (structuring provisions, encoding rules, checking
+citations, reviewing applications) works on those records, never on the original file. Model calls receive page text with page
 markers instead of PDFs, which keeps them cheap, keeps citations exact, and avoids paying to re-read the same pages.
 
 Research for this page was done on 2026-10-08; prices and API versions change, so re-check before relying on them.
@@ -12,7 +12,7 @@ Research for this page was done on 2026-10-08; prices and API versions change, s
 
 | File | Workflow | Started by |
 | --- | --- | --- |
-| Governing document | `DocumentIngest(documentId)`, which sets the document `ready` or `failed` | `completeUpload` |
+| Governing document | `DocumentIngest(documentId)`, which sets the document `ready` or `failed` | `completeDocumentUpload` |
 | Application file | The `ocr` and `visuals` stages of `ApplicationReview(applicationId)` | `runReview` |
 
 A rulebook build only uses documents that are already `ready`, so building or rebuilding a rulebook never re-runs OCR.
@@ -24,6 +24,9 @@ DocumentIngest's stages, which are also the job's `stage` values (every step nam
 | `resolve-prompts` | `resolve-prompts` |
 | `ocr` | `ocr:hash`, then per range `ocr:submit:{range}`, `ocr:poll:{range}`, `ocr:pages:{range}`, then `ocr:labels` |
 | `visuals` | `visuals:{figureId}` |
+
+Around them, `load` reads the document first, `finish` sets it `ready` (or `failed` as a duplicate), and
+`build-rulebook` then requests a rulebook build.
 
 ApplicationReview runs the same steps per file, with the file id in each name ([application-review.md](application-review.md#stages)).
 
@@ -59,7 +62,9 @@ Upload ──> R2 ──presigned GET──> Layout ──> raw response ──>
    A final `ocr:labels` step runs once all ranges are written, because it needs the whole document: it computes
    printed labels from the most common offset for pages with no `pageNumber` paragraph, finds text repeated on more
    than half the pages (watermarks, recording stamps), and writes both to `layout.json` beside the pages. Page records
-   stay write-once; readers apply `layout.json` when they load pages. It also sets `pageCount`.5. **Visuals.** For each figure Layout reports, `visuals:{figureId}` fetches its cropped PNG from
+   stay write-once; readers apply `layout.json` when they load pages. It also sets `pageCount`.
+
+5. **Visuals.** For each figure Layout reports, `visuals:{figureId}` fetches its cropped PNG from
    `/analyzeResults/{resultId}/figures/{figureId}`, stores it at `figures/{figureId}.png`, sends it to the vision model,
    and stores the description at `figures/{figureId}.json`. Uploaded and extracted images (JPEG and PNG only) are sent
    as they are, as figure `image`. Descriptions are stored beside the page record, never merged into its text, so
@@ -148,7 +153,7 @@ the OCR text. Model settings are fallbacks; a prompt version's `config.model` ta
 | Engine | Verdict |
 | --- | --- |
 | **Azure AI Document Intelligence, Layout** | **Chosen.** Faithful OCR with word confidence; roles for headings, page numbers, headers and footers; section hierarchy; HTML tables; checkboxes; figure images. About $10 per 1,000 pages. |
-| Mistral OCR 4.1 API | Alternative if Layout fails the full-document tests; not a runtime fallback. Generative OCR with per-page Markdown, headers, footers and tables at $4 per 1,000 pages. Handles messy layouts well, but testers report occasional added, dropped or changed words, invented table structure and misread checkboxes, and it leaves section structure to us. |
+| Mistral OCR 4.1 API | Alternative if Layout falls short; not a runtime fallback. Generative OCR with per-page Markdown, headers, footers and tables at $4 per 1,000 pages. Handles messy layouts well, but testers report occasional added, dropped or changed words, invented table structure and misread checkboxes, and it leaves section structure to us. |
 | Azure AI Document Intelligence, Read | Cheapest (about $1.50 per 1,000 pages) but text and lines only, with no headings, tables or checkboxes. |
 | OpenRouter's PDF parser | Rejected: it only runs inside a chat request, while OCR is an upload-time step. No documented page boundaries or confidence. |
 | Sending PDFs straight to the review model | Bills every page on every call, can quietly paraphrase, and loses page boundaries. |
@@ -185,16 +190,6 @@ What the pipeline must handle on scans:
 - **Dropped punctuation** (sentence-ending periods). Citation matching ignores punctuation and compares words.
 - **Low-confidence words** are kept, and a citation whose quote overlaps a low-confidence span is marked for the
   administrator to check.
-
-Still to test, early in phase 1:
-
-- the full guidelines and the 81-page CC&Rs (two ranges), measuring peak Worker memory while parsing a range, and the
-  error Layout returns for a range past the end of the file;
-- the application form's checkboxes;
-- the Word appendix: extracting its four pictures with their context, classifying the plat map as `plot-plan`, and the
-  vision model reading the red route and the gate from it;
-- for other packets, whether a hand-marked plot plan on a PDF page is reported as a figure (if not, its page has no
-  image for the vision model, and the review relies on Layout's text for that page).
 
 The OCR client sits behind one small interface (file in, raw responses out), so the engine can change without touching
 the rest of the pipeline.

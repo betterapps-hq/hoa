@@ -1,7 +1,7 @@
 # Application review
 
-> **Spec, not built.** Replaces the first build's review pipeline. Reads the rulebook [encoding.md](encoding.md) produces and
-> evaluates it as [schema.md, Evaluation](schema.md#7-evaluation) defines. The tasks that build it are in
+> Reads the rulebook [encoding.md](encoding.md) produces and evaluates it as
+> [schema.md, Evaluation](schema.md#7-evaluation) defines. The tasks that build it are in
 > [implementation-plan.md](implementation-plan.md).
 
 How a homeowner's application packet is checked against the organization's published rulebook, starting with fences.
@@ -25,7 +25,7 @@ silently; code can't.
 | --- | --- | --- | --- | --- |
 | 1 | `resolve-prompts` | `resolve-prompts` | Prompt versions on the job | Code |
 | 2 | `load` | `load` | The application, the published rules file (hash checked), settings | Code |
-| 3 | `ocr` | as today | Page records, figures and visual descriptions for every file | Code, OCR, vision model |
+| 3 | `ocr` | The OCR steps ([ocr.md](ocr.md)), per file | Page records, figures and visual descriptions for every file | Code, OCR, vision model |
 | 4 | `classify` | `classify:{fileId}` | A document type for every page | Small model |
 | 5 | `subjects` | `subjects` | The entities in the application: the work, its items (fence runs, gates), and how they relate | Model, with images |
 | 6 | `select` | `select` | The rules that can apply, and the overriding rules that target them | Code |
@@ -39,7 +39,7 @@ silently; code can't.
 | 14 | `write` | `write` | Assessment, homeowner feedback, phrased action items | Model, from findings only |
 | 15 | `save-review` | `save-review` | The review in R2 and D1; the application `reviewed` | Code |
 
-Model results are cached per application as today, so re-running after adding one file pays only for what changed.
+Model results are cached per application, so re-running after adding one file pays only for what changed.
 
 ### 2. Load
 
@@ -48,14 +48,14 @@ against D1, and parses it with `rulesFile`. A 2 MB file parses in milliseconds; 
 
 **The request.** An application is an `architectural-application` request. Its governing date is the submission date
 (the request type's `governingDate`, `architectural-application.submitted-on`). A review before submission uses the
-evaluation date and is marked provisional, as the first build did.
+evaluation date and is marked provisional.
 
 ### 4. Classify
 
 One small-model call per page with `hoa-page-classification`. The choices are the rulebook's document types (things of
 nature `document` that document checks name, such as `neighbor-approval-form` and `site-plan`) plus generic kinds
 (`application-form`, `photo`, `product-specification`, `drawing`, `other`), each with its labels and definition. The
-page's visual descriptions go in as context, as today. A category with no definition of its own is described by its
+page's visual descriptions go in as context. A category with no definition of its own is described by its
 criteria when they're text (a plot plan: "a drawing of the Unit showing its boundaries and where the proposed Work
 goes"); subjects and document review describe types the same way.
 
@@ -379,7 +379,7 @@ units, and every organization's rulebook supplies its own labels and units.
 
 | Prompt | Trace name | Model | Variables | Output |
 | --- | --- | --- | --- | --- |
-| `hoa-visual-description` | `visual-description` | `OPENROUTER_MODEL` | as today | as today |
+| `hoa-visual-description` | `visual-description` | `OPENROUTER_MODEL` | `documentKind`, `contextText`, `ocrText` | A description of the figure ([ocr.md](ocr.md)) |
 | `hoa-page-classification` | `page-classification` | `anthropic/claude-haiku-5.5` (`config.model`) | `documentTypes`, `contextText`, `visualDescriptions`, `pageText` | `{ type: string }` |
 | `hoa-subject-identification` | `subject-identification` | `anthropic/claude-haiku-5.5` (`config.model`) | `requestType`, `projectKind`, `description`, `candidateTypes`, `pages` | `SubjectsOutput` |
 | `hoa-entity-facts` | `entity-facts` | `anthropic/claude-haiku-5.5` (`config.model`); escalations on `anthropic/claude-sonnet-5.5` (`config.escalationModel`) | `requestType`, `description`, `entities`, `properties`, `textConditions`, `pages` | facts and condition answers, typed by the fact schema |
@@ -393,11 +393,8 @@ is generic: it names no organization's terms, project type, product, place or sa
 about one organization arrives as data: the rulebook's labels, definitions, scope notes and value meanings
 (`promptInputs.ts` sends a term's scope note and each allowed value's meaning with it), and the project type.
 
-Every review prompt runs at its model's default effort (no `config.effort`): evaluation round 2 found Haiku at high
-effort no better on any stage, and not a match for Sonnet on the document review (implementation-log.md).
-
-Retired with the code that calls them: `hoa-file-classification`, `hoa-fact-extraction`, `hoa-document-check`,
-`hoa-qualitative-check`, `hoa-review-writer`.
+Every review prompt runs at its model's default effort (no `config.effort`): the review's evaluation found Haiku at
+high effort no better on any stage, and not a match for Sonnet on the document review (implementation-log.md).
 
 ## UX
 
@@ -685,22 +682,11 @@ work. So the entities stay `work-1` and `space-1`. Converting an attic instead
 
 ## Quality
 
-| Dataset | Item | Expected output |
-| --- | --- | --- |
-| `page-classification` | One page | Its document type |
-| `subject-identification` | One packet | Entities with types and references |
-| `entity-facts` | One packet and fact plan; or, from a correction, one packet, entity and property | Facts per entity and property; a correction's settled fact, or a person's label |
-| `document-review` | One packet and its document checks | Results per check and subject |
-| `judgment-check` | One rule, subject, facts and evidence | The answer |
-| `review-decision` | Facts, documents, judgments and a rules file | Findings, recommendation and action items (code only) |
-| `review-summary` | Findings and action items | None: the coding agent judges faithfulness and clarity from each case's `writer.md` |
-
-Application variants start from the redacted compliant baseline, as [evaluation.md](evaluation.md) describes, and each
-changes one thing. Tuning and measurement use separate cases, and the fence is held out from prompt tuning
-([evaluation.md, Tuning and measurement](evaluation.md#tuning-and-measurement)).
-
-Scores, in code: entity accuracy (type and count), fact accuracy per property, normalization accuracy, evidence
-verification rate, finding outcome accuracy per rule and entity, recommendation accuracy and action items. The writer's
-faithfulness and clarity are judged by the coding agent from the comparison file `pnpm eval:review` writes for each case
-([evaluation.md, Judging by the coding agent](evaluation.md#judging-by-the-coding-agent)); no judge prompt or model call
-scores them.
+The review is measured on the cases `pnpm eval:review` runs: the synthetic garage enclosure packets above and the fence
+packet's case ([evaluation.md, Review cases](evaluation.md#review-cases)). Code scores entities, facts, documents,
+normalization, evidence verification, findings per rule and entity, the recommendation and the action items; the
+coding agent judges the writer's faithfulness and clarity from each case's `writer.md`
+([evaluation.md, Judging by the coding agent](evaluation.md#judging-by-the-coding-agent)). Tuning and measurement use
+separate cases, and the fence is held out from prompt tuning
+([evaluation.md, Tuning and measurement](evaluation.md#tuning-and-measurement)). The facts stage's corrections go to
+the Langfuse dataset `entity-facts` ([Recognition](#recognition)).

@@ -1,8 +1,9 @@
 # Encoding governing documents
 
-> **Built: the pipeline through save-draft and publishing (phase 4) and the rules UX (phase 5).** Replaces the first build's rulebook
-> pipeline and rule model. The rules it produces follow [schema.md](schema.md). The tasks that build it are in
-> [implementation-plan.md](implementation-plan.md).
+> **Built: the pipeline through save-draft and publishing, and the rules UX.** The rules it produces follow
+> [schema.md](schema.md). The tasks that build it are in [implementation-plan.md](implementation-plan.md). A redesigned
+> step pipeline (`src/encoding/steps/`) is in testing, one step at a time, and isn't wired into the build yet
+> ([evaluation.md, Encoding step datasets](evaluation.md#encoding-step-datasets)).
 
 How an organization's governing documents become a rulebook: a single rules file, validated by the Zod schema, that an
 administrator reviews and publishes. The application review ([application-review.md](application-review.md)) reads the
@@ -12,17 +13,6 @@ The pipeline was proved by hand first: the sample Declaration (21 articles and E
 agents working from the conventions below, then checked by code. That run produced 537 provisions, 559 terms and 307
 rules with no checker problems. Every stage here replaces something those agents did with tools (reading files,
 searching the vocabulary, running the type checker) with context code assembles and validators code runs.
-
-## What changes from the first build
-
-| First build | This pipeline |
-| --- | --- |
-| Sections split on headings, routed to the `fence` project type | Provisions parsed from the numbering, every one encoded or given a reason |
-| One global, fence-only attribute catalog | Each organization's vocabulary, built first, from its own definitions |
-| Candidate rules with free quotes, verified afterwards | Rule drafts that cite provision keys; quotes are always the provision's own text |
-| Rule keys generated from check, subject and conditions | `{provision key}#{aspect}` |
-| Consolidation over full candidates per project type | Consolidation over one-line summaries of every rule, across the whole rulebook |
-| Rulebook versions, edited and republished | A rulebook is one generated rules file; changed documents mean a new build |
 
 ## Stages
 
@@ -46,7 +36,7 @@ and every Workflow step name starts with it.
 | 12 | Review | | Approved, edited and rejected records | Administrator |
 | 13 | Publish | | The rules file in R2, with its hash | Code, in a server function |
 
-Model results are cached per organization as today (`hoas/{hoaId}/cache/{stage}/{hash}.json`), so rebuilding after one
+Model results are cached per organization (`hoas/{hoaId}/cache/{stage}/{hash}.json`), so rebuilding after one
 document changes only pays for units whose text or context changed. A unit's context includes its vocabulary slice, so
 the vocabulary is reused while a document's definitions read the same ([Vocabulary](#4-vocabulary)).
 
@@ -56,7 +46,7 @@ Workflow step whose output goes to R2, and `pnpm eval:encoding` runs the same mo
 
 ### 1. Resolve prompts
 
-As today: pin every prompt the build uses (`hoa-term-extraction`, `hoa-provision-encoding`, `hoa-encoding-repair`,
+Pin every prompt the build uses (`hoa-term-extraction`, `hoa-provision-encoding`, `hoa-encoding-repair`,
 `hoa-rulebook-consolidation`, `hoa-structure-repair`, and `hoa-provision-audit` once built) on the job.
 
 ### 1b. Check
@@ -296,15 +286,13 @@ the previous published rulebook `superseded`.
 
 ## Storage
 
-Nothing is released, so the old rule tables and objects are dropped rather than migrated; the build is re-run.
-
-**D1** (Drizzle, new migration):
+**D1** (Drizzle):
 
 | Table | Holds | Key columns |
 | --- | --- | --- |
-| `governing_documents` | Uploaded documents, as today, and referenced ones | `key` (unique per organization) and `document_json` (the schema's `GoverningDocument`); `status` `referenced`, with no file columns, for named, not uploaded; `lineage_id`, `version`, `amends` dropped at cutover |
+| `governing_documents` | Uploaded documents and referenced ones | `lineage_id` and `version` (an upload's versions), `amends`, `key` (unique per organization) and `document_json` (the schema's `GoverningDocument`); `status` `referenced`, with no file columns, for a document the rules name that nobody uploaded |
 | `provisions` | One row per provision | `document_id`, `key` (unique per organization), `label`, `parent_key`, `kind`, `ordinal`, `provision_json` (the schema's `Provision`) |
-| `rulebooks` | One per build, as today | `status` building, draft, published, superseded, failed; add `settings_json`, `file_key`, `file_sha256`, `coverage_json`; `catalog_version` dropped at cutover |
+| `rulebooks` | One per build | `status` building, draft, published, superseded, failed, cancelled; `settings_json`, `file_key`, `file_sha256`, `coverage_json` |
 | `rulebook_rules` | Draft and published rule records | `rulebook_id`, `rule_key`, `kind`, `request_types` (JSON, for filtering), `applies_to`, `review_status`, `content_hash`, `rule_json` (the schema's `Rule`) |
 | `rulebook_terms` | The organization's terms and proposed core terms per rulebook | `rulebook_id`, `term_key`, `kind`, `review_status`, `content_hash`, `term_json` |
 | `rulebook_questions` | Interpretation and conflict questions | `rulebook_id`, `id`, `question_json`, `answer_json` |
@@ -315,10 +303,10 @@ The partial unique indexes (one `building`, one `draft` rulebook per organizatio
 
 | Key | Contents |
 | --- | --- |
-| `hoas/{hoaId}/governing/{documentId}/…` | As today: source, OCR, pages, layout, figures |
+| `hoas/{hoaId}/governing/{documentId}/…` | Source, OCR, pages, layout, figures |
 | `hoas/{hoaId}/rulebooks/{rulebookId}/rules.json` | The published rules file, immutable |
 | `hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json` | Every build step's output, by step name: `structure/{documentId}`, `encode/{unitId}`, `repair/{unitId}:{round}`, and `{stage}/result` for steps without an item (`plan`, `merge`, `consolidate`) |
-| `hoas/{hoaId}/cache/{stage}/{hash}.json` | Model results, as today |
+| `hoas/{hoaId}/cache/{stage}/{hash}.json` | Model results |
 
 A review records the rulebook id and the file's SHA-256, so it can always be reproduced against the exact file.
 
@@ -461,19 +449,15 @@ draft and every review action are checked on the server (`requireAdministrator`)
 | `hoa-rulebook-consolidation` | `rulebook-consolidation` | `anthropic/claude-opus-5.5`, high effort | `rules`, `termPairs`, `documents` | `Consolidation` |
 | `hoa-provision-audit` (not built) | `provision-audit` | `anthropic/claude-haiku-5.5` (`config.model`) | `document`, `provisions` | `{ items: { provisionKey, kind: "number" \| "duration" \| "party" \| "condition", quote, value }[] }` |
 
-`hoa-rules-encoding-guide` holds the encoding conventions and the schema's rules in one text with no variables; the
-encoding, repair and term prompts include it by pinned version (Langfuse prompt composition), so it's written once.
 The statement link syntax is described on the output schema's `statement` field, because Langfuse would read double
 braces in prompt text as variables.
 
-The old `hoa-section-routing`, `hoa-section-rule-extraction` and `hoa-rule-consolidation` are retired with the code
-that calls them.
-
 **Output size.** `RuleDraft`'s JSON Schema is recursive (conditions and operands) and large. `runObjectPrompt` sends it
-through the `respond` tool with `reused: "inline"`, which can't inline a cycle. The first task of the build is to
-measure it against the model ([implementation-plan.md](implementation-plan.md), phase 0); if a provider rejects it,
-recursive definitions go out as `$defs` references, and if that's rejected too, the schema is described in the prompt
-text and the answer validated by Zod alone (the `answerOf` JSON fallback).
+through the `respond` tool. Zod writes the recursive parts as `$defs` references and, by default, inlines every other
+schema at each use (`reused: "inline"`); a call that sets `sharedDefinitions` (the redesigned steps' calls do) sends
+each repeated schema once, as a `$defs` reference (`reused: "ref"`), which keeps the tool schema and its cached prefix
+small ([ai.md, Prompt caching](../ai.md#prompt-caching)). A model that answers in JSON text instead of calling the tool
+is read too (`answerOf`), and the answer is validated by Zod either way.
 
 ## Recognition
 
@@ -516,18 +500,19 @@ administrator:
 
 An audit item that fails its own check (a quote not in the provision, a numeral that disagrees) is dropped and recorded,
 not raised. These checks replace the planned text-analysis cross-checks (quantity coverage and modality cues from
-LexNLP and spaCy); modality is measured by evaluation round 1's modality agreement and gets a check only if its
+LexNLP and spaCy); modality is measured by the encoding evaluation's modality agreement and gets a check only if its
 failures call for one.
 
 **Corrections become data.** Every audit item code rejects, every problem the audit raises, and how repair or the
 administrator resolved it (encoded, explained in a no-rule note, or dismissed as the audit's error) is recorded on the
-build, so it can become an item of the `provision-encoding` dataset, as the review's corrections become `entity-facts`
-items.
+build, so it can become evaluation data, as the review's corrections become `entity-facts` items.
+
 ## Quality
 
-- **Gold encodings.** The hand-run encoding of the sample Declaration, once an administrator has reviewed it, is the
-  first gold set, one item per encoding unit. It's committed at `apps/hoa/samples/declaration/` and loaded into the
-  Langfuse dataset `provision-encoding` from there.
+- **Gold encodings.** The golden encoding of the sample Declaration is committed at `apps/hoa/samples/declaration/`
+  (`rules.json`). `pnpm eval:encoding` builds from the sample documents and `pnpm eval:encoding:score` scores the run
+  against the golden, per split, recording to the Langfuse dataset `encoding-evaluation` with `--record`
+  ([evaluation.md](evaluation.md#datasets)).
 - **Scores per build**, sent to Langfuse on the build's trace: Zod-valid units, checker problems before and after
   repair, coverage, rules per kind, requirement and approval counts, text conditions, `SCHEMA GAP` notes.
 - **Experiment scores against gold:** in code, modality agreement, check agreement on test cases (both rules of a pair
@@ -560,7 +545,7 @@ about 30,000 tokens. Every model stage stays on Opus 5.5 at high effort until th
   the provider's `retry-after`, or 5, 10, 20, 40 and 60 seconds, and is retried up to six times (`defaultRetry` in
   `runPrompt.ts`) before its step fails and the Workflow retries the step.
 - **Prompt caching.** Every encode and repair call marks its shared prefix (the `respond` tool's schema, about 15,000
-  tokens, then the instructions, the guide, core terms and request types, about 3,000 more) for Anthropic's five-minute
+  tokens, then the instructions, core terms and request types, about 3,000 more) for Anthropic's five-minute
   prompt cache, refreshed by each call that reads it. Calls in flight at the start each write it once (1.25 times the
   input price); after that, reads cost a tenth. Repair has its own prefix, since its tool schema is the patch.
 - **Repair timing and size.** A unit's first repair starts when its own encode is verified, so repairs overlap the

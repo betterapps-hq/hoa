@@ -84,15 +84,15 @@ Each step has a gate. The next step starts only when the gate is met.
 
 ## Tasks
 
-Paused until the current investigation finishes (the defined-terms finder: GLiNER and Decide picking the paragraphs
+Runs in parallel with the current investigation (the defined-terms finder: GLiNER and Decide picking the paragraphs
 step B reads, then a large-model run comparing it with today's candidate finder).
 
 | # | Task | Step | State |
 | --- | --- | --- | --- |
 | 1 | Goldens for nine more organizations: defined terms and per-provision rule labels; two held out | — | Done |
 | 2 | Embedding units from the goldens: rule-bearing provisions with heading path and lead-in | 1 | Done (1,905 units) |
-| 3 | The same units from raw Azure paragraphs and headings, without the parser | 1 | Paused |
-| 4 | Embed with text-embedding-3-small and -large, Voyage 4 and 4-large; cluster each with BERTopic | 2 | Embedded (7 cents); clustering paused |
+| 3 | The same units from raw Azure paragraphs and headings, without the parser | 1 | Running |
+| 4 | Embed with text-embedding-3-small and -large, Voyage 4 and 4-large; cluster each with BERTopic | 2 | Embedded (7 cents); clustering running |
 | 5 | Manual review: name, merge and split clusters; list missing kinds; choose the embedding model | 2 | To do |
 | 6 | Draft taxonomy: kinds with descriptions, which template and which don't | 3 | To do |
 | 7 | Coverage: share of rules per kind, templated share, outliers | 3 | To do |

@@ -1,75 +1,36 @@
 # Evaluation
 
-Prompt tuning only counts when it's measured. Each model stage below has a Langfuse dataset with expected output, a
-score that code computes where possible, and a regression bar that a prompt or model change must clear before it's
-labeled `production` in Langfuse.
-
-Two model stages have no dataset of their own and are measured through the stages that consume them: section structure
-(through extraction recall and citation validity) and visual descriptions (through fact accuracy on inferred facts).
+Prompt tuning only counts when it's measured. Each evaluation runs in process against expected data: code computes
+every score it can, and the coding agent judges what needs reading for meaning, from comparison files the scripts write
+([Judging by the coding agent](#judging-by-the-coding-agent)). Langfuse holds a dataset only where one is listed below.
+Every run that calls a model needs the person's approval.
 
 ## Datasets
 
-| Dataset | Item | Expected output | Source |
-| --- | --- | --- | --- |
-| `section-routing` | One section | Project types, topics, relevance | Sample declaration and guidelines |
-| `rule-extraction` | One governing-document section | The candidate rules a careful reviewer extracts, with checks and citations | Sample fence sections, reviewed by hand |
-| `rule-consolidation` | All candidates for a project type | Merges, conflicts and exception links | The gold candidates from `rule-extraction` |
-| `file-classification` | One page | `ApplicationFileKind` | Redacted sample packet and variants |
-| `fact-extraction` | One packet | Components, facts and text-condition answers | Redacted sample packet and variants |
-| `document-check` | One packet | Document statuses | Redacted sample packet and variants |
-| `qualitative-check` | One rule and component, with facts and evidence | Status | Hand-built cases |
-| `review-decision` | Facts, document statuses and a rulebook | Findings, recommendation and action items | Hand-built variants; code only, no model |
-| `review-writer` | Findings, recommendation and action items | None: judged by the coding agent ([below](#judging-by-the-coding-agent)) | Items from `review-decision` |
-| `rule-corrections` | An administrator's edit or rejection | The corrected rule | Production; reviewed before it's copied into `rule-extraction` |
-| `encoding-evaluation` | One split of the sample Declaration (`encoding-dev`, `encoding-test`) | The golden encoding, `samples/declaration/rules.json` | `pnpm eval:encoding:score <run> --record`: one dataset run per evaluation run, a score per measure code computes (evaluation round 1) |
-| Encoding step datasets (local) | One input of one redesigned encoding step | Derived from the golden | `pnpm eval:datasets`, local files only ([below](#encoding-step-datasets)) |
+| Dataset | Where | Item | Expected output | Built and run by |
+| --- | --- | --- | --- | --- |
+| `encoding-evaluation` | Langfuse | One split of the sample Declaration (`encoding-dev`, `encoding-test`) | The golden encoding, `samples/declaration/rules.json` | `pnpm eval:encoding` runs the build; `pnpm eval:encoding:score <run> --record` records one dataset run per evaluation run, a score per measure code computes |
+| Encoding step datasets | Local | One input of one redesigned encoding step | Derived from the golden | `pnpm eval:datasets`, then `pnpm eval:step` ([below](#encoding-step-datasets)) |
+| Review cases | Local | One application: its project type, answers, packet and expected review | Entities, facts, documents, findings per rule and entity, recommendation and action items | `pnpm eval:review` ([below](#review-cases)) |
+| `entity-facts` | Langfuse | One packet, entity and property, from a correction the review recorded | The settled fact, or null with `needsLabel` for a person to label | `pnpm review:corrections` ([application-review.md, Recognition](application-review.md#recognition)) |
 
-The gold rulebook comes from the governing documents only: guidelines Article 5 and its exhibits, CC&R Article 4, and
-the HOA's blank application form and checklist (until the HOA provides a blank copy, the packet's form pages with every
-filled value removed). It follows the schema's one-requirement-per-rule convention ([schema.md](schema.md#4-rules)) and has about 45
-fence rules.
+The golden encoding comes from the governing documents only and follows the schema's one-requirement-per-rule
+convention ([schema.md](schema.md#4-rules)).
 
-Application variants start from a **complete, compliant baseline**: the redacted packet with a listed Trex color,
-vertical boards in a K style, a stated 72-inch height, both owners' signatures, a signed checklist that answers "Yes" to before photos,
-neighbor approval letters that state everything 5.6.1(i) requires, and a gate that matches the fence. Each variant then changes one thing, so every branch of the
-decision policy is reached:
-
-| Variant | Expected recommendation |
-| --- | --- |
-| Baseline | Approve |
-| Frame It All color with Trex (River Birch) | Approve with conditions |
-| Horizontal boards | Approve with conditions |
-| 78-inch fence, no lattice | Approve with conditions |
-| 60-inch fence with 18 inches of lattice | Approve |
-| Gate color doesn't match the fence | Approve with conditions |
-| Unlisted composite manufacturer | Approve, with a committee decision |
-| Vinyl, with `curableOutcome: reject` | Reject |
-| Neighbor approval missing | Request information |
-| Height not given | Request information |
-| The sample packet as submitted | Request information ([application-review.md](application-review.md#expected-result-for-the-sample-application)) |
-
-The governing documents are shared with the HOA's members, but the sample application isn't: every dataset item uses
-the redacted copy, with the homeowners' details replaced.
+The governing documents are shared with the HOA's members, but the sample application isn't: the fence packet's case
+and every file that quotes it stay in the git-ignored `.fixtures/`.
 
 ## Scores
 
-| Score | How | Stage |
+| Score | How | Run by |
 | --- | --- | --- |
-| Routing accuracy | Tags equal gold | Route |
-| Rule recall and precision | Match extracted rules to gold by check type, attributes, conditions and section | Extract, consolidate |
-| Check accuracy | Values, ranges and keyed tables equal gold | Extract |
-| Citation validity | Share of citations with an `exact` or `fuzzy` match (code; also sent from every production build) | Extract |
-| Consolidation accuracy | Merges, conflicts and exception links equal gold | Consolidate |
-| Classification accuracy | Page kinds equal gold | Classify |
-| Fact accuracy | Per attribute and component: value, `valueMatch` and status equal gold | Facts |
-| Document status accuracy | Status and problems equal gold | Documents |
-| Qualitative accuracy | Status equals gold | Qualitative checks |
-| Finding and recommendation accuracy | Equal gold (code) | Evaluate, decide |
-| Feedback faithfulness and clarity | The coding agent, from each case's `writer.md` ([below](#judging-by-the-coding-agent)): the assessment, the feedback and each action item are faithful (every statement is backed by a finding or action item; nothing is invented) and clear (the homeowner can tell exactly what to change or provide); the score is the share of parts that are both | Write |
-| Encoding against the golden | Code: provision keys and text, coverage and no-rule reasons, term recall, validity and repair, and modality and check agreement (the engine on generated facts) on rules paired by key or by the coding agent. The coding agent, from the run's `compare/` files: rule recall, precision and pairwise quality, per provision | Rulebook build ([implementation-plan.md](implementation-plan.md#evaluation-round-1-encoding-quality)) |
+| Encoding against the golden | Code: provision keys and text, coverage and no-rule reasons, term recall, validity and repair, and modality and check agreement (the engine on generated facts) on rules paired by key or by the coding agent. The coding agent, from the run's `compare/` files: rule recall, precision and pairwise quality, per provision | `pnpm eval:encoding:score` |
+| Encoding steps | Code, per step ([below](#encoding-step-datasets)); the coding agent judges faithfulness and meaning from each item's comparison file | `pnpm eval:datasets`, `pnpm eval:step` |
+| Review | Code (`src/evaluation/review/score.ts`): entity accuracy, fact accuracy, document accuracy, normalization accuracy, evidence verification, finding outcome accuracy per rule and entity, recommendation accuracy and action items | `pnpm eval:review` |
+| Feedback faithfulness and clarity | The coding agent, from each case's `writer.md`: the assessment, the feedback and each action item are faithful (every statement is backed by a finding or action item; nothing is invented) and clear (the homeowner can tell exactly what to change or provide); the score is the share of parts that are both | `pnpm eval:review` |
 
-Evaluate and decide are code, so `review-decision` also runs as ordinary unit tests; the Langfuse experiment tracks the
-pipeline end to end.
+Every rulebook build also sends the scores code computes on it to Langfuse
+([encoding.md, Quality](encoding.md#quality)). Production evaluators are deferred.
 
 ## Judging by the coding agent
 
@@ -77,7 +38,8 @@ Scores are code wherever code can compute them: exact matches, structural compar
 engine's outcomes. What needs reading for meaning (whether two rules state the same requirement, whether a rule is
 faithful to its text, whether a summary is faithful and clear) is judged by the coding agent (Claude Code) in its own
 session, on the person's Claude subscription. There are no judge prompts in Langfuse and no judge calls through the
-app's OpenRouter key. Judging needs no approval: it calls no model through the app and writes nothing to Langfuse.
+app's OpenRouter key (the person's decision of 2026-10-09 in [implementation-log.md](implementation-log.md)). Judging
+needs no approval: it calls no model through the app and writes nothing to Langfuse.
 
 The evaluation scripts write comparison files for it to the run folder under `.fixtures/eval/` (git-ignored, since they
 quote the documents and packets):
@@ -88,13 +50,15 @@ quote the documents and packets):
   by side as sentences and JSON, and what code found: pairs by key or from `pairs.json`, modality, the engine's check
   agreement, the rules left unpaired), and `terms.md` lists the golden terms no key, label or pair matches with the
   pipeline terms they may be. The script calls no model, and writes to Langfuse only with `--record`.
+- **Encoding steps.** `pnpm eval:datasets` and `pnpm eval:step` write `compare/<item>.md` per item
+  ([below](#encoding-step-datasets)).
 - **Review.** `pnpm eval:review` writes, beside each case's `review.json` and `scores.json`, a `writer.md`: the case's
   scores from code, what the writer read (the recommendation, the findings with their rules and provisions, the action
   items as the writer phrased them, the suggestions) and what it wrote (the assessment and the feedback).
 
 The agent's loop:
 
-1. Read the run's index or each case's `writer.md`.
+1. Read the run's index, each item's comparison file or each case's `writer.md`, and every wrong and missed item.
 2. **Encoding:** for each provision, pair every golden rule with the pipeline rule stating the same requirement, if
    any (rule recall); say whether each pipeline rule is faithful to the text (rule precision); and say whether the
    pipeline's encoding of the provision is better than, equal to or worse than the golden (pairwise quality). In
@@ -106,8 +70,7 @@ The agent's loop:
 4. **Review:** for the assessment, the feedback and each action item, say whether it's faithful and clear; the writer
    score is the share of parts that are both.
 5. Write the judged scores, with the keys behind each miss and the reasons, to `judgment.md` in the run folder, and
-   record them with the code's scores in the implementation log. A judged score clears its bar the same way a code
-   score does.
+   record them with the code's scores in the implementation log.
 
 Where the pipeline and the golden disagree and the text supports the pipeline, the agent says so; a confirmed golden
 error is fixed in the sample with a cited reason, as any expected-data change.
@@ -116,12 +79,12 @@ error is fixed in the sample with a cited reason, as any expected-data change.
 
 The redesigned encoding steps (B defined terms, E find the rules, C shared vocabulary, C-merge, F structure the rules
 and its retry, consolidation; prompt code in `src/encoding/steps/`) each have a local dataset, so a prompt is tested on
-its own before it's wired into the build. `pnpm eval:datasets` (no model call, nothing to Langfuse) builds the items from
-every golden in `samples/*/rules.json` and writes them to `.fixtures/eval/datasets/<step>/` (git-ignored: items quote
-the documents); rerun it when a golden changes. Each item has a stable id, the step's input as the step receives it, the
-expected output derived from the golden, and slice tags: document, split (dev, test, or `other` for provisions in
-neither, such as the guidelines), topic areas (rule domains) and features present (check types, override, sanction,
-judgment, cross-reference, amendment, text condition, no-rule reason).
+its own before it's wired into the build. `pnpm eval:datasets` (no model call) builds the items from every golden in
+`samples/*/rules.json` and writes them to `.fixtures/eval/datasets/<step>/` (git-ignored: items quote the documents);
+rerun it when a golden changes. These datasets never go to Langfuse. Each item has a stable id, the step's input as the
+step receives it, the expected output derived from the golden, and slice tags: document, split (dev, test, or `other`
+for provisions in neither, such as the guidelines), topic areas (rule domains) and features present (check types,
+override, sanction, judgment, cross-reference, amendment, text condition, no-rule reason).
 
 | Step | Item | Input | Expected |
 | --- | --- | --- | --- |
@@ -133,16 +96,18 @@ judgment, cross-reference, amendment, text condition, no-rule reason).
 | `rule-retry` | A failing rule a saved run recorded | The rule, its problems (paths inside it), its provisions and vocabulary | Fixed, with nothing changed outside the problems |
 | `consolidation` | A split | Its golden rules with every cross-section override removed, cross-references, similar pairs | The removed overrides |
 
-**The v3 and v5 columns.** The same command scores each item against what the old pipeline's saved runs produced for
-the same input (`--runs`; by default v3 `2026-10-09T22-47-00-dev` and `22-45-54-test`, v5 `23-14-52-dev`). The old
-pipeline had other steps, so code maps them: its vocabulary step to B, its encode answers (before repair) to E's outlines
+**The saved build runs' columns.** The same command scores each item against what today's build pipeline produced for
+the same input in saved runs under `.fixtures/eval/encoding/` (`--runs <label>=<run id>,...`; a label may name a dev
+and a test run, and the first that covers an item counts; each run folder records the prompt versions it used). The
+build has other steps, so code maps them: its vocabulary stage to B, its encode answers (before repair) to E's outlines
 (kind, modality, bearer, subject, request types, citations per rule) and to F's structured rules, its first repair to
-F's retry, its consolidation to consolidation; C and C-merge have no equivalent and say so. Each item gets a verdict per
-run: correct, partly correct (the notes say what's wrong), wrong, missing (no old result: the run never encoded the
-item's document or section, as with the guidelines), or no equivalent. `results.json` holds every verdict and metric,
-`summary.md` the counts by slice, each run's accuracy per metric and per slice, and the items every run got wrong (the
-most useful test items), and `compare/<item>.md` the input, the expected output and each run's output for the coding
-agent to judge what code can't (faithfulness, whether two terms or rules mean the same).
+F's retry, its consolidation to consolidation; C and C-merge have no equivalent and say so. The `rule-retry` items are
+the runs' recorded failing rules, at most `--retry-quota <problem class prefix>=<count>,...` per class. Each item gets a
+verdict per run: correct, partly correct (the notes say what's wrong), wrong, missing (no result: the run never encoded
+the item's document or section, as with the guidelines), or no equivalent. `results.json` holds every verdict and
+metric, `summary.md` the counts by slice, each run's accuracy per metric and per slice, and the items every run got
+wrong (the most useful test items), and `compare/<item>.md` the input, the expected output and each run's output for
+the coding agent to judge what code can't (faithfulness, whether two terms or rules mean the same).
 
 **What code scores, per step** (`src/evaluation/encoding/steps/scores.ts`):
 
@@ -159,8 +124,8 @@ agent to judge what code can't (faithfulness, whether two terms or rules mean th
 ## Running one step
 
 `pnpm eval:step --stage <step>` runs one step alone, so a drafted prompt is tested cheaply before the pipeline uses it.
-Without `--yes` it only prints what it would run (items, calls, pinned prompts) and stops: every model run needs the
-person's approval.
+Without `--yes` it's a dry run: it prints the items, the estimated model calls per repeat and the pinned prompts, and
+stops. That estimate is what the person approves; the script has no spending cap.
 
 - **Golden mode** (the default): the step runs over its dataset's items, built in memory from the golden as above, so
   it's measured against perfect upstream input. `--golden <sample>` picks the golden (default `declaration`).
@@ -174,14 +139,27 @@ person's approval.
   no model and must give back exactly what the run saved (`reproduced`, compared as the runner writes JSON;
   `replay.test.ts`).
 
-Options: `--items <id part>,...` keeps matching items; `--prompts <name>=<version>,...` pins versions no label points
-at (drafted prompts are loaded by version, labeled or not); `--repeat <n>` runs again with its own content cache per
-repeat to show run-to-run noise (each metric's mean with its min and max across repeats, per item in `scores.json` and over the items in `report.md`, so a version comparison can tell a change from noise); `--reruns 0|1` reruns a failing B, E or C item once with its problems;
-`--retries 0-2` runs F's retry on the rules still failing; `--rescore <step run>` calls no model and scores that run's saved
-outputs again against the dataset as it is now (B's check rerun too), into a new `<time>-<step>-rescored` folder, applying and copying the run's `judgments.json`. Each run writes `.fixtures/eval/steps/<run id>/`: `run.json`
-(calls with input, cached-input, cache-write and output tokens, cost and latency; problems), `outputs/`,
-`handoff.json`, `scores.json`, `report.md` (calls, cost, time, cached tokens, problems by class, the scores beside the
-dataset's v3 and v5 columns) and `compare/`.
+Options:
+
+- `--items <id part>,...` keeps matching items.
+- `--prompts <name>=<version>,...` pins versions no label points at (drafted prompts are loaded by version, labeled or
+  not); other prompts load by label.
+- `--repeat <n>` runs again with its own content cache per repeat to show run-to-run noise: each metric's mean with its
+  min and max across repeats, per item in `scores.json` and over the items in `report.md`, so a version comparison can
+  tell a change from noise.
+- `--reruns 0|1` (default 1) reruns a failing B, E or C item once with its problems, as the pipeline does.
+- `--retries 0-2` (default 0) runs F's retry on the rules still failing.
+- `--runs <label>=<run id>,...` picks the saved build runs the report sets beside the scores, and
+  `--retry-quota <class prefix>=<count>,...` how many of their failing rules `rule-retry` takes per problem class.
+- `--finder <file>` gives B the provisions another finder picked (a JSON map of item id to provision keys) instead of
+  the ones code picks, and `--expect all|picked` (default `picked`) scores B against every term the golden defines in
+  the document, or only those in the provisions B is given, so finders can be compared (`scripts/stepFinder.ts`).
+- `--rescore <step run>` calls no model and scores that run's saved outputs again against the dataset as it is now
+  (B's check rerun too), into a new `<time>-<step>-rescored` folder, applying and copying the run's `judgments.json`.
+
+Each run writes `.fixtures/eval/steps/<run id>/`: `run.json` (calls with input, cached-input, cache-write and output
+tokens, cost and latency; problems), `outputs/`, `handoff.json`, `scores.json`, `report.md` (calls, cost, time, cached
+tokens, problems by class, the scores beside the saved build runs') and `compare/`.
 
 **B's golden gaps.** A thing or category B returns that the golden lacks, citing a provision B was given as defining,
 is a golden-gap candidate: its comparison file lists it. The coding agent reads the text and records its verdict in the
@@ -190,30 +168,37 @@ run folder's `judgments.json`
 rescores the run: `golden-gaps` counts the confirmed ones (0 until judged), and they no longer count as extra things. A
 confirmed gap is also a golden error to fix with a cited reason, as any expected-data change.
 
-## In production
+## Review cases
 
-- **Citation validity** is computed in the Verify stage and sent to Langfuse as a score through the SDK, on every build.
-- **Feedback faithfulness** (deferred until after the demo; implementation-plan.md, 8.8) is an LLM-as-a-judge evaluator on observations, filtered to root observations whose trace
-  name is `review-writer`. The root observation's input holds the findings and action items, and its output holds the
-  feedback. It's sampled to control cost. (Langfuse v4 retires trace-level evaluators on November 16, 2026, so none
-  are used.)
-- **Administrator edits are labels.** When an administrator edits or rejects an extracted rule, the before and after go
-  to the `rule-corrections` dataset. Corrections that hold up are copied into `rule-extraction` as test cases.
+`pnpm eval:review [--case <id>,...]` runs the review (`reviewApplication`, the code the `ApplicationReview` Workflow
+runs) in process on each case with the real models, scores it in code against the case's expected review, and writes
+each case's `review.json`, `scores.json` and `writer.md`, plus `report.md`, to `.fixtures/eval/review/<run id>/`. Model
+results are cached, so a rerun pays only for what changed; `--sample <n>` reads and writes its own cache, so the same
+configuration can be measured on fresh model answers, and `--config` overrides a prompt version's model and effort for
+an experiment without a new Langfuse version. The rules file is the one `pnpm db:seed:sample --review` publishes.
+
+The cases are the synthetic garage enclosure packets committed under `samples/garage-enclosure/` (`baseline`,
+`replacement-plans`, `attic`, `fee-not-paid`:
+[application-review.md, Expected result for a garage enclosure](application-review.md#expected-result-for-a-garage-enclosure))
+and the fence packet's case in the git-ignored `.fixtures/eval/review/fence-application/`
+([application-review.md](application-review.md#expected-result-for-the-sample-application)). The engine and the
+decision policy are code, with unit tests of their own.
 
 ## Tuning and measurement
 
 Tuning fits whatever it's measured on, so the cases a prompt is tuned on never measure it.
 
 - **Slices.** Every case belongs to slices: its organization, its project type, and whether it's a real or a synthetic
-  packet. Every run reports its scores per slice as well as per case, and a change is judged on the held-out slices.
+  packet; every step dataset item has its document, split, topic areas and features. Every run reports its scores per
+  slice as well as per case, and a change is judged on the held-out slices.
 - **Held out.** Measurement cases are never read while tuning: no prompt, code, validation or rulebook term is written
   from what they contain or what they got wrong. Whole project types are held out, and whole organizations once there
   is more than one: a fix that only helps one organization or one type is fitting.
 - **Today.** Two project types, from one organization. **The fence is held out for all prompt tuning**: prompts are
-  tuned on the garage enclosure cases and measured on the fence packet. The fence is the one real packet and the type
-  the first round of tuning fitted to, so it's the better measure of whether the prompts generalize. Its failures are
-  recorded, but they're fixed only by a generic change shown on the tuning slice first, or by rulebook data with a
-  cited reason (a definition or scope note the governing text supports), never by naming its terms in a prompt.
+  tuned on the garage enclosure cases and measured on the fence packet. The fence is the one real packet, so it's the
+  better measure of whether the prompts generalize. Its failures are recorded, but they're fixed only by a generic
+  change shown on the tuning slice first, or by rulebook data with a cited reason (a definition or scope note the
+  governing text supports), never by naming its terms in a prompt.
 - **More data, not more checks.** Adding a customer adds cases and a slice; it never adds a check, a prompt or code.
   The plan for the next slices: more organizations' governing documents (some held out from all tuning), and a second
   packet of each project type.
@@ -221,12 +206,17 @@ Tuning fits whatever it's measured on, so the cases a prompt is tuned on never m
 
 ## Tuning loop
 
-1. Change a prompt in Langfuse as a new version, without the `production` label. The version's `config.model` names
-   its model, so a model change is a prompt version too.
-2. Run the dataset experiment against it, on the tuning cases while iterating.
-3. Measure on the held-out slices, and compare scores per slice with the current `production` version in Langfuse.
-4. Move the `production` label only when nothing regresses.
+One step at a time:
 
-Jobs resolve labels to versions when they start, so promoting a prompt (and its model) needs no deploy, and a job in
-progress keeps the versions it started with. `OPENROUTER_MODEL` and `OPENROUTER_SMALL_MODEL` apply only when a prompt
-version doesn't name a model.
+1. Draft the change as a new prompt version in Langfuse, with no label. The version's `config.model` names its model,
+   so a model change is a prompt version too.
+2. Run its step alone with `pnpm eval:step --stage <step> --prompts <name>=<version>`: a dry run first, then, with the
+   person's approval, `--yes`.
+3. Judge every wrong and missed item from the comparison files, not only the score.
+4. Fix what the judging shows: the code or a scorer when it's wrong, the golden when the text supports the model (with
+   a cited reason), the prompt otherwise. Rescore with `--rescore` when only code or the golden changed.
+5. Repeat until the step is good, then move to the next step.
+
+Move a label (`development`, which the app loads locally, then `preview` and `production`) to a version only with the
+person's approval. Jobs resolve labels to versions when they start, so a job in progress keeps the versions it started
+with. `OPENROUTER_MODEL` and `OPENROUTER_SMALL_MODEL` apply only when a prompt version doesn't name a model.

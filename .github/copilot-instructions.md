@@ -1,33 +1,23 @@
-# HOA Monorepo — Project Guidelines
+# HOA Monorepo Project Guidelines
 
-A Turborepo + pnpm monorepo with React 19 and TypeScript applications. UI systems are selected at the app or
-product-surface boundary. Shared config lives in `@repo/*` packages under `packages/`. See [README.md](../README.md) for
-setup and the [docs index](../docs/README.md) for conventions.
+A Turborepo and pnpm monorepo for hoa, an AI-native HOA management platform built on each community's governing
+documents. Architectural review is its first module. The app is React 19 and TypeScript. Shared config lives in
+`@repo/*` packages under `packages/`. See [README.md](../README.md) for setup and the [docs index](../docs/README.md)
+for conventions.
 
 ## Tooling (differs from common defaults)
 
-- **Lint:** `oxlint` (not eslint) · **Format:** `oxfmt` (not prettier).
-- **Type-check:** `tsc` from a pinned native TypeScript — keep the version aligned across packages.
-- **Test:** Vitest (happy-dom unit tests) · **Web framework:** TanStack Start on Vite, running on Cloudflare Workers.
-- **AI:** Vercel AI SDK (`ai`) with the OpenRouter provider; prompts, traces, cost, latency and evaluations in Langfuse.
+- **Lint:** `oxlint` (not eslint). **Format:** `oxfmt` (not prettier).
+- **Type-check:** `tsc` from the native TypeScript 7.0.2 pinned in the `pnpm-workspace.yaml` catalog.
+- **Test:** Vitest (happy-dom unit tests). **Web framework:** TanStack Start on Vite, running on Cloudflare Workers.
+- **AI:** Vercel AI SDK (`ai`) with the OpenRouter provider; prompts, traces, cost and latency in Langfuse.
 - **Package manager:** pnpm (`>=12`) on Node `>=26`, enforced via root `engines` + `engine-strict`.
 - **Task runner:** Turborepo.
 
-## Build / verify loop
+## Build and verify loop
 
-Complete the coherent implementation before running unit tests, type-checks, lint, browser acceptance, or the full
-verification suite. Do not run these checks after each small edit. Once the implementation is complete, run the smallest
-relevant focused checks, then run the required final verification. If a check exposes related defects, batch the repairs
-before rerunning that check.
-
-Run `pnpm verify` before declaring work done — it must be clean. It runs, in order, `check:format` (oxfmt), `check:lint`
-and `check:types` (per package via Turbo), `check:unused` (`knip` over the whole graph) and `test:coverage`. Formatting
-is global; lint and type-check are per-package; knip is root-only.
-
-Git hooks (lefthook): **pre-commit** runs `oxlint --fix` + `oxfmt` on staged files; **pre-push** runs
-`pnpm check:types`. Do not bypass them with `--no-verify` unless the user explicitly authorizes it for a failure wholly
-caused by unrelated project work. That exception does not waive focused verification for the files being committed, and
-the commit handoff must record the unrelated blocker and the checks run directly.
+Run `pnpm verify` before declaring work done; it must be clean. When to run checks, what `pnpm verify` covers and the
+lefthook rules are in [conventions.md](../docs/conventions.md#quality-gates).
 
 ## Workspace layout
 
@@ -38,10 +28,11 @@ the commit handoff must record the unrelated blocker and the checks run directly
 
 ## Conventions
 
-Coding conventions live in the [`docs/`](../docs/README.md) folder — start at the index and read the relevant page
-before writing code. Working in an app or package, read its own `docs/README.md` too. Two points worth stating up front:
-the **React Compiler is on** (don't hand-write `useMemo`/`useCallback`/`memo`), and **reuse before building** — check
-the [hooks](../docs/hooks.md) and [type-helper](../docs/typescript.md) catalogs before writing your own.
+Coding conventions live in the [`docs/`](../docs/README.md) folder. Start at the index and read the relevant page before
+writing code. Working in an app or package, read its own `docs/README.md` too. Two points worth stating up front: the
+**React Compiler is on** (don't hand-write `useMemo`/`useCallback`/`memo`), and **reuse before building**: check
+[hooks.md](../docs/hooks.md) and [typescript.md](../docs/typescript.md) for what the preferred libraries already provide
+before writing a hook or type helper.
 
 Prefer the tools in the [preferred tech stack](../docs/tech-stack.md); **introducing a library that isn't already used
 needs a human discussion**, not a silent add.
@@ -62,13 +53,12 @@ needs a human discussion**, not a silent add.
   may name an organization's terms, a project type, a product or an example from a sample case. Organization and project
   knowledge lives only in rulebook data (term definitions, scope notes, value relations). Tune on some cases and measure
   on held-out ones, including whole project types; change expected data only with a cited reason.
-- **Every model stage is measured.** It has a Langfuse dataset (or is measured through the stage that consumes it),
-  listed in the app's design/evaluation.md; production evaluators exist only where that page lists them. See
-  [apps/hoa/docs/ai.md](../apps/hoa/docs/ai.md).
+- **Every model stage is measured.** How each stage is evaluated, and what runs in production, is in
+  [apps/hoa/docs/design/evaluation.md](../apps/hoa/docs/design/evaluation.md).
 
 ## Documentation
 
-- **Keep this file brief** — it's the entry point; link to `docs/` articles rather than duplicating detail.
+- **Keep this file brief.** It's the entry point; link to `docs/` articles rather than duplicating detail.
 - **Docs live with what they describe.** The root [`docs/`](../docs/README.md) is only for engineering across the whole
   monorepo. Everything specific to one app or package goes in that app or package's own `docs/` folder, indexed by its
   `docs/README.md`. A new app or package gets a `docs/` folder with its first doc, and a link from the root index.
@@ -102,14 +92,10 @@ needs a human discussion**, not a silent add.
 
 ## Principles for development
 
-- **Don't reinvent wheels.** [typescript.md](../docs/typescript.md) and [hooks.md](../docs/hooks.md) catalog what the
-  installed libraries already provide. Check them before adding a hook or type helper.
-- Don't overtest or verify. Complete shippable units of work before running test passes and resolving failures. Test
-  passes cost lots of time.
 - **Correctness over expediency.** Fix root causes and keep contracts coherent, even when a shortcut is faster.
 - **No backward compatibility by default.** Replace obsolete contracts and implementations directly. If a change would
   break something that might need to keep working, ask first; with no one to ask, assume it doesn't. The exception is D1
-  migrations: every pull request preview shares one preview database, so migrations must stay backward compatible.
+  migrations ([apps/hoa/docs/setup.md](../apps/hoa/docs/setup.md#schema-and-binding-changes)).
 - **One canonical implementation.** No version-suffixed files, symbols, schemas, routes or APIs (`V2`, `Phase2`,
   `legacy`) and no compatibility aliases. Fix forward instead of adding shims, fallbacks or dual paths for unreleased
   behavior.

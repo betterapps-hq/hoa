@@ -14,8 +14,8 @@ Two kinds of documents flow through the app, with different owners, sensitivity 
 
 | Store | Holds |
 | --- | --- |
-| **D1** (one shared database; every table except `hoas` has `hoa_id`) | HOAs, document and file records, provisions, page kinds, section metadata, jobs, rulebooks and their rules, terms and questions, applications, review summaries |
-| **R2** (one bucket per environment) | Original files, raw OCR responses, page records, figure images and descriptions, section text, published rules files, per-job stage outputs, full review records, the content caches |
+| **D1** (one shared database; every table except `hoas` has `hoa_id`) | HOAs, document and file records, provisions, page kinds, jobs, rulebooks and their rules, terms and questions, project types, applications, review summaries |
+| **R2** (one bucket per environment) | Original files, raw OCR responses, page records, figure images and descriptions, published rules files, per-job step outputs, full review records, the content caches |
 | **Langfuse** | Traces, prompts, datasets and scores ([evaluation.md](evaluation.md)) |
 
 D1 tables, defined with Drizzle in `src/db/schema.ts` with migrations in `apps/hoa/migrations`:
@@ -23,24 +23,25 @@ D1 tables, defined with Drizzle in `src/db/schema.ts` with migrations in `apps/h
 | Table | One row per | Notes |
 | --- | --- | --- |
 | `hoas` | HOA | `settings_json` holds `HoaSettings` |
-| `governing_documents` | Uploaded version of a document, or a document the rules name that nobody uploaded | `UNIQUE(lineage_id, version)`. `key` is unique per HOA and `document_json` holds the rules schema's `GoverningDocument`, both set once a build or the sample seed keys the document. A referenced document (status `referenced`) has no file columns. The upload list shows only rows with a file |
+| `governing_documents` | Uploaded version of a document, or a document the rules name that nobody uploaded | `UNIQUE(lineage_id, version)`. `key` is unique per HOA and `document_json` holds the rules schema's `GoverningDocument`, both set once a build or the sample seed keys the document. A referenced document (status `referenced`) has no file columns. `structure_json` holds how a build structures the upload; `removed_at` is set when an administrator removes the document. The upload list shows only rows with a file that aren't removed |
 | `provisions` | Provision of a keyed document | Primary key `(hoa_id, key)`; `document_id`, `label`, `parent_key`, `kind` and `ordinal` for lookups and order; the whole `Provision` in `provision_json` |
-| `sections` | Section of a document version (first build) | Written once per version; `id` is `{documentId}:{ordinal}`. Metadata and latest routing only; text is in R2. Dropped at cutover |
-| `jobs` | Workflow instance | `id` is the Workflow instance id; progress and errors |
+| `jobs` | Workflow instance | `id` is the Workflow instance id; stage, counts, errors, and the step list in `progress_json` |
 | `rulebooks` | Rulebook | `UNIQUE(hoa_id, version)`; partial unique indexes allow one `building` and one `draft` per HOA. `settings_json` and `coverage_json` once the build saves the draft; `file_key` and `file_sha256` once it's published |
 | `rulebook_rules` | Rule in a rulebook | Primary key `(rulebook_id, rule_key)`; `kind`, `request_types`, `applies_to` and `review_status` for filtering, `content_hash` for carrying approvals forward; the whole `Rule` in `rule_json` |
 | `rulebook_terms` | Organization term, or proposed core term, in a rulebook | Primary key `(rulebook_id, term_key)`; `kind`, `review_status`, `content_hash`; the whole `Term` in `term_json` |
 | `rulebook_questions` | Interpretation or conflict question | Primary key `(rulebook_id, id)`; `question_json` and `answer_json` |
-| `rules` | Rule in a first-build rulebook | `UNIQUE(rulebook_id, rule_key)`; the first build's `Rule` in `rule_json`. Dropped at cutover |
 | `project_types` | An organization's project type | `status` active or archived; `rulebook_id` it was built against; the `ProjectTypeDefinition` (fields and documents) in `definition_json` |
-| `applications` | Application | `project_type_id` and the form's answers in `answers_json`; `project_type` and `project_kind` are the earlier builds' and dropped at cutover |
+| `applications` | Application | `project_type_id` and the form's answers in `answers_json` |
 | `application_files` | Uploaded or derived file | |
 | `application_pages` | Page of an application file | `(file_id, page_index)` and the page's `kind` from classification |
 | `reviews` | Review run | Recommendation, cost and session, and `rules_file_sha256`, the rules file it read; the full record is in R2 |
 
-Migrations only add tables and nullable columns, because every pull request preview shares one preview database: the
-first build's tables and columns (`sections`, `rules`, `rulebooks.catalog_version`, the lineage columns) are dropped in
-one migration at cutover (implementation-plan.md, 9.6), once `main` no longer reads them.
+Legacy tables and columns awaiting removal ([implementation-plan.md](implementation-plan.md), task 9.6): the `sections`
+and `rules` tables, `rulebooks.catalog_version`, and `applications.project_type` and `project_kind`.
+
+Migrations only add tables and nullable columns, because every pull request preview shares one preview database: a
+preview may run its branch's code against a schema another branch has already migrated. A migration that drops
+something waits until `main` no longer reads it.
 
 D1 has no interactive transactions. Changes that must land together (publishing a rulebook, saving a draft, starting a
 job) are one `batch()` call, which D1 runs atomically.
@@ -58,12 +59,13 @@ type HoaSettings = {
   curableOutcome: "approve-with-conditions" | "reject" // when every unmet rule is curable; default approve-with-conditions
   retentionDays: number // days after the committee's last decision; default 365
   draftRetentionDays: number // days after the last change to an application that was never submitted; default 30
+  unitSystem: "imperial" | "metric" // the units forms offer for amounts; default imperial
 }
 
 type ErrorInfo = { stage: string; message: string; isRetryable: boolean }
 
 type GoverningDocument = {
-  id: string // one id per uploaded version; pages, sections and citations use it
+  id: string // one id per uploaded version; pages and citations use it
   lineageId: string // shared by every version of the same document
   version: number // 1, 2, 3 ... within the lineage
   hoaId: string
@@ -82,6 +84,11 @@ type GoverningDocument = {
   uploadedAt: string
 }
 ```
+
+The row also carries what this type leaves out: `key` and `document_json` (the rules schema's document) once a build
+keys it, `structure_json`, and `removed_at`. Rows for referenced documents have status `referenced` and no file;
+`listGoverningDocuments` returns only uploads that aren't removed. A removed document drops out of builds and the
+documents list, while what already cites its pages still opens them.
 
 Authority comes from `kind` and the organization's precedence clause (see [schema.md](schema.md#rank-and-conflicts)), not from a stored number. An upload
 starts a new lineage, or names an existing `lineageId` to become its next version; amendments name the lineage they
@@ -121,35 +128,8 @@ type VisualDescription = {
 }
 ```
 
-`getPage` returns the page with its visual descriptions and, for application pages, its kind.
-
-### Sections
-
-Governing documents only. Sections are written once per document version, by the first build that needs them, with
-deterministic ids, so later builds and published rules' `provenance.sectionId` always point at the same rows.
-Re-structuring a document is an explicit administrator action that replaces its sections in one batch. The structure
-stage ([encoding.md](encoding.md#2-structure)) replaces sections with provisions.
-
-```ts
-type Section = {
-  id: string // "{documentId}:{ordinal}"
-  documentId: string // a governing document version
-  ordinal: number // order within the document
-  number: string | null // "5.4.2"
-  heading: string
-  kind: "body" | "definitions" | "exhibit"
-  parentId: string | null
-  pageStart: number
-  pageEnd: number
-  startOffset: number // into the text of page pageStart
-  endOffset: number // into the text of page pageEnd
-  references: string[] // ids of sections this one refers to ("see Exhibit K", "as defined in Article 1")
-  routing: { projectTypes: ProjectTypeId[]; topics: Rule["topic"][]; isRelevant: boolean } | null // latest result
-}
-```
-
-Routing is recomputed per build through the content cache; the column holds the latest result for display, and nothing
-published depends on it.
+`getDocumentPage` returns one page of a governing document, with its text and printed label, for the viewer that shows
+a citation.
 
 Page markers are lines of the form `<<page 23 | label 17>>` (or `<<page 23>>` with no printed label) placed before each
 page's text. A citation's quote lies on one page; a requirement that crosses a page break gets one citation per page.
@@ -160,7 +140,8 @@ page's text. A citation's quote lies on one page; a requirement that crosses a p
 type Application = {
   id: string
   hoaId: string
-  projectType: ProjectTypeId
+  projectTypeId: string | null // the organization's project type; null for "Something else"
+  answers: ProjectAnswers | null // the homeowner's answers to the project type's form
   description: string | null // typed by the homeowner; a fact source
   createdBy: string
   createdAt: string
@@ -216,13 +197,14 @@ type Job = {
   hoaId: string
   kind: "document-ingest" | "rulebook-build" | "application-review"
   subjectId: string // document, rulebook or application id
-  status: "running" | "completed" | "completed-with-errors" | "failed"
+  status: "running" | "completed" | "completed-with-errors" | "failed" | "cancelled" // cancelled: an administrator stopped it
   stage: string | null // a stage id from ocr.md, encoding.md or application-review.md
   done: number // set from a count of finished items, never incremented
   total: number
   promptVersions: Record<string, PromptVersion> // resolved once when the job starts
   failures: { stage: string; itemId: string; message: string }[] // items that failed without failing the job
   error: ErrorInfo | null
+  progress: JobProgress | null // every step the job works through, with counts and times (src/jobs/progress.ts)
   createdAt: string
   updatedAt: string
 }
@@ -240,7 +222,6 @@ hoas/{hoaId}/governing/{documentId}/pages/{pageIndex}.json               Page re
 hoas/{hoaId}/governing/{documentId}/layout.json                          offset labels and repeated text, from ocr:labels
 hoas/{hoaId}/governing/{documentId}/figures/{figureId}.png
 hoas/{hoaId}/governing/{documentId}/figures/{figureId}.json              VisualDescription
-hoas/{hoaId}/governing/{documentId}/sections/{sectionId}.md              section text with page markers
 hoas/{hoaId}/cache/{stage}/{key}.json                                    content cache for governing-document stages
 hoas/{hoaId}/rulebooks/{rulebookId}/rules.json                           published rules file, canonical JSON; its SHA-256 is on the rulebook
 hoas/{hoaId}/applications/{applicationId}/files/{fileId}/source.{ext}
@@ -250,11 +231,12 @@ hoas/{hoaId}/applications/{applicationId}/files/{fileId}/figures/{figureId}.png
 hoas/{hoaId}/applications/{applicationId}/files/{fileId}/figures/{figureId}.json
 hoas/{hoaId}/applications/{applicationId}/cache/{stage}/{key}.json        content cache for this application's stages
 hoas/{hoaId}/applications/{applicationId}/reviews/{reviewId}.json        full Review record
-hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json                          per-job stage outputs
+hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json                          per-job step outputs
 ```
 
-A rulebook build's stage outputs are `structure/{documentId}`, `analyze/{documentId}`, `encode/{unitId}`,
-`merge/draft` and `consolidate/result` (`rulebookBuildKeys` in `src/storage/keys.ts`).
+A build or review step's output is keyed by its step name: the part before the first colon is the stage and the rest
+the item, so `encode:{unitId}` is `encode/{unitId}.json`, and a step without an item, such as `merge`, is
+`merge/result.json` (`jobStepKey` and `rulebookBuildKeys` in `src/storage/keys.ts`).
 
 Duplicates are caught by hash instead of being cached:
 
@@ -267,31 +249,30 @@ Duplicates are caught by hash instead of being cached:
 
 Browsers upload directly to R2 with presigned `PUT` URLs, so large files never pass through a Worker:
 
-1. The page calls `createUpload` with the file name, size and type. The server checks the type and size, creates the
+1. The page calls `createDocumentUpload` or `createApplicationUpload` with the file name, size and type. The server checks the type and size, creates the
    record with status `uploading`, and returns a presigned URL signed with `aws4fetch` against R2's S3 API. The URL
-   expires after 15 minutes; `completeUpload` then checks the stored object's size, since the URL can't bind it.
+   expires after 15 minutes; the complete call then checks the stored object's size, since the URL can't bind it.
 2. The browser `PUT`s the file. The bucket's CORS rule allows `PUT` with the `Content-Type` header from
    `http://localhost:3000`, the demo origin and the preview origin pattern.
-3. The page calls `completeUpload`. The server checks the object exists with the expected size. For a governing
-   document it starts DocumentIngest; application files wait for `runReview`.
+3. The page calls `completeDocumentUpload` or `completeApplicationUpload`. The server checks the object exists with the
+   expected size. For a governing document it starts DocumentIngest; application files wait for `runReview`.
 
-**Without an R2 API token** (`R2_*` settings unset), `createUpload` returns no URL and the page uploads through a
-server function that streams the file into R2, and OCR sends Layout the file inline (`base64Source`) instead of a
+**Without an R2 API token** (`R2_*` settings unset), the create call returns no URL and the page uploads through
+`uploadDocumentFile` or `uploadApplicationFile`, which stream the file into R2, and OCR sends Layout the file inline (`base64Source`) instead of a
 presigned URL. That works at demo sizes (the largest sample is 14 MB); with a token, uploads and OCR skip the Worker.
 
 Accepted types: PDF and DOCX for every upload, and JPEG and PNG for application files. HEIF, TIFF, BMP, WebP and GIF are
 refused with a message asking for JPEG or PNG, because the review model can't read them. Limits: 50 MB and 300 pages per governing document (OCR reads PDFs in 50-page ranges, see
 [ocr.md](ocr.md#flow); peak memory per range is measured on the 81-page CC&Rs), 25 MB per application PDF or Word file,
-5 MB per image, 20 files per application. The prototype's `src/documents/uploads.ts` (which allows WebP, GIF and 30 MB) changes in the
-same pull request as the upload flow.
+and 5 MB per image. `src/storage/uploadRules.ts` holds these rules.
 
 ## Access
 
 - Governing documents, their pages and the published rulebook are readable by every member of the HOA.
 - Application files, their pages and reviews are readable only by the homeowner who created the application and by the
-  HOA's administrators (in phase 1, the Administrator role).
+  HOA's administrators (the Administrator role).
 - Files are never public. A server function checks access, then returns a presigned `GET` URL that expires after
-  5 minutes. A governing document's original file is served through the app instead, at
+  5 minutes, or the file inline where the environment has no R2 token (`getPacketImage`, for a packet's photos). A governing document's original file is served through the app instead, at
   `/files/governing/{documentId}`, which finds the document only in the requester's organization
   ([encoding.md, UX](encoding.md#ux)).
 
@@ -300,7 +281,8 @@ same pull request as the upload flow.
 The demo doesn't apply privacy controls to homeowner data beyond access and retention: model inputs and outputs,
 including page text from application packets, reach Langfuse in full through the app's spans and OpenRouter Broadcast.
 
-- **Retention.** A daily Cron Trigger finds applications past `deleteAfter` and, for each one: deletes everything under
+- **Retention.** Every application gets a `deleteAfter`; the sweep that acts on it isn't built. The design is a
+  daily Cron Trigger that finds applications past `deleteAfter` and, for each one: deletes everything under
   `applications/{applicationId}/` except the review records, which it rewrites without evidence quotes or raw values;
   deletes `jobs/{jobId}/` and the Langfuse traces for every job whose subject is the application (listing them by
   session id through Langfuse's API, then deleting them); deletes the application's file and page rows; and clears
@@ -310,14 +292,12 @@ including page text from application packets, reach Langfuse in full through the
 - **Before real HOAs onboard:** application stages record summaries instead of content, and the hosted OpenRouter
   workspace uses Broadcast's privacy mode. Not needed for the demo.
 
-## Phase 1 assumptions
+## Demo assumptions
 
-- **One HOA.** A seed script, `db:seed`, creates one `Hoa` row with default settings in each environment's database;
-  it's idempotent and runs once after the first migration. The HOA name moves from the prototype's upload form to that
-  record.
-- **Request context.** A `getRequestContext()` server helper returns `{ hoaId, user, role }`. The user comes from the
+- **One HOA.** `seed/hoa.sql` creates one `Hoa` row with default settings in each environment's database
+  (`db:seed:local`, `db:seed:preview`, `db:seed:demo`); it's idempotent and runs once after the first migration.
+- **Request context.** A `getRequestContext()` server helper returns `{ hoa, user, role }`. The user comes from the
   Cloudflare Access identity when one is present, otherwise a fixed demo user per role. The role comes from a cookie
-  written by the demo role switcher, which moves from `localStorage` to that cookie.
+  written by the demo role switcher (`setDemoRole`).
 - **Tenancy.** Repositories take `hoaId` as a required argument. Server functions pass it only from the request
-  context, never from their input; Workflow steps pass it from the job row they were started with; the retention sweep
-  passes it from the application row it's deleting. Administrator-only server functions check the role.
+  context, never from their input; Workflow steps pass it from the job row they were started with. Administrator-only server functions check the role.

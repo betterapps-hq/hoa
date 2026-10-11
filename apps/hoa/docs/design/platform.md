@@ -9,9 +9,9 @@ How the design maps onto Cloudflare, and how local development and deployment wo
 | --- | --- | --- |
 | Web app and API | **Workers**, running TanStack Start | Officially supported through Cloudflare's Vite plugin |
 | Files: originals, OCR output, page records, reviews | **R2** | Large objects, free egress, private by default, presigned URLs for browser uploads |
-| Metadata: HOAs, documents, section metadata, jobs, rulebooks, rules, applications | **D1** (SQLite), one shared database with an `hoa_id` column | Small relational data; Drizzle support; 10 GB per database is far more than rules and metadata need |
+| Metadata: HOAs, documents, provisions, jobs, rulebooks and their records, project types, applications | **D1** (SQLite), one shared database with an `hoa_id` column | Small relational data; Drizzle support; 10 GB per database is far more than rules and metadata need |
 | OCR, rulebook builds and application reviews | **Workflows** | Durable steps with retries, results checkpointed, survives the user closing the tab |
-| Retention | **Cron Trigger** | A daily sweep deletes application data past `deleteAfter` ([documents.md](documents.md#privacy-and-retention)) |
+| Retention | **Cron Trigger** | A daily sweep deletes application data past `deleteAfter` ([documents.md](documents.md#privacy-and-retention)). Not built yet |
 
 What lives in each store is listed in [documents.md](documents.md#what-lives-where).
 
@@ -28,47 +28,55 @@ this workload out.
 
 | Limit (Workers Paid) | Design response |
 | --- | --- |
-| 128 MB memory per Worker | Never load a whole PDF: browsers upload straight to R2, and Layout reads files through presigned URLs. Layout responses are analyzed in 50-page ranges, streamed to R2, and parsed one range at a time. Peak memory is measured on the 81-page CC&Rs before the 300-page limit is fixed. |
+| 128 MB memory per Worker | Never load a whole PDF: browsers upload straight to R2, and Layout reads files through presigned URLs. Layout responses are analyzed in 50-page ranges, streamed to R2, and parsed one range at a time. Documents are limited to 300 pages. |
 | 30 s CPU per request by default (configurable to 5 min) | Waiting on model calls uses almost no CPU; heavy work runs in Workflow steps |
 | A request's work may be canceled when the client disconnects; `waitUntil` adds only 30 s | Anything longer than a quick call runs in a Workflow |
 | Workflow step results up to 1 MiB; instance state up to 1 GB | Steps return R2 keys, not page text |
 | Workflow step timeout defaults to 10 min per attempt | Every step sets its timeout and retries explicitly (see [Errors and retries](#errors-and-retries)) |
 | 100 MB request body on Free and Pro zones | Uploads go directly to R2 with presigned `PUT` URLs, never through the Worker |
-| D1: 2 MB per row, 100 KB per statement, 1,000 queries per invocation, no interactive transactions | Page and section text lives in R2; changes that must land together use `batch()` |
+| D1: 2 MB per row, 100 KB per statement, 1,000 queries per invocation, no interactive transactions | Page text and step outputs live in R2; changes that must land together use `batch()` |
 | R2: one write per second to the same key | Every write targets a new key |
 
 ## Workflows
 
-Three workflows. Each takes ids, never content, and every step updates the job row (`stage`, `done`, `total`) so the UI
-can show progress. Every step name starts with its stage id, then the item id, so names are deterministic.
+Three workflows. Each takes ids, never content, and reports progress on its job row (`stage`, `done`, `total`) so the
+UI can show it; a rulebook build also writes its whole step list to `progress_json` when it starts and moves it forward
+as it goes. A stage's step names start with its stage id, then the item id, so names are deterministic.
 
 ```text
-DocumentIngest(documentId)                        started by completeUpload for a governing document
-  resolve-prompts
+DocumentIngest(documentId)                        started by completeDocumentUpload
+  load ─> resolve-prompts
   ocr:hash ─> per 50-page range: ocr:submit:{range} ─> ocr:poll:{range} ─> ocr:pages:{range} ─> ocr:labels
   visuals:{figureId}
-  sets the document ready, or failed with its error
+  finish: the document ready, or failed with its error (a duplicate of an earlier upload fails)
+  build-rulebook: requests a rulebook build once the document is ready
 
-RulebookBuild(rulebookId)                         started by startRulebookBuild; documents must be ready
-  resolve-prompts
+RulebookBuild(rulebookId)                         started by an upload's build-rulebook step, or startRulebookBuild
+  load:sources ─> load ─> progress:start ─> resolve-prompts
+  check                                            problems with the uploads' own records stop the build here
   structure:{documentId} ─> analyze:{documentId} ─> vocabulary:{documentId} ─> plan
-  encode:{unitId}                                  8 at a time, settled; failures recorded on the job
-  verify ─> repair:{unitId}:1 ─> verify:merged ─> repair:{unitId}:2 ─> merge ─> consolidate
+  per unit: encode:{unitId} ─> verify:{unitId} ─> repair:{unitId}:1
+                                                   ENCODING_CONCURRENCY units at a time (default 16), settled
+  verify:merged ─> repair:{unitId}:2 ─> merge ─> consolidate
   save-draft ─> save-draft:scores ─> save-draft:finish
+  follow-up:check ─> follow-up:ids ─> follow-up    another build, when the documents changed while this one ran
   ends; review and publishing are server functions
 
 ApplicationReview(applicationId)                  started by runReview
-  resolve-prompts
-  per file, in parallel: ocr:hash:{fileId} ─> ocr:media:{fileId} ─> ocr:submit / ocr:poll / ocr:pages per range
-  visuals:{fileId}:{figureId}
-  classify:{fileId} ─> facts ─> documents
-  evaluate ─> evaluate:{ruleId}:{componentId} for qualitative checks
-  decide ─> write ─> save-review
+  resolve-prompts ─> load
+  ocr:list ─> ocr:media:{fileId} for Word files ─> ocr:pending
+  per file, in parallel: ocr:hash:{fileId} ─> ocr:submit / ocr:poll / ocr:pages per range ─> visuals:{figureId}:{fileId}
+  ocr:files
+  classify:{fileId} ─> subjects ─> select ─> plan ─> facts:{group} ─> normalize ─> documents
+  judgment:{ruleKey}:{entityId} ─> evaluate ─> decide ─> write ─> save-review
 ```
 
 Stage ids are defined in [ocr.md](ocr.md#where-it-runs), [encoding.md](encoding.md#stages) and
 [application-review.md](application-review.md#stages). Each workflow instance is one Langfuse session: the job id is the session id. A workflow
 reads `hoaId` from its job row, not from its parameters.
+
+An administrator can stop a running build (`stopRulebookBuild`): its job becomes `cancelled`, nothing is saved, and
+the follow-up build isn't requested.
 
 Publishing isn't a workflow step. `publishRulebook` checks the publish gate ([encoding.md](encoding.md#12-review-and-13-publish))
 and runs one D1 batch, so an administrator can take as long as they like to review a draft.
@@ -105,7 +113,7 @@ step with a retryable error. Per-job outputs are written to
 
 | Step kind | Retries | Backoff | Timeout |
 | --- | --- | --- | --- |
-| Model call | 3 | Exponential from 10 s | 5 min |
+| Model call | 3 | Exponential from 10 s | 5 min; 15 min in a rulebook build |
 | Layout submit | 3 | Exponential from 5 s | 1 min |
 | Layout poll | 180, by throwing "not ready" (15 min) | Constant 5 s | 30 s per check |
 | R2 and D1 work | 2 | 1 s | 1 min |
@@ -118,45 +126,68 @@ step with a retryable error. Per-job outputs are written to
   `completed-with-errors`.
 - **Everything else fails the job.** The workflow body catches the error and, in a final step, sets the job to `failed`
   with `error: { stage, message, isRetryable }`, and updates its subject: a document or rulebook becomes `failed`, an
-  application goes back to the status it had before the review. The UI shows the message and a way to run it again;
+  application goes back to the status it had before the review. A build an administrator stopped stays `cancelled`. The UI shows the message and a way to run it again;
   the content cache makes that cheap.
 
 ## Server functions
 
-The UI talks to the pipeline only through these. None of them take `hoaId` or the user as input: both come from
-`getRequestContext()` ([documents.md](documents.md#phase-1-assumptions)). Each checks the role and access rules.
+The UI talks to the pipeline only through these, defined in `src/features/**/*.functions.ts`. None of them take
+`hoaId` or the user as input: both come from `getRequestContext()` ([documents.md](documents.md#demo-assumptions)).
+Each checks the role and access rules.
 
 | Function | Role | Input | Output |
 | --- | --- | --- | --- |
-| `createUpload` | Administrator (governing), homeowner (application) | Target, file name, type, size; for governing documents kind, title, effective date, and optionally the `lineageId` it's a new version of or the lineage it amends; for application files the application id | Record id, presigned `PUT` URL |
-| `completeUpload` | Same | Record id | Job id, for governing documents |
-| `getJob` | Any | Job id | `Job` |
-| `getActiveJob` | Any | Subject id | The running job for a document, rulebook or application, if any, so a reloaded page finds it |
+| `createDocumentUpload` | Administrator | File name, type, size; kind, title, effective date, and optionally the `lineageId` it's a new version of or the lineage it amends | Document id, presigned `PUT` URL (or none, see `uploadDocumentFile`) |
+| `uploadDocumentFile` | Administrator | Document id, the file as form data | Stores the file through the Worker, where the environment has no R2 token |
+| `completeDocumentUpload` | Administrator | Document id | Job id; starts DocumentIngest |
+| `removeGoverningDocument` | Administrator | Document id | Removes every version from builds and the documents list |
 | `listDocuments` | Any | | `GoverningDocument[]` |
-| `startRulebookBuild` | Administrator | Document ids | Job id, rulebook id |
-| `getRulebook` | Administrator for drafts, any for published | `draft` or `published` | Rulebook, rules, and for a draft the removed rules (`ruleKey`, title, citations) |
-| `saveRule` | Administrator | Rule id (or none, to add), edited fields | `Rule`, re-verified |
-| `reviewRule` | Administrator | Rule id, approve or reject, note | `Rule` |
-| `resolveIssue` | Administrator | Rule id, issue code, note | `Rule` |
-| `publishRulebook` | Administrator | Rulebook id | `Rulebook`, or the reasons it's blocked |
-| `getPage` | Per access rules | Document or file id, page index | `Page`, with its descriptions, kind and presigned figure URLs |
-| `getFileUrl` | Per access rules | Document or file id | Presigned `GET` URL |
-| `createApplication` | Homeowner | Project type, description | `Application` |
-| `updateApplication` | Owner | Application id, description; files to remove | `Application` |
+| `getDocumentPage` | Any | Document id, page index | One page's text and label, for the citation viewer |
+| `getDocumentReading` | Any | Document id | The document's provisions in reading order with the text outside them |
+| `getPageGeometry` | Any | Document id, page range (up to 25) | Page sizes and word boxes, for highlights on the original |
+| `locateProvisions` | Any | Provision keys | The upload each is read in, and its heading |
+| `getJobStatus` | Any | Job id | `Job` |
+| `getActiveJob` | Any | Subject id | The latest job for a document, rulebook or application, so a reloaded page finds work in progress |
+| `startRulebookBuild` | Administrator | | Job id, rulebook id; refused while a document is being read or another build runs |
+| `stopRulebookBuild` | Administrator | | Whether the build was stopped or had already ended |
+| `getBuildResults` | Administrator | Job id, cursor | What the running build has produced since the cursor |
+| `getRulebookView` | Administrator for the draft, any for the published | `draft` or `published` | The rulebook and its records |
+| `getRulebookSources`, `getSourceText` | Any | | The documents and provisions the rules cite; page text no provision holds |
+| `reviewRulebookRecords` | Administrator | Rulebook id, record refs, `proposed`, `approved` or `rejected` | Records updated, and those skipped with why |
+| `resolveRulebookIssue` | Administrator | Rulebook id, issue ref, note | |
+| `saveRulebookRule` | Administrator | Rulebook id, edited rule | The rule's remaining problems |
+| `answerRulebookQuestion` | Administrator | Rulebook id, question id, chosen option, note | |
+| `setProvisionNoRule` | Administrator | Rulebook id, provision key, reason or none | |
+| `saveRulebookSettings` | Administrator | Rulebook id, settings clauses, policy | The settings' remaining problems |
+| `discardRulebookDraft` | Administrator | Rulebook id | |
+| `publishRulebook` | Administrator | Rulebook id | The new version, or the reasons it's blocked |
+| `getPublishedRulesFileJson` | Any | | The published rules file, for download |
+| `listActiveProjectTypes` | Any | | The project types homeowners can choose |
+| `getProjectTypesOverview`, `getProjectTypeView`, `listCitableProvisions` | Administrator | Project type id for the view | Project types with their use, one type with its rules, passages to cite |
+| `suggestProjectTypes` | Administrator | | Project types the published rulebook suggests (a model call) |
+| `createProjectType`, `updateProjectType`, `applyProjectTypeUpdates` | Administrator | The type's details and form | `ProjectType`; the form is checked against the rules |
+| `setProjectTypeStatus`, `deleteProjectType` | Administrator | Project type id, status | Archives, unarchives or deletes a type no application uses |
+| `countOutdatedProjectTypes` | Any (0 for homeowners) | | Active types out of date with the published rulebook |
+| `createApplication` | Any | Project type id or none, answers, description | `Application` |
+| `createApplicationUpload` | Owner | Application id, file name, type, size, context text | File id, presigned `PUT` URL (or none) |
+| `uploadApplicationFile`, `completeApplicationUpload`, `removeApplicationFile` | Owner | File id (and the file as form data) | Stores, confirms or removes a file |
 | `runReview` | Owner | Application id | Job id; allowed in `draft`, `reviewed` and `information-requested` |
 | `submitApplication` | Owner | Application id, confirmation when the latest review requests information | `Application` (`submitted`) |
-| `listApplications` | Homeowner (their own), administrator (all, filterable by status) | Status filter | Applications with their latest recommendation |
-| `getApplication` | Owner or administrator | Application id | Application, files, latest review and earlier reviews |
+| `listApplications`, `listDashboardApplications` | Homeowner (their own), administrator (all) | | Applications with their latest recommendation |
+| `getApplicationView` | Owner or administrator | Application id | Application, files, latest review and earlier reviews, and what the viewer can do |
+| `getPacketImage` | Owner or administrator | Application id, file id | A presigned `GET` URL for a photo, or the image inline |
 | `recordDecision` | Administrator | Application id, outcome, note | `Application` |
+| `getDashboardSummary`, `getNextRulebook` | Any | | The dashboard's numbers; the coming rulebook, for administrators |
+| `getSession`, `setDemoRole` | Any | Role, to switch | The user, role and HOA |
 
-The UI polls `getJob` every 2 seconds with TanStack Query's `refetchInterval` until the job ends, and shows progress in
-the units the job reports ("Extracting rules: 12 of 40 sections").
+Job progress polls `getJobStatus` every 2 seconds with TanStack Query's `refetchInterval` until the job ends. A
+rulebook build shows its step list from `progress_json`: each step done, current, upcoming or skipped, with counts, one
+bar for the whole build and an estimate of the time left.
 
 ## App wiring
 
-`apps/hoa/wrangler.jsonc` is the source of truth; today it holds the prototype's settings and R2 bucket. Phase 1 adds
-D1, Workflows, the cron trigger and the R2 signing settings, sketched below. Nothing at the top level reaches `previews`
-or an `env` block: each repeats every var and binding it needs.
+`apps/hoa/wrangler.jsonc` is the source of truth; its shape is sketched below. Nothing at the top level reaches
+`previews` or an `env` block: each repeats every var and binding it needs.
 
 ```jsonc
 {
@@ -171,7 +202,6 @@ or an `env` block: each repeats every var and binding it needs.
     { "name": "hoa-rulebook-build", "binding": "RULEBOOK_BUILD", "class_name": "RulebookBuild" },
     { "name": "hoa-application-review", "binding": "APPLICATION_REVIEW", "class_name": "ApplicationReview" }
   ],
-  "triggers": { "crons": ["0 9 * * *"] }, // retention sweep
   "vars": { /* every non-secret setting, with LANGFUSE_TRACING_ENVIRONMENT "production" and R2_BUCKET "hoa-files" */ },
   "previews": {
     "vars": { /* every setting again, with LANGFUSE_TRACING_ENVIRONMENT "preview" and R2_BUCKET "hoa-preview" */ },
@@ -197,17 +227,16 @@ or an `env` block: each repeats every var and binding it needs.
       "vars": { /* development values */ },
       "d1_databases": [{ "binding": "DB", "database_name": "hoa-dev", "database_id": "…", "migrations_dir": "migrations" }],
       "r2_buckets": [{ "binding": "FILES", "bucket_name": "hoa-dev", "remote": true }],
-      "workflows": [ /* the three Workflows, as at the top level */ ]
+      "workflows": [ /* the three hoa-dev-* Workflows */ ]
     }
   }
 }
 ```
 
-- `src/server.ts` exports TanStack Start's handler as `fetch`, the retention sweep as `scheduled`, and the three
-  Workflow classes.
-- Server code reads bindings with `import { env } from "cloudflare:workers"`. `src/env.server.ts` keeps t3-env
-  validation for vars and secrets and gains the phase 1 settings (`OPENROUTER_SMALL_MODEL`, the Azure and `R2_*`
-  values). `wrangler types` generates `worker-configuration.d.ts`, which is committed so `check:types` works in CI.
+- `src/server.ts` exports TanStack Start's handler as `fetch` and the three Workflow classes.
+- Server code reads bindings with `import { env } from "cloudflare:workers"`. `src/env.server.ts` validates vars
+  and secrets with t3-env, including `OPENROUTER_SMALL_MODEL`, `ENCODING_CONCURRENCY`, and the Azure and `R2_*`
+  values. `wrangler types` generates `worker-configuration.d.ts`, which is committed so `check:types` works in CI.
 - Secrets (`OPENROUTER_API_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `AZURE_DOCUMENT_INTELLIGENCE_KEY`,
   `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`) are set with `wrangler secret put` for the demo,
   `wrangler preview base-config secret put` for previews, and `wrangler secret put --env preview-workflows` for the
@@ -219,10 +248,7 @@ or an `env` block: each repeats every var and binding it needs.
 ## Local development
 
 `pnpm dev` runs the app inside workerd, Cloudflare's runtime, through the Vite plugin. Model calls, OCR and Langfuse go
-to the real services. Until phase 1 adds the `dev` environment, local runs use the top-level bindings with R2 simulated
-on disk.
-
-From phase 1, `vite.config.ts` sets `process.env.CLOUDFLARE_ENV ??= "dev"` when serving, so development selects the
+to the real services. `vite.config.ts` sets `process.env.CLOUDFLARE_ENV ??= "dev"` when serving, so development selects the
 `dev` environment on every platform (a `CLOUDFLARE_ENV=dev` prefix in a pnpm script doesn't work in Windows' shell). R2
 is then the real `hoa-dev` bucket through a remote binding, because presigned browser uploads and Layout's `urlSource`
 both need a real S3 endpoint; D1 and Workflows stay simulated on disk. Scripts in `apps/hoa`: `db:migrate:local`
@@ -233,7 +259,7 @@ both need a real S3 endpoint; D1 and Workflows stay simulated on disk. Scripts i
   so reviews can run before the rules UX exists. `src/rulebook/seedRulebook.ts` writes the D1 rows as SQL, which
   `wrangler d1 execute --local` runs, and assembles the rules file from the same records, which
   `wrangler r2 object put --local` stores. Running it again replaces the same rulebook.
-- **`db:reset:rules`** empties rulebooks, their records, sections, provisions, referenced documents, rulebook-build
+- **`db:reset:rules`** empties rulebooks, their records, provisions, referenced documents, rulebook-build
   and review jobs and reviews, with their R2 objects, through `getPlatformProxy` (`src/db/resetRules.ts`). Uploaded
   documents, applications (back to `draft`), model caches and settings stay.
 - Both use Wrangler's local R2 by default. `pnpm dev` binds the real `hoa-dev` bucket instead, so add `--dev-bucket`
@@ -247,20 +273,30 @@ OpenRouter's generation and cost nested under it. `telemetry.server.ts` uses a `
 `AsyncLocalStorageContextManager` (which needs `nodejs_compat`). Without the context manager, `propagateAttributes`
 silently stops putting the trace name and session id on spans.
 
-Server functions await `flush()` before returning, as today. Workflow steps await it at the end of each step.
+Server functions await `flush()` before returning. Workflow steps await it at the end of each step.
 `runPrompt.test.ts` checks that exported spans carry the trace name and session id, using the same registration.
 
 ## Code layout and tests
 
 ```text
-src/db/          Drizzle schema and repositories (*.server.ts)
-src/storage/     R2 keys and presigning
-src/rulebook/    assembling, hashing and reading the published rules file; carrying approvals forward; the sample seed
-src/ocr/         Layout client (fetch) and the page builder
-src/pipeline/    stage logic as pure functions: structure, verify, consolidation, evaluate, decide
-src/workflows/   the three Workflow classes: thin wiring of steps to stage logic
-src/server.ts    the Worker entry
-migrations/      D1 migrations
+src/db/             Drizzle schema and repositories
+src/storage/        R2 keys, objects, page records, presigning and upload rules
+src/ocr/            Layout client (fetch), the page builder and Word pictures
+src/schema/         the rules schema: Zod types, core terms, validation
+src/encoding/       the rulebook build's stages (buildRulebook); steps/ holds the step-by-step pipeline pnpm eval:step runs
+src/rulebook/       saving drafts, carrying approvals forward, assembling and publishing the rules file, the sample seed
+src/engine/         the decision engine: applicability, checks, evaluate, decide
+src/review/         the application review's stages (reviewApplication)
+src/projectTypes/   project types: forms built from the rules, binding, suggestions, updates
+src/ai/             prompts, model calls, scores and tracing
+src/jobs/           job records and their progress
+src/text/           text normalization and matching: numerals, quantities, dates, quotes
+src/evaluation/     scoring encoding and review runs against goldens
+src/features/       UI features and their server functions (*.functions.ts)
+src/routes/         TanStack Start routes
+src/workflows/      the three Workflow classes: thin wiring of steps to stage logic
+src/server.ts       the Worker entry
+migrations/         D1 migrations
 ```
 
 - Stage logic and the page builder are pure and unit-tested with co-located tests, the page builder against trimmed
@@ -269,25 +305,18 @@ migrations/      D1 migrations
 - Repository tests run in the normal Vitest run, with v8 coverage: `src/tests/testDatabase.ts` starts an in-memory D1
   through Wrangler's `getPlatformProxy` and applies every migration, so the real SQL, unique and partial indexes
   included, is exercised. (Cloudflare's Vitest plugin still requires Vitest 4.)
-- `src/server.ts` and `src/workflows/**` are added to the coverage exclusions, alongside `*.server.ts`.
+- `src/server.ts`, `src/workflows/**` and `*.functions.ts` are excluded from coverage, alongside `*.server.ts`.
 - `wrangler` is an `apps/hoa` dev dependency. `cloudflare:workers` resolves to a stub in unit tests
   (`vitest.config.ts`), and knip ignores it as a dependency.
 
 ## Dependencies
 
-Already added: `wrangler`, `@cloudflare/vite-plugin` and `drizzle-kit` (dev), `drizzle-orm`,
-`@opentelemetry/sdk-trace-base` and `@opentelemetry/context-async-hooks`; `@opentelemetry/sdk-trace-node` is removed.
-Phase 1 adds:
+Cloudflare and storage: `wrangler`, `@cloudflare/vite-plugin` and `drizzle-kit` (dev), `drizzle-orm`, and `aws4fetch`
+for presigned R2 URLs. Tracing: `@opentelemetry/sdk-trace-base` and `@opentelemetry/context-async-hooks`. UI:
+`@tanstack/react-query` for polling jobs and `@tanstack/react-form` for forms. `fflate` reads pictures out of Word files;
+Layout reads Word text. Azure is called with `fetch`, and ids come from `crypto.randomUUID()`.
+[docs/tech-stack.md](../../../../docs/tech-stack.md) lists these.
 
-| Package | For |
-| --- | --- |
-| `aws4fetch` | Presigned R2 URLs |
-| `@tanstack/react-query` | Polling jobs |
-| `@tanstack/react-form` | Forms, replacing react-hook-form |
-| `fflate` | Reading pictures out of Word files |
-
-Phase 1 removes `mammoth` (Layout reads Word text). Azure is called with `fetch`, and ids come from
-`crypto.randomUUID()`. [docs/tech-stack.md](../../../../docs/tech-stack.md) lists these.
 ## CI/CD
 
 Hosted on GitHub as a private repository, `AndrewCraswell/hoa`. Everything runs in GitHub Actions, and a deploy only
@@ -301,13 +330,13 @@ happens after `pnpm verify` passes. Both pipelines call the same verification (`
 
 - **Credentials.** The jobs read the repository secret `CLOUDFLARE_API_TOKEN` and the variable `CLOUDFLARE_ACCOUNT_ID`.
   Until the variable is set, the Cloudflare jobs are skipped and only `verify` runs.
-- **Migrations and the preview Workflows.** Once D1 arrives, `deploy` runs
+- **Migrations and the preview Workflows.** `deploy` runs
   `wrangler d1 migrations apply hoa --remote`, `wrangler deploy`, then `wrangler deploy --env preview-workflows` (so
   previews' Workflows follow `main`). `preview` runs `wrangler d1 migrations apply hoa-preview --remote --env preview-workflows`
   before `wrangler preview`. Databases are named explicitly so a pull request can never migrate the demo's database.
 - **Previews are isolated from the demo's data.** The `previews` block in `wrangler.jsonc` binds the `hoa-preview` bucket
-  (and later a preview D1 database). Previews share those with each other, so **migrations must stay backward
-  compatible**: a preview may run old code against a newer schema. Worker secrets for previews are set once with
+  and D1 database. Previews share those with each other, so **migrations must stay additive**: a preview may run old
+  code against a newer schema. Worker secrets for previews are set once with
   `wrangler preview base-config secret put`.
 - **Workflows are the exception.** A preview binds to an already deployed Workflow rather than getting its own, so a
   second Worker, `hoa-preview`, deploys preview copies of the Workflows from `main`, and previews bind to those. Workflow
