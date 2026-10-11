@@ -65,10 +65,10 @@ export function stepFindings(results: readonly BuildResult[]): Record<string, st
   if (outlines.length > 0) {
     findings["Finding rules"] = `${counted(ruleCount, "rule", "rules")} found`
   }
-  const vocabulary = results.filter((result) => result.kind === "vocabulary")
+  // A group looked at again lists its terms again: each term counts once.
+  const vocabulary = results.flatMap((result) => (result.kind === "vocabulary" ? [result.labels] : []))
   if (vocabulary.length > 0) {
-    const terms = vocabulary.reduce((sum, result) => sum + result.labels.length, 0)
-    findings["Building the vocabulary"] = `${counted(terms, "term", "terms")} so far`
+    findings["Building the vocabulary"] = counted(new Set(vocabulary.flat()).size, "term", "terms")
   }
   const drafted = new Set(
     results.flatMap((result) => (result.kind === "rules" ? result.rules.map((rule) => rule.key) : []))

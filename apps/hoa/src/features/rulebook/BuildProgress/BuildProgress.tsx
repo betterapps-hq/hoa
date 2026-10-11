@@ -1,3 +1,4 @@
+import { useInterval } from "@mantine/hooks"
 import { useQuery } from "@tanstack/react-query"
 import { CheckIcon, ChevronDownIcon, CircleIcon, MinusIcon } from "lucide-react"
 import { useState } from "react"
@@ -57,6 +58,10 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults,
 
   const isRunning = !job || job.status === "running"
   const results = useBuildResults(jobId, loadResults, isRunning)
+  // The time so far and the time left move with the clock, not only when the job changes: a step whose calls take
+  // minutes would otherwise freeze them.
+  const [, setTick] = useState(0)
+  useInterval(() => setTick((tick) => tick + 1), 10_000, { autoInvoke: true })
 
   if (job && !job.progress) {
     return <JobProgress jobId={jobId} loadJob={loadJob} onFinished={onFinished} />

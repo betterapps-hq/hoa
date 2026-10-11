@@ -70,6 +70,7 @@ describe("stepFindings", () => {
     { id: "o2", at: at(3), kind: "outlines", unitId: "b", rules: [rule("b#1"), rule("b#2")], isRerun: false },
     { id: "o3", at: at(4), kind: "outlines", unitId: "a", rules: [rule("a#1"), rule("a#2")], isRerun: true },
     { id: "v", at: at(5), kind: "vocabulary", unitId: "a", labels: ["Height", "Fence", "Material"] },
+    { id: "v2", at: at(6), kind: "vocabulary", unitId: "a", labels: ["Height", "Fence"] },
     { id: "r1", at: at(6), kind: "rules", batchId: "a#1", rules: [rule("a#1"), rule("a#2")], round: 0 },
     { id: "r2", at: at(7), kind: "rules", batchId: "a#1", rules: [rule("a#2")], round: 1 }
   ]
@@ -78,7 +79,7 @@ describe("stepFindings", () => {
     expect(stepFindings(results)).toEqual({
       "Finding defined terms": "2 terms found",
       "Finding rules": "4 rules found",
-      "Building the vocabulary": "3 terms so far",
+      "Building the vocabulary": "3 terms",
       "Drafting rules": "2 of 4 rules drafted"
     })
     expect(
