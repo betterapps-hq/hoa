@@ -23,6 +23,33 @@ describe("scores", () => {
     expect(ratio("restnctions", "restrictions")).toBeCloseTo(20 / 23)
   })
 
+  it("ratio's common subsequence agrees with the textbook table across word boundaries", () => {
+    const tableSubsequence = (a: string, b: string) => {
+      const rows = Array.from({ length: a.length + 1 }, () => Array.from({ length: b.length + 1 }, () => 0))
+      for (let i = 1; i <= a.length; i += 1) {
+        for (let j = 1; j <= b.length; j += 1) {
+          const row = rows[i] ?? []
+          row[j] =
+            a[i - 1] === b[j - 1] ? (rows[i - 1]?.[j - 1] ?? 0) + 1 : Math.max(rows[i - 1]?.[j] ?? 0, row[j - 1] ?? 0)
+        }
+      }
+      return rows[a.length]?.[b.length] ?? 0
+    }
+    // A fixed linear congruential sequence: lengths around the 32-character word size, from a small alphabet.
+    let seed = 7
+    const next = (limit: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed % limit
+    }
+    const text = (length: number) => Array.from({ length }, () => "abcde fg"[next(8)]).join("")
+    for (let round = 0; round < 300; round += 1) {
+      const a = text(next(100))
+      const b = text(next(100))
+      const total = a.length + b.length
+      expect([a, b, ratio(a, b)]).toEqual([a, b, total === 0 ? 1 : (2 * tableSubsequence(a, b)) / total])
+    }
+  })
+
   it("partial ratio finds the shorter text inside the longer", () => {
     expect(partialRatio("gray", "winchester gray")).toBe(1)
     expect(partialRatio("", "")).toBe(1)

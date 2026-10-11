@@ -8,23 +8,66 @@ import { labelForms } from "./normalize"
 export type MatchKind = "exact" | "fuzzy"
 export type LabelMatch = { kind: MatchKind; score: number }
 
-/** The length of the longest common subsequence, in linear memory. */
-function commonSubsequence(a: string, b: string) {
-  if (a.length === 0 || b.length === 0) {
-    return 0
+const wordBits = 32
+
+// The common subsequence is computed on bit vectors, so its bitwise operators are meant, not mistyped logic.
+/* oxlint-disable no-bitwise */
+
+/**
+ * The length of the longest common subsequence of `pattern` and any text, bit-parallel (Allison and Dix, as Hyyrö
+ * describes it): one bit per pattern character, so each text character costs a pass over pattern length / 32 words
+ * rather than over every character. The pattern's masks are built once, for comparing it with many texts.
+ */
+function commonSubsequenceWith(pattern: string) {
+  const size = Math.ceil(pattern.length / wordBits)
+  const masks = new Map<number, Uint32Array>()
+  for (let i = 0; i < pattern.length; i += 1) {
+    const code = pattern.charCodeAt(i)
+    const mask = masks.get(code) ?? new Uint32Array(size)
+    mask[Math.floor(i / wordBits)] = (mask[Math.floor(i / wordBits)] ?? 0) | (1 << (i % wordBits))
+    masks.set(code, mask)
   }
-  let previous = new Uint32Array(b.length + 1)
-  let current = new Uint32Array(b.length + 1)
-  for (let i = 1; i <= a.length; i += 1) {
-    for (let j = 1; j <= b.length; j += 1) {
-      current[j] =
-        a.charCodeAt(i - 1) === b.charCodeAt(j - 1)
-          ? (previous[j - 1] ?? 0) + 1
-          : Math.max(previous[j] ?? 0, current[j - 1] ?? 0)
+  return (text: string) => {
+    if (size === 0 || text.length === 0) {
+      return 0
     }
-    ;[previous, current] = [current, previous]
+    // A zero bit marks a pattern character matched so far; matching a character moves a zero up (V + U) and keeps it.
+    const row = new Uint32Array(size).fill(0xffffffff)
+    for (let j = 0; j < text.length; j += 1) {
+      const mask = masks.get(text.charCodeAt(j))
+      if (!mask) {
+        continue
+      }
+      let carry = 0
+      for (let k = 0; k < size; k += 1) {
+        const v = row[k] ?? 0
+        const u = (v & (mask[k] ?? 0)) >>> 0
+        const sum = v + u + carry
+        carry = sum > 0xffffffff ? 1 : 0
+        row[k] = (sum | (v & ~u)) >>> 0
+      }
+    }
+    // Bits past the pattern's end stay set, so only the pattern's own bits count.
+    let zeros = 0
+    for (const word of row) {
+      zeros += wordBits - popCount(word)
+    }
+    return zeros
   }
-  return previous[b.length] ?? 0
+}
+
+function popCount(word: number) {
+  let rest = word - ((word >>> 1) & 0x55555555)
+  rest = (rest & 0x33333333) + ((rest >>> 2) & 0x33333333)
+  return Math.imul((rest + (rest >>> 4)) & 0x0f0f0f0f, 0x01010101) >>> 24
+}
+
+/* oxlint-enable no-bitwise */
+
+/** The length of the longest common subsequence. */
+function commonSubsequence(a: string, b: string) {
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a]
+  return commonSubsequenceWith(shorter)(longer)
 }
 
 /** The Levenshtein distance: insertions, deletions and substitutions, each costing one. */
@@ -55,9 +98,10 @@ export function partialRatio(a: string, b: string) {
   if (shorter.length === 0) {
     return longer.length === 0 ? 1 : 0
   }
+  const common = commonSubsequenceWith(shorter)
   let best = 0
   for (let start = 0; start + shorter.length <= longer.length && best < 1; start += 1) {
-    best = Math.max(best, ratio(shorter, longer.slice(start, start + shorter.length)))
+    best = Math.max(best, (2 * common(longer.slice(start, start + shorter.length))) / (2 * shorter.length))
   }
   return best
 }

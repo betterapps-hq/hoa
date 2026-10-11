@@ -7,8 +7,10 @@ import { citedPages, decidingFacts, escalationGroup, isConfirmed, settle, verifi
 
 const rulesFile = fenceRulesFile()
 const request = fenceRequest()
+// Built once: the fixture rebuilds the sample rules file, and the deciding facts evaluate the request once per fact.
+const answers = fenceAnswers()
 const evaluateFacts = (facts: T.Fact[]) =>
-  evaluate({ rulesFile, request: { ...request, facts }, answers: fenceAnswers(), evaluatedAt: "2026-09-10T00:00:00Z" })
+  evaluate({ rulesFile, request: { ...request, facts }, answers, evaluatedAt: "2026-09-10T00:00:00Z" })
 
 const keyOf = (fact: T.Fact) => `${fact.entity} ${fact.property}`
 const factOf = (entity: string, property: string) => {
