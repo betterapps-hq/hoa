@@ -148,7 +148,7 @@ export const setProvisionNoRule = createServerFn({ method: "POST" })
         provisionKey: z.string(),
         noRule: z
           .object({
-            reason: z.enum(["heading", "recital", "reserved", "explanatory", "duplicate", "not-evaluated"]),
+            reason: z.enum(["heading", "recital", "reserved", "explanatory", "duplicate"]),
             note
           })
           .nullable()

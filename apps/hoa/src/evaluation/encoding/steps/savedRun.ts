@@ -50,7 +50,12 @@ export const stepFileName = (item: string) => item.replaceAll(":", "~")
 /** Reads a saved run's folder. Every part is optional except the plan and structure. */
 export function readSavedRun(folder: string) {
   const steps = join(folder, "steps")
-  const read = (path: string): unknown => JSON.parse(readFileSync(join(steps, path), "utf8"))
+  // Runs saved before the schema dropped the `not-evaluated` reason read it as `explanatory`, the nearest reason left:
+  // every requirement is now a rule, so a saved run that gave one a reason counts as having found no rule there.
+  const read = (path: string): unknown =>
+    JSON.parse(
+      readFileSync(join(steps, path), "utf8").replaceAll(/"reason"\s*:\s*"not-evaluated"/g, '"reason":"explanatory"')
+    )
   const has = (path: string) => existsSync(join(steps, path))
   const runId = basename(folder)
   const info = existsSync(join(folder, "run.json"))

@@ -56,8 +56,7 @@ export const noRuleReasonLabels: Record<T.NoRule["reason"], string> = {
   recital: "A recital, background only",
   reserved: "Reserved, no text in force",
   explanatory: "Explains, requires nothing",
-  duplicate: "Repeats another provision",
-  "not-evaluated": "A requirement not evaluated yet"
+  duplicate: "Repeats another provision"
 }
 
 /** "Only a heading. Its text is in its paragraphs.": why a provision has no rule, in words, with its note. */

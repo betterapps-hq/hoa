@@ -10,7 +10,7 @@ import { ChoiceSelect } from "../ChoiceSelect/ChoiceSelect"
 import { noRuleReasonLabels, reviewLabels } from "../ruleLabels"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 
-const reasons: T.NoRule["reason"][] = ["heading", "recital", "reserved", "explanatory", "duplicate", "not-evaluated"]
+const reasons: T.NoRule["reason"][] = ["heading", "recital", "reserved", "explanatory", "duplicate"]
 const reasonChoices = reasons.map((reason) => ({ value: reason, label: noRuleReasonLabels[reason] }))
 
 export type NoRuleReasonProps = { provision: T.Provision }

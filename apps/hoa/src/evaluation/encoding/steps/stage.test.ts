@@ -297,7 +297,6 @@ function noRuleOf(key: string, reason: string | null) {
     case "duplicate":
       return { reason, of: key }
     case "explanatory":
-    case "not-evaluated":
       return { reason, note: "no requirement" }
     default:
       return { reason }

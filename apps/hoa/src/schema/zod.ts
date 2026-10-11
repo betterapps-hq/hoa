@@ -181,7 +181,7 @@ export const governingDocument = z.object({
   edition: edition.nullable()
 })
 
-export const noRuleReason = z.enum(["heading", "recital", "reserved", "explanatory", "duplicate", "not-evaluated"])
+export const noRuleReason = z.enum(["heading", "recital", "reserved", "explanatory", "duplicate"])
 
 export const provision = z.object({
   key: provisionKey,
@@ -408,7 +408,7 @@ const ruleBase = {
   title: z.string().min(1),
   statement: z.string().min(1),
   citations: z.array(citation),
-  requestTypes: z.array(termKey).min(1),
+  requestTypes: z.array(termKey),
   appliesTo: termKey.nullable(),
   appliesWhen: condition.nullable(),
   scope: scope.nullable(),
@@ -772,7 +772,7 @@ const draftBase = {
   title: z.string().min(1),
   statement: statementDraft,
   citations: z.array(citation).min(1),
-  requestTypes: z.array(termKey).min(1),
+  requestTypes: z.array(termKey),
   appliesTo: d(termKey),
   appliesWhen: d(condition),
   scope: d(scope),

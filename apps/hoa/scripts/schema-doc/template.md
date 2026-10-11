@@ -103,10 +103,10 @@ __TYPES:Sources__
   are prohibited unless authorized by the Board:"), and `wrapUp` is text after them that finishes them. A citation of a
   child shows its ancestors' intros, its own text and their wrap-ups, so the operative words are never dropped.
 - **Coverage.** Every provision is cited by a rule, a term or a setting, or has `noRule` with a reason an administrator
-  approved: `heading`, `recital`, `reserved` ("[Reserved]"), `explanatory` (states no requirement), `duplicate` (says
-  what another provision says) or `not-evaluated` (a requirement the portal doesn't evaluate yet). Any other provision
-  is uncovered, and an organization's rules aren't complete while one is. This is what catches whole sections an
-  extraction skipped, like the privacy screens and walls the phase 1 build missed.
+  approved: `heading`, `recital`, `reserved` ("[Reserved]"), `explanatory` (states no requirement) or `duplicate` (says
+  what another provision says). A requirement is always a rule, whether or not any request evaluates it yet. Any other
+  provision is uncovered, and an organization's rules aren't complete while one is. This is what catches whole
+  sections an extraction skipped, like the privacy screens and walls the phase 1 build missed.
 - **A citation** points at a provision by key, with an optional highlight of the operative words, or a
   `region` on a drawing or plat (a box in fractions of the page). The quote shown is always the provision's own text,
   so it can't be typed or clipped.
@@ -120,7 +120,8 @@ __TYPES:Vocabulary__
 - **Core terms** (`organizationId: null`) ship with the portal and are the same for every organization. A term is core
   only if portal code reads or writes it: the parties (owner, tenant, guest, occupant, applicant, organization,
   members, board, committee), the community and its lots, the request types with the fields their features supply
-  (submitted on, notice delivered on, due on, total votes), and units.
+  (submitted on, notice delivered on, due on, total votes), the documents the portal's application form provides
+  (`application-form`, `project-description`), and units.
 - **Organization terms** are generated from one organization's documents and edited by its administrators: everything
   its documents define or regulate, such as fence runs, composite colors, Trex, return fences and commercial vehicles.
 - **Refining a core term.** An organization term with a core term's key replaces the core term's labels, definition,
@@ -296,6 +297,9 @@ rule.
   (notices, hearings, fines, self-help), `general` (interpretation, definitions, severability).
 - **`requestTypes`** are the kinds of request a rule is evaluated in. A fence rule runs in applications and in
   violations, so an existing fence is judged by the same rule as a proposed one; a pet limit runs only in violations.
+  The list is empty for a rule no request type evaluates yet (a declarant's duty to convey land, a limit on the
+  association's own rule-making): the rulebook records every rule the documents state, and which ones a request needs
+  is decided when it's evaluated. A sanction always names its one request type.
 - **Remedies** say what fixes a finding:
 
 | Remedy | Means | Set by |
@@ -662,7 +666,33 @@ in an evaluation request, and they keep the findings that come back.
 - **Shared law.** Today each organization uploads the statutes it relies on, like any governing document. Sharing law
   across organizations would mean recording each law's jurisdiction (federal, state, county, city) and each
   organization's location, so the laws that apply are found by address, and linking each organization's terms to the
-  law's.
+  law's. Some law applies by facts about the organization rather than the lot: Washington's flag and political sign
+  sections (RCW 64.38.033 and .034) cover associations created before July 1, 2018, and a sign's protection runs
+  before an election. `governs` tests each lot, so this needs core terms for the community (when it was formed,
+  election dates) that a statute's `governs` can read with `from: "community"`.
+- **How a record was made, and how sure.** `Provenance` says only that extraction proposed a record. The
+  [taxonomy-first pipeline](taxonomy-ingestion.md) routes by confidence: small classifiers first, the large model for
+  what they're unsure of. Records would carry the method (classifier, large model, person), the model and its
+  confidence, so review can start with the least certain and a benchmark can trace each record to what produced it.
+  Facts already carry a confidence.
+- **Several documents in one file.** Some uploads are one PDF holding several documents (a declaration and its bylaws,
+  say). An edition's `files` give only a page count, so a document can't say which pages are its own. Each file entry
+  would need its first and last page.
+- **Rule topics.** `domain` has seven broad values. Clustering rule sections across ten organizations found about 40
+  recurring kinds of rule (fences, signs, leasing, liens), which sorting, per-project application forms and comparing
+  organizations all need. A rule would name a topic from a shared catalog kept as data, like the core terms. Wait for
+  the reviewed taxonomy ([taxonomy-ingestion.md](taxonomy-ingestion.md), step 2) before fixing the catalog.
+- **Shared concepts for organization terms.** Each organization names things its own way ("fence run", "fencing", "wall
+  or fence"). One application form or comparison across organizations needs each organization's term linked to a
+  shared concept, with SKOS's match relations (exact, close, broader, narrower). This moves part of "reusing rules
+  across organizations" from out of scope into the schema.
+- **Questions for application forms.** A form asks "How tall will the fence be?", while the property's label is
+  "height". Either property terms carry an optional question, or the form generates one from the label; decide with
+  the form builder.
+- **Rights and easements.** A grant of a right or an easement ("the Declarant reserves an easement to enter Units to
+  correct defects") overrides no rule and requires nothing, so it isn't a rule and its provision is explanatory; only
+  the conditions on using it are rules. Recording every rule the documents state may call for a standalone right, so
+  a request (an entry dispute, say) can cite who holds which right and over what.
 - **Master and sub-associations.** How precedence works between a master association's documents and a
   sub-association's.
 - **Computations beyond checks.** Election results (cumulative voting), allocating assessments across lots, and budget

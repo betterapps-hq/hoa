@@ -48,7 +48,7 @@ export function ruleFindingAnswer(keys: ReturnType<typeof findingKeys>) {
   const party = z.union([keyEnum(keys.parties), label])
   const subject = z.union([keyEnum(keys.subjects), label])
   const requestType = keyEnum(keys.requestTypes)
-  const requestTypes = z.array(requestType).min(1)
+  const requestTypes = z.array(requestType)
   const read = z.object({ about: z.string().min(1), fact: z.string().min(1) })
   const targets = z.object({
     rules: z.array(ruleKey),
@@ -110,7 +110,7 @@ export function ruleFindingAnswer(keys: ReturnType<typeof findingKeys>) {
   ])
   const noRule = z.discriminatedUnion("reason", [
     z.object({ reason: z.enum(["heading", "recital", "reserved"]) }),
-    z.object({ reason: z.enum(["explanatory", "not-evaluated"]), note: z.string().min(1) }),
+    z.object({ reason: z.literal("explanatory"), note: z.string().min(1) }),
     z.object({ reason: z.literal("duplicate"), of: provisionKey })
   ])
   const settingFlag = z.object({

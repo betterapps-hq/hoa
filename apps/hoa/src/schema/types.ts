@@ -76,7 +76,7 @@ export type Provision = {
 }
 
 export type NoRule = {
-  reason: "heading" | "recital" | "reserved" | "explanatory" | "duplicate" | "not-evaluated"
+  reason: "heading" | "recital" | "reserved" | "explanatory" | "duplicate"
   note: string | null
   review: Review
 }
