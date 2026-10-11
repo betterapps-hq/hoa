@@ -235,7 +235,7 @@ hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json                          per-job
 ```
 
 A build or review step's output is keyed by its step name: the part before the first colon is the stage and the rest
-the item, so `encode:{unitId}` is `encode/{unitId}.json`, and a step without an item, such as `merge`, is
+the item, so `find-rules:{unitId}` is `find-rules/{unitId}.json`, and a step without an item, such as `merge`, is
 `merge/result.json` (`jobStepKey` and `rulebookBuildKeys` in `src/storage/keys.ts`).
 
 Duplicates are caught by hash instead of being cached:

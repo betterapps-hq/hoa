@@ -19,8 +19,9 @@ scored in code and judged by the coding agent, and Langfuse datasets only where 
   structured-output schema into a grammar, and the rule schemas are larger than they accept. Zod's `oneOf` unions are
   sent as `anyOf` (Anthropic models on Vertex and Bedrock refuse `oneOf`), and the answer is validated with Zod. An
   invalid answer throws, so the Workflow step retries.
-- `runCheckedObjectPrompt` is the same call for stages that repair answers (the rulebook build's encode and repair):
-  an answer that fails Zod comes back with its issues instead of throwing, and is cached like a valid one.
+- `runCheckedObjectPrompt` is the same call for stages that rerun a failing answer with its problems (the rulebook
+  build's steps): an answer that fails Zod comes back with its issues instead of throwing, and is cached like a valid
+  one.
 - `codeFields` lists fields code owns (a rule's `effectiveFrom`, a term's `organizationId`): they're left out of the
   schema the model sees, and filled in on the answer before Zod checks it.
 - Text the model must read about the output, such as the statement link syntax, goes in the Zod schema's
@@ -105,11 +106,11 @@ evaluators are deferred.
 ### Prompt caching
 
 The provider's prompt cache is separate from the content cache: it makes a repeated prefix of a request cheaper, not
-the answer free. A prompt opts in by naming its `sharedVariables` in its registry entry (the rulebook build's encoding,
-repair and term-extraction prompts name `coreTerms`, and encoding `requestTypes` too); their templates put those
-variables before the call's own. `runPrompt.ts` (`sharedPrefix`) sends the compiled prompt as two text parts: the text
-up to where the first other variable begins, marked with `cacheControl: { type: "ephemeral" }` (OpenRouter passes it to
-Anthropic as `cache_control`), then the rest. Anthropic caches the request up to that mark, the tools first, so the
+the answer free. A prompt opts in by naming its `sharedVariables` in its registry entry (the rulebook build's step
+prompts name theirs, such as `coreTerms` and `requestTypes`); their templates put those variables before the call's
+own. `runPrompt.ts` (`sharedPrefix`) sends the compiled prompt as two text parts: the text up to where the first other
+variable begins, marked with `cacheControl: { type: "ephemeral" }` (OpenRouter passes it to Anthropic as
+`cache_control`), then the rest. Anthropic caches the request up to that mark, the tools first, so the
 `respond` tool's schema is cached with it. The cache lives five minutes and each read renews it; a write costs 1.25
 times the input price and a read a tenth. A template that puts a call's own variable first still works: its prefix is
 shorter. Prompts without `sharedVariables` send one text part, unmarked. A chat prompt (its definition says `chat: true`; the redesigned

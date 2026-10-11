@@ -18,7 +18,7 @@ Each finished phase in one line. Task ids that code and other docs cite are kept
 | 1 Schema in the app | `src/schema/`: types, Zod validators and drafts, core terms, `validateRulebook` with typing checks, `describe`, statement links; the 57 examples and the sample tested; `pnpm docs:schema`. |
 | 2 Engine | `src/engine/`: exact numbers, vocabulary, three-valued values, calendar, paths, operands, conditions, derived properties, checks, deadlines, overrides, evaluate and decide; the fence fixture `src/tests/fenceSchemaFixture.ts` (2.13) and the fence and garage enclosure expected results as tests. Sanctions (2.15) wait for the violations work. |
 | 3 Storage | Additive migrations for provisions, rulebook rules, terms and questions, rulebook file and coverage columns and the review's rules file hash; `src/rulebook/assemble.ts` and `carryForward.ts`; the sample seed (3.11, `pnpm db:seed:sample`). |
-| 4 Encoding pipeline | `src/encoding/` and `src/text/`: clean, numbering, provisions, check, references, defined terms, plan, prompt variables, merge, consolidate, repair as patches, and the `RulebookBuild` Workflow with `ENCODING_CONCURRENCY` calls in flight (default 16), the check stage, build scores, stop, step progress and results as they arrive. |
+| 4 Encoding pipeline | `src/encoding/` and `src/text/`: clean, numbering, provisions, check, references, defined terms, plan, prompt variables, merge, consolidate, and the `RulebookBuild` Workflow with `ENCODING_CONCURRENCY` calls in flight (default 16), the check stage, build scores, stop, step progress and results as they arrive. |
 | 5 Rules UX | `RuleReference`, `TermChip`, `Statement`, `RuleTable`, `RuleCard`, the rule form and check editors, the Vocabulary, Coverage, Questions and Settings tabs, publish, the rule preview (5.15) and the coverage report (`src/rulebook/coverage.ts`). |
 | 6 Review pipeline | `src/review/`: load, selection, fact plan and schema, model-first normalization with the generic verifier (`valueCheck.ts`), numerals, evidence, second readings with escalation, corrections and `pnpm review:corrections`, rule markers, the writer; `reviewApplication` (`run.ts`) inside the `ApplicationReview` Workflow; the synthetic garage enclosure cases. |
 | 7 Review UX | The project kind picker, `ReviewReport`, findings by outcome, "What we read from your packet", the provisional notice, the rule matrix (`ReviewMatrix.utils.ts` and `ReviewMatrix`), the finding sheet, entity headers, and project types as organization data (`project_types`, the `/project-types` pages and the homeowner's form). |
@@ -31,8 +31,7 @@ against the rules); the reordered step pipeline below replaces the need.
 The current work. The build is reordered into steps that each do one thing and can each be tested alone, before any
 of them is wired into the build: B defined terms (`hoa-defined-terms`), E find the rules (`hoa-rule-finding`), C shared
 vocabulary over E's outlines (`hoa-vocabulary-group`), C-merge (`hoa-vocabulary-merge`), F structure each rule with
-its retry (`hoa-rule-structuring`), and consolidation (`hoa-consolidation`; the naive encoder keeps `hoa-rulebook-consolidation`). The code is in
-`src/encoding/steps/`. Each step has a local dataset from the goldens (`pnpm eval:datasets`) and runs alone over it, a
+its retry (`hoa-rule-structuring`), and consolidation (`hoa-consolidation`). The code is in `src/encoding/steps/`. Each step has a local dataset from the goldens (`pnpm eval:datasets`) and runs alone over it, a
 saved build run or an earlier step run (`pnpm eval:step`; [evaluation.md](evaluation.md#encoding-step-datasets)).
 
 | Id | Task | Done when |
@@ -43,16 +42,16 @@ saved build run or an earlier step run (`pnpm eval:step`; [evaluation.md](evalua
 | R.4 | C shared vocabulary and C-merge. | Done: `hoa-vocabulary-group` v2 and `hoa-vocabulary-merge` v1 (implementation-log.md, 2026-10-11). Open: C-merge's clusters miss duplicates whose labels differ. |
 | R.5 | F structure the rules, with its retry. | Done: `hoa-rule-structuring` v4 with `hoa-guide-rule-structure` v3 (implementation-log.md, 2026-10-11). |
 | R.6 | Consolidation. | Runs: `hoa-consolidation` v2. The golden holds 3 cross-section overrides, too few to measure it; needs a larger held-out set. |
-| R.7 | Wire the steps into `RulebookBuild` in place of vocabulary, plan, encode, verify and repair; `pnpm eval:step` chained runs match the build's. | Done (implementation-log.md, 2026-10-11): the full sample build runs end to end, 1,330 valid rules, judged rule recall 0.93 and precision 0.97 on a sample of 80 provisions, about $126. |
+| R.7 | Wire the steps into `RulebookBuild`; `pnpm eval:step` chained runs match the build's. | Done (implementation-log.md, 2026-10-11): the full sample build runs end to end, 1,330 valid rules, judged rule recall 0.93 and precision 0.97 on a sample of 80 provisions, about $126. |
 | R.8 | Update the build's UX (steps, estimate, results as they arrive) for the new stages. | Browser check during a build. |
 
 Tested one step at a time: revise a prompt, run it alone, judge every miss, then move to the next step.
 
 ### R.7 design: the steps in the build
 
-The build keeps its first and last stages (check, structure, analyze; merge, consolidate, save) and replaces vocabulary,
-plan, encode, verify and repair with the steps. Each model call is its own durable step (output in R2, as today), and
-every cross-item check is a code step between rounds, so a replay reads the same answers in the same order.
+The build runs its first stages (check, structure, analyze), then the steps, then its last (merge, consolidate,
+save). Each model call is its own durable step (output in R2), and every cross-item check is a code step between
+rounds, so a replay reads the same answers in the same order.
 
 | Stage | Steps | Does |
 | --- | --- | --- |
@@ -63,12 +62,11 @@ every cross-item check is a code step between rounds, so a replay reads the same
 | `vocabulary-merge` | `vocabulary-merge` (model, skipped with no clusters) | exact keys merge, clusters go to C-merge, the vocabulary freezes with what each term serves |
 | `structure-rules` | `structure-rules:{batchId}`, `structure-rules:check:{round}`, `structure-rules:{batchId}:retry-{round}` | F per batch of outlines with their related rules; a batch whose whole answer fails Zod is rerun once with its problems; up to two retry rounds of the rules that fail the validator |
 | `merge` | `merge` | one draft per section (E's no-rule reasons, questions, referenced documents) and per batch (F's rules, proposed terms, clauses) through `mergeDrafts`, with the frozen vocabulary |
-| `consolidate` | `consolidate` (model) | `hoa-consolidation` over the merged rules with cross-references, exceptions that override nothing and alternative readings; `applyConsolidation` with no term merges |
+| `consolidate` | `consolidate` (model) | `hoa-consolidation` over the merged rules with cross-references, exceptions that override nothing and alternative readings; `applyConsolidation` |
 
 The six step prompts join the build's pinned prompts. The step code the evaluations run (`src/evaluation/encoding/steps/
 stage.ts`) and the build share the per-item functions in `src/encoding/steps/`, so a chained `pnpm eval:step` and a
-build make the same calls. The naive encoder's encode, verify and repair code stays only where the evaluation tools
-replay saved runs.
+build make the same calls.
 
 ### Settled for R.5: a requirement is fact-checked only
 
@@ -119,8 +117,8 @@ only to measure, never to tune.
 | E1.1 | OCR the sample Declaration once into page records, cached in the git-ignored `.fixtures/`. | Done (`pnpm ocr:fixture`). |
 | E1.2 | `scripts/eval-encoding.ts`: run the encoding stages in process on a split, save the draft, score it against the golden. | Done (`pnpm eval:encoding`). |
 | E1.3 | Scorers in code and comparison files for the coding agent. | Done (`src/evaluation/encoding/`, `pnpm eval:encoding:score`). |
-| E1.4 | Runs of the current build on dev and test. | Done: they are the step datasets' comparison columns ([evaluation.md](evaluation.md#encoding-step-datasets)). |
-| E1.5 | Clear every bar on dev, then measure test once. | Pursued through the reordered pipeline above, not by tuning the current build's prompts. |
+| E1.4 | Runs of the build on dev and test. | Superseded: the reordered build runs on the whole sample (R.7). |
+| E1.5 | Clear every bar on dev, then measure test once. | Pursued through the reordered pipeline above. |
 
 ## Evaluation round 2: review quality
 

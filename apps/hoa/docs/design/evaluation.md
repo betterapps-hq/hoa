@@ -10,7 +10,7 @@ Every run that calls a model needs the person's approval.
 | Dataset | Where | Item | Expected output | Built and run by |
 | --- | --- | --- | --- | --- |
 | `encoding-evaluation` | Langfuse | One split of the sample Declaration (`encoding-dev`, `encoding-test`) | The golden encoding, `samples/declaration/rules.json` | `pnpm eval:encoding` runs the build; `pnpm eval:encoding:score <run> --record` records one dataset run per evaluation run, a score per measure code computes |
-| Encoding step datasets | Local | One input of one redesigned encoding step | Derived from the golden | `pnpm eval:datasets`, then `pnpm eval:step` ([below](#encoding-step-datasets)) |
+| Encoding step datasets | Local | One input of one redesigned encoding step | Derived from the golden | `pnpm eval:step` builds and runs one step's items; `pnpm eval:datasets` writes every step's items ([below](#encoding-step-datasets)) |
 | Review cases | Local | One application: its project type, answers, packet and expected review | Entities, facts, documents, findings per rule and entity, recommendation and action items | `pnpm eval:review` ([below](#review-cases)) |
 | `entity-facts` | Langfuse | One packet, entity and property, from a correction the review recorded | The settled fact, or null with `needsLabel` for a person to label | `pnpm review:corrections` ([application-review.md, Recognition](application-review.md#recognition)) |
 
@@ -25,7 +25,7 @@ and every file that quotes it stay in the git-ignored `.fixtures/`.
 | Score | How | Run by |
 | --- | --- | --- |
 | Encoding against the golden | Code: provision keys and text, coverage and no-rule reasons, term recall, validity and repair, and modality and check agreement (the engine on generated facts) on rules paired by key or by the coding agent. The coding agent, from the run's `compare/` files: rule recall, precision and pairwise quality, per provision | `pnpm eval:encoding:score` |
-| Encoding steps | Code, per step ([below](#encoding-step-datasets)); the coding agent judges faithfulness and meaning from each item's comparison file | `pnpm eval:datasets`, `pnpm eval:step` |
+| Encoding steps | Code, per step ([below](#encoding-step-datasets)); the coding agent judges faithfulness and meaning from each item's comparison file | `pnpm eval:step` |
 | Review | Code (`src/evaluation/review/score.ts`): entity accuracy, fact accuracy, document accuracy, normalization accuracy, evidence verification, finding outcome accuracy per rule and entity, recommendation accuracy and action items | `pnpm eval:review` |
 | Feedback faithfulness and clarity | The coding agent, from each case's `writer.md`: the assessment, the feedback and each action item are faithful (every statement is backed by a finding or action item; nothing is invented) and clear (the homeowner can tell exactly what to change or provide); the score is the share of parts that are both | `pnpm eval:review` |
 
@@ -50,8 +50,8 @@ quote the documents and packets):
   by side as sentences and JSON, and what code found: pairs by key or from `pairs.json`, modality, the engine's check
   agreement, the rules left unpaired), and `terms.md` lists the golden terms no key, label or pair matches with the
   pipeline terms they may be. The script calls no model, and writes to Langfuse only with `--record`.
-- **Encoding steps.** `pnpm eval:datasets` and `pnpm eval:step` write `compare/<item>.md` per item
-  ([below](#encoding-step-datasets)).
+- **Encoding steps.** `pnpm eval:step` writes `compare/<item>.md` per item
+  ([below](#running-one-step)).
 - **Review.** `pnpm eval:review` writes, beside each case's `review.json` and `scores.json`, a `writer.md`: the case's
   scores from code, what the writer read (the recommendation, the findings with their rules and provisions, the action
   items as the writer phrased them, the suggestions) and what it wrote (the assessment and the feedback).
@@ -77,14 +77,15 @@ error is fixed in the sample with a cited reason, as any expected-data change.
 
 ## Encoding step datasets
 
-The build's encoding steps (B defined terms, E find the rules, C shared vocabulary, C-merge, F structure the rules and
+The build's encoding steps (B defined terms, E find the rules, C shared vocabulary, C-merge, F structure the rules with
 its retry, consolidation; code in `src/encoding/steps/`, shared with the build) each have a local dataset, so a prompt
-is tested on its own. `pnpm eval:datasets` (no model call) builds the items from every golden in
-`samples/*/rules.json` and writes them to `.fixtures/eval/datasets/<step>/` (git-ignored: items quote the documents);
-rerun it when a golden changes. These datasets never go to Langfuse. Each item has a stable id, the step's input as the
-step receives it, the expected output derived from the golden, and slice tags: document, split (dev, test, or `other`
-for provisions in neither, such as the guidelines), topic areas (rule domains) and features present (check types,
-override, sanction, judgment, cross-reference, amendment, text condition, no-rule reason).
+is tested on its own. `pnpm eval:step` builds its step's items from the golden in memory; `pnpm eval:datasets` (no
+model call) builds every step's items from every golden in `samples/*/rules.json` and writes them to
+`.fixtures/eval/datasets/<step>/items/` (git-ignored: items quote the documents) for reading; rerun it when a golden
+changes. These datasets never go to Langfuse. Each item has a stable id, the step's input as the step receives it, the
+expected output derived from the golden, and slice tags: document, split (dev, test, or `other` for provisions in
+neither, such as the guidelines), topic areas (rule domains) and features present (check types, override, sanction,
+judgment, cross-reference, amendment, text condition, no-rule reason).
 
 | Step | Item | Input | Expected |
 | --- | --- | --- | --- |
@@ -93,21 +94,7 @@ override, sanction, judgment, cross-reference, amendment, text condition, no-rul
 | `shared-vocabulary` | A group of sections | The golden outlines with their reads, the defined terms | The terms those outlines read, with the outlines each serves |
 | `vocabulary-merge` | The synthetic set | Golden terms, planted duplicates (an alternative wording rekeyed), same-key value-type collisions | The merges, the renames, lookalikes kept apart |
 | `rule-structuring` | A batch of about 15 golden outlines | The outlines with their term keys, the whole vocabulary, cited provisions, settings flags | The golden rules |
-| `rule-retry` | A failing rule a saved run recorded | The rule, its problems (paths inside it), its provisions and vocabulary | Fixed, with nothing changed outside the problems |
 | `consolidation` | A split | Its golden rules with every cross-section override removed, cross-references, similar pairs | The removed overrides |
-
-**The saved build runs' columns.** The same command scores each item against what today's build pipeline produced for
-the same input in saved runs under `.fixtures/eval/encoding/` (`--runs <label>=<run id>,...`; a label may name a dev
-and a test run, and the first that covers an item counts; each run folder records the prompt versions it used). The
-build has other steps, so code maps them: its vocabulary stage to B, its encode answers (before repair) to E's outlines
-(kind, modality, bearer, subject, request types, citations per rule) and to F's structured rules, its first repair to
-F's retry, its consolidation to consolidation; C and C-merge have no equivalent and say so. The `rule-retry` items are
-the runs' recorded failing rules, at most `--retry-quota <problem class prefix>=<count>,...` per class. Each item gets a
-verdict per run: correct, partly correct (the notes say what's wrong), wrong, missing (no result: the run never encoded
-the item's document or section, as with the guidelines), or no equivalent. `results.json` holds every verdict and
-metric, `summary.md` the counts by slice, each run's accuracy per metric and per slice, and the items every run got
-wrong (the most useful test items), and `compare/<item>.md` the input, the expected output and each run's output for
-the coding agent to judge what code can't (faithfulness, whether two terms or rules mean the same).
 
 **What code scores, per step** (`src/evaluation/encoding/steps/scores.ts`):
 
@@ -117,8 +104,7 @@ the coding agent to judge what code can't (faithfulness, whether two terms or ru
 | E | Coverage (a reason, an outline citing it, or covered outside the section); rule recall and precision (pairs by key, then kind, per provision); kind, bearer, subject (a label counts when it is the golden term's), request-type and no-rule-reason agreement |
 | C | Recall of properties, value sets and values, things and categories; duplicates (two terms sharing a label in one scope) |
 | C-merge | Merge recall and precision; collisions renamed; lookalikes merged |
-| F | Rules structured; valid before any retry (Zod); without problems (Zod and the validator); kind agreement; check agreement through the engine; problems |
-| F retry | Fixed; collateral changes (a structural diff outside the problem paths; title and statement reported apart) |
+| F | Rules structured; valid before any retry (Zod); without problems (Zod and the validator, after the retries `--retries` allows); kind agreement; check agreement through the engine; problems |
 | Consolidation | Recall and precision of the removed cross-section overrides; invalid and not-allowed overrides |
 
 ## Running one step
@@ -130,14 +116,10 @@ stops. That estimate is what the person approves; the script has no spending cap
 - **Golden mode** (the default): the step runs over its dataset's items, built in memory from the golden as above, so
   it's measured against perfect upstream input. `--golden <sample>` picks the golden (default `declaration`).
 - **From a saved build run**: `--from <run under .fixtures/eval/encoding>` freezes that run's saved steps as the
-  inputs: its structure for `defined-terms`, its sections for `rule-finding`, its recorded failures for `rule-retry`.
+  inputs: its structure for `defined-terms`, its sections for `rule-finding`.
 - **Chained**: `--from <run under .fixtures/eval/steps>` reads an earlier step run's `handoff.json`, so steps run in
   pipeline order on accepted outputs (E's outlines and flags, then C's terms, then C-merge's frozen vocabulary for F,
   then F's rules for consolidation). Items whose ids match the dataset's are scored against it.
-- **Replays of today's build stages** (`vocabulary`, `encode`, `repair` round 1, `consolidate`, `--from <build run>`):
-  the run's saved steps are the frozen inputs and its prompt versions are pinned; with the content cache a replay calls
-  no model and must give back exactly what the run saved (`reproduced`, compared as the runner writes JSON;
-  `replay.test.ts`).
 
 Options:
 
@@ -151,8 +133,6 @@ Options:
   step's items and keep the rest as a check.
 - `--reruns 0|1` (default 1) reruns a failing B, E or C item once with its problems, as the pipeline does.
 - `--retries 0-2` (default 0) runs F's retry on the rules still failing.
-- `--runs <label>=<run id>,...` picks the saved build runs the report sets beside the scores, and
-  `--retry-quota <class prefix>=<count>,...` how many of their failing rules `rule-retry` takes per problem class.
 - `--finder <file>` gives B the provisions another finder picked (a JSON map of item id to provision keys) instead of
   the ones code picks, and `--expect all|picked` (default `picked`) scores B against every term the golden defines in
   the document, or only those in the provisions B is given, so finders can be compared (`scripts/stepFinder.ts`).
@@ -161,7 +141,8 @@ Options:
 
 Each run writes `.fixtures/eval/steps/<run id>/`: `run.json` (calls with input, cached-input, cache-write and output
 tokens, cost and latency; problems), `outputs/`, `handoff.json`, `scores.json`, `report.md` (calls, cost, time, cached
-tokens, problems by class, the scores beside the saved build runs') and `compare/`.
+tokens, problems by class, the scores by slice and the items every run got wrong) and `compare/`: per item, its
+input, the expected output and each repeat's output with its score, for the coding agent.
 
 **B's golden gaps.** A thing or category B returns that the golden lacks, citing a provision B was given as defining,
 is a golden-gap candidate: its comparison file lists it. The coding agent reads the text and records its verdict in the

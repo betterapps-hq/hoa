@@ -52,8 +52,7 @@ calls.
 ### 1. Resolve prompts
 
 Pin every prompt the build uses (`hoa-structure-repair`, `hoa-defined-terms`, `hoa-rule-finding`,
-`hoa-vocabulary-group`, `hoa-vocabulary-merge`, `hoa-rule-structuring` and `hoa-consolidation`) on the job. The naive
-encoder's prompts stay defined for the evaluation tools that replay its saved runs.
+`hoa-vocabulary-group`, `hoa-vocabulary-merge`, `hoa-rule-structuring` and `hoa-consolidation`) on the job.
 
 ### 1b. Check
 
@@ -297,15 +296,15 @@ and follows the build's own pace once finding or drafting the rules has done som
 how long this takes" until the sections are known. The bar never
 reads full before the build ends. The steps fold away to the one line.
 
-**Results as they arrive** (`BuildFeed`). Under the steps, a quiet feed shows what the build has produced, newest
-first, the latest four and "Show all": the terms each document defines and each group of sections' vocabulary, the
-rules each section outlines and each batch drafts (title and citation, which opens the reader in a sheet), what the
-checks across sections and rules found and what was looked at again or redrafted, and the conflicts merging and
-consolidation found. Nothing in it is reviewable; review
-happens in the draft. `getBuildResults` (administrators, the organization's own builds) lists the build's step outputs
-in R2 and reads only those written since the page's cursor; the page polls it every four seconds. Polling, not
-server-sent events: a stream would hold a Worker request open for the hour a build runs and still have to poll R2
-inside it, while a poll is short, survives a dropped connection and reads nothing twice.
+**Counts as they arrive.** Each step's line counts what it has produced so far, never the items themselves: "2 terms
+found", "92 rules found" (a section looked at again replaces its first count), the vocabulary's terms, "40 of 92 rules
+drafted" (a redrafted rule counts once) and the conflicts left to decide. The current step also says how much work is
+under way ("0 of 2 sections, 2 under way": the calls in flight, at most `concurrency`) and has a thin bar of its own, so
+a step whose first calls take minutes doesn't look frozen. The counts come from `getBuildResults` (administrators, the
+organization's own builds), which lists the build's step outputs in R2 and reads only those written since the page's
+cursor; the page polls it every four seconds. Polling, not server-sent events: a stream would hold a Worker request
+open for the hour a build runs and still have to poll R2 inside it, while a poll is short, survives a dropped
+connection and reads nothing twice.
 
 **Stopping a build.** While a build runs, **Stop building** (quiet, beside the progress) asks "Stop this build? Work
 finished so far is kept and reused next time. Nothing is published." Stopping (`stopRulebookBuild`, administrators
@@ -347,7 +346,19 @@ list is ordered by relevance; without, in its usual order. The other filters sti
   against facts" (the engine's preview). Editing is the form (title, statement, modality, bearer, remedy, request
   types, and the structured check and condition editors with their JSON fallback). There's no whole-rule JSON editor
   and no delete.
-- **Terms:** each term with its kind, definition and the rules that use it.
+- **Terms:** grouped under what they describe. Each subject (a thing, request, party, event or document the
+  organization's terms hang off, core ones included, then the lists of choices no detail uses and the units) is a
+  collapsed row in its section, most used first, the first eight until "Show all", saying what it holds ("37 details
+  and 3 kinds") and how many rules read it or anything under it. Open, it shows its definition and other labels, its
+  kinds (categories, with their definition or criteria) and its details (properties, by the name they're shown by
+  under it: "height" under gate, not "gate height"), each with what it holds in words, its definition, the rules that
+  read it and its review. A choice detail shows its list's choices as chips (folded past eight; "or another" when the
+  list is open), each opening what it means, the rules that read it and its review; a later detail in the same
+  subject choosing from the same list refers back to it ("as for material"). Kinds and details come most used first.
+  The review filter (to review by default in a draft) keeps a subject for any term under it that matches, and only
+  those kinds and details ("3 of 37 details"); "Approve all N terms" approves what an open subject keeps, its details
+  and their choices included. A search lists the subjects it finds best first, opened: a found subject shows all of
+  itself, otherwise only the details holding a match, and a found choice is marked.
 - **Questions:** each question with its citations and readings; Answer becomes the primary action once a reading is
   chosen.
 - **Settings:** the review, then each clause in words with its citations (edited as JSON), and the policy.
@@ -432,8 +443,8 @@ the text states, each with its exact quote and its value in schema terms (an exa
 key; a party's wording and the party term it names; a condition's words). Code checks the audit before using it,
 generically, as the review's verifier does: each quote is in its provision's text, every numeral in a number's or
 duration's quote agrees with its value after unit conversion, and the unit is a vocabulary unit. Then it checks each
-item against the encoded records citing that provision, so a dropped number or party goes to repair instead of to the
-administrator:
+item against the encoded records citing that provision, so a dropped number or party goes back to the model instead of
+to the administrator:
 
 1. **Numbers and durations** appear as a constant, an offset or a fraction in a rule, term or clause citing the
    provision, equal after unit conversion with exact arithmetic, or the provision's no-rule note explains them; else
@@ -441,14 +452,14 @@ administrator:
 2. **Parties** appear as a bearer, approver, signer, subject or party value of a record citing the provision; else
    `unencoded-party`.
 3. **Conditions** appear as an `appliesWhen`, condition, exception (an overriding rule) or text condition on a record
-   citing the provision; else `unencoded-condition`, a warning sent to repair once with its quote.
+   citing the provision; else `unencoded-condition`, a warning sent back once with its quote.
 
 An audit item that fails its own check (a quote not in the provision, a numeral that disagrees) is dropped and recorded,
 not raised. These checks replace the planned text-analysis cross-checks (quantity coverage and modality cues from
 LexNLP and spaCy); modality is measured by the encoding evaluation's modality agreement and gets a check only if its
 failures call for one.
 
-**Corrections become data.** Every audit item code rejects, every problem the audit raises, and how repair or the
+**Corrections become data.** Every audit item code rejects, every problem the audit raises, and how the model or the
 administrator resolved it (encoded, explained in a no-rule note, or dismissed as the audit's error) is recorded on the
 build, so it can become evaluation data, as the review's corrections become `entity-facts` items.
 
@@ -473,31 +484,23 @@ build, so it can become evaluation data, as the review's corrections become `ent
 
 ## Cost and scale
 
-Measured on the naive encoder's build of two documents (the sample Declaration and Design Guidelines) before the
-changes below: 64 units,
-130 to 180 calls to Opus 5.5 at high effort, 45 to 70 minutes and $77 to $108. An encode call read about 45,000 tokens
-and wrote about 22,000 (half of them reasoning); a repair read about 62,000 and wrote about 20,000, because it wrote the
-whole draft again, so repairs cost as much as encoding. No call read the prompt cache. Consolidation is one call of
-about 30,000 tokens. Every model stage stays on Opus 5.5 at high effort until the encoding's quality is good.
+Measured on a full build of the sample documents (the Declaration, its use restrictions and the Design Guidelines) on
+the reordered steps: 1,330 rules for about $126, from Langfuse (write the rules $70, shared vocabulary $36, find
+the rules $17, the rest $3; implementation-log.md, 2026-10-11). Every model stage stays on Opus 5.5 at high effort
+until the encoding's quality is good.
 
-- **Unit budget.** 3,000 estimated tokens of provision text per unit (`unitTokenBudget`), with small neighbours packed
-  up to it ([Plan](#5-plan)). An encode at that size already writes about 22,000 tokens; doubling it would bring
-  answers toward the 40,000 tokens that come close to a build step's 15-minute timeout, and a longer answer has more to
-  repair. Packing cuts the calls for documents of many short sections without growing the largest answers.
+- **Section budget.** 3,000 estimated tokens of provision text per section (`unitTokenBudget`), with small neighbours
+  packed up to it ([Plan](#5-plan)). Packing cuts the calls for documents of many short sections without growing the
+  largest answers.
 - **Concurrency.** `ENCODING_CONCURRENCY` (default 16, [setup.md](../setup.md)) caps each stage's model calls in
   flight together. OpenRouter sets no request limit on paid models; the limits that matter are the upstream providers'
-  (OpenRouter spreads Opus over several) and Anthropic's per-minute output tokens: 16 calls each writing about 22,000
-  tokens over three to five minutes is roughly 70,000 to 120,000 output tokens a minute, well within them, and
-  prompt-cache reads don't count toward Anthropic's input limit. Calls stream, so a Worker's limit of six connections
-  waiting for response headers doesn't hold the others back. A call refused for now (429, overloaded, 5xx) waits for
-  the provider's `retry-after`, or 5, 10, 20, 40 and 60 seconds, and is retried up to six times (`defaultRetry` in
-  `runPrompt.ts`) before its step fails and the Workflow retries the step.
-- **Prompt caching.** Every encode and repair call marks its shared prefix (the `respond` tool's schema, about 15,000
-  tokens, then the instructions, core terms and request types, about 3,000 more) for Anthropic's five-minute
-  prompt cache, refreshed by each call that reads it. Calls in flight at the start each write it once (1.25 times the
-  input price); after that, reads cost a tenth. Repair has its own prefix, since its tool schema is the patch.
-- **Repair timing and size.** A unit's first repair starts when its own encode is verified, so repairs overlap the
-  encodes instead of waiting for the slowest one; only round 2 waits for the merge. A repair writes a patch, so its
-  output is the records it changes rather than the whole draft.
-- **Rebuilds.** The vocabulary is reused while definitions are unchanged, so unchanged units hit the content cache and
-  cost nothing.
+  (OpenRouter spreads Opus over several) and Anthropic's per-minute output tokens, and prompt-cache reads don't count
+  toward Anthropic's input limit. Calls stream, so a Worker's limit of six connections waiting for response headers
+  doesn't hold the others back. A call refused for now (429, overloaded, 5xx) waits for the provider's `retry-after`,
+  or 5, 10, 20, 40 and 60 seconds, and is retried up to six times (`defaultRetry` in `runPrompt.ts`) before its step
+  fails and the Workflow retries the step.
+- **Prompt caching.** Every step's call marks its shared prefix (the `respond` tool's schema, the system message's
+  instructions, then the user message's build-wide variables such as core terms and request types) for Anthropic's
+  five-minute prompt cache, refreshed by each call that reads it ([ai.md, Prompt caching](../ai.md#prompt-caching)).
+  Calls in flight at the start each write it once (1.25 times the input price); after that, reads cost a tenth.
+- **Rebuilds.** Model results are cached by content, so a call whose prompt and variables are unchanged costs nothing.

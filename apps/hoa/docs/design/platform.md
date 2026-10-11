@@ -54,10 +54,12 @@ DocumentIngest(documentId)                        started by completeDocumentUpl
 RulebookBuild(rulebookId)                         started by an upload's build-rulebook step, or startRulebookBuild
   load:sources ─> load ─> progress:start ─> resolve-prompts
   check                                            problems with the uploads' own records stop the build here
-  structure:{documentId} ─> analyze:{documentId} ─> vocabulary:{documentId} ─> plan
-  per unit: encode:{unitId} ─> verify:{unitId} ─> repair:{unitId}:1
-                                                   ENCODING_CONCURRENCY units at a time (default 16), settled
-  verify:merged ─> repair:{unitId}:2 ─> merge ─> consolidate
+  structure:{documentId} ─> analyze:{documentId} ─> defined-terms:{documentKey} ─> plan
+  find-rules:{unitId} ─> find-rules:check ─> find-rules:{unitId}:rerun ─> find-rules:resolve
+  vocabulary:{groupId} ─> vocabulary:check ─> vocabulary:{groupId}:rerun ─> vocabulary-merge
+  structure-rules:{batchId} ─> structure-rules:check:{round} ─> structure-rules:{batchId}:retry-{round}
+                                                   ENCODING_CONCURRENCY model calls at a time (default 16)
+  merge ─> consolidate
   save-draft ─> save-draft:scores ─> save-draft:finish
   follow-up:check ─> follow-up:ids ─> follow-up    another build, when the documents changed while this one ran
   ends; review and publishing are server functions
