@@ -265,7 +265,14 @@ export function buildDatasets(context: GoldenContext) {
     }
   })
 
-  const vocabularyItems: SharedVocabularyItem[] = vocabularyGroups(sections).map((group) => {
+  const outlinesPerUnit = new Map<string, number>()
+  for (const outline of outlines) {
+    outlinesPerUnit.set(outline.unitId, (outlinesPerUnit.get(outline.unitId) ?? 0) + 1)
+  }
+  const vocabularyItems: SharedVocabularyItem[] = vocabularyGroups(
+    sections,
+    (unit) => outlinesPerUnit.get(unit.id) ?? 0
+  ).map((group) => {
     const ids = new Set(group.units.map((unit) => unit.id))
     const groupOutlines = outlines.filter((outline) => ids.has(outline.unitId))
     const expected = expectedVocabulary(golden, groupOutlines, new Set(definedTerms.map((term) => term.key)))

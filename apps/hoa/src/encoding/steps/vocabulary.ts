@@ -34,20 +34,44 @@ import { termKeyBuilder } from "./termKeys"
 /** Provision text a group of sections holds at most, in estimated tokens (the drafts' ~15k). */
 export const groupTokenBudget = 15_000
 
+/**
+ * Outlines a group holds at most. The answer grows with the outlines it serves (about 450 output tokens each), so a
+ * group of many short rules would run past the output limit: 50 keeps an answer near 25k tokens.
+ */
+export const groupOutlineBudget = 50
+
 export type VocabularyGroup = { id: string; documentKey: string; units: EncodingUnit[] }
 
-/** Packs sections, in order and within one document, into groups of at most `budget` tokens of provision text. */
-export function vocabularyGroups(units: readonly EncodingUnit[], budget = groupTokenBudget): VocabularyGroup[] {
+/**
+ * Packs sections, in order and within one document, into groups of at most `budget` tokens of provision text and at
+ * most `outlineBudget` outlines (a section with more stays a group of its own).
+ */
+export function vocabularyGroups(
+  units: readonly EncodingUnit[],
+  outlinesOf: (unit: EncodingUnit) => number = () => 0,
+  budget = groupTokenBudget,
+  outlineBudget = groupOutlineBudget
+): VocabularyGroup[] {
   const size = (unit: EncodingUnit) =>
     unit.provisions.reduce((sum, provision) => sum + estimateTokens(provisionBlock(provision)), 0)
-  const groups: { group: VocabularyGroup; tokens: number }[] = []
+  const groups: { group: VocabularyGroup; tokens: number; outlines: number }[] = []
   for (const unit of units) {
     const last = groups.at(-1)
-    if (last && last.group.documentKey === unit.documentKey && last.tokens + size(unit) <= budget) {
+    if (
+      last &&
+      last.group.documentKey === unit.documentKey &&
+      last.tokens + size(unit) <= budget &&
+      last.outlines + outlinesOf(unit) <= outlineBudget
+    ) {
       last.group.units.push(unit)
       last.tokens += size(unit)
+      last.outlines += outlinesOf(unit)
     } else {
-      groups.push({ group: { id: unit.id, documentKey: unit.documentKey, units: [unit] }, tokens: size(unit) })
+      groups.push({
+        group: { id: unit.id, documentKey: unit.documentKey, units: [unit] },
+        tokens: size(unit),
+        outlines: outlinesOf(unit)
+      })
     }
   }
   return groups.map(({ group }) => group)
