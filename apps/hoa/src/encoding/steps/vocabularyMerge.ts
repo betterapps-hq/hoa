@@ -11,7 +11,7 @@ import { valueTypeText } from "../promptVariables"
 import { mergeLabels, uniqueCitations } from "../records"
 import type { stepPrompts } from "./prompts"
 import { keySegment } from "./termKeys"
-import { signatureOf } from "./vocabulary"
+import { signatureOf, widenedParties } from "./vocabulary"
 
 // C-merge (hoa-vocabulary-merge, prompt drafts v2): code merges the groups' exact keys (same key, kind and value
 // type), then lists clusters as term lines: terms of one kind and scope whose labels match exactly or fuzzily, and
@@ -32,8 +32,8 @@ const isFixed = (entry: VocabularyEntry) => fixedOrigins.has(entry.origin)
 
 /**
  * The groups' terms with exact keys merged: the same key, kind and value type is one entry (labels, citations and
- * outlines joined, the first origin kept); the same key with another kind or value type stays a separate entry, a
- * collision for C-merge.
+ * outlines joined, a party property's allowed parties widened, the first origin kept); the same key with another kind
+ * or value type stays a separate entry, a collision for C-merge.
  */
 export function mergeExactKeys(entries: readonly VocabularyEntry[]): VocabularyEntry[] {
   const merged: VocabularyEntry[] = []
@@ -46,6 +46,7 @@ export function mergeExactKeys(entries: readonly VocabularyEntry[]): VocabularyE
       continue
     }
     mergeLabels(same.term, entry.term.labels)
+    widenedParties(same.term, entry.term)
     same.term.citations = uniqueCitations([...same.term.citations, ...entry.term.citations])
     same.term.definition ??= entry.term.definition
     same.serves = [...new Set([...same.serves, ...entry.serves])]
@@ -220,7 +221,8 @@ export function applyVocabularyMerge(input: {
     const index = input.ids.get(id)
     return index === undefined ? undefined : entries[index]
   }
-  const removed = new Set<VocabularyEntry>()
+  // Entries are replaced as references are rewritten, so a merged-away entry is tracked by its position.
+  const removed = new Set<number>()
   const merges: { keep: TermKey; merge: TermKey[] }[] = []
   for (const { keep, merge } of input.answer.merges) {
     const kept = at(keep)
@@ -242,20 +244,30 @@ export function applyVocabularyMerge(input: {
     }
     for (const entry of found) {
       mergeLabels(kept.term, entry.term.labels)
+      widenedParties(kept.term, entry.term)
       kept.term.citations = uniqueCitations([...kept.term.citations, ...entry.term.citations])
       kept.serves = [...new Set([...kept.serves, ...entry.serves])]
-      removed.add(entry)
+      removed.add(entries.indexOf(entry))
     }
-    const renames = new Map(
-      found.filter((entry) => entry.term.key !== kept.term.key).map((entry) => [entry.term.key, kept.term.key])
-    )
-    entries = entries.map((entry) => (removed.has(entry) ? entry : { ...entry, term: renamed(entry.term, renames) }))
-    merges.push({ keep: kept.term.key, merge: found.map((entry) => entry.term.key) })
+    const keptKey = kept.term.key
+    for (const entry of found.filter((item) => item.term.key !== keptKey)) {
+      // When another term still holds the merged key (a collision), only the merged term's own group meant this one.
+      const from = entry.term.key
+      const held = entries.some((item, index) => !removed.has(index) && item.term.key === from)
+      const renames = new Map([[from, keptKey]])
+      entries = entries.map((item, index) =>
+        removed.has(index) || (held && item.origin !== entry.origin)
+          ? item
+          : { ...item, term: renamed(item.term, renames) }
+      )
+    }
+    merges.push({ keep: keptKey, merge: found.map((entry) => entry.term.key) })
   }
   const renamedEntries: { key: TermKey; origin: TermOrigin; to: TermKey }[] = []
   for (const { id, label } of input.answer.renames) {
+    const index = input.ids.get(id)
     const entry = at(id)
-    if (!entry || removed.has(entry)) {
+    if (!entry || index === undefined || removed.has(index)) {
       refuse(id, `${id} isn't a line of the clusters`)
       continue
     }
@@ -302,7 +314,9 @@ export function applyVocabularyMerge(input: {
     }
   }
   const frozen = mergeExactKeys(
-    entries.filter((entry) => !removed.has(entry)).map((entry) => ({ ...entry, term: termDraft.parse(entry.term) }))
+    entries
+      .filter((_entry, index) => !removed.has(index))
+      .map((entry) => ({ ...entry, term: termDraft.parse(entry.term) }))
   )
   const coreKeys = new Set(coreTerms.map((term) => term.key))
   return {

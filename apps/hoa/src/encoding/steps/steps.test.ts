@@ -24,7 +24,13 @@ import {
 import { changedPaths, collateralChanges, outlineOfRecord, retryProblemsText } from "./ruleRetry"
 import { clausesOf, draftsOf, ruleStructuringAnswer, structuringBatches } from "./ruleStructuring"
 import { checkSharedVocabulary, sharedVocabularyAnswer, sharedVocabularyTerms } from "./vocabulary"
-import { applyVocabularyMerge, mergeClusters, vocabularyMergeAnswer, vocabularyMergeVariables } from "./vocabularyMerge"
+import {
+  applyVocabularyMerge,
+  mergeClusters,
+  mergeExactKeys,
+  vocabularyMergeAnswer,
+  vocabularyMergeVariables
+} from "./vocabularyMerge"
 
 // The redesigned steps' code (prompt drafts v2): what each check finds, what code refuses, and the answer formats the
 // model is sent. The steps' whole-dataset round trips are in src/evaluation/encoding/steps/stage.test.ts.
@@ -528,6 +534,47 @@ describe("C-merge", () => {
       "alternative"
     ])
     expect(applied.serves.get("shed.height")).toEqual(["a", "b", "c"])
+  })
+
+  it("merges a party property's exact keys whatever parties each allows, widening them", () => {
+    const party = (among: string[] | null) => property("shed.built-by", { type: "party", among }, "built by")
+    const merged = mergeExactKeys([
+      { term: party(["owner"]), serves: ["a"], origin: "group 1" },
+      { term: party(["board", "owner"]), serves: ["b"], origin: "group 2" },
+      { term: party(["declarant"]), serves: ["c"], origin: "group 3" }
+    ])
+    expect(merged).toHaveLength(1)
+    expect(merged[0]?.term).toMatchObject({ valueType: { type: "party", among: ["board", "declarant", "owner"] } })
+    expect(mergeExactKeys([merged[0]!, { term: party(null), serves: [], origin: "group 4" }])[0]?.term).toMatchObject({
+      valueType: { type: "party", among: null }
+    })
+  })
+
+  it("keeps merged terms out after a rename, and leaves a colliding term's key alone", () => {
+    const colliding = [
+      { term: shed, serves: [], origin: "defined" as const },
+      { term: property("shed.kind", { type: "boolean" }, "kind"), serves: ["a"], origin: "group 1" as const },
+      { term: property("shed.sort", { type: "boolean" }, "kind"), serves: ["b"], origin: "group 1" as const },
+      { term: property("shed.kind", { type: "count" }, "kind"), serves: ["c"], origin: "group 2" as const },
+      { term: property("shed.size", { type: "count" }, "size"), serves: ["d"], origin: "group 1" as const }
+    ]
+    const ids = new Map(colliding.map((_entry, index) => [`t${index + 1}`, index]))
+    const applied = applyVocabularyMerge({
+      entries: colliding,
+      ids,
+      answer: {
+        merges: [{ keep: "t3", merge: ["t2"], why: "one fact" }],
+        renames: [{ id: "t5", label: "floor area", why: "clearer" }],
+        distinct: [],
+        notes: []
+      }
+    })
+    expect(applied.terms.map((item) => `${item.key} ${item.kind === "property" ? item.valueType.type : ""}`)).toEqual([
+      "shed ",
+      "shed.floor-area count",
+      "shed.kind count",
+      "shed.sort boolean"
+    ])
   })
 })
 

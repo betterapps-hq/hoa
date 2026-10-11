@@ -269,9 +269,32 @@ export type GroupVocabulary = {
   problems: readonly StepProblem[]
 }
 
-/** A term's kind and value type: two terms with one key must agree on it to be one term. */
-export const signatureOf = (term: TermContent) =>
-  term.kind === "property" ? `property ${JSON.stringify(term.valueType)}` : term.kind
+/**
+ * A term's kind and value type: two terms with one key must agree on it to be one term. Which parties a party property
+ * allows narrows its values, not its type: one fact, whose allowed parties widen when the terms merge.
+ */
+export const signatureOf = (term: TermContent) => {
+  if (term.kind !== "property") {
+    return term.kind
+  }
+  return `property ${JSON.stringify(term.valueType.type === "party" ? { type: "party" } : term.valueType)}`
+}
+
+/** A merged party property's allowed parties: every party either allows, or any party when either allows any. */
+export function widenedParties(kept: TermContent, other: TermContent) {
+  if (kept.kind !== "property" || other.kind !== "property") {
+    return
+  }
+  if (kept.valueType.type !== "party" || other.valueType.type !== "party") {
+    return
+  }
+  const { among } = kept.valueType
+  const added = other.valueType.among
+  kept.valueType = {
+    type: "party",
+    among: among === null || added === null ? null : [...new Set([...among, ...added])].toSorted(compareCodeUnits)
+  }
+}
 
 /** Outlines whose checks read facts, so some term must serve them (judged rules, prohibitions and the like needn't). */
 const readsFacts = (outline: Outline) => ["obligation", "recommendation", "requirement"].includes(kindName(outline))

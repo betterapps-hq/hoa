@@ -434,7 +434,8 @@ export async function runVocabularyMerge(
   const outputs = new Map<string, MergeOutput | null>()
   let handoff: Handoff = {}
   for (const item of items) {
-    const { entries } = item.input
+    // Exact keys merge again first, so what C handed over is merged by the current rules.
+    const entries = mergeExactKeys(item.input.entries)
     const clusters = mergeClusters(entries)
     if (clusters.length === 0) {
       outputs.set(item.id, { merges: [], renames: [] })
