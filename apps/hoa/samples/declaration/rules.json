@@ -3796,16 +3796,7 @@
       "intro": null,
       "text": "Members who are also subject to a Neighborhood Association may have their voting rights exercised by a voting representative if and to the extent set forth in the governing documents of such Neighborhood Association.",
       "wrapUp": null,
-      "noRule": {
-        "reason": "explanatory",
-        "note": "Lets a Neighborhood Association's members vote through a voting representative to the extent that association's documents provide; grants a right; no rule.",
-        "review": {
-          "status": "proposed",
-          "by": null,
-          "at": null,
-          "note": null
-        }
-      },
+      "noRule": null,
       "anchors": []
     },
     {
@@ -7366,16 +7357,7 @@
       "intro": null,
       "text": "Declarant's rights under this Article shall not diminish the obligation to comply with all applicable laws, including, without limitation, the obligation to obtain a franchise, special use, and/or permit approval, if necessary.",
       "wrapUp": null,
-      "noRule": {
-        "reason": "explanatory",
-        "note": "Law still applies to the Declarant; law outranks the Declaration in precedence already.",
-        "review": {
-          "status": "proposed",
-          "by": null,
-          "at": null,
-          "note": null
-        }
-      },
+      "noRule": null,
       "anchors": []
     },
     {
@@ -8331,16 +8313,7 @@
       "intro": null,
       "text": "The exercise of any rights pursuant to the easements granted or reserved in this Article 11 shall be subject to all provisions of applicable law including, without limitation, any requirement to obtain a franchise, [illegible] authorization, building permit or other permit approval from any governmental entity with an ownership interest in affected property or jurisdiction in connection with the exercise of such rights.",
       "wrapUp": null,
-      "noRule": {
-        "reason": "explanatory",
-        "note": "Easement holders must follow the law; law outranks the Declaration in precedence already.",
-        "review": {
-          "status": "proposed",
-          "by": null,
-          "at": null,
-          "note": null
-        }
-      },
+      "noRule": null,
       "anchors": []
     },
     {
@@ -10158,16 +10131,7 @@
       "intro": null,
       "text": "The Association may transfer, dedicate, or grant easements over portions of the Common Area to King County, Washington, or to any other local, state, or federal governmental or quasi-governmental entity without a vote of the Owners.",
       "wrapUp": null,
-      "noRule": {
-        "reason": "explanatory",
-        "note": "A power of the Association that overrides no rule encoded here; if another article requires a vote to convey Common Area, this becomes a permission overriding it.",
-        "review": {
-          "status": "proposed",
-          "by": null,
-          "at": null,
-          "note": null
-        }
-      },
+      "noRule": null,
       "anchors": []
     },
     {
@@ -18661,6 +18625,51 @@
         "note": null
       },
       "issues": []
+    },
+    {
+      "key": "parking.private-amenity-right",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "parked under the Private Amenity parking right",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": "Parking on the community's roads by a Private Amenity's members, guests or invitees under 15.4.",
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:15.4",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "parking",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
     },
     {
       "key": "vehicle-repair",
@@ -38672,6 +38681,187 @@
       "issues": []
     },
     {
+      "key": "vote.distributed-on",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "copies sent to Owners on",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": "When the Board sent each Owner a copy of the new or changed Use Restrictions (3.3(c)).",
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:3.3(c)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "date"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "vote.effective-on",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "takes effect on",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:3.3(c)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "date"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "vote.disapproval-petition-received-on",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "petition for a disapproval meeting received on",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": "A petition, as the By-Laws require for special meetings, to consider disapproving a Board change to the Use Restrictions.",
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:3.3(a)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "date"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "vote.conveyed-to",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "conveyed to",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:19.3/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "vote",
+      "valueType": {
+        "type": "party",
+        "among": null
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
       "key": "eligible-holder",
       "organizationId": "org-sample",
       "kind": "thing",
@@ -38985,6 +39175,51 @@
         "note": null
       },
       "issues": []
+    },
+    {
+      "key": "assessment.certified-paid",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "a payment certificate states it paid",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": "The certificate an officer signs under 8.7(a)/p4; it's conclusive evidence of payment.",
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:8.7(a)/p4",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "assessment",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
     },
     {
       "key": "violation.uncured-60-days",
@@ -39612,6 +39847,51 @@
       "issues": []
     },
     {
+      "key": "title-transfer.advance-payment-required",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "Board required advance payment of assessments at closing",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:8.6/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "title-transfer",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
       "key": "common-area.improvements-completed-on",
       "organizationId": "org-sample",
       "kind": "property",
@@ -40016,6 +40296,97 @@
         "note": null
       },
       "issues": []
+    },
+    {
+      "key": "community.declarant-consent-recorded",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "the Declarant Recorded a document requiring its consent to Board consents and approvals",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": "Possible once the Class \"B\" Member has ended the Class \"B\" Control Period; it may cover any or all such actions.",
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:article-2/class-b-control-period(d)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "community",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "community.units-owned-by",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "owners of Units among the Declarant, its Affiliates and Builders",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": "which of the Declarant, its Affiliates and Builders still own any Unit",
+      "scopeNote": "Unlike community.exhibit-property-owned-by, counts only Units. The feature states the list complete.",
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:article-2/class-b-control-period(d)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "community",
+      "valueType": {
+        "type": "party",
+        "among": ["declarant", "affiliate", "builder"]
+      },
+      "many": true,
+      "ifUnstated": "unknown",
+      "derived": null
     },
     {
       "key": "acre",
@@ -41374,6 +41745,96 @@
       "issues": []
     },
     {
+      "key": "architectural-application.neighbor-disclosure-required",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "the Reviewer required disclosure to affected neighbors",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "guidelines:3.1.3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "architectural-application",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "architectural-application.disclosed-to-neighbors",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "proposed change disclosed to the affected neighbors",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "guidelines:3.1.3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "architectural-application",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
       "key": "work.compliance-only",
       "organizationId": "org-sample",
       "kind": "property",
@@ -42615,6 +43076,51 @@
         "note": null
       },
       "issues": []
+    },
+    {
+      "key": "lot.vote-cast-by-representative",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "vote cast by a Neighborhood Association's voting representative",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.3(c)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "lot",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
     },
     {
       "key": "entry.inspects-work",
@@ -48939,6 +49445,117 @@
       "issues": []
     },
     {
+      "key": "gate.self-latching",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "self-latching",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        },
+        {
+          "text": "self-closing latch",
+          "role": "alternative",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "guidelines:exhibit-k",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "guidelines:exhibit-l",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "guidelines:exhibit-m",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "gate",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "gate.clearance",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "gate clearance",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": "The clear opening the gate leaves when open; Exhibit K requires at least 3 feet.",
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "guidelines:exhibit-k",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "gate",
+      "valueType": {
+        "type": "quantity",
+        "unit": "inch"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
       "key": "screen",
       "organizationId": "org-sample",
       "kind": "thing",
@@ -50225,6 +50842,51 @@
       "issues": []
     },
     {
+      "key": "detached-structure.screened-walls",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "walls enclosed with screening",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "guidelines:7.13.4",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "detached-structure",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
       "key": "outdoor-living-area",
       "organizationId": "org-sample",
       "kind": "thing",
@@ -51382,6 +52044,96 @@
       "issues": []
     },
     {
+      "key": "deck.additional-screening-required",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "the Reviewer required additional provisions to reduce the lattice screening's visual impact",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "guidelines:7.14.7",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "deck",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "deck.additional-screening-provided",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "additional provisions the Reviewer required provided",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "guidelines:7.14.7",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "deck",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
       "key": "patio-cover",
       "organizationId": "org-sample",
       "kind": "thing",
@@ -51570,6 +52322,51 @@
         "note": null
       },
       "issues": []
+    },
+    {
+      "key": "patio-enclosure.screened-walls",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "walls enclosed with screening",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "guidelines:7.14.6",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "patio-enclosure",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
     },
     {
       "key": "railing",
@@ -52769,6 +53566,46 @@
       "kind": "thing",
       "nature": "party",
       "request": null
+    },
+    {
+      "key": "design-review-delegation",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "delegation of the Declarant's design review rights",
+          "role": "preferred",
+          "plural": "delegations of the Declarant's design review rights",
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T18:00:00Z"
+          }
+        }
+      ],
+      "definition": "a delegation or assignment of any of the Declarant's rights under Article 4 to another Person or committee, such as the DRC",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:4.2(a)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "thing",
+      "nature": "document",
+      "request": null
     }
   ],
   "proposedCore": [
@@ -53617,7 +54454,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -53771,7 +54608,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -53806,6 +54643,110 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:article-2/class-b-control-period(d)#declarant-consent",
+      "domain": "governance",
+      "title": "Board consents may also need the Declarant's consent",
+      "statement": "Once the {{class-b-member}} ends the Class \"B\" Control Period, if the {{declarant}} so requires in a Recorded document, an action that needs the {{board}}'s consent or approval under the {{declaration}} may be taken, while the Declarant, an {{affiliate}} or a {{builder}} owns any {{lot}}, only if the Declarant also consents to or approves it.",
+      "citations": [
+        {
+          "provisionKey": "declaration:article-2/class-b-control-period(d)",
+          "highlight": {
+            "start": 110,
+            "end": 229
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "approval",
+      "appliesWhen": {
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["approval.by"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "board"
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "from": "community",
+              "path": ["community.declarant-consent-recorded"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          },
+          {
+            "type": "some",
+            "where": null,
+            "test": {
+              "type": "in",
+              "left": {
+                "type": "ref",
+                "path": []
+              },
+              "values": [
+                {
+                  "type": "value",
+                  "term": "declarant"
+                },
+                {
+                  "type": "value",
+                  "term": "affiliate"
+                },
+                {
+                  "type": "value",
+                  "term": "builder"
+                }
+              ]
+            },
+            "from": "community",
+            "path": ["community.units-owned-by"]
+          }
+        ]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "requirement",
+      "bearer": null,
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Did the Declarant also consent to or approve the action the Board consented to or approved, if the Declarant's Recorded document covers that action?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -54023,6 +54964,54 @@
       "issues": []
     },
     {
+      "key": "declaration:3.1(a)#occupancy-determinations",
+      "domain": "use",
+      "title": "Occupancy determinations follow UPD Permit Attachment 6",
+      "statement": "The {{board}}'s determinations of when a person occupies or resides in a {{lot}} must be consistent with Attachment 6 of the {{upd-permit}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:3.1(a)",
+          "highlight": {
+            "start": 882,
+            "end": 971
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "community",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "board",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Are the Board's determinations of when a person occupies or resides in a Unit consistent with Attachment 6 of the UPD Permit?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:3.1(a)/p2#amended-by",
       "domain": "governance",
       "title": "Only the Declarant, and later the Board, amends 3.1(a) for the Act",
@@ -54034,7 +55023,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -54176,7 +55165,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -54293,7 +55282,7 @@
       "key": "declaration:3.1(a)(i)#surviving-occupant",
       "domain": "use",
       "title": "A surviving occupant stays only with the Board's permission",
-      "statement": "When a {{residence}}'s sole {{qualifying-permanent-resident}} dies, is hospitalized or otherwise absent for a long time, or their marriage is dissolved, an occupant 18 or older who lived with them may stay without one only with the {{board}}'s permission, given in its sole and absolute discretion, and only if the community stays at 80 percent.",
+      "statement": "When a {{residence}}'s sole {{qualifying-permanent-resident}} dies, is hospitalized or otherwise absent for a long time, or their marriage is dissolved, an occupant 18 or older who lived with them may stay without one only with the {{board}}'s permission, given in its sole and absolute discretion, and only if the community stays at 80 percent and the occupancy, considering other factors the Board deems appropriate, wouldn't jeopardize the community's status as housing for older persons under the Act, now or in the future.",
       "citations": [
         {
           "provisionKey": "declaration:3.1(a)(i)",
@@ -54356,6 +55345,10 @@
               "numerator": 4,
               "denominator": 5
             }
+          },
+          {
+            "type": "text",
+            "text": "the occupancy, considering other factors the Board deems appropriate, wouldn't jeopardize the community's status as housing for older persons under the Act, at the time of the request or in the future"
           }
         ]
       },
@@ -56646,7 +57639,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -57037,6 +58030,54 @@
       "issues": []
     },
     {
+      "key": "declaration:3.3(a)#business-judgment",
+      "domain": "governance",
+      "title": "Business judgment in changing the Use Restrictions",
+      "statement": "The {{board}} must exercise business judgment and reasonableness on behalf of the Association and its {{members}} in changing the {{use-restrictions}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:3.3(a)",
+          "highlight": {
+            "start": 58,
+            "end": 168
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "community",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "board",
+      "beneficiary": "members",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Has the Board exercised business judgment and reasonableness on behalf of the Association and its Members in changing the Use Restrictions?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:3.3(a)/p2#petition-meeting",
       "domain": "governance",
       "title": "Call a disapproval meeting on petition",
@@ -57082,6 +58123,94 @@
       "issues": []
     },
     {
+      "key": "declaration:3.3(a)/p2#suspended-pending-meeting",
+      "domain": "governance",
+      "title": "A petition holds a Board change until the disapproval meeting",
+      "statement": "If a petition for a {{meeting}} to consider disapproving a {{board}} change to the {{use-restrictions}} is received before the change's effective date, the change doesn't take effect until after the meeting is held, and then only as the meeting's outcome allows.",
+      "citations": [
+        {
+          "provisionKey": "declaration:3.3(a)/p2",
+          "highlight": {
+            "start": 615,
+            "end": 718
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["meeting"],
+      "appliesTo": "vote",
+      "appliesWhen": {
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.subject"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "vote-subject.use-restrictions-amendment"
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.by"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "board"
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.disapproval-petition-received-on"]
+            },
+            "op": "<",
+            "right": {
+              "type": "ref",
+              "path": ["vote.effective-on"]
+            }
+          }
+        ]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "requirement",
+      "bearer": null,
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Did the Board's change take effect only after the meeting the petition called for was held, and only if that meeting didn't disapprove it?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:3.3(c)#distribute-copy",
       "domain": "governance",
       "title": "Send each Owner the changed Use Restrictions",
@@ -57117,6 +58246,83 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:3.3(c)#effective-date",
+      "domain": "governance",
+      "title": "A Use Restrictions change takes effect at least 30 days after distribution",
+      "statement": "A new or changed {{use-restrictions}} adopted under Section 3.3 takes effect no earlier than 30 days after the {{board}} sends a copy of it to the {{owner:plural}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:3.3(c)",
+          "highlight": {
+            "start": 151,
+            "end": 229
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["meeting"],
+      "appliesTo": "vote",
+      "appliesWhen": {
+        "type": "in",
+        "left": {
+          "type": "ref",
+          "path": ["vote.subject"]
+        },
+        "values": [
+          {
+            "type": "value",
+            "term": "vote-subject.use-restrictions-amendment"
+          },
+          {
+            "type": "value",
+            "term": "vote-subject.use-restrictions-adoption"
+          }
+        ]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "requirement",
+      "bearer": null,
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "deadline",
+        "act": {
+          "type": "ref",
+          "path": ["vote.effective-on"]
+        },
+        "anchor": {
+          "type": "ref",
+          "path": ["vote.distributed-on"]
+        },
+        "earliest": {
+          "value": 30,
+          "unit": "calendar-day",
+          "at": null
+        },
+        "latest": null,
+        "onMiss": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -57862,6 +59068,51 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "use-restrictions:a#authorization-conditions",
+      "domain": "use",
+      "title": "An authorized restricted activity follows the Board's rules and conditions",
+      "statement": "An activity (a) restricts that the {{board}} expressly authorized remains subject to the {{board-rules}} and to the conditions the Board imposes on the authorization.",
+      "citations": [
+        {
+          "provisionKey": "use-restrictions:a",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "requestTypes": ["violation"],
+      "appliesTo": "lot",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "owner",
+      "beneficiary": "organization",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Does each activity on the Unit that the Board authorized under Exhibit C (a) comply with the Board Rules and Regulations and with the conditions the Board imposed on the authorization?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -60556,6 +61807,54 @@
       "issues": []
     },
     {
+      "key": "declaration:4.2(a)/p2#delegation-in-writing",
+      "domain": "architectural",
+      "title": "A delegation of design review is in writing and names the responsibilities",
+      "statement": "A {{design-review-delegation}} by the {{declarant}} takes effect only in writing, and only if it specifies the delegated responsibilities.",
+      "citations": [
+        {
+          "provisionKey": "declaration:4.2(a)/p2",
+          "highlight": {
+            "start": 208,
+            "end": 293
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "design-review-delegation",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "requirement",
+      "bearer": null,
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Is the delegation in writing, and does it specify the delegated responsibilities?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:4.2(b)#drc-size",
       "domain": "architectural",
       "title": "The DRC has three to seven members",
@@ -60567,7 +61866,7 @@
           "region": null
         }
       ],
-      "requestTypes": [],
+      "requestTypes": ["compliance-period"],
       "appliesTo": "community",
       "appliesWhen": null,
       "scope": null,
@@ -60707,7 +62006,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -60821,7 +62120,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -60939,6 +62238,54 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:4.3(a)/p3#upd-permit-compliance",
+      "domain": "architectural",
+      "title": "The Design Guidelines comply with the UPD Permit",
+      "statement": "The {{residential-design-guidelines}} and every amendment to them must comply with the {{upd-permit}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:4.3(a)/p3",
+          "highlight": {
+            "start": 605,
+            "end": 720
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "community",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "requirement",
+      "bearer": null,
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Do the Residential Design Guidelines and every amendment to them comply with the UPD Permit?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -62513,7 +63860,7 @@
       "key": "declaration:4.5#variance",
       "domain": "architectural",
       "title": "Reviewer may grant variances from its guidelines",
-      "statement": "When unique circumstances such as topography, natural obstructions, hardship, or aesthetic or environmental considerations require, the {{committee}} may authorize a written variance from the {{residential-design-guidelines}}, but never one contrary to the {{declaration}}.",
+      "statement": "When unique circumstances such as topography, natural obstructions, hardship, or aesthetic or environmental considerations require, the {{committee}} may authorize a written variance from the {{residential-design-guidelines}}, but only in accordance with duly adopted rules and regulations, and never one contrary to the {{declaration}}.",
       "citations": [
         {
           "provisionKey": "declaration:4.5",
@@ -62529,17 +63876,26 @@
       "requestTypes": ["architectural-application"],
       "appliesTo": null,
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "from": "request",
-          "path": ["architectural-application.variance-requested"]
-        },
-        "op": "=",
-        "right": {
-          "type": "boolean",
-          "value": true
-        }
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "from": "request",
+              "path": ["architectural-application.variance-requested"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          },
+          {
+            "type": "text",
+            "text": "the variance is authorized in accordance with duly adopted rules and regulations"
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -62942,7 +64298,7 @@
       "key": "declaration:4.8/p4#declarant-enforcement",
       "domain": "enforcement",
       "title": "Declarant may enforce when the Association doesn't",
-      "statement": "While the {{declarant}}, an {{affiliate}} or a {{builder}} owns property in Exhibit \"A\" or \"B\", if in the Declarant's discretion the {{organization}} fails to enforce Article 4 in a reasonable time, the {{declarant}} may remove the violation, restore the property, and assess the cost against the violating {{owner}} as a Specific Assessment.",
+      "statement": "While the {{declarant}}, an {{affiliate}} or a {{builder}} owns property in Exhibit \"A\" or \"B\", if in the Declarant's discretion the {{organization}} fails to enforce Article 4 in a reasonable time, the {{declarant}} may remove the violation, restore the property, assess the cost against the violating {{owner}} as a Specific Assessment, and assert the Association's lien rights for it under Article 8.",
       "citations": [
         {
           "provisionKey": "declaration:4.8/p4",
@@ -63324,6 +64680,54 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:5.4/p2#premiums-assessed",
+      "domain": "financial",
+      "title": "Premiums for insurance the Association obtains for Owners are assessed",
+      "statement": "If the {{organization}} obtains insurance coverage on behalf of {{owner:plural}}, the premiums must be levied as a Neighborhood Assessment, when the coverage is provided to all {{lot:plural}} in the {{neighborhood}}, or otherwise as a Specific Assessment against the benefited Unit and its Owner.",
+      "citations": [
+        {
+          "provisionKey": "declaration:5.4/p2",
+          "highlight": {
+            "start": 353,
+            "end": 451
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Were premiums for insurance the Association obtained on behalf of Owners levied as a Neighborhood Assessment, if provided to all Units in the Neighborhood, or otherwise as a Specific Assessment against the benefited Unit and Owner?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -63731,6 +65135,62 @@
       "issues": []
     },
     {
+      "key": "declaration:6.3(c)/p2#voting-representative",
+      "domain": "governance",
+      "title": "A voting representative votes only as the Neighborhood Association provides",
+      "statement": "A voting representative may exercise the voting rights of {{members}} who are also subject to a {{neighborhood-association}} only if and to the extent that association's governing documents provide.",
+      "citations": [
+        {
+          "provisionKey": "declaration:6.3(c)/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "requestTypes": ["meeting"],
+      "appliesTo": "lot",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["lot.vote-cast-by-representative"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "requirement",
+      "bearer": null,
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Do the Neighborhood Association's governing documents provide for the voting representative to cast this Unit's vote as it was cast?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:8.8/p2#association-owned-no-vote",
       "domain": "governance",
       "title": "No vote for a Unit the Association owns after foreclosure",
@@ -63808,7 +65268,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -63884,7 +65344,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "in",
@@ -64096,6 +65556,124 @@
       "issues": []
     },
     {
+      "key": "declaration:6.4(a)/p3#admin-charge-reasonable",
+      "domain": "financial",
+      "title": "The administrative charge on Neighborhood services is reasonable",
+      "statement": "An administrative charge the {{board}} includes in the cost of a {{neighborhood}}'s higher level of service or special services, assessed as a Neighborhood Assessment, must be reasonable.",
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(a)/p3",
+          "highlight": {
+            "start": 728,
+            "end": 826
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["assessment.type"]
+        },
+        "op": "=",
+        "right": {
+          "type": "value",
+          "term": "assessment-type.neighborhood"
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "board",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Is any administrative charge included in the cost of the Neighborhood's requested or special services reasonable?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:6.4(a)/p3#admin-charge-uniform",
+      "domain": "financial",
+      "title": "The same administrative charge per Unit for the same service",
+      "statement": "An administrative charge on a {{neighborhood}}'s higher level of service or special services must apply at the same rate per {{lot}} to all Neighborhoods receiving the same service.",
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(a)/p3",
+          "highlight": {
+            "start": 910,
+            "end": 1026
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["assessment.type"]
+        },
+        "op": "=",
+        "right": {
+          "type": "value",
+          "term": "assessment-type.neighborhood"
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "board",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Does any administrative charge on the service apply at the same rate per Unit as in every other Neighborhood receiving the same service?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:6.4(b)#voting-group-limit",
       "domain": "governance",
       "title": "No more Voting Groups than Class A directors",
@@ -64107,7 +65685,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "community",
       "appliesWhen": null,
       "scope": null,
@@ -64162,7 +65740,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "community",
       "appliesWhen": null,
       "scope": null,
@@ -64346,7 +65924,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "community",
       "appliesWhen": {
         "type": "compare",
@@ -64403,7 +65981,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "community",
       "appliesWhen": {
         "type": "compare",
@@ -64886,6 +66464,61 @@
       "issues": []
     },
     {
+      "key": "declaration:7.2(c)#owner-planted-excluded",
+      "domain": "maintenance",
+      "title": "The Association needn't maintain owner-planted landscaping",
+      "statement": "The {{organization}} isn't required to maintain flowers, plants or other landscaping an {{owner}} or resident planted or installed, even where {{association-maintained-landscaping}} is located.",
+      "citations": [
+        {
+          "provisionKey": "declaration:7.2(c)",
+          "highlight": {
+            "start": 612,
+            "end": 761
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["compliance-period"],
+      "appliesTo": "planting",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["planting.in-association-landscaping"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "permission",
+      "bearer": "organization",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": ["declaration:7.2(c)#association-landscaping"],
+      "noExceptions": null,
+      "check": null,
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:7.2/p3#maintain-other-property",
       "domain": "maintenance",
       "title": "Maintaining property it doesn't own needs a Board determination",
@@ -65036,7 +66669,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -65113,7 +66746,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -65189,7 +66822,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -67316,7 +68949,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -68665,7 +70298,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -69609,7 +71242,7 @@
       "bearer": "owner",
       "beneficiary": null,
       "decidedBy": null,
-      "overrides": ["declaration:8.6/p2#due-date"],
+      "overrides": ["declaration:8.6/p2#due-date", "declaration:8.7(a)#grantee-liability"],
       "noExceptions": null,
       "check": null,
       "remedy": null,
@@ -71328,6 +72961,54 @@
       "issues": []
     },
     {
+      "key": "declaration:7.3(b)/p2#deductible-allocation",
+      "domain": "financial",
+      "title": "An insured loss's deductible is charged like the premiums",
+      "statement": "On an insured loss, the deductible must be treated as a Common Expense or a Neighborhood Expense in the same manner as the premiums for that coverage, unless the {{board}} assesses it against a negligent {{owner}} as a Specific Assessment.",
+      "citations": [
+        {
+          "provisionKey": "declaration:7.3(b)/p2",
+          "highlight": {
+            "start": 216,
+            "end": 326
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Was the deductible on any insured loss charged as a Common Expense or Neighborhood Expense in the same manner as the premiums for that coverage, apart from a deductible the Board assessed against a negligent Owner as a Specific Assessment?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:7.3(b)(ii)#common-area-beneficiaries",
       "domain": "governance",
       "title": "Common Area policies benefit the Association and its Members",
@@ -71754,6 +73435,65 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:7.3(c)/p2#no-mortgagee-participation",
+      "domain": "governance",
+      "title": "Mortgagees take no part in deciding whether to restore",
+      "statement": "No {{mortgagee}} may take part in deciding whether damaged or destroyed {{common-area}} improvements are repaired or reconstructed.",
+      "citations": [
+        {
+          "provisionKey": "declaration:7.3(c)/p2",
+          "highlight": {
+            "start": 244,
+            "end": 313
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["meeting"],
+      "appliesTo": "vote",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["vote.subject"]
+        },
+        "op": "=",
+        "right": {
+          "type": "value",
+          "term": "vote-subject.not-restore-damage"
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "requirement",
+      "bearer": null,
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Did no Mortgagee, as such, take part in deciding whether to repair or reconstruct the damaged Common Area improvements?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -72944,6 +74684,54 @@
       "issues": []
     },
     {
+      "key": "declaration:7.8/p2#required-services",
+      "domain": "governance",
+      "title": "The Board can't cancel services the Governing Documents require",
+      "statement": "The {{board}} may modify or cancel existing contracts for services only as the contract terms allow, and must not modify or cancel services the {{governing-documents}} require.",
+      "citations": [
+        {
+          "provisionKey": "declaration:7.8/p2",
+          "highlight": {
+            "start": 187,
+            "end": 338
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "community",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "board",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Has the Board kept every service the Governing Documents require, modifying or cancelling service contracts only as their terms allow?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:7.12(a)#association-upd-permit",
       "domain": "use",
       "title": "Association complies with the UPD Permit and King County law",
@@ -73077,6 +74865,102 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:7.12(b)#common-expense",
+      "domain": "financial",
+      "title": "UPD Permit program costs are a Common Expense",
+      "statement": "The cost of the {{upd-permit}} conservation, education and other programs must be a Common Expense, though certain costs may be shared with other owners and occupants within or near Trilogy at Redmond Ridge under a {{covenant-to-share-costs}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:7.12(b)",
+          "highlight": {
+            "start": 467,
+            "end": 520
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Were the costs of the UPD Permit programs and requirements charged as a Common Expense, apart from costs shared under a Covenant to Share Costs?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:7.13/p2#common-expense",
+      "domain": "financial",
+      "title": "Tax-exempt organization expenses are a Common Expense",
+      "statement": "The Association's expenses for, and contributions to, a {{tax-exempt-organization}} established for activities within Trilogy at Redmond Ridge must be a Common Expense, though the {{organization}} may share them with other property owners under a {{covenant-to-share-costs}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:7.13/p2",
+          "highlight": {
+            "start": 278,
+            "end": 344
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Were the Association's expenses for and contributions to tax-exempt organizations under Section 7.13 charged as a Common Expense, apart from expenses shared under a Covenant to Share Costs?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -73708,6 +75592,118 @@
       "issues": []
     },
     {
+      "key": "declaration:8.6/p1#commencement",
+      "domain": "financial",
+      "title": "Assessments start when the first levy or submission comes, whichever is later",
+      "statement": "The obligation to pay assessments on a {{lot}} starts in the later of the month the {{board}} first determines a budget and levies assessments and the month the Unit is submitted to the {{declaration}}; the {{organization}} must not charge a Unit for any earlier period.",
+      "citations": [
+        {
+          "provisionKey": "declaration:8.6/p1",
+          "highlight": {
+            "start": 0,
+            "end": 92
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Does the assessment charge the Unit only for the period from the month its assessment obligation commenced, the later of the month the Board first determined a budget and levied assessments and the month the Unit was submitted to the Declaration?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:8.6/p1#first-year-proration",
+      "domain": "financial",
+      "title": "The first annual assessment is prorated by months remaining",
+      "statement": "The first annual Base Assessment and any Neighborhood Assessment levied on a {{lot}} must be adjusted according to the number of months remaining in the fiscal year when assessments commence on it.",
+      "citations": [
+        {
+          "provisionKey": "declaration:8.6/p1",
+          "highlight": {
+            "start": 245,
+            "end": 352
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": {
+        "type": "in",
+        "left": {
+          "type": "ref",
+          "path": ["assessment.type"]
+        },
+        "values": [
+          {
+            "type": "value",
+            "term": "assessment-type.base"
+          },
+          {
+            "type": "value",
+            "term": "assessment-type.neighborhood"
+          }
+        ]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "If this is the Unit's first annual Base or Neighborhood Assessment, was it adjusted according to the number of months remaining in the fiscal year when assessments commenced on the Unit?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:8.6/p2#acceleration",
       "domain": "financial",
       "title": "All assessments due at once on delinquency",
@@ -73747,6 +75743,65 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:8.6/p2#advance-payment-at-closing",
+      "domain": "financial",
+      "title": "Assessments paid in advance at closing when the Board requires",
+      "statement": "When the {{board}} requires advance payment of assessments at closing of the transfer of title to a {{lot}}, they must be paid at the closing.",
+      "citations": [
+        {
+          "provisionKey": "declaration:8.6/p2",
+          "highlight": {
+            "start": 87,
+            "end": 185
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["title-transfer"],
+      "appliesTo": "title-transfer",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["title-transfer.advance-payment-required"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "owner",
+      "beneficiary": "organization",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Were the assessments the Board required paid in advance paid at the closing of the transfer?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -73948,6 +76003,79 @@
       "issues": []
     },
     {
+      "key": "declaration:8.7(a)#grantee-liability",
+      "domain": "financial",
+      "title": "A grantee is liable for assessments due at the transfer",
+      "statement": "On a transfer of title to a {{lot}}, the grantee is jointly and severally liable for any assessments and other charges due at the time of conveyance.",
+      "citations": [
+        {
+          "provisionKey": "declaration:8.7(a)",
+          "highlight": {
+            "start": 552,
+            "end": 637
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["assessment.due-on"]
+        },
+        "op": "<=",
+        "right": {
+          "type": "ref",
+          "from": "lot",
+          "path": ["lot.owner-took-title-on"]
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "owner",
+      "beneficiary": "organization",
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "deadline",
+        "act": {
+          "type": "ref",
+          "path": ["assessment.paid-on"]
+        },
+        "anchor": {
+          "type": "ref",
+          "path": ["assessment.due-on"]
+        },
+        "earliest": null,
+        "latest": {
+          "value": 0,
+          "unit": "calendar-day",
+          "at": null
+        },
+        "onMiss": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:8.7(a)/p2#keep-paying",
       "domain": "financial",
       "title": "Owners keep paying when the Board fails to fix assessments",
@@ -74106,6 +76234,65 @@
       "issues": []
     },
     {
+      "key": "declaration:8.7(a)/p4#conclusive-evidence",
+      "domain": "financial",
+      "title": "A payment certificate is conclusive evidence of payment",
+      "statement": "An assessment a certificate from the {{organization}} states has been paid is conclusively paid; it can't be collected from the {{owner}} as unpaid.",
+      "citations": [
+        {
+          "provisionKey": "declaration:8.7(a)/p4",
+          "highlight": {
+            "start": 210,
+            "end": 267
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["assessment.certified-paid"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "permission",
+      "bearer": "owner",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [
+        "declaration:8.6/p2#due-date",
+        "declaration:8.7(a)#grantee-liability",
+        "declaration:article-18#transferor-liability"
+      ],
+      "noExceptions": null,
+      "check": null,
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:8.8/p1#lien",
       "domain": "financial",
       "title": "Lien for delinquent assessments",
@@ -74251,6 +76438,54 @@
       "issues": []
     },
     {
+      "key": "declaration:8.8/p2#pro-rata-share",
+      "domain": "financial",
+      "title": "Other Units share a foreclosed Unit's assessment",
+      "statement": "While the {{organization}} owns a {{lot}} after foreclosure, each other Unit must be charged, besides its usual assessment, its pro rata share of the assessment the Association-owned Unit would have been charged.",
+      "citations": [
+        {
+          "provisionKey": "declaration:8.8/p2",
+          "highlight": {
+            "start": 282,
+            "end": 375
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "If the Association owned any Unit after foreclosure during the period, does this assessment add the Unit's pro rata share of the assessment that would have been charged on the Association-owned Unit?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:8.12#facilities-condition",
       "domain": "financial",
       "title": "Recreational facilities conditioned on paying fees",
@@ -74353,6 +76588,294 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:8.8/p3#reallocated-common-expense",
+      "domain": "financial",
+      "title": "Assessments extinguished by foreclosure become Common Expenses",
+      "statement": "Assessments on a {{lot}} that the foreclosure of its first Mortgage extinguished must be treated as Common Expenses collectible from the {{owner:plural}} of all Units subject to assessment, including the acquirer.",
+      "citations": [
+        {
+          "provisionKey": "declaration:8.8/p3",
+          "highlight": {
+            "start": 476,
+            "end": 574
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Were assessments the foreclosure of a first Mortgage extinguished treated as Common Expenses collectible from the Owners of all Units subject to assessment, including the acquirer?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:8.10#not-advance-payment",
+      "domain": "financial",
+      "title": "The working capital contribution isn't an advance on assessments",
+      "statement": "A working capital contribution under Section 8.10 doesn't count as an advance payment of any {{assessment}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:8.10",
+          "highlight": {
+            "start": 637,
+            "end": 701
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": {
+        "type": "in",
+        "left": {
+          "type": "ref",
+          "path": ["assessment.type"]
+        },
+        "values": [
+          {
+            "type": "value",
+            "term": "assessment-type.base"
+          },
+          {
+            "type": "value",
+            "term": "assessment-type.neighborhood"
+          },
+          {
+            "type": "value",
+            "term": "assessment-type.special"
+          },
+          {
+            "type": "value",
+            "term": "assessment-type.specific"
+          }
+        ]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "requirement",
+      "bearer": null,
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Was no working capital contribution paid under Section 8.10 counted as an advance payment of this assessment?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:8.10#nonrefundable",
+      "domain": "financial",
+      "title": "No refund of the working capital contribution",
+      "statement": "No one may claim a refund of a working capital contribution paid under Section 8.10.",
+      "citations": [
+        {
+          "provisionKey": "declaration:8.10",
+          "highlight": {
+            "start": 571,
+            "end": 632
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["dispute"],
+      "appliesTo": "claim",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "claimant",
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Does the Claim seek no refund of a working capital contribution paid under Section 8.10?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:8.11#not-advance-payment",
+      "domain": "financial",
+      "title": "The reserve contribution isn't an advance on assessments",
+      "statement": "A reserve contribution under Section 8.11 doesn't count as an advance payment of any other {{assessment}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:8.11",
+          "highlight": {
+            "start": 560,
+            "end": 630
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": {
+        "type": "in",
+        "left": {
+          "type": "ref",
+          "path": ["assessment.type"]
+        },
+        "values": [
+          {
+            "type": "value",
+            "term": "assessment-type.base"
+          },
+          {
+            "type": "value",
+            "term": "assessment-type.neighborhood"
+          },
+          {
+            "type": "value",
+            "term": "assessment-type.special"
+          },
+          {
+            "type": "value",
+            "term": "assessment-type.specific"
+          }
+        ]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "requirement",
+      "bearer": null,
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Was no reserve contribution paid under Section 8.11 counted as an advance payment of this assessment?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:8.11#nonrefundable",
+      "domain": "financial",
+      "title": "No refund of the reserve contribution",
+      "statement": "No one may claim a refund of a reserve contribution paid under Section 8.11.",
+      "citations": [
+        {
+          "provisionKey": "declaration:8.11",
+          "highlight": {
+            "start": 494,
+            "end": 555
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["dispute"],
+      "appliesTo": "claim",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "claimant",
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Does the Claim seek no refund of a reserve contribution paid under Section 8.11?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -74821,7 +77344,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -74879,7 +77402,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -74965,7 +77488,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -75825,6 +78348,65 @@
       "issues": []
     },
     {
+      "key": "declaration:10.3#no-fees",
+      "domain": "financial",
+      "title": "No fees for the Declarant's use of sales facilities",
+      "statement": "The {{organization}} must not charge the {{declarant}}, its {{affiliate:plural}} or {{authorized-builder:plural}} fees or rental charges for access to and use of the sales, management and construction facilities, the clubhouse and the recreational facilities that 10.3 lets them maintain and use.",
+      "citations": [
+        {
+          "provisionKey": "declaration:10.3",
+          "highlight": {
+            "start": 1268,
+            "end": 1314
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["assessment.type"]
+        },
+        "op": "=",
+        "right": {
+          "type": "value",
+          "term": "assessment-type.use-fee"
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "declarant",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Is the fee free of any charge to the Declarant, an Affiliate or an authorized Builder for access to and use of the facilities Section 10.3 lets them maintain and use?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:10.4#upd-permitted-uses",
       "domain": "use",
       "title": "Declarant's development work on Common Area fits its permitted uses",
@@ -76024,7 +78606,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -76107,6 +78689,198 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:10.7/p1#reasonable-fee",
+      "domain": "financial",
+      "title": "Community Systems and Services user fees are reasonable",
+      "statement": "A fee the {{declarant}}, or anyone it permits to provide Community Systems and Services, charges individual users for them must be reasonable.",
+      "citations": [
+        {
+          "provisionKey": "declaration:10.7/p1",
+          "highlight": {
+            "start": 1039,
+            "end": 1082
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "community",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "declarant",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Are the fees charged to individual users of Community Systems and Services reasonable?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:10.7/p1#maximum-charge",
+      "domain": "financial",
+      "title": "Community Systems and Services user fees within the legal maximum",
+      "statement": "A fee charged to individual users of Community Systems and Services must not exceed the maximum allowable charge for the service, where the laws, rules and regulations of the relevant government authority define one.",
+      "citations": [
+        {
+          "provisionKey": "declaration:10.7/p1",
+          "highlight": {
+            "start": 1083,
+            "end": 1142
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "community",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "declarant",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Are the fees charged to individual users of Community Systems and Services within any maximum allowable charge the relevant government authority defines?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:10.7/p2#requester-pays",
+      "domain": "financial",
+      "title": "Owners pay the provider for services they request",
+      "statement": "If particular services or benefits are provided to particular {{owner:plural}} or {{lot:plural}} at their request, the benefited Owners must pay the service provider directly, unless the {{organization}} assesses the costs as a Specific Assessment.",
+      "citations": [
+        {
+          "provisionKey": "declaration:10.7/p2",
+          "highlight": {
+            "start": 458,
+            "end": 538
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "lot",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "owner",
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Has the Owner paid the service provider directly for services or benefits provided at the Owner's request, unless the Association assessed their cost as a Specific Assessment?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:10.7/p2#bona-fide-contracts",
+      "domain": "governance",
+      "title": "Declarant contracts with service providers are bona fide",
+      "statement": "Any contract or agreement between the {{declarant}} or an {{affiliate}} and a provider of Community Systems and Services must be bona fide and commercially reasonable.",
+      "citations": [
+        {
+          "provisionKey": "declaration:10.7/p2",
+          "highlight": {
+            "start": 936,
+            "end": 982
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "community",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "declarant",
+      "beneficiary": "organization",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Is every contract or agreement between the Declarant or an Affiliate and a provider of Community Systems and Services bona fide and commercially reasonable?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -76654,6 +79428,51 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:10.12#applicable-law",
+      "domain": "governance",
+      "title": "The Declarant complies with law in exercising its Article 10 rights",
+      "statement": "In exercising its rights under Article 10, the {{declarant}} must comply with all applicable laws, including obtaining any franchise, special use or permit approval needed.",
+      "citations": [
+        {
+          "provisionKey": "declaration:10.12",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "community",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "declarant",
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Did the Declarant comply with applicable law in exercising its Article 10 rights, including obtaining any franchise, special use or permit approval needed?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -78379,7 +81198,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["violation"],
+      "requestTypes": [],
       "appliesTo": "shared-work",
       "appliesWhen": {
         "type": "compare",
@@ -78743,6 +81562,51 @@
       "issues": []
     },
     {
+      "key": "declaration:11.9#applicable-law",
+      "domain": "governance",
+      "title": "Easement holders comply with law and obtain permits",
+      "statement": "Exercising a right under an {{easement}} Article 11 grants or reserves must comply with all applicable law, including obtaining any franchise, authorization, building permit or other permit approval from a {{governmental-entity}} with an ownership interest in, or jurisdiction over, the affected property.",
+      "citations": [
+        {
+          "provisionKey": "declaration:11.9",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "easement",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "person",
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Did the exercise of the easement comply with applicable law, including obtaining any franchise, authorization, building permit or other permit approval needed from a governmental entity with an interest in or jurisdiction over the affected property?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:12.1#cost-allocation",
       "domain": "financial",
       "title": "Limited Common Area costs charged only to the Units it's assigned to",
@@ -78814,6 +81678,105 @@
       "issues": []
     },
     {
+      "key": "declaration:12.2/p1#declarant-reassignment",
+      "domain": "governance",
+      "title": "The Declarant may later assign Limited Common Area to more Units",
+      "statement": "While the {{declarant}} or an {{affiliate}} owns property described in Exhibit \"A\" or \"B\", the Declarant may later assign use of a {{limited-common-area}} to additional {{lot:plural}} or {{neighborhood:plural}} without the {{board}}'s approval or a vote of the {{members}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:12.2/p1",
+          "highlight": {
+            "start": 176,
+            "end": 281
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "vote",
+      "appliesWhen": {
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.subject"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "vote-subject.limited-common-area-assignment"
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.by"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "declarant"
+            }
+          },
+          {
+            "type": "some",
+            "where": null,
+            "test": {
+              "type": "in",
+              "left": {
+                "type": "ref",
+                "path": []
+              },
+              "values": [
+                {
+                  "type": "value",
+                  "term": "declarant"
+                },
+                {
+                  "type": "value",
+                  "term": "affiliate"
+                }
+              ]
+            },
+            "from": "community",
+            "path": ["community.exhibit-property-owned-by"]
+          }
+        ]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "permission",
+      "bearer": "declarant",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [
+        "declaration:12.2/p2#board-approval",
+        "declaration:12.2/p2#member-vote",
+        "declaration:12.2/p2#neighborhood-vote"
+      ],
+      "noExceptions": null,
+      "check": null,
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:12.2/p2#board-approval",
       "domain": "governance",
       "title": "Assigning Limited Common Area needs the Board's approval",
@@ -78825,7 +81788,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -79036,7 +81999,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -79101,6 +82064,58 @@
       "issues": []
     },
     {
+      "key": "declaration:12.3#fee-use",
+      "domain": "financial",
+      "title": "Limited Common Area user fees offset its expenses",
+      "statement": "User fees the {{organization}} collects from {{owner:plural}} of other {{lot:plural}} for using a {{limited-common-area}} must be used to offset the expenses attributable to that Limited Common Area.",
+      "citations": [
+        {
+          "provisionKey": "declaration:12.3",
+          "highlight": {
+            "start": 230,
+            "end": 318
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["compliance-period"],
+      "appliesTo": "limited-common-area",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Were the user fees collected for this Limited Common Area used to offset the expenses attributable to it?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": {
+        "type": "ref",
+        "from": "community",
+        "path": ["community.fiscal-year-start"]
+      },
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:13.2/p1#equal-share",
       "domain": "maintenance",
       "title": "Owners sharing a party structure share repair costs equally",
@@ -79117,7 +82132,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["violation"],
+      "requestTypes": [],
       "appliesTo": "shared-work",
       "appliesWhen": {
         "type": "compare",
@@ -79197,7 +82212,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["violation"],
+      "requestTypes": [],
       "appliesTo": "shared-work",
       "appliesWhen": {
         "type": "compare",
@@ -79934,6 +82949,58 @@
       "cure": null
     },
     {
+      "key": "declaration:14.4(b)(iii)#waiver-nonparticipation",
+      "domain": "enforcement",
+      "title": "Take part in mediation in good faith, or the Claim is waived",
+      "statement": "A {{claimant}} who submits a {{claim}} to mediation must appear for and participate in good faith in the mediation, or is deemed to have waived the Claim, and the {{respondent}} is released from liability to the Claimant on it.",
+      "citations": [
+        {
+          "provisionKey": "declaration:14.4(b)(iii)",
+          "highlight": {
+            "start": 69,
+            "end": 138
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["dispute"],
+      "appliesTo": "claim",
+      "appliesWhen": {
+        "type": "exists",
+        "from": "request",
+        "path": ["dispute.mediation-submitted-on"]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "claimant",
+      "beneficiary": "respondent",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Did the Claimant appear for and participate in good faith in the mediation?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:14.4(b)(v)#own-costs",
       "domain": "enforcement",
       "title": "Each Party bears its own negotiation and mediation costs",
@@ -80225,6 +83292,65 @@
       "issues": []
     },
     {
+      "key": "declaration:15.4#amenity-parking-limits",
+      "domain": "use",
+      "title": "Private Amenity parking only around its events, when its own parking is short",
+      "statement": "Members, guests and invitees of a {{private-amenity}} may park on the community's roads only at reasonable times before, during and after tournaments and other member or public functions held by or at it, only to the extent its own parking is insufficient for their vehicles, and subject to applicable parking restriction laws.",
+      "citations": [
+        {
+          "provisionKey": "declaration:15.4",
+          "highlight": {
+            "start": 693,
+            "end": 815
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "parking",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["parking.private-amenity-right"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "person",
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Was the vehicle parked at a reasonable time before, during or after a tournament or other member or public function at the Private Amenity, while its own parking was insufficient, and within applicable parking restriction laws?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:15.5#amenity-owner-approval",
       "domain": "governance",
       "title": "Amendments affecting a Private Amenity need its owner's approval",
@@ -80236,7 +83362,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -80311,7 +83437,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -80380,7 +83506,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -80438,7 +83564,7 @@
           "region": null
         }
       ],
-      "requestTypes": [],
+      "requestTypes": ["compliance-period"],
       "appliesTo": "private-amenity",
       "appliesWhen": null,
       "scope": null,
@@ -80847,7 +83973,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -80998,8 +84124,8 @@
     {
       "key": "declaration:16.4#deemed-approval",
       "domain": "governance",
-      "title": "A Mortgagee that doesn't respond within 30 days approves",
-      "statement": "A {{mortgagee}} sent a written request by certified or registered mail must respond within 30 days of the request, or it is deemed to have approved the action.",
+      "title": "A Mortgagee's silence for 30 days is approval",
+      "statement": "A {{mortgagee}} the {{board}} asks in writing, by certified or registered mail with return receipt requested, to respond to or consent to an action is deemed to have approved it unless the Association receives its written response within 30 days of the request.",
       "citations": [
         {
           "provisionKey": "declaration:16.4",
@@ -81007,7 +84133,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "mortgagee-consent-request",
       "appliesWhen": {
         "type": "compare",
@@ -81025,9 +84151,9 @@
       "authority": null,
       "effectiveFrom": "2001-12-04",
       "kind": "norm",
-      "modality": "obligation",
-      "bearer": "mortgagee",
-      "beneficiary": "organization",
+      "modality": "requirement",
+      "bearer": null,
+      "beneficiary": null,
       "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
@@ -81090,7 +84216,7 @@
           "region": null
         }
       ],
-      "requestTypes": [],
+      "requestTypes": ["dispute"],
       "appliesTo": "community",
       "appliesWhen": null,
       "scope": null,
@@ -81138,7 +84264,7 @@
           "region": null
         }
       ],
-      "requestTypes": [],
+      "requestTypes": ["dispute"],
       "appliesTo": "master-plan",
       "appliesWhen": null,
       "scope": null,
@@ -81932,6 +85058,97 @@
       "issues": []
     },
     {
+      "key": "declaration:article-18#transferor-liability",
+      "domain": "financial",
+      "title": "A transferor stays liable until the Board receives the transfer notice",
+      "statement": "After a transfer of title, the {{transferor}} remains jointly and severally responsible with the transferee for all obligations of the {{owner}} of the {{lot}}, assessments included, until the date the {{board}} receives the {{transfer-notice}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:article-18",
+          "highlight": {
+            "start": 517,
+            "end": 606
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": {
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["assessment.due-on"]
+            },
+            "op": ">=",
+            "right": {
+              "type": "ref",
+              "from": "lot",
+              "path": ["lot.owner-took-title-on"]
+            }
+          },
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["assessment.due-on"]
+            },
+            "op": "<",
+            "right": {
+              "type": "ref",
+              "from": "lot",
+              "path": ["lot.transfer-notice-received-on"]
+            }
+          }
+        ]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "transferor",
+      "beneficiary": "organization",
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "deadline",
+        "act": {
+          "type": "ref",
+          "path": ["assessment.paid-on"]
+        },
+        "anchor": {
+          "type": "ref",
+          "path": ["assessment.due-on"]
+        },
+        "earliest": null,
+        "latest": {
+          "value": 0,
+          "unit": "calendar-day",
+          "at": null
+        },
+        "onMiss": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:19.1/p1#conveyance-vote",
       "domain": "governance",
       "title": "Conveying Common Area under threat of condemnation needs 67 percent",
@@ -81943,7 +85160,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -82020,7 +85237,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -82244,7 +85461,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -82714,6 +85931,80 @@
       "issues": []
     },
     {
+      "key": "declaration:19.3/p2#government-transfer",
+      "domain": "governance",
+      "title": "Common Area may go to a government without an Owner vote",
+      "statement": "The {{organization}} may transfer, dedicate or grant easements over portions of the {{common-area}} to {{king-county}} or another {{governmental-entity}} without a vote of the {{owner:plural}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:19.3/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "vote",
+      "appliesWhen": {
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["vote.subject"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "vote-subject.condemnation-conveyance"
+            }
+          },
+          {
+            "type": "in",
+            "left": {
+              "type": "ref",
+              "path": ["vote.conveyed-to"]
+            },
+            "values": [
+              {
+                "type": "value",
+                "term": "king-county"
+              },
+              {
+                "type": "value",
+                "term": "governmental-entity"
+              }
+            ]
+          }
+        ]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "permission",
+      "bearer": "organization",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": ["declaration:19.1/p1#conveyance-vote"],
+      "noExceptions": null,
+      "check": null,
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "declaration:20.1/p1#any-purpose-before-first-sale",
       "domain": "governance",
       "title": "Declarant may amend for any purpose before the first sale",
@@ -82725,7 +86016,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -82812,7 +86103,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -82911,7 +86202,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -83039,7 +86330,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -83169,7 +86460,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -83266,7 +86557,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -83576,7 +86867,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -83738,7 +87029,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -83813,7 +87104,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -83888,7 +87179,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -84201,7 +87492,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "all",
@@ -84292,7 +87583,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -84374,7 +87665,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -84451,7 +87742,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["meeting"],
+      "requestTypes": [],
       "appliesTo": "vote",
       "appliesWhen": {
         "type": "compare",
@@ -84618,10 +87909,58 @@
       "issues": []
     },
     {
+      "key": "guidelines:3.1.2#prohibited-not-approvable",
+      "domain": "architectural",
+      "title": "A PROHIBITED guideline can't be approved away",
+      "statement": "The {{committee}} must not approve {{work}} that deviates from a guideline noted PROHIBITED; such a condition may not be violated.",
+      "citations": [
+        {
+          "provisionKey": "guidelines:3.1.2",
+          "highlight": {
+            "start": 398,
+            "end": 521
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["architectural-application"],
+      "appliesTo": "work",
+      "appliesWhen": null,
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2025-11-12",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "committee",
+      "beneficiary": "owner",
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Does the approval allow no deviation from a guideline noted PROHIBITED?",
+        "evidence": []
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "guidelines:3.1.3#consult-neighbors",
       "domain": "architectural",
       "title": "Consult the neighbors the work may affect",
-      "statement": "An {{owner}} should consult any {{neighbor}} who may be affected by the {{work}} they intend to perform; the {{committee}} may require the change to be disclosed to them.",
+      "statement": "An {{owner}} should consult any {{neighbor}} who may be affected by the {{work}} they intend to perform.",
       "citations": [
         {
           "provisionKey": "guidelines:3.1.3",
@@ -84663,6 +88002,75 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "guidelines:3.1.3#disclose-to-neighbors",
+      "domain": "architectural",
+      "title": "Disclose the change to neighbors when the Reviewer requires",
+      "statement": "When the {{committee}} requires it, the proposed change must be disclosed to the affected {{neighbor:plural}}.",
+      "citations": [
+        {
+          "provisionKey": "guidelines:3.1.3",
+          "highlight": {
+            "start": 107,
+            "end": 213
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["architectural-application"],
+      "appliesTo": "architectural-application",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["architectural-application.neighbor-disclosure-required"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2025-11-12",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "owner",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "compare",
+          "left": {
+            "type": "ref",
+            "path": ["architectural-application.disclosed-to-neighbors"]
+          },
+          "op": "=",
+          "right": {
+            "type": "boolean",
+            "value": true
+          }
+        }
+      },
+      "remedy": "change-detail",
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -85472,7 +88880,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "lot",
       "appliesWhen": null,
       "scope": null,
@@ -85739,7 +89147,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "lot",
       "appliesWhen": null,
       "scope": null,
@@ -86476,7 +89884,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "fence-run",
       "appliesWhen": {
         "type": "compare",
@@ -86547,7 +89955,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "fence-run",
       "appliesWhen": {
         "type": "compare",
@@ -86613,7 +90021,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "fence-run",
       "appliesWhen": {
         "type": "compare",
@@ -87492,7 +90900,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "fence-run",
       "appliesWhen": {
         "type": "all",
@@ -88102,7 +91510,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "fence-run",
       "appliesWhen": {
         "type": "all",
@@ -90113,7 +93521,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "fence-run",
       "appliesWhen": {
         "type": "compare",
@@ -90747,7 +94155,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "fence-run",
       "appliesWhen": {
         "type": "compare",
@@ -90870,7 +94278,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "fence-run",
       "appliesWhen": {
         "type": "in",
@@ -90942,7 +94350,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "fence-run",
       "appliesWhen": {
         "type": "in",
@@ -90991,7 +94399,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "fence-run",
       "appliesWhen": {
         "type": "compare",
@@ -92093,7 +95501,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "gate",
       "appliesWhen": {
         "type": "all",
@@ -92630,7 +96038,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "screen",
       "appliesWhen": null,
       "scope": null,
@@ -92896,7 +96304,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "utility-screen",
       "appliesWhen": null,
       "scope": null,
@@ -93651,7 +97059,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "detached-structure",
       "appliesWhen": null,
       "scope": null,
@@ -93743,7 +97151,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "detached-structure",
       "appliesWhen": null,
       "scope": null,
@@ -93798,7 +97206,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "detached-structure",
       "appliesWhen": null,
       "scope": null,
@@ -93884,6 +97292,53 @@
         "note": null
       },
       "issues": []
+    },
+    {
+      "key": "guidelines:7.13.4#screening-considered",
+      "domain": "architectural",
+      "title": "Screened walls on structures considered",
+      "statement": "The {{committee}} considers case by case a {{detached-structure}} whose walls are enclosed with screening.",
+      "citations": [
+        {
+          "provisionKey": "guidelines:7.13.4",
+          "highlight": {
+            "start": 55,
+            "end": 92
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["architectural-application"],
+      "appliesTo": "detached-structure",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["detached-structure.screened-walls"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2025-11-12",
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "discretion",
+      "decidedBy": "committee",
+      "overrides": ["guidelines:7.13.4#no-solid-walls"]
     },
     {
       "key": "guidelines:7.14.1#max-coverage",
@@ -94043,7 +97498,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "deck",
       "appliesWhen": {
         "type": "compare",
@@ -94110,7 +97565,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "deck",
       "appliesWhen": {
         "type": "compare",
@@ -94244,7 +97699,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "patio-cover",
       "appliesWhen": null,
       "scope": null,
@@ -94466,7 +97921,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "patio",
       "appliesWhen": null,
       "scope": null,
@@ -94534,7 +97989,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "deck",
       "appliesWhen": null,
       "scope": null,
@@ -94594,7 +98049,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "deck",
       "appliesWhen": null,
       "scope": null,
@@ -94694,10 +98149,57 @@
       "issues": []
     },
     {
+      "key": "guidelines:7.14.6#screening-considered",
+      "domain": "architectural",
+      "title": "Screened walls on patio and deck enclosures considered",
+      "statement": "The {{committee}} considers case by case a {{patio-enclosure}} whose walls are enclosed with screening.",
+      "citations": [
+        {
+          "provisionKey": "guidelines:7.14.6",
+          "highlight": {
+            "start": 71,
+            "end": 108
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["architectural-application"],
+      "appliesTo": "patio-enclosure",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["patio-enclosure.screened-walls"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2025-11-12",
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "discretion",
+      "decidedBy": "committee",
+      "overrides": ["guidelines:7.14.6#no-solid-walls"]
+    },
+    {
       "key": "guidelines:7.14.7#screen-underside",
       "domain": "architectural",
       "title": "Screen under decks more than 6 feet up",
-      "statement": "The open area under a {{deck}} more than 6 feet above the ground should be screened with landscaping or lattice; the {{committee}} may require more to reduce the lattice's visual impact.",
+      "statement": "The open area under a {{deck}} more than 6 feet above the ground should be screened with landscaping or lattice.",
       "citations": [
         {
           "provisionKey": "guidelines:7.14.7",
@@ -94705,7 +98207,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "deck",
       "appliesWhen": {
         "type": "compare",
@@ -94838,6 +98340,86 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "guidelines:7.14.7#additional-provisions",
+      "domain": "architectural",
+      "title": "Additional screening provisions the Reviewer requires",
+      "statement": "When the {{committee}} requires additional provisions to reduce the visual impact of a {{deck}}'s lattice screening, the deck must include them.",
+      "citations": [
+        {
+          "provisionKey": "guidelines:7.14.7",
+          "highlight": {
+            "start": 198,
+            "end": 303
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["architectural-application", "violation"],
+      "appliesTo": "deck",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["deck.additional-screening-required"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2025-11-12",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "owner",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "compare",
+          "left": {
+            "type": "ref",
+            "path": ["deck.additional-screening-provided"]
+          },
+          "op": "=",
+          "right": {
+            "type": "boolean",
+            "value": true
+          }
+        }
+      },
+      "remedy": "change-detail",
+      "recurs": null,
+      "cure": {
+        "value": 0,
+        "unit": "calendar-day",
+        "after": {
+          "from": "request",
+          "path": ["violation.cure-by"]
+        },
+        "curedBy": {
+          "from": "request",
+          "path": ["violation.cured-on"]
+        }
+      },
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -95346,7 +98928,7 @@
           "region": null
         }
       ],
-      "requestTypes": ["architectural-application", "violation"],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "railing",
       "appliesWhen": {
         "type": "all",
@@ -95516,6 +99098,254 @@
       "issues": []
     },
     {
+      "key": "guidelines:exhibit-k#tall-solid-height",
+      "domain": "architectural",
+      "title": "Tall solid wood fences 5 feet 2 inches to 6 feet",
+      "statement": "A {{fence-style.wood-tall-solid}} {{fence-run}} must have a {{fence-run.height}} of at least 62 and at most 72 inches.",
+      "citations": [
+        {
+          "provisionKey": "guidelines:exhibit-k",
+          "highlight": {
+            "start": 171,
+            "end": 191
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["architectural-application", "violation"],
+      "appliesTo": "fence-run",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["fence-run.style"]
+        },
+        "op": "=",
+        "right": {
+          "type": "value",
+          "term": "fence-style.wood-tall-solid"
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2025-11-12",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "owner",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "between",
+          "left": {
+            "type": "ref",
+            "path": ["fence-run.height"]
+          },
+          "min": {
+            "type": "quantity",
+            "value": 62,
+            "unit": "inch"
+          },
+          "max": {
+            "type": "quantity",
+            "value": 72,
+            "unit": "inch"
+          },
+          "includeMin": true,
+          "includeMax": true
+        }
+      },
+      "remedy": "change-detail",
+      "recurs": null,
+      "cure": {
+        "value": 0,
+        "unit": "calendar-day",
+        "after": {
+          "from": "request",
+          "path": ["violation.cure-by"]
+        },
+        "curedBy": {
+          "from": "request",
+          "path": ["violation.cured-on"]
+        }
+      },
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "guidelines:exhibit-k#self-closing-latch",
+      "domain": "architectural",
+      "title": "Gates on tall solid wood fences have a self-closing latch",
+      "statement": "A {{gate}} on a {{fence-style.wood-tall-solid}} fence must have a self-closing latch.",
+      "citations": [
+        {
+          "provisionKey": "guidelines:exhibit-k",
+          "highlight": {
+            "start": 427,
+            "end": 445
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["architectural-application", "violation"],
+      "appliesTo": "gate",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["gate.fence-run", "fence-run.style"]
+        },
+        "op": "=",
+        "right": {
+          "type": "value",
+          "term": "fence-style.wood-tall-solid"
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2025-11-12",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "owner",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "compare",
+          "left": {
+            "type": "ref",
+            "path": ["gate.self-latching"]
+          },
+          "op": "=",
+          "right": {
+            "type": "boolean",
+            "value": true
+          }
+        }
+      },
+      "remedy": "change-detail",
+      "recurs": null,
+      "cure": {
+        "value": 0,
+        "unit": "calendar-day",
+        "after": {
+          "from": "request",
+          "path": ["violation.cure-by"]
+        },
+        "curedBy": {
+          "from": "request",
+          "path": ["violation.cured-on"]
+        }
+      },
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "guidelines:exhibit-k#gate-clearance",
+      "domain": "architectural",
+      "title": "Gates on tall solid wood fences clear at least 3 feet",
+      "statement": "A {{gate}} on a {{fence-style.wood-tall-solid}} fence must have a {{gate.clearance}} of at least 36 inches (3 feet).",
+      "citations": [
+        {
+          "provisionKey": "guidelines:exhibit-k",
+          "highlight": {
+            "start": 483,
+            "end": 503
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["architectural-application", "violation"],
+      "appliesTo": "gate",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["gate.fence-run", "fence-run.style"]
+        },
+        "op": "=",
+        "right": {
+          "type": "value",
+          "term": "fence-style.wood-tall-solid"
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2025-11-12",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "owner",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "compare",
+          "left": {
+            "type": "ref",
+            "path": ["gate.clearance"]
+          },
+          "op": ">=",
+          "right": {
+            "type": "quantity",
+            "value": 36,
+            "unit": "inch"
+          }
+        }
+      },
+      "remedy": "change-detail",
+      "recurs": null,
+      "cure": {
+        "value": 0,
+        "unit": "calendar-day",
+        "after": {
+          "from": "request",
+          "path": ["violation.cure-by"]
+        },
+        "curedBy": {
+          "from": "request",
+          "path": ["violation.cured-on"]
+        }
+      },
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
       "key": "guidelines:exhibit-l#low-open-height",
       "domain": "architectural",
       "title": "Low open wood fences 40 to 48 inches",
@@ -95590,6 +99420,166 @@
       "provenance": {
         "by": "extraction",
         "at": "2026-10-09T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "guidelines:exhibit-l#self-latching-gate",
+      "domain": "architectural",
+      "title": "Gates on low open wood fences are self-latching",
+      "statement": "A {{gate}} on a {{fence-style.wood-low-open}} fence must be self-latching.",
+      "citations": [
+        {
+          "provisionKey": "guidelines:exhibit-l",
+          "highlight": {
+            "start": 297,
+            "end": 315
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["architectural-application", "violation"],
+      "appliesTo": "gate",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["gate.fence-run", "fence-run.style"]
+        },
+        "op": "=",
+        "right": {
+          "type": "value",
+          "term": "fence-style.wood-low-open"
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2025-11-12",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "owner",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "compare",
+          "left": {
+            "type": "ref",
+            "path": ["gate.self-latching"]
+          },
+          "op": "=",
+          "right": {
+            "type": "boolean",
+            "value": true
+          }
+        }
+      },
+      "remedy": "change-detail",
+      "recurs": null,
+      "cure": {
+        "value": 0,
+        "unit": "calendar-day",
+        "after": {
+          "from": "request",
+          "path": ["violation.cure-by"]
+        },
+        "curedBy": {
+          "from": "request",
+          "path": ["violation.cured-on"]
+        }
+      },
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "guidelines:exhibit-m#self-latching-gate",
+      "domain": "architectural",
+      "title": "Gates on low open scallop wood fences are self-latching",
+      "statement": "A {{gate}} on a {{fence-style.wood-low-open-scallop}} fence must be self-latching.",
+      "citations": [
+        {
+          "provisionKey": "guidelines:exhibit-m",
+          "highlight": {
+            "start": 32,
+            "end": 50
+          },
+          "region": null
+        }
+      ],
+      "requestTypes": ["architectural-application", "violation"],
+      "appliesTo": "gate",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["gate.fence-run", "fence-run.style"]
+        },
+        "op": "=",
+        "right": {
+          "type": "value",
+          "term": "fence-style.wood-low-open-scallop"
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2025-11-12",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "owner",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "compare",
+          "left": {
+            "type": "ref",
+            "path": ["gate.self-latching"]
+          },
+          "op": "=",
+          "right": {
+            "type": "boolean",
+            "value": true
+          }
+        }
+      },
+      "remedy": "change-detail",
+      "recurs": null,
+      "cure": {
+        "value": 0,
+        "unit": "calendar-day",
+        "after": {
+          "from": "request",
+          "path": ["violation.cure-by"]
+        },
+        "curedBy": {
+          "from": "request",
+          "path": ["violation.cured-on"]
+        }
+      },
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T18:00:00Z"
       },
       "review": {
         "status": "proposed",
@@ -96613,7 +100603,15 @@
         }
       ],
       "about": {
-        "rules": ["guidelines:exhibit-l#low-open-height", "guidelines:5.2.1#approved-styles"],
+        "rules": [
+          "guidelines:exhibit-l#low-open-height",
+          "guidelines:5.2.1#approved-styles",
+          "guidelines:exhibit-k#tall-solid-height",
+          "guidelines:exhibit-k#self-closing-latch",
+          "guidelines:exhibit-k#gate-clearance",
+          "guidelines:exhibit-l#self-latching-gate",
+          "guidelines:exhibit-m#self-latching-gate"
+        ],
         "terms": ["fence-style"]
       },
       "options": [
@@ -96623,7 +100621,15 @@
         },
         {
           "label": "The drawn dimensions bind too",
-          "keeps": ["guidelines:5.2.1#approved-styles", "guidelines:exhibit-l#low-open-height"]
+          "keeps": [
+            "guidelines:5.2.1#approved-styles",
+            "guidelines:exhibit-l#low-open-height",
+            "guidelines:exhibit-k#tall-solid-height",
+            "guidelines:exhibit-k#self-closing-latch",
+            "guidelines:exhibit-k#gate-clearance",
+            "guidelines:exhibit-l#self-latching-gate",
+            "guidelines:exhibit-m#self-latching-gate"
+          ]
         }
       ],
       "answer": null,
