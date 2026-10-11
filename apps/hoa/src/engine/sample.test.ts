@@ -64,6 +64,7 @@ const expected: Record<string, Record<string, Outcome>> = {
   "declaration:4.1/p1#approval-required": { "work-1": "committee" },
   "declaration:4.2(d)#fee-before-review": { request: "missing-information" },
   "declaration:4.3(b)#plans": { request: "met" },
+  "declaration:4.3(b)#additional-information": { request: "not-applicable" },
   "declaration:4.3(b)/p2#harmony": { "work-1": "committee" },
   // Not in the table: the committee's own duties, which never count against the applicant.
   "declaration:4.3(b)/p3#written-response": { request: "pending" },

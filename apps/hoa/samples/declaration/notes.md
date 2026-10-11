@@ -130,8 +130,9 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   the section itself is marked heading.
 - The preamble (which names the Declarant) and the Part One and Part Two introductions sit outside the article ranges,
   so they're encoded here.
-- Article 1 and 2 hold no rule of their own: 1.1/p2 (55 and over) duplicates 3.1(a), 1.3/p2 (consent to Record
-  covenants, a requirement with an approval check) duplicates 10.5, and the rest is purpose, definitions or settings.
+- Articles 1 and 2's own rules are 1.2/p2's and 1.2/p3's (below); 1.1/p2 (55 and over) duplicates 3.1(a), 1.3/p2
+  (consent to Record covenants, a requirement with an approval check) duplicates 10.5, and the rest is purpose,
+  definitions or settings.
 - No sanctionPreconditions here: Articles 1 and 2 state no notice-and-hearing procedure, so the Article 7 encoder sets
   it from 7.4.
 - The precedence clause is from 1.3/p3 (Washington law, then the Declaration, the Articles, the By-Laws); design
@@ -165,6 +166,15 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   inserting a missing "for".
 - Vehicle class is single-valued (commercial, recreational, mobile home, watercraft), and oversized, inoperable and
   stored are separate booleans, since a vehicle can be both a class and inoperable.
+- 1.2/p2's "enforceable by Declarant, the Association, any Owner" is two legal-action sanctions in violations, one
+  imposed by any Owner and one by the Declarant, enforcing the whole Declaration, like 4.3(b)/p7's aggrieved-owner
+  action; the Association's own suit is 7.4(a)/p2(iii).
+- The 20-year term and 10-year renewals apply only if the law limits how long covenants can be enforced, so the
+  termination window (1.2/p2#termination-window) is a requirement on a termination vote whose judgment question carries
+  that condition, rather than a text condition.
+- 1.2/p3's perpetuities clause sets when a void provision expires and states no requirement; its easement sentence is a
+  requirement on a termination vote (1.2/p3#easement-holder-consent), judged because the easement holder varies (the
+  Declarant, the Association, Owners, utilities) and no approval test can name it.
 
 ## Article 3 and Exhibit C, the Use Restrictions
 
@@ -282,14 +292,29 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   Use Restrictions, are Board judgments in a compliance period. When a change takes effect (at least 30 days after
   distribution, or after a petitioned meeting) isn't a rule; it sets the effectiveFrom of the use-restrictions editions.
 - 3.5's limits apply only to Use Restrictions and Board Rules adopted under 3.3, not to the initial Exhibit C (3.5's
-  intro and 3.5/p2), so (a) to (e) override no Exhibit C rule, and they stay not-evaluated because they limit what later
-  rules may say, with time, place and manner exceptions a selector can't separate; 3.5(f) is a grandfathering permission
-  whose selector covers the use-restrictions and board-rules documents, adopted after the current Owner took title
-  (lot.owner-took-title-on), which also leaves out the initial Exhibit C.
+  intro and 3.5/p2), so (a) to (e) override no Exhibit C rule; they're obligations of the Association on the rules it
+  adopts (below). 3.5(f) is a grandfathering permission whose selector covers the use-restrictions and board-rules
+  documents, adopted after the current Owner took title (lot.owner-took-title-on), which also leaves out the initial
+  Exhibit C.
 - The precedence clause repeats the vocab order (design guidelines above rules) and cites 3.3(d), which is where "the
   Residential Design Guidelines shall control" over the Use Restrictions comes from.
-- Liability: 3.1(d) and 3.1(a)(vi)/p3 make the Owner answer for occupants, tenants and guests; 3.1(d) also makes them
-  answer for losses to the Area of Common Responsibility, which no rule here evaluates.
+- Liability: 3.1(d) and 3.1(a)(vi)/p3 make the Owner answer for occupants, tenants and guests in the settings' liability
+  clauses, which carry sanctions, not losses; 3.1(d)'s responsibility for the losses they cause to the Area of Common
+  Responsibility is its own Owner obligation on the damage (3.1(d)#occupant-losses), judged by the Board, with no
+  request type yet.
+- 3.5(a) to (e) and (g) to (i) are obligations of the Association with no request types, since no request evaluates the
+  adoption of rules. (a) to (e) cite 3.5/p2 because they limit only the authority under 3.3, and their statements say
+  "adopted under 3.3"; (g) and (i) name rules and actions generally, and (h) follows 3.5's intro, so none of them cites
+  3.5/p2.
+- 3.5(c) is two rules, because an occupancy limit can be unreasonable or rest on other grounds while household
+  composition is left alone.
+- 3.5(e)'s reasonable fee is the one limit a request clearly evaluates: the fee is charged on a lease or a transfer, so
+  it runs in lease registrations and title transfers, on the Unit.
+- 3.3(e)'s exemption from the 3.3 procedures overrides nothing, since those procedures govern only Use Restrictions; its
+  business judgment duty is the rule (3.3(e)#business-judgment, with no request type).
+- 3.1's "amended only in accordance with Article 20" is a requirement on a vote that amends Section 3.1 (the new
+  vote.amends-section-3-1, like vote.amends-litigation-consent), met by an amendment to the Declaration or by
+  3.1(a)/p2's amendment for the Act, the exception Section 3.1 itself provides.
 
 ## Articles 4 and 5
 
@@ -337,9 +362,11 @@ schema can't express faithfully yet; the closest faithful form is encoded.
 - The DRC's duty to notify the Declarant applies only while the Declarant holds design review rights and the DRC decided
   the application; approved-with-conditions and approved-in-part count as approved through broader.
 - Review fees paid before review (4.2(d)) are a requirement on the application, applying when the Reviewer requires
-  prepayment (architectural-application.review-fee is stated); the fee amounts, hiring reviewers and budgeting their pay
-  aren't evaluated. The payment date (.review-fee-paid-on) is unknown when unstated: payment is the Association's
-  record, so a packet's silence doesn't show the fee unpaid (changed while building the engine).
+  prepayment (architectural-application.review-fee is stated); hiring reviewers and budgeting their pay are powers, not
+  rules, and the fees' reasonableness is the Reviewer's obligation in the application, judged by the Board
+  (4.2(d)#reasonable-fees, like 4.7's reasonable certificate fee). The payment date (.review-fee-paid-on) is unknown
+  when unstated: payment is the Association's record, so a packet's silence doesn't show the fee unpaid (changed while
+  building the engine).
 - The Declarant exemption (4.1/p4) is a permission whose selector covers every rule under Article 4 and the guidelines
   document (the guidelines bind only through 4.1/p1's "in compliance with ... this Article and the Residential Design
   Guidelines"), excepting Article 4's own exemptions so no selector selects itself; the same selector serves the 4.7
@@ -400,8 +427,8 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   that the committee judges.
 - Conditions of approval are decision rules (scope and authority 4.3(b)/p3) created by the approvals feature; 4.8/p2
   makes every approval conditional on completing all elements, encoded as the completion deadline citing 4.8/p2.
-- Limits of liability (4.6, the last sentence of 4.8/p3) aren't rules: no request evaluates whether the Association or
-  the Reviewer is liable, and limit rules only cap sanctions.
+- 4.6/p1 (review is aesthetic and creates no duty) is explanatory, and 4.6/p2's release is a rule (below); so is the
+  last sentence of 4.8/p3, a like release for exercising the exclusion right (4.8/p3#no-exclusion-liability).
 - This Declaration's Article 4 has no inspection provision; entry to inspect is in Article 11 and 7.4.
 - SELF-HELP FOR MAINTENANCE: Article 5 itself grants no self-help; the Association's right to perform maintenance an
   owner neglects and charge it as a Specific Assessment is in 7.4 (the paragraph after 7.4(a)(viii)), so the Article 7
@@ -419,10 +446,12 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   lot.
 - 5.4/p4 is one judgment covering a Neighborhood Association's repair, insurance and rebuilding, rather than three rules
   mirroring the owner's.
-- The owner's duty to pay costs insurance doesn't cover (5.4/p3) and premiums levied as assessments (5.4/p2) aren't
-  encoded; they're charges, not compliance checks.
-- The DRC's size (three to seven persons) and appointment by the Board (4.2(b)) aren't encoded: no request type
-  evaluates committee composition, though 4.2(b) is covered by the reviewer terms that cite it.
+- The owner's duty to pay costs insurance doesn't cover (5.4/p3) is its own Owner obligation with no request type
+  (5.4/p3#uninsured-costs), since the costs are paid to whoever rebuilds, not to the Association; premiums levied as
+  assessments (5.4/p2) have no rule of their own, and the insurance rule cites that paragraph.
+- The DRC's size (three to seven persons, 4.2(b)) is a Board obligation with no request type (4.2(b)#drc-size), since
+  the Board appoints, removes and replaces its members; that appointment itself is a power, and 4.2(b) is otherwise
+  covered by the reviewer terms that cite it.
 - Sections whose heading is on its own line and that have several paragraphs (4.1, 4.6, 4.8, 5.2, 5.3, 5.4) are headings
   with counted paragraphs p1 onward; single-paragraph sections (4.4, 4.5, 4.7, 5.1) keep heading and paragraph in their
   own text; lettered points whose heading is inline keep their first paragraph and count continuations from p2. No
@@ -434,6 +463,17 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   "cri", "wu") and page footers are removed.
 - The Part Three introduction (lines 1505-1512) falls in this range, so it's encoded here as part-three, matching
   vocab's part-one and part-two.
+- Every release of liability in the Declaration ("shall not be liable", "no liability", immunities, assumptions of risk)
+  is a rule: an obligation, on the party barred from claiming, not to hold the released party liable for the stated
+  matters, in dispute requests on the Claim, judged by the Board because no fact says what a Claim seeks, like 19.2's
+  bar on partition suits. The bearer is the Claimant where the text bars anyone, and the Owner where only the Owner is
+  bound (15.3/p1). In this range: 4.6/p2, 4.8/p3 and 7.2/p3; the others are listed under their articles. 4.6/p2's second
+  sentence points to 7.6's indemnity, so it's left to 7.6.
+- 4.3(a)/p4's Recorded version controlling disputes over which guidelines were in effect is a rule of evidence, not a
+  requirement; its duty to make the guidelines available is a yearly compliance-period judgment.
+- 5.3/p1's charging of designated Neighborhood costs, the grounds for the Board's assignment of costs, and like
+  treatment of similarly situated Neighborhoods run in assessment requests on Neighborhood Assessments, like 8.2/p2's
+  levy rules; the Owners' duty to pay them is 8.6/p2's payment rule.
 
 ## Articles 6 to 8
 
@@ -450,9 +490,10 @@ schema can't express faithfully yet; the closest faithful form is encoded.
 - SCHEMA GAP: barring an Owner who owes TRRS (7.4(a)(iii)) enforces a debt to another organization, not a rule here;
   it's a suspension enforcing the declaration document, conditioned on TRRS's notice.
 - SCHEMA GAP: computing an allocation of assessments (proration by months remaining in 8.6/p1, pro rata shares in
-  8.8/p2, the same administrative charge per Unit in 6.4(a)/p3) is the schema's open computations question; those are
-  marked not-evaluated or left to the assessment feature, and lot.assessments-commence-on derives only the commencement
-  date. 8.1/p2's and 8.2/p2's equal and benefit-based levies are checked on the allocation's outcome instead (below).
+  8.8/p2, the same administrative charge per Unit in 6.4(a)/p3) is the schema's open computations question; the
+  computation is left to the assessment feature, and lot.assessments-commence-on derives only the commencement date. The
+  levy and allocation rules (8.1/p2's and 8.2/p2's equal and benefit-based levies, 5.3/p1, 7.2/p6, 7.3(a)/p3, 12.1) are
+  checked on the allocation's outcome instead (below).
 - SCHEMA GAP: lien priority (8.8/p1: superior to all but taxes and first Mortgages) concerns other creditors and isn't a
   sanction property; only extinguishment by first-Mortgage foreclosure is encoded, as a limit rule, with the buyer's
   freedom from earlier assessments as a permission.
@@ -619,8 +660,8 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   assessment was levied equally (assessment.levied-equally) or by benefit (assessment.levied-by-benefit), so the rule
   checks the allocation's outcome without computing it.
 - The pro rata reallocation of an Association-owned Unit's share (8.8/p2(c)) and treating assessments extinguished by a
-  first-Mortgage foreclosure as Common Expenses (8.8/p3) stay unencoded: they let the Association charge more, and no
-  request finds them unmet.
+  first-Mortgage foreclosure as Common Expenses (8.8/p3) have no rules: they're powers that let the Association charge
+  more, not limits on it.
 - 8.7(a)/p2's duty to keep paying on the last year's basis when the Board fails to fix assessments is an Owner
   obligation on a carried-forward assessment (assessment.carried-forward), with 8.6/p2#due-date's deadline and cure.
 - Working capital and reserve contributions being nonrefundable and not advance payments of assessments (8.10, 8.11),
@@ -649,6 +690,39 @@ schema can't express faithfully yet; the closest faithful form is encoded.
 - Judgments about the Association's own duties (maintaining the Area of Common Responsibility, continuous operation,
   nearest-equivalent insurance, the transfer fee approximating cost) are decided by the board, the only deciding body
   the schema has for them.
+- 6.3(b)'s "shall not vote" is a requirement on every vote (6.3(b)#class-b-no-vote), judged because no vote fact counts
+  Class "B" votes; appointing directors under the By-Laws, the Declarant acting as the Class "B" Member, and becoming
+  Class "A" Members when Class "B" ends grant powers or describe status.
+- 6.2/p2's transfer of membership only with title has no request type, since no request records a transfer of
+  membership.
+- 7.1(c)'s "may adopt such reasonable rules" and 7.2/p3's "may maintain ... if the Board determines" limit those powers,
+  so each is an obligation; the bare powers in 7.1(a), 7.2/p2 and 7.4(d) are explanatory.
+- 7.2/p6's Limited Common Area sentence is 12.1#cost-allocation, which now cites it; its Common Expense sentence and
+  7.3(a)/p3's premiums run in assessment requests like the other levy rules, and 7.3(a)/p3(iii)'s "may be assessed" for
+  Limited Common Area premiums is read as within 12.1's "must allocate".
+- 7.3(a)(vi) takes 7.3(a)'s "shall obtain", so the additional insurance the Board finds advisable is a duty once it
+  does.
+- 7.3(c)'s claims and estimates and 7.3(c)/p3's surplus proceeds are compliance-period judgments on damage to property
+  the Association must insure (the new property-damage.association-insured), like 7.3(c)/p2; the Mortgagee's right to
+  enforce 7.3(c)/p3 is in the statement and the beneficiary, since sanctions run in violations.
+- 7.4(c)'s bar on arbitrary or capricious enforcement runs in violations (7.4(c)#not-arbitrary); its four grounds are
+  explanatory.
+- 7.5/p3 is two rules, for Board members and for officers, with no request type.
+- 7.6/p1's and 7.6/p2's indemnities are Association obligations judged by the Board with no request type; 7.6/p2's first
+  two sentences are releases (Articles 4 and 5), one rule each on the Claimant in dispute requests: no liability of
+  officers, directors and committee members for mistakes of judgment short of willful misfeasance, malfeasance,
+  misconduct or bad faith (7.6/p2#no-judgment-liability), and no personal liability of officers and directors on
+  good-faith commitments beyond what they bear as Members (7.6/p2#no-personal-liability).
+- 8.3/p2's last sentence, no Declarant liability for inadequate reserves while the Board acts in good faith, is a
+  release too (8.3/p2#no-reserve-liability), the good faith asked in the judgment.
+- 7.7/p2's veto and power to require action are limits on the Association (only on the Board's reasonable determination,
+  only within the Neighborhood Association's obligations), and 7.8/p1's "if provided to all Units" limits what goes in
+  the Base Assessment, judged in assessment requests.
+- 7.12(b) is two obligations: the Declarant's to run the UPD Permit programs (no request type) and the Association's to
+  accept and fulfil delegated ones, in compliance-period requests like 7.12(a)'s.
+- 8.1/p5 and 8.2/p4 are read as Association obligations that the assessment follow the continuing budget, beside the
+  Owners' duty to keep paying in 8.7(a)/p2; 8.5(a) caps a services Specific Assessment at its costs and cites its
+  lead-in 8.5/p1, which is no longer explanatory.
 
 ## Articles 9 to 13
 
@@ -702,20 +776,18 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   give #delinquency-suspension-after-hearing an assessment notice (assessment.notice-delivered-on) and a hearing (the
   new assessment.hearing-requested-on and .hearing-held-on) and except #delinquency-suspension from both, replacing the
   text condition.
-- Most of Articles 9 to 11 grant rights to the Declarant, the Association, golf course owners or utilities that override
-  no rule an Owner request could test, so those provisions are not-evaluated with a note rather than permissions with
-  nothing to exempt.
+- Grants of rights and easements in Articles 9 to 11 to the Declarant, the Association, golf course owners or utilities
+  are explanatory ("grants a right; no rule"), since the schema has no standalone right; the conditions and limits on
+  them are rules, mostly with no request type yet (below).
 - The Association's right of entry (11.5) overrides no stated Owner rule, so it isn't a permission; its stated
   conditions (notice except in an emergency, reasonable hours) are obligations on the organization, evaluated in the
   violation whose inspection entered the Unit, with the entry as an entity.
 - Entries and work by the Declarant and utility easement holders (10.9(b), 10.9(c), 11.3(a)/p2, 11.3(d)) have the same
-  kind of conditions but no request type carries them, so they're not-evaluated.
+  kind of conditions; they're rules with no request type, since none carries those entries yet.
 - 10.10's notice to the Declarant and any Builder before retaining an expert for a design or construction claim is a
   claimant obligation in dispute requests (dispute-kind.design-construction): a deadline putting
   dispute.declarant-builder-notified-on no later than dispute.expert-retained-on.
 - 10.7/p2's non-use clause is cited by 8.6/p2#due-date alongside 7.8/p2.
-- The 11.8(a)/p2 golf ball release is not-evaluated rather than explanatory: it's a real limit of liability, but no
-  request type tests it.
 - 10.11 is read as ending the Article 10 rights at the earlier of December 4, 2031 or a Recorded statement that sales
   have ceased (community.declarant-reserved-rights-in-force), though "shall not terminate until" could also be read as a
   minimum duration only.
@@ -723,9 +795,9 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   show the recording stamp.
 - The vote requirements for 9.2, 10.6, 12.2 and 12.3 run in meeting requests on a vote entity, as the Declaration
   amendment example does, even where approval may come by written consent or Board action rather than at a meeting.
-- 10.5 (no Recording of covenants without the Declarant's, later the Board's, written consent) would be a requirement
-  with an approval check, but no request type carries a Recording by a Person other than the Association, so it stays
-  not-evaluated, and vocab marks 1.3/p2 a duplicate of it.
+- 10.5 (no Recording of covenants without the Declarant's, later the Board's, written consent) is two requirements with
+  approval checks (10.5#declarant-consent, 10.5#board-consent) and no request type, since none carries a Recording by a
+  Person other than the Association; vocab marks 1.3/p2 a duplicate of it.
 - 12.1's cost allocation is an obligation on the Association evaluated in an assessment request: an assessment that
   charges Limited Common Area costs must fall on a Unit the area is assigned to.
 - Article 13 has no requirement that an Owner get a neighbor's consent before altering a party structure; it only
@@ -742,8 +814,8 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   "without cost to the other Owners" need judging.
 - 11.7/p1 grants easements; a duty not to obstruct them is only implied, so no obstruction rule is encoded and the
   paragraph is covered by the 11.7/p2 maintenance rules, which cite it second.
-- 11.2's encroachment easement isn't encoded because no rule prohibits encroachment for it to override; the encroachment
-  terms in vocab.ts (encroachment, .distance, .willful) go unused here.
+- 11.2's encroachment easement is explanatory (grants a right; no rule), since no rule prohibits encroachment for it to
+  override; the encroachment terms in vocab.ts (encroachment, .distance, .willful) go unused here.
 - 11.1, 11.1(iv) and 11.3(a) are lead-ins to their lettered items, so their words are the provision's intro and their
   text is empty.
 - 11.1's closing paragraph is labeled 11.1/p2, treating the section's own lead-in as its first paragraph; likewise
@@ -753,6 +825,40 @@ schema can't express faithfully yet; the closest faithful form is encoded.
 - OCR: 11.9 has an illegible word before "authorization" (scanned as "iip?"), kept as [illegible].
 - Part Five's introduction (and Part Six's, which ends this range) are encoded here as explanatory paragraphs; Part
   Four's introduction precedes Article 9 and isn't in this range.
+- The Declarant's powers in 9.1, 9.3, 10.1, 10.2, 10.5 and 10.8 are recorded through what the acts need to take effect:
+  Exhibit B property, the 20-year expiry (a deadline from the Declaration's 2001-12-04 Recording) and the owner's
+  consent for an annexation; the owner's signed consent for added covenants; the Declarant's ownership, the development
+  scheme, the owner's consent and county approval for a withdrawal; the Declarant's ownership for a public site; the
+  Declarant's, then the Board's, written consent to Record covenants (1.3/p2 stays its duplicate); and a Recorded,
+  non-enlarging, UPD-consistent instrument for a transfer of Declarant rights. The Association's duties to effect a
+  withdrawal or permit a designated site's use are obligations. None has a request type yet.
+- TERMS, Declarant acts (9.1, 9.3, 10.1, 10.2, 10.5): properties of supplemental-declaration (recorded-by, recorded-on,
+  annexes, adds-covenants, property-owned-by, exhibit-b-property), property-withdrawal with its owner party,
+  site-designation and covenant-instrument; annexed-property-owner now also covers the Declarant's Supplemental
+  Declarations.
+- The easements in 10.4 and 10.9(a) aren't rules, but 10.4's limit (activities consistent with the UPD Permit's Common
+  Area uses) and 10.9(b) and (c)'s conditions are Declarant obligations on entries marked entry.declarant-easement.
+- 10.9(b)#entry-notice (reasonable notice, except in an emergency) and 10.9(c)#entry-notice (reasonable notice to the
+  Owner or occupant, with no emergency exception) overlap and are kept as separate rules, since merging them would read
+  10.9(b)'s emergency exception into 10.9(c); in an emergency entry without notice, 10.9(b)'s rule is met and 10.9(c)'s
+  is not, which is what the text says, and the organization can resolve the tension in review.
+- The Board's powers in 11.1(iv)(A) and (C) to (G), the encroachment easement (11.2), the Community Systems easement
+  (11.3(b)) and the golf course owner's easement (11.8(b)) are explanatory: each grants a power or right that overrides
+  no rule. The golf-ball release (11.8(a)/p2#no-golf-ball-liability) and the overspray release
+  (11.8(c)#no-overspray-liability) are releases (Articles 4 and 5); 11.8(c)'s overspray easement itself still grants a
+  right with no rule of its own.
+- Every condition on an easement holder is a rule, mostly with no request type yet: 11.3(a)/p2's limits on the
+  Declarant's utility easement (no work through a dwelling, repair damage, obey law and get permits) cite the 11.3(a)
+  lead-in, and the duties 11.3(a)/p2 shares with 11.3(d) (no unreasonable interference, notice before entering) are one
+  rule each under 11.3(d), citing both, covering the utility, Community Systems and specific easements of 11.3 (the new
+  value easement-type.specific).
+- The burdened owner's approval of a specific easement's location (11.3(c)) is a requirement with an approval check, and
+  not withholding it unreasonably an obligation on that owner.
+- 11.1/p2's deemed assignment of a leasing Owner's use rights is an Owner obligation in violations; letting Owners
+  extend their rights to family and invitees overrides nothing, so it's not encoded, but the Board's regulation of it
+  must be reasonable (11.1/p2#reasonable-regulation).
+- Golfers (a new party) must retrieve balls reasonably and need the Owner's permission to enter a fenced or walled Unit
+  (11.8(a)).
 
 ## Articles 14 to 21 and Exhibits A and B
 
@@ -776,8 +882,8 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   30 days after the Notice.
 - The mediation deadline counts the Claimant's 30 days from the Termination of Negotiations and deems the Claim waived
   when missed (14.4(b)(iii)); the other ground for waiver, not appearing for and participating in good faith in the
-  mediation, isn't encoded: the good faith is a judgment and the Declaration names no one to decide it, as for
-  14.4(b)(i).
+  mediation, isn't encoded: it's a ground for deeming the Claim waived rather than a duty, and the good faith would be a
+  judgment.
 - 14.4(b)(ii)'s forum (a King County dispute resolution center, or an agency the Parties agree on) is its own obligation
   (14.4(b)(ii)#mediation-forum) on a stated dispute.mediation-forum-qualified, since the deadline check can't test where
   the Claim was mediated.
@@ -785,7 +891,8 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   bound by the Declaration, so only its date is a fact (dispute.mediation-terminated-on).
 - 14.2's promise to use the procedures 'in lieu of filing suit' is encoded as a rule that suit may be filed only on or
   after the Termination of Mediation, which also fails when the Claim was waived and mediation never happened.
-- 14.5's cost and fee recovery isn't encoded; it's an award between the Parties that no request type evaluates.
+- 14.5's cost and fee recovery isn't encoded: it entitles the enforcing Party to its costs, a right rather than a
+  requirement.
 - Every vote threshold and consent in 14.1, 15.5, 15.6, 19.1, 20.1 to 20.3 and Article 21 is a requirement on the vote
   (no bearer): the act doesn't take effect without it; 14.1's bar on the Association commencing a proceeding is the
   requirement on the vote that authorizes it, and its exempt proceedings are a permission exempting that vote.
@@ -820,8 +927,11 @@ schema can't express faithfully yet; the closest faithful form is encoded.
 - 15.6's bar on Use Restrictions affecting a Private Amenity is a requirement with the owner's prior written approval on
   any vote that adopts them (vote.restricts-private-amenity-use), whoever votes: the Board under 3.3(a) or the Members
   under 3.3(b).
-- 15.6's "each shall reasonably assist the other" isn't encoded: it's a cooperation covenant between the Association and
-  the Private Amenities, with no act or event a request carries and no one named to judge it.
+- 15.6's "each shall reasonably assist the other" is two obligations with no request type, one each way, since either
+  side can fail it alone: the Association's to assist each Private Amenity (15.6#association-assists) and the Private
+  Amenity owner's to assist the Association (15.6#amenity-assists), in upholding the Community-Wide Standard as to
+  maintenance and the Residential Design Guidelines, judged by the Board. The Declarant's intent to cooperate is
+  explanatory.
 - 19.2's partition bar is an obligation on the claimant in a dispute of kind partition, with an approval check by owner
   and mortgagee, prior and written; the Board's power to acquire and dispose of property overrides nothing.
 - 20.3/p3's six-month window for procedural challenges is a requirement on the challenge (a dispute of kind
@@ -839,9 +949,9 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   the UPD Permit' isn't encoded: it has no testable content here.
 - 20.3/p3's 'effective upon Recording' isn't a rule: when an amendment takes effect sets the edition's effectiveFrom, as
   3.3's procedures do for the Use Restrictions.
-- 16.1's 'timely written notice' has no period, so the delinquency, violation and consent notices are judgments decided
-  by the board; (a) casualty or condemnation losses and (c) insurance lapses are not-evaluated, since no request type
-  covers those events.
+- 16.1's 'timely written notice' has no period, so the notices are judgments decided by the board; (a) is split into
+  condemnation and casualty notices, and (c) is a notice of a lapse or change in the Association's insurance per
+  Association policy, all with no request type yet, since none covers those events.
 - 16.1(b) uses facts the ledger and enforcement features supply (assessment.delinquent-60-days,
   violation.uncured-60-days), because a condition can't read the evaluation date to count 60 days.
 - 16.4's deemed approval is a deadline on the Mortgagee, evaluated in a meeting on a mortgagee-consent-request, deeming
@@ -869,7 +979,8 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   (use-restrictions:a(i)#restricted-vehicles) covers only commercial, recreational and similar vehicles and binds
   occupants.
 - Article 17's disclosures are explanatory, except the covenants with a duty in them (17.1 not to object to Master Plan
-  changes, 17.2 to inform tenants, 15.3 and 17.5 to indemnify), which are not-evaluated.
+  changes, 17.2/p2 to inform tenants, 15.3/p2 and 17.5 to indemnify) and the releases and assumptions of risk, which are
+  rules (below).
 - The lead-ins of 14.4(a) and 16.1 are their provisions' intro, with empty text; 14.3/p2, 17.6/p1 and 19.1/p1 also end
   in lead-ins, but their items are children of the section rather than of the paragraph, so they keep their text and the
   items keep their keys.
@@ -890,6 +1001,25 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   'Article 21' for 'Article 211', and 'EP-1' and 'PB-4' in Exhibit A.
 - The recording volume and page numbers in Exhibits A and B are illegible in the scan and are shown as [illegible]
   rather than guessed.
+- The duty to negotiate in good faith (14.4(b)(i)) and the cost split (14.4(b)(v), own costs and equal mediator fees as
+  two rules) are Board-judged obligations in dispute requests, like the other Article 14 procedures; the Board's power
+  to appoint a negotiation representative is not encoded.
+- The Owner's indemnities in 15.3/p2 and 17.5 follow 3.1(a)(vi)/p3: Board-judged obligations on the claim in dispute
+  requests. The releases and assumptions of risk beside them are rules too, in the same requests, as Articles 4 and 5
+  describe: releases for proximity to a Private Amenity (15.3/p2#no-amenity-liability) and to the natural areas
+  (17.5#no-animal-liability), for security (17.2/p1#no-security-liability), for Community Systems and Services
+  interruptions (17.4#no-interruption-liability, and 17.4#no-interruption-refund for the bar on refunds and offsets),
+  for the Bodies of Water (17.6/p3#no-water-liability) and the Declarant's limited personal liability
+  (17.7#limited-liability); and assumptions of risk, read as barring claims for the risks assumed, for a nearby Private
+  Amenity (15.3/p1#assume-amenity-risk, on the Owner, the only one it binds), third parties' acts
+  (17.2/p2#assume-third-party-risk, beside the covenant to inform), indigenous animals (17.5#assume-animal-risk) and the
+  Bodies of Water (17.6/p2#assume-water-risk). 14.4(b)(iii)'s deemed release of a Respondent is the effect of missing
+  the mediation deadline, so 14.4(b)(ii)#mediation-deadline covers it.
+- 16.2's rule of construction is encoded as the Association's duty not to put an Owner ahead of the Unit's first
+  Mortgagee in distributing Common Area insurance proceeds or condemnation awards.
+- 17.1's covenant not to object is two rules, (a) and (b), on every Person acquiring an interest, left out of violations
+  because the Declarant, not the Association, is the one it protects; 17.2/p2's covenant to inform tenants and occupants
+  is an Owner obligation in violations.
 
 ## Residential Design Guidelines: Articles 3 and 5, Sections 7.13 and 7.14, Exhibits K to O
 
@@ -942,8 +1072,8 @@ Judgment calls:
   stated percentage of the Unit. "Should follow" against "required percentages" (and 7.14.1's "must") is a question.
 - 3.6/p1 makes the Board the Reviewer for variances from shall and shall-not guidelines: a discretion rule decided by
   the Board over the whole document, since a selector can't choose rules by modality. The homeowner's right to appeal a
-  DRC decision to the Board isn't encoded (there's no appeal request type, and no time limit to check). Whether 3.6/p2
-  lets the DRC waive any guideline or only the procedures is a question.
+  DRC decision to the Board isn't encoded: it grants a right and states no time limit or condition to check. Whether
+  3.6/p2 lets the DRC waive any guideline or only the procedures is a question.
 - 5.2.1's "See Exhibits K, L and M for the specific approved wood fence styles" is read as restrictive (an obligation to
   use one of them). Whether the exhibits' drawn dimensions bind (Exhibit L's 40 to 48 inches) is a question, and so is
   what 5.2.2's "K style" means.
@@ -965,7 +1095,7 @@ Judgment calls:
   case-by-case." is one discretion rule over the setback recommendation.
 - The Reviewer's powers to require more (a greater distance in 5.7.2, plantings, deviations and a 3 to 5 foot set-back
   in 5.8.3, more screening under decks in 7.14.7, disclosure to neighbors in 3.1.3) are conditions of approval, decision
-  rules citing these provisions as their authority; 5.8.3, which says nothing else, is not-evaluated.
+  rules citing these provisions as their authority; 5.8.3, which says nothing else, is explanatory.
 - "Coordinate with the adjacent fence types" and "substantially the same height" (5.9.1, 5.9.3) are judgments; 5.9.2's
   total gate height counts the gate's lattice, with or without an arbor.
 - 5.10.1's approval "prior to submitting a proposal and application" is an approval check by the Association Staff or
@@ -1004,12 +1134,25 @@ Judgment calls:
   application form takes the guidelines' name, the DRC Application packet.
 - SCHEMA GAP: 3.1.7's notification is the Association's document, but a document check reads the requester's files; it's
   encoded as a document check on the disapproval notice all the same.
+- The Owner's sole responsibility for county permits (3.3.1) and for verifying boundary lines before building a fence
+  (5.8.1) are Reviewer-judged obligations with no request type, since 3.3.3 already holds applications for county
+  approval and an application doesn't carry the verification.
+- In 5.8.2, a fence in a utility easement where a recorded plat or document prohibits it is a judged obligation in
+  applications and violations (remedy redesign); the Owner's cost of a utility's removal is an obligation with no
+  request type; and examining plot plans for sight lines is a recommendation with no request type.
 
 ## Corrections from evaluation
 
 The step E (rule-finding) review on 2026-10-11 (run 2026-10-11T08-24-51-rule-finding) added 36 rules, removed 1, changed
 9, added 21 terms and changed 5 provision reasons; its judgment calls are in the article sections above. New rules are
 encoded one per requirement a reviewer could find unmet on its own.
+
+On 2026-10-11 every not-evaluated provision was converted, and the schema dropped that no-rule reason, under the product
+owner's principle: the rulebook records every rule the documents state, whether or not any request type evaluates it
+yet, and filtering happens later. Requirements became rules (rules 483 to 594, terms 848 to 873), and 74 rules have no
+request type; provisions stating no requirement (bare grants of a power or right, background) became explanatory, 98
+provisions in all, with "grants a right; no rule" where they grant a right or easement, because the schema has no
+standalone right (an open schema question). The judgment calls are in the article sections above.
 
 Golden errors confirmed while judging step runs against this encoding (evaluation.md, Judging by the coding agent),
 fixed with the reason the text gives.

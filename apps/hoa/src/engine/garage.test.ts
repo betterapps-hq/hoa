@@ -124,6 +124,7 @@ const expected: Record<string, Outcome> = {
   "use-restrictions:a(vii)#no-conversion space-1": "not-applicable",
   "declaration:4.1/p1#approval-required work-1": "committee",
   "declaration:4.3(b)#plans request": "met",
+  "declaration:4.3(b)#additional-information request": "not-applicable",
   "declaration:4.3(b)/p2#harmony work-1": "committee",
   "declaration:4.2(d)#fee-before-review request": "met",
   "declaration:4.3(b)/p3#written-response request": "pending",
