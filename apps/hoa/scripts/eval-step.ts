@@ -75,8 +75,9 @@ import { readFinder, withFinder } from "./stepFinder.ts"
 // repeats, per item in scores.json and over the items in report.md.
 //
 // Model calls cost money: without --yes this prints what it would run and stops. Usage, from apps/hoa:
-//   pnpm eval:step --stage <step> [--from <run>] [--items <id part>,...] [--prompts <name>=<version>,...]
-//     [--golden <sample>] [--repeat <n>] [--reruns <0-1>] [--retries <0-2>] [--runs <label>=<run id>,...] [--yes]
+//   pnpm eval:step --stage <step> [--from <run>] [--items <id part>,...] [--split <split>,...]
+//     [--prompts <name>=<version>,...] [--golden <sample>] [--repeat <n>] [--reruns <0-1>] [--retries <0-2>]
+//     [--runs <label>=<run id>,...] [--yes]
 //   pnpm eval:step --rescore <step run id> [--items <id part>,...] [--golden <sample>]
 // --finder <file> gives B the provisions another finder picked (a JSON map of item id to provision keys), and
 // --expect all scores B against every term the golden defines in the document (stepFinder.ts), to compare finders.
@@ -90,6 +91,7 @@ const { values } = parseArgs({
     from: { type: "string" },
     rescore: { type: "string" },
     items: { type: "string" },
+    split: { type: "string" },
     prompts: { type: "string" },
     repeat: { type: "string", default: "1" },
     retries: { type: "string", default: "0" },
@@ -296,7 +298,8 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
   /** The step's check of one output, run again on a rescore. */
   recheck?: (item: I, output: O) => Omit<StepProblem, "itemId">[]
 }) {
-  const items = input.items.filter((item) => wanted(item.id))
+  const splits = values.split?.split(",")
+  const items = input.items.filter((item) => wanted(item.id) && (!splits || splits.includes(item.tags.split)))
   const started = performance.now()
   const runs: StepRun<O>[] = []
   if (rescored) {

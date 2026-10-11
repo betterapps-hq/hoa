@@ -147,6 +147,8 @@ Options:
 - `--repeat <n>` runs again with its own content cache per repeat to show run-to-run noise: each metric's mean with its
   min and max across repeats, per item in `scores.json` and over the items in `report.md`, so a version comparison can
   tell a change from noise.
+- `--split dev,test` runs only the items of those splits (the dataset's `split` tag), to try a prompt on part of a
+  step's items and keep the rest as a check.
 - `--reruns 0|1` (default 1) reruns a failing B, E or C item once with its problems, as the pipeline does.
 - `--retries 0-2` (default 0) runs F's retry on the rules still failing.
 - `--runs <label>=<run id>,...` picks the saved build runs the report sets beside the scores, and
