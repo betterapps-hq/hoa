@@ -61274,7 +61274,7 @@
       "organizationId": "org-sample",
       "labels": [
         {
-          "text": "Special Assessment levy scope",
+          "text": "levy scope",
           "role": "preferred",
           "plural": null,
           "citation": null,
@@ -61290,6 +61290,11 @@
       "citations": [
         {
           "provisionKey": "declaration:8.4",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:6.4(a)/p3",
           "highlight": null,
           "region": null
         }
@@ -61399,6 +61404,11 @@
         },
         {
           "provisionKey": "declaration:article-2/special-assessment",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:6.4(a)/p3",
           "highlight": null,
           "region": null
         }
@@ -61608,6 +61618,323 @@
       "of": "common-area",
       "valueType": {
         "type": "date"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "neighborhood.common-property-insured-by",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "property insurance on the Neighborhood Association's common property carried by",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:5.4/p4",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "neighborhood",
+      "valueType": {
+        "type": "party",
+        "among": ["organization", "neighborhood-association"]
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "neighborhood.common-property-insurance-policies",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "insurance policies on the Neighborhood Association's common property",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:5.4/p4",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "neighborhood",
+      "valueType": {
+        "type": "reference",
+        "to": "insurance-policy"
+      },
+      "many": true,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "neighborhood.common-property-damaged-on",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "common property structures damaged or destroyed on",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:5.4/p4",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "neighborhood",
+      "valueType": {
+        "type": "date"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "neighborhood.uninsured-restoration-costs-paid",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "uninsured repair, reconstruction or clearing costs paid by the Neighborhood Association",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:5.4/p4",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "neighborhood",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "neighborhood.services-request-approved",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "Owners of a majority of the Units requested a higher level of service or special services",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(a)/p3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "neighborhood",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "absent",
+      "derived": null
+    },
+    {
+      "key": "neighborhood.requested-services-provided",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "requested services provided by the Association",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(a)/p3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "neighborhood",
+      "valueType": {
+        "type": "boolean"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "assessment.neighborhood-services-costs",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "charges the cost of a higher level of service or special services for a Neighborhood",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(a)/p3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "assessment",
+      "valueType": {
+        "type": "boolean"
       },
       "many": false,
       "ifUnstated": "absent",
@@ -72417,11 +72744,16 @@
     {
       "key": "declaration:5.4/p4#neighborhood-association-repair",
       "domain": "maintenance",
-      "title": "Neighborhood Associations repair, insure and rebuild their property",
-      "statement": "A {{neighborhood-association}} must repair and replace its common property to the {{community-wide-standard}}, insure it at full replacement cost, and after damage rebuild it or clear and landscape it, as Section 5.4 requires of an {{owner}}.",
+      "title": "Neighborhood Associations repair and replace their common property",
+      "statement": "A {{neighborhood-association}} must repair and replace its common property as necessary to keep it at a level consistent with the {{community-wide-standard}}.",
       "citations": [
         {
           "provisionKey": "declaration:5.4/p4",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:5.4/p1",
           "highlight": null,
           "region": null
         }
@@ -72441,7 +72773,7 @@
       "noExceptions": null,
       "check": {
         "type": "judgment",
-        "question": "Does the Neighborhood Association repair and replace its common property to the Community-Wide Standard, carry property insurance on it at full replacement cost, and after any damage promptly rebuild it or clear and landscape it?",
+        "question": "Does the Neighborhood Association repair and replace its common property as necessary to keep it at a level consistent with the Community-Wide Standard?",
         "evidence": ["photo", "inspection-report"]
       },
       "remedy": null,
@@ -74433,7 +74765,7 @@
       "key": "declaration:6.4(a)/p3#services-vote",
       "domain": "governance",
       "title": "Neighborhood services need a majority of its Units",
-      "statement": "A request for a higher level of service or special services for a {{neighborhood}} takes effect with the vote or written consent of {{owner:plural}} of more than half of the {{lot:plural}} in it; the {{organization}} then provides them and assesses their cost to those Units as a Neighborhood Assessment.",
+      "statement": "A request for a higher level of service or special services for a {{neighborhood}} takes effect with the vote or written consent of {{owner:plural}} of more than half of the {{lot:plural}} in it.",
       "citations": [
         {
           "provisionKey": "declaration:6.4(a)/p3",
@@ -83418,7 +83750,9 @@
       "enforces": {
         "rules": [
           "declaration:5.3/p2#neighborhood-association-maintenance",
-          "declaration:5.4/p4#neighborhood-association-repair"
+          "declaration:5.4/p4#neighborhood-association-repair",
+          "declaration:5.4/p4#neighborhood-association-insurance",
+          "declaration:5.4/p4#neighborhood-association-rebuild-or-clear"
         ],
         "documents": [],
         "except": []
@@ -87567,7 +87901,7 @@
       "key": "declaration:10.1#while-owns",
       "domain": "governance",
       "title": "Withdrawal only while the Declarant owns Exhibit property",
-      "statement": "The {{declarant}} may amend the Declaration to withdraw property only while it or an {{affiliate}} owns property described in Exhibit \"A\" or \"B\".",
+      "statement": "The {{declarant}} may amend the Declaration to withdraw property only while it or an {{affiliate}} owns property described in Exhibit \"A\" or \"B\", and before the Article 10 rights end under 10.11 (30 years after the Declaration is Recorded, or earlier if the Declarant Records a statement that all sales activity has ceased).",
       "citations": [
         {
           "provisionKey": "declaration:10.1",
@@ -87945,7 +88279,7 @@
       "key": "declaration:10.2/p1#while-owns",
       "domain": "governance",
       "title": "Public sites designated only while the Declarant owns Exhibit property",
-      "statement": "The {{declarant}} may make a {{site-designation}} only while it or an {{affiliate}} owns property described in Exhibit \"A\" or \"B\".",
+      "statement": "The {{declarant}} may make a {{site-designation}} only while it or an {{affiliate}} owns property described in Exhibit \"A\" or \"B\", and before the Article 10 rights end under 10.11 (30 years after the Declaration is Recorded, or earlier if the Declarant Records a statement that all sales activity has ceased).",
       "citations": [
         {
           "provisionKey": "declaration:10.2/p1",
@@ -95206,7 +95540,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "community",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -95268,7 +95602,7 @@
         }
       ],
       "requestTypes": ["dispute"],
-      "appliesTo": "master-plan",
+      "appliesTo": "dispute",
       "appliesWhen": null,
       "scope": null,
       "authority": null,
@@ -99702,7 +100036,7 @@
           "region": null
         }
       ],
-      "requestTypes": [],
+      "requestTypes": ["violation"],
       "appliesTo": "work",
       "appliesWhen": {
         "type": "compare",
@@ -100105,7 +100439,35 @@
       ],
       "requestTypes": ["architectural-application"],
       "appliesTo": "lot",
-      "appliesWhen": null,
+      "appliesWhen": {
+        "type": "in",
+        "left": {
+          "type": "ref",
+          "path": ["lot.unit-type"]
+        },
+        "values": [
+          {
+            "type": "value",
+            "term": "unit-type.lakes-collection"
+          },
+          {
+            "type": "value",
+            "term": "unit-type.port-collection"
+          },
+          {
+            "type": "value",
+            "term": "unit-type.island-collection"
+          },
+          {
+            "type": "value",
+            "term": "unit-type.forest-collection"
+          },
+          {
+            "type": "value",
+            "term": "unit-type.estate-collection"
+          }
+        ]
+      },
       "scope": null,
       "authority": null,
       "effectiveFrom": "2025-11-12",
@@ -100233,7 +100595,35 @@
       ],
       "requestTypes": ["architectural-application", "violation"],
       "appliesTo": "lot",
-      "appliesWhen": null,
+      "appliesWhen": {
+        "type": "in",
+        "left": {
+          "type": "ref",
+          "path": ["lot.unit-type"]
+        },
+        "values": [
+          {
+            "type": "value",
+            "term": "unit-type.lakes-collection"
+          },
+          {
+            "type": "value",
+            "term": "unit-type.port-collection"
+          },
+          {
+            "type": "value",
+            "term": "unit-type.island-collection"
+          },
+          {
+            "type": "value",
+            "term": "unit-type.forest-collection"
+          },
+          {
+            "type": "value",
+            "term": "unit-type.estate-collection"
+          }
+        ]
+      },
       "scope": null,
       "authority": null,
       "effectiveFrom": "2025-11-12",
@@ -102460,16 +102850,25 @@
       "requestTypes": ["architectural-application", "violation"],
       "appliesTo": "fence-run",
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["fence-run.material"]
-        },
-        "op": "=",
-        "right": {
-          "type": "value",
-          "term": "fence-material.wood"
-        }
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["fence-run.material"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "fence-material.wood"
+            }
+          },
+          {
+            "type": "exists",
+            "path": ["fence-run.stain"]
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -111002,6 +111401,366 @@
         "from": "community",
         "path": ["community.fiscal-year-start"]
       },
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:5.4/p4#neighborhood-association-insurance",
+      "domain": "maintenance",
+      "title": "Neighborhood Associations insure their common property",
+      "statement": "A {{neighborhood-association}} must carry property insurance for the full replacement cost of all insurable improvements on its common property, less a reasonable deductible, unless the {{organization}} carries it.",
+      "citations": [
+        {
+          "provisionKey": "declaration:5.4/p4",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:5.4/p2",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "requestTypes": ["violation"],
+      "appliesTo": "neighborhood",
+      "appliesWhen": {
+        "type": "not",
+        "of": {
+          "type": "in",
+          "left": {
+            "type": "ref",
+            "path": ["neighborhood.common-property-insured-by"]
+          },
+          "values": [
+            {
+              "type": "value",
+              "term": "organization"
+            }
+          ]
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "neighborhood-association",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "some",
+          "where": {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["insurance-policy.coverage"]
+            },
+            "op": "=",
+            "right": {
+              "type": "value",
+              "term": "insurance-coverage.property"
+            }
+          },
+          "test": {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["insurance-policy.full-replacement-cost"]
+            },
+            "op": "=",
+            "right": {
+              "type": "boolean",
+              "value": true
+            }
+          },
+          "path": ["neighborhood.common-property-insurance-policies"]
+        }
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:5.4/p4#neighborhood-association-rebuild-or-clear",
+      "domain": "maintenance",
+      "title": "Neighborhood Associations rebuild or clear damaged common property",
+      "statement": "After damage to or destruction of structures on its common property, a {{neighborhood-association}} must promptly and diligently repair or reconstruct them consistently with the original construction or plans approved under Article 4, or clear the property and keep it neat, attractive and landscaped to the {{community-wide-standard}}.",
+      "citations": [
+        {
+          "provisionKey": "declaration:5.4/p4",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:5.4/p3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "requestTypes": ["violation"],
+      "appliesTo": "neighborhood",
+      "appliesWhen": {
+        "type": "exists",
+        "path": ["neighborhood.common-property-damaged-on"]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "neighborhood-association",
+      "beneficiary": null,
+      "decidedBy": "board",
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "judgment",
+        "question": "Since the damage, is the Neighborhood Association promptly and diligently repairing or reconstructing the structures on its common property consistently with the original construction or plans approved under Article 4, or has the property been cleared and kept in a neat, attractive, landscaped condition consistent with the Community-Wide Standard?",
+        "evidence": ["photo", "inspection-report"]
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:5.4/p4#neighborhood-association-uninsured-costs",
+      "domain": "maintenance",
+      "title": "Neighborhood Associations pay uninsured restoration costs",
+      "statement": "When structures on its common property are damaged or destroyed, a {{neighborhood-association}} must pay any costs of repairing, reconstructing or clearing the property that insurance proceeds don't cover.",
+      "citations": [
+        {
+          "provisionKey": "declaration:5.4/p4",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:5.4/p3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "requestTypes": [],
+      "appliesTo": "neighborhood",
+      "appliesWhen": {
+        "type": "exists",
+        "path": ["neighborhood.common-property-damaged-on"]
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "neighborhood-association",
+      "beneficiary": null,
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "compare",
+          "left": {
+            "type": "ref",
+            "path": ["neighborhood.uninsured-restoration-costs-paid"]
+          },
+          "op": "=",
+          "right": {
+            "type": "boolean",
+            "value": true
+          }
+        }
+      },
+      "remedy": null,
+      "recurs": null,
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:6.4(a)/p3#provide-services",
+      "domain": "governance",
+      "title": "The Association provides the services a Neighborhood voted for",
+      "statement": "Once {{owner:plural}} of more than half of the {{lot:plural}} in a {{neighborhood}} vote for or consent to a higher level of service or special services, the {{organization}} must provide them.",
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(a)/p3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "requestTypes": ["compliance-period"],
+      "appliesTo": "neighborhood",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["neighborhood.services-request-approved"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "organization",
+      "beneficiary": "owner",
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "compare",
+          "left": {
+            "type": "ref",
+            "path": ["neighborhood.requested-services-provided"]
+          },
+          "op": "=",
+          "right": {
+            "type": "boolean",
+            "value": true
+          }
+        }
+      },
+      "remedy": null,
+      "recurs": {
+        "type": "ref",
+        "from": "community",
+        "path": ["community.fiscal-year-start"]
+      },
+      "cure": null,
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": []
+    },
+    {
+      "key": "declaration:6.4(a)/p3#services-assessed",
+      "domain": "financial",
+      "title": "Neighborhood services assessed to that Neighborhood's Units",
+      "statement": "The {{board}} must assess the cost of a higher level of service or special services for a {{neighborhood}} against the {{lot:plural}} in that Neighborhood, as a Neighborhood Assessment.",
+      "citations": [
+        {
+          "provisionKey": "declaration:6.4(a)/p3",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "requestTypes": ["assessment"],
+      "appliesTo": "assessment",
+      "appliesWhen": {
+        "type": "compare",
+        "left": {
+          "type": "ref",
+          "path": ["assessment.neighborhood-services-costs"]
+        },
+        "op": "=",
+        "right": {
+          "type": "boolean",
+          "value": true
+        }
+      },
+      "scope": null,
+      "authority": null,
+      "effectiveFrom": "2001-12-04",
+      "kind": "norm",
+      "modality": "obligation",
+      "bearer": "board",
+      "beneficiary": "owner",
+      "decidedBy": null,
+      "overrides": [],
+      "noExceptions": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "all",
+          "of": [
+            {
+              "type": "compare",
+              "left": {
+                "type": "ref",
+                "path": ["assessment.type"]
+              },
+              "op": "=",
+              "right": {
+                "type": "value",
+                "term": "assessment-type.neighborhood"
+              }
+            },
+            {
+              "type": "compare",
+              "left": {
+                "type": "ref",
+                "path": ["assessment.levied-against"]
+              },
+              "op": "=",
+              "right": {
+                "type": "value",
+                "term": "levy-scope.neighborhood-units"
+              }
+            }
+          ]
+        }
+      },
+      "remedy": null,
+      "recurs": null,
       "cure": null,
       "provenance": {
         "by": "extraction",

@@ -470,8 +470,8 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   owner neglects and charge it as a Specific Assessment is in 7.4 (the paragraph after 7.4(a)(viii)), so the Article 7
   encoder's sanction should enforce declaration:5.2/p1#maintain-unit, declaration:5.2/p2#adjacent-landscaping,
   declaration:5.4/p2#property-insurance and declaration:5.4/p3#rebuild-or-clear, and a Neighborhood Association variant
-  should enforce declaration:5.3/p2#neighborhood-association-maintenance and
-  declaration:5.4/p4#neighborhood-association-repair.
+  should enforce declaration:5.3/p2#neighborhood-association-maintenance and 5.4/p4's repair, insurance and
+  rebuild-or-clear duties (#neighborhood-association-repair, -insurance, -rebuild-or-clear).
 - Maintenance standards tied to the Community-Wide Standard are judgments decided by the board, with photos and
   inspection reports as evidence; 5.4/p1 (maintenance includes repair and replacement) is folded into 5.2/p1's judgment.
 - 5.2/p1's exceptions (Area of Common Responsibility, maintenance the Association or a Neighborhood Association assumed)
@@ -480,8 +480,12 @@ schema can't express faithfully yet; the closest faithful form is encoded.
 - The owner's insurance duty applies unless vocab's lot.insured-by names the Association or a Neighborhood Association;
   it's an ongoing duty checked in violations, not a recurring compliance period, since compliance periods concern no
   lot.
-- 5.4/p4 is one judgment covering a Neighborhood Association's repair, insurance and rebuilding, rather than three rules
-  mirroring the owner's.
+- 5.4/p4 applies Section 5.4 to a Neighborhood Association as if it were an Owner, so it's four rules mirroring the
+  Owner's, one per duty that can fail alone: repair and replacement to the Community-Wide Standard (5.4/p1, judged),
+  insurance at full replacement cost (a test on neighborhood.common-property-insurance-policies unless
+  neighborhood.common-property-insured-by names the Association), rebuild-or-clear after damage (judged, on
+  neighborhood.common-property-damaged-on) and uninsured costs (a test, with no request type, like 5.4/p3's). It was
+  once one judgment, which hid which duty failed.
 - The owner's duty to pay costs insurance doesn't cover (5.4/p3) is its own Owner obligation with no request type
   (5.4/p3#uninsured-costs), since the costs are paid to whoever rebuilds, not to the Association. Premiums for insurance
   the Association obtains for Owners are levied as a Neighborhood or Specific Assessment (5.4/p2#premiums-assessed), an
@@ -632,6 +636,11 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   applying when a representative cast the Unit's vote (lot.vote-cast-by-representative), a document check that the
   Neighborhood Association's governing documents (neighborhood-association-documents) provide for the representative and
   reach the matter voted on; it was explanatory as a grant, but it decides whether a vote counts.
+- 6.4(a)/p3's voted services are three rules: the vote that requests them (#services-vote), the Association's duty to
+  provide them once the vote passes (#provide-services, a yearly compliance-period test on
+  neighborhood.requested-services-provided when neighborhood.services-request-approved holds), and the Board's duty to
+  assess their cost against that Neighborhood's Units as a Neighborhood Assessment (#services-assessed, on
+  assessment.neighborhood-services-costs, with 8.4#levy-scope's assessment.levied-against).
 - 6.4(a)/p3's administrative charge is two Board obligations in assessment requests on Neighborhood Assessments, since
   either can fail alone: the charge is reasonable (#admin-charge-reasonable), and it's the same per Unit for every
   Neighborhood receiving the same service (#admin-charge-uniform); both apply only when assessment.service-admin-charge
@@ -715,7 +724,8 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   enforce; 7.4(a)(vii) enforces those and the guidelines document together, against the contractor.
 - 7.4(a)/p3's maintenance self-help and Recorded notice of violation enforce part-arch's Article 5 rules (5.2/p1,
   5.2/p2, 5.4/p2, 5.4/p3) plus 7.2(c)#enclosed-area, and the Neighborhood Association variant enforces 5.3/p2 and
-  5.4/p4, against the Neighborhood Association and the Owners whose Units are assessed.
+  5.4/p4's repair, insurance and rebuild-or-clear duties, against the Neighborhood Association and the Owners whose
+  Units are assessed.
 - "Reasonable notice and an opportunity to cure" (7.4(a)/p3) states no number of days, so no default cure clause is set;
   7.2(c)#enclosed-area's cure ends on violation.cure-by, the time the notice sets, cured by violation.cured-on.
 - Fines and the fine's lien are set-by-imposer: the Declaration leaves the amount to the Board's range of penalties
@@ -1284,9 +1294,9 @@ Judgment calls:
   application form takes the guidelines' name, the DRC Application packet.
 - SCHEMA GAP: 3.1.7's notification is the Association's document, but a document check reads the requester's files; it's
   encoded as a document check on the disapproval notice all the same.
-- The Owner's sole responsibility for county permits (3.3.1) and for verifying boundary lines before building a fence
-  (5.8.1) are Reviewer-judged obligations with no request type, since 3.3.3 already holds applications for county
-  approval and an application doesn't carry the verification.
+- The Owner's sole responsibility for county permits (3.3.1) is an approval check by King County or another governmental
+  entity in violations only, since 3.3.3 already holds applications for county approval; verifying boundary lines before
+  building a fence (5.8.1) is a deadline with no request type, since an application doesn't carry the verification.
 - In 5.8.2, a fence in a utility easement where a recorded plat or document prohibits it is a judged obligation in
   applications and violations (remedy redesign); the Owner's cost of a utility's removal is an obligation with no
   request type; and examining plot plans for sight lines is a recommendation in applications (remedy change-detail).
@@ -1510,3 +1520,32 @@ now also apply to a Board designation of Voting Groups and cite 6.4(b)/p2, and w
   10.2/p1#while-owns also test community.declarant-reserved-rights-in-force and cite 10.11, which ends the Article 10
   rights; Design Guidelines 5.8.2#check-sight-lines runs in architectural-application requests, as recommendations do,
   with remedy change-detail.
+
+**Rule-structuring review 3 (run 2026-10-11T16-18-18-rule-structuring).**
+
+- 5.4/p4: neighborhood-association-repair bundled separately deniable duties, so it's split to mirror the Owner's 5.4/p2
+  and 5.4/p3 rules: repair and replacement to the Community-Wide Standard (the key kept, judged), insurance at full
+  replacement cost (#neighborhood-association-insurance, a test on the new
+  neighborhood.common-property-insurance-policies unless neighborhood.common-property-insured-by names the Association),
+  rebuild-or-clear after damage (#neighborhood-association-rebuild-or-clear, judged, on the new
+  neighborhood.common-property-damaged-on) and uninsured costs (#neighborhood-association-uninsured-costs, on the new
+  neighborhood.uninsured-restoration-costs-paid, with no request type). 7.4(a)/p3#neighborhood-maintenance enforces the
+  three that run in violations.
+- 6.4(a)/p3: the new #provide-services (an Association obligation in yearly compliance periods, applying when
+  neighborhood.services-request-approved holds and testing neighborhood.requested-services-provided) and
+  #services-assessed (a Board obligation in assessment requests on assessment.neighborhood-services-costs: a
+  Neighborhood Assessment levied against that Neighborhood's Units, as 8.4#levy-scope reads assessment.levied-against)
+  hold the duties #services-vote's statement carried; its statement keeps only the vote. levy-scope is relabelled from
+  Special Assessments to any levy and cites 6.4(a)/p3.
+- Design Guidelines 3.5.3: max-coverage and max-coverage-required apply only to the five collections the table lists
+  (the home models count through broader), since the open Unit-type set would otherwise fail any unlisted type.
+- Design Guidelines 5.4.1(ii): stain-opacity applies only when the wood fence is stained (fence-run.stain stated).
+- 17.1: no-objection-undeveloped and no-objection-master-plan apply to the dispute, whose facts they read.
+- Design Guidelines 3.3.1: county-permits runs in violations; 3.3.3 holds applications for county approval.
+- 10.1, 10.2/p1: the while-owns statements now state 10.11's end of the Article 10 rights.
+- 15.4: the amenity parking rules (#amenity-parking-limits, #amenity-parking-reasonable-times) are intentionally
+  dormant, with no request type: the parkers are a Private Amenity's members, guests and invitees, who needn't be
+  Owners, so no violation request reaches them.
+- Design Guidelines 5.11.3: stain-permitted stays for now. It overrides nothing, but it's the "options among others"
+  answer of question-guidelines-8, which keeps it, so removing it waits on that question; "Metal and composite materials
+  will be considered" stays without a rule, since nothing requires wood (above).
