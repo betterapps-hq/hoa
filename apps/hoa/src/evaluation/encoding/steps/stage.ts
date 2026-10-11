@@ -192,7 +192,8 @@ export async function runDefinedTerms(
   const outputs = new Map<string, VocabularyOutput | null>()
   const calls: ModelCall[] = []
   const problems: StepProblem[] = []
-  for (const item of items) {
+  // Documents are independent, so their calls run in parallel, each with its own reruns.
+  await inParallel(items, context.concurrency ?? 8, async (item) => {
     let problemsBlock: string | undefined
     for (let attempt = 0; attempt <= (context.reruns ?? 0); attempt += 1) {
       const result = await runStepPrompt({
@@ -222,7 +223,7 @@ export async function runDefinedTerms(
       }
       problemsBlock = problemsText(check)
     }
-  }
+  })
   return {
     outputs,
     calls,
@@ -380,12 +381,14 @@ export async function runSharedVocabulary(
     return []
   }
   const zodFailures = new Map<string, StepProblem[]>()
-  for (const item of items) {
+  // Groups are independent, so their calls run in parallel, as the build runs them; the check across groups waits for
+  // every first answer, then the failing groups rerun in parallel.
+  await inParallel(items, context.concurrency ?? 8, async (item) => {
     zodFailures.set(item.id, await run(item))
-  }
+  })
   if ((context.reruns ?? 0) > 0) {
     const checked = checkSharedVocabulary([...groups.values()], known)
-    for (const item of items) {
+    await inParallel(items, context.concurrency ?? 8, async (item) => {
       const found = checked.get(item.id) ?? []
       const failures = zodFailures.get(item.id) ?? []
       if (found.length > 0 || failures.length > 0) {
@@ -396,7 +399,7 @@ export async function runSharedVocabulary(
         )
         zodFailures.set(item.id, await run(item, block))
       }
-    }
+    })
   }
   for (const failures of zodFailures.values()) {
     problems.push(...failures)
