@@ -127,6 +127,7 @@ const expected: Record<string, Outcome> = {
   "declaration:4.3(b)#additional-information request": "not-applicable",
   "declaration:4.3(b)/p2#harmony work-1": "committee",
   "declaration:4.2(d)#fee-before-review request": "met",
+  "declaration:4.2(d)#reasonable-fees request": "committee",
   "declaration:4.3(b)/p3#written-response request": "pending",
   // Not in the table: the Declarant's notice and veto, and variance consents, none of which this packet reaches.
   "declaration:4.3(b)/p6#notify-declarant request": "missing-information",

@@ -212,6 +212,7 @@ describe("reviewApplication on the fence fixture", () => {
       "facts:gate",
       "normalize",
       "documents",
+      "judgment:declaration:4.2(d)#reasonable-fees:request",
       "judgment:declaration:4.3(b)/p2#harmony:work-1",
       // Each fact that alone decides a finding, read again: the gate's run isn't one, since every run's boards are
       // horizontal, and the return run borders nothing a rule reads. Every second reading confirms its fact, so nothing

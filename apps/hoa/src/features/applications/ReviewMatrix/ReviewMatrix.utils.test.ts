@@ -90,6 +90,7 @@ describe("reviewMatrix on the sample fence application's expected result", () =>
     const committee = grid(filterMatrix(model, { isAttentionOnly: false, outcomes: ["committee"] }))
     expect(Object.keys(committee).toSorted()).toEqual([
       "declaration:4.1/p1#approval-required",
+      "declaration:4.2(d)#reasonable-fees",
       "declaration:4.3(b)/p2#harmony"
     ])
   })

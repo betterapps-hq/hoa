@@ -300,9 +300,12 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   approval of Members' Use Restrictions (3.3(b)) is a separate requirement during the Control Period.
 - Member disapproval of a Board change (3.3(a)) uses its own vote subject with vote.in-favor, rather than vote.against
   on the change, so a passing vote means the change is disapproved.
-- "A meeting called for such purpose" (3.3(b)) is in the statement only; no meeting term records a meeting's purpose.
-- 3.3's Board duties to call a meeting when Members petition to disapprove a change, and to send each Owner the changed
-  Use Restrictions, are Board judgments in a compliance period.
+- "A meeting called for such purpose" (3.3(b)) is part of the adoption's check: the request's meeting.purpose is
+  vote-subject.use-restrictions-adoption, as 8.1/p4#meeting-window reads the purpose.
+- 3.3's Board duty to call a meeting when Members petition to disapprove a change is a Board judgment in a compliance
+  period. Its duty to send each Owner the changed Use Restrictions is a deadline on the adopting vote in meeting
+  requests (3.3(c)#distribute-copy): vote.distributed-on at least a day before vote.effective-on, since the copies go
+  out "prior to" the change becoming effective.
 - When a change takes effect is two requirements on the vote that adopts it, in meeting requests: no earlier than 30
   days after the copies go to the Owners (3.3(c)#effective-date, a deadline from the new vote.distributed-on to
   vote.effective-on, for Board changes and Members' adoptions alike), and, when a disapproval petition arrives before
@@ -385,10 +388,10 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   the application; approved-with-conditions and approved-in-part count as approved through broader.
 - Review fees paid before review (4.2(d)) are a requirement on the application, applying when the Reviewer requires
   prepayment (architectural-application.review-fee is stated); hiring reviewers and budgeting their pay are powers, not
-  rules, and the fees' reasonableness is the Reviewer's obligation in the application, judged by the Board
-  (4.2(d)#reasonable-fees, like 4.7's reasonable certificate fee). The payment date (.review-fee-paid-on) is unknown
-  when unstated: payment is the Association's record, so a packet's silence doesn't show the fee unpaid (changed while
-  building the engine).
+  rules, and the fees' reasonableness is the Reviewer's obligation in architectural-application requests when a fee is
+  charged, judged by the Board (4.2(d)#reasonable-fees, like 4.7's reasonable certificate fee). The payment date
+  (.review-fee-paid-on) is unknown when unstated: payment is the Association's record, so a packet's silence doesn't
+  show the fee unpaid (changed while building the engine).
 - The Declarant exemption (4.1/p4) is a permission whose selector covers every rule under Article 4 and the guidelines
   document (the guidelines bind only through 4.1/p1's "in compliance with ... this Article and the Residential Design
   Guidelines"), excepting Article 4's own exemptions so no selector selects itself; the same selector serves the 4.7
@@ -643,8 +646,10 @@ schema can't express faithfully yet; the closest faithful form is encoded.
   schedule for checking the continuing ones, so yearly is a judgment call.
 - Other yearly compliance-period judgments: 7.3(c)/p2's debris clearing and landscaped upkeep after a decision not to
   restore, on Common Area with common-area.restoration-declined; the Association's own UPD Permit compliance, since
-  7.12(a) binds the Association as well as each Owner; and 8.3/p1's reserve budget. 8.4's levy scope is a permission in
-  assessment requests.
+  7.12(a) binds the Association as well as each Owner; and 8.3/p1's reserve budget. 8.4's levy scope is an Association
+  obligation in assessment requests on Special Assessments (8.4#levy-scope): one for Common Expenses is levied against
+  the entire membership, one for Neighborhood Expenses only against that Neighborhood's Units (assessment.levied-against
+  with assessment.funds-expense-type).
 - The annual insurance review and the Common Expense budget are deadlines on compliance-period.completed-on from the
   scheduled date (within a year; 60 days before), so a missed duty is found even with no record of it; Neighborhood
   budgets stay per budget entity, since one compliance period can't tell the Neighborhoods apart, and the five-year
@@ -733,9 +738,10 @@ schema can't express faithfully yet; the closest faithful form is encoded.
 - Advance payment of assessments at closing, when the Board requires it (8.6/p2), runs in title-transfer requests on
   title-transfer.advance-payment-required, like the working capital contribution; the Board's other payment terms are
   how the assessment feature sets due-on.
-- The grantee's joint and several liability for assessments due at the conveyance (8.7(a)#grantee-liability) is the
-  payment rule's deadline borne by the Owner for assessments due on or before lot.owner-took-title-on; the foreclosure
-  buyer's permission (8.8/p3#new-owner-not-liable) now overrides it too.
+- The grantee's joint and several liability for assessments due at the conveyance (8.7(a)#grantee-liability) is an Owner
+  obligation on assessments due on or before lot.owner-took-title-on and still unpaid then (assessment.paid-on absent or
+  later), testing that the assessment is paid; the foreclosure buyer's permission (8.8/p3#new-owner-not-liable) now
+  overrides it too.
 - The payment certificate being conclusive evidence of payment (8.7(a)/p4) is a permission for the Owner over the
   payment rules once a certificate states the assessment paid (assessment.certified-paid), the counterpart of 4.7's
   estoppel.
@@ -1436,3 +1442,27 @@ now also apply to a Board designation of Voting Groups and cite 6.4(b)/p2, and w
 - 4.2(c): The Reviewer is the party with jurisdiction, the Declarant or the DRC, so architectural-application.reviewer
   is a party among declarant and committee; the reviewer value set and its two values are gone, and 4.3(b)/p6 compares
   with the parties.
+
+**Rule-structuring review (2026-10-11, run 2026-10-11T15-32-06-rule-structuring).**
+
+- 4.2(d): reasonable-fees runs in architectural-application requests, applying when a review fee is charged
+  (architectural-application.review-fee), since the fee is charged on the application, as 3.5(e)'s and 4.7's fees run in
+  theirs.
+- 3.3(c): distribute-copy is a fact, not a judgment: a Board obligation on the adopting vote in meeting requests, with
+  #effective-date's vote subjects, and a deadline with vote.distributed-on at least a day before vote.effective-on,
+  since the copies go out "prior to" the action becoming effective.
+- 8.4: levy-scope was a permission that overrode nothing; it's now what 8.4 restricts, an Association obligation that a
+  Special Assessment for Common Expenses is levied against the entire membership and one for Neighborhood Expenses only
+  against that Neighborhood's Units, on assessment.funds-expense-type and the new assessment.levied-against (levy-scope
+  values entire-membership and neighborhood-units, citing 8.4 and the Article 2 definition). No levy-purpose rule: "to
+  cover unbudgeted expenses or expenses in excess of those budgeted" states the power's purpose and no fact or limit
+  beyond it.
+- 3.1(a)(iii), 8.7(a): The new purchaser party (grantee, buyer), the transferor's counterpart, signs the contract of
+  sale: sale-age-statement checks signedBy purchaser instead of a mustState line, as lease-age-statement checks the
+  tenant.
+- 3.3(b): member-adoption's check also tests that the request's meeting.purpose is
+  vote-subject.use-restrictions-adoption, the "meeting called for such purpose".
+- 8.7(a): grantee-liability makes the grantee liable only for amounts still due at the conveyance, so it applies when
+  the assessment was due by lot.owner-took-title-on and unpaid then (assessment.paid-on absent or later), and tests that
+  it's paid, replacing the deadline from the original due date, which made the grantee answer for lateness before the
+  transfer; 8.8/p3#new-owner-not-liable still overrides it.

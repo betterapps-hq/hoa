@@ -72,7 +72,7 @@ describe("ReviewMatrix", () => {
     await user.click(screen.getByRole("checkbox", { name: "Only what needs attention" }))
     expect(screen.queryByText("Wood, composite or open metal fences only")).not.toBeInTheDocument()
     expect(rowOf(colors)).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Committee 2" }))
+    await user.click(screen.getByRole("button", { name: "Committee 3" }))
     expect(screen.queryByText(colors, { selector: "span" })).not.toBeInTheDocument()
     expect(rowOf("Work in harmony with its surroundings")).toBeInTheDocument()
   })

@@ -67,6 +67,7 @@ const expected: Record<string, Record<string, Outcome>> = {
   "declaration:4.3(b)#additional-information": { request: "not-applicable" },
   "declaration:4.3(b)/p2#harmony": { "work-1": "committee" },
   // Not in the table: the committee's own duties, which never count against the applicant.
+  "declaration:4.2(d)#reasonable-fees": { request: "committee" },
   "declaration:4.3(b)/p3#written-response": { request: "pending" },
   "declaration:4.3(b)/p6#notify-declarant": { request: "missing-information" },
   "declaration:4.3(b)/p6#veto-window": { request: "not-applicable" },

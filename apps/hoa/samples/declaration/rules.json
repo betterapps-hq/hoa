@@ -61222,6 +61222,266 @@
       "many": false,
       "ifUnstated": "absent",
       "derived": null
+    },
+    {
+      "key": "assessment.levied-against",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "levied against",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "the Owners and Units the assessment is charged against",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:8.4",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "property",
+      "of": "assessment",
+      "valueType": {
+        "type": "choice",
+        "set": "levy-scope"
+      },
+      "many": false,
+      "ifUnstated": "unknown",
+      "derived": null
+    },
+    {
+      "key": "levy-scope",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "Special Assessment levy scope",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:8.4",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value-set",
+      "complete": false
+    },
+    {
+      "key": "levy-scope.entire-membership",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "the entire membership",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        },
+        {
+          "text": "all Owners",
+          "role": "alternative",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:8.4",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:article-2/special-assessment",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "levy-scope",
+      "broader": []
+    },
+    {
+      "key": "levy-scope.neighborhood-units",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "the Units within the Neighborhood whose expenses it covers",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        },
+        {
+          "text": "all Owners in a Neighborhood",
+          "role": "alternative",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": null,
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:8.4",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:article-2/special-assessment",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "value",
+      "set": "levy-scope",
+      "broader": []
+    },
+    {
+      "key": "purchaser",
+      "organizationId": "org-sample",
+      "labels": [
+        {
+          "text": "purchaser",
+          "role": "preferred",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        },
+        {
+          "text": "grantee",
+          "role": "alternative",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        },
+        {
+          "text": "buyer",
+          "role": "alternative",
+          "plural": null,
+          "citation": null,
+          "provenance": {
+            "by": "extraction",
+            "at": "2026-10-11T12:00:00Z"
+          }
+        }
+      ],
+      "definition": "the Person taking title to a Unit under a contract of sale or conveyance",
+      "scopeNote": null,
+      "context": null,
+      "citations": [
+        {
+          "provisionKey": "declaration:3.1(a)(iii)",
+          "highlight": null,
+          "region": null
+        },
+        {
+          "provisionKey": "declaration:8.7(a)",
+          "highlight": null,
+          "region": null
+        }
+      ],
+      "provenance": {
+        "by": "extraction",
+        "at": "2026-10-11T12:00:00Z"
+      },
+      "review": {
+        "status": "proposed",
+        "by": null,
+        "at": null,
+        "note": null
+      },
+      "issues": [],
+      "kind": "thing",
+      "nature": "party",
+      "request": null
     }
   ],
   "proposedCore": [
@@ -63335,7 +63595,7 @@
       "key": "declaration:3.1(a)(iii)#sale-age-statement",
       "domain": "use",
       "title": "Contracts of sale state the community is for persons 55 and over",
-      "statement": "Each {{contract-of-sale}} for a {{lot}} must state in conspicuous type that the Units are intended for the housing of persons 55 years of age or older, and must be in writing and signed by the purchaser.",
+      "statement": "Each {{contract-of-sale}} for a {{lot}} must state in conspicuous type that the Units are intended for the housing of persons 55 years of age or older, and must be in writing and signed by the {{purchaser}}.",
       "citations": [
         {
           "provisionKey": "declaration:3.1(a)(iii)",
@@ -63361,10 +63621,9 @@
         "document": "contract-of-sale",
         "per": "request",
         "mustState": [
-          "a statement, in conspicuous type, that the Units within the Residential Community are intended for the housing of persons 55 years of age or older",
-          "the contract is signed by the purchaser"
+          "a statement, in conspicuous type, that the Units within the Residential Community are intended for the housing of persons 55 years of age or older"
         ],
-        "signedBy": []
+        "signedBy": ["purchaser"]
       },
       "remedy": null,
       "recurs": null,
@@ -65346,27 +65605,45 @@
       "check": {
         "type": "test",
         "test": {
-          "type": "compare",
-          "left": {
-            "type": "quotient",
-            "of": [
-              {
-                "type": "ref",
-                "path": ["vote.in-favor"]
+          "type": "all",
+          "of": [
+            {
+              "type": "compare",
+              "left": {
+                "type": "quotient",
+                "of": [
+                  {
+                    "type": "ref",
+                    "path": ["vote.in-favor"]
+                  },
+                  {
+                    "type": "ref",
+                    "from": "community",
+                    "path": ["community.total-voting-power"]
+                  }
+                ]
               },
-              {
-                "type": "ref",
-                "from": "community",
-                "path": ["community.total-voting-power"]
+              "op": ">",
+              "right": {
+                "type": "fraction",
+                "numerator": 1,
+                "denominator": 2
               }
-            ]
-          },
-          "op": ">",
-          "right": {
-            "type": "fraction",
-            "numerator": 1,
-            "denominator": 2
-          }
+            },
+            {
+              "type": "compare",
+              "left": {
+                "type": "ref",
+                "from": "request",
+                "path": ["meeting.purpose"]
+              },
+              "op": "=",
+              "right": {
+                "type": "value",
+                "term": "vote-subject.use-restrictions-adoption"
+              }
+            }
+          ]
         }
       },
       "remedy": null,
@@ -66054,7 +66331,7 @@
       "key": "declaration:3.3(c)#distribute-copy",
       "domain": "governance",
       "title": "Send each Owner the changed Use Restrictions",
-      "statement": "Before any new or changed {{use-restrictions}} under 3.3, or a designation of {{voting-group:plural}}, take effect, the {{board}} must send a copy of them to each {{owner}}.",
+      "statement": "The {{board}} must send each {{owner}} a copy of new or changed {{use-restrictions}} under 3.3, or of a designation of {{voting-group:plural}}, before it takes effect.",
       "citations": [
         {
           "provisionKey": "declaration:3.3(c)",
@@ -66067,9 +66344,29 @@
           "region": null
         }
       ],
-      "requestTypes": ["compliance-period"],
-      "appliesTo": "community",
-      "appliesWhen": null,
+      "requestTypes": ["meeting"],
+      "appliesTo": "vote",
+      "appliesWhen": {
+        "type": "in",
+        "left": {
+          "type": "ref",
+          "path": ["vote.subject"]
+        },
+        "values": [
+          {
+            "type": "value",
+            "term": "vote-subject.use-restrictions-amendment"
+          },
+          {
+            "type": "value",
+            "term": "vote-subject.use-restrictions-adoption"
+          },
+          {
+            "type": "value",
+            "term": "vote-subject.voting-group-designation"
+          }
+        ]
+      },
       "scope": null,
       "authority": null,
       "effectiveFrom": "2001-12-04",
@@ -66077,13 +66374,26 @@
       "modality": "obligation",
       "bearer": "board",
       "beneficiary": "owner",
-      "decidedBy": "board",
+      "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "judgment",
-        "question": "Before each new or changed Use Restriction adopted under Section 3.3, and each designation of Voting Groups, took effect, did the Board send a copy of it to each Owner?",
-        "evidence": []
+        "type": "deadline",
+        "act": {
+          "type": "ref",
+          "path": ["vote.distributed-on"]
+        },
+        "anchor": {
+          "type": "ref",
+          "path": ["vote.effective-on"]
+        },
+        "earliest": null,
+        "latest": {
+          "value": -1,
+          "unit": "calendar-day",
+          "at": null
+        },
+        "onMiss": []
       },
       "remedy": null,
       "recurs": null,
@@ -70015,9 +70325,12 @@
           "region": null
         }
       ],
-      "requestTypes": [],
+      "requestTypes": ["architectural-application"],
       "appliesTo": "architectural-application",
-      "appliesWhen": null,
+      "appliesWhen": {
+        "type": "exists",
+        "path": ["architectural-application.review-fee"]
+      },
       "scope": null,
       "authority": null,
       "effectiveFrom": "2001-12-04",
@@ -84361,8 +84674,8 @@
     {
       "key": "declaration:8.4#levy-scope",
       "domain": "financial",
-      "title": "Special Assessments on the membership or a Neighborhood",
-      "statement": "The {{organization}} may levy a Special Assessment to cover unbudgeted expenses or expenses over budget, against the entire membership if for Common Expenses, or against the {{lot:plural}} in a {{neighborhood}} if for its Neighborhood Expenses.",
+      "title": "Special Assessments levied on the membership or a Neighborhood",
+      "statement": "A Special Assessment the {{organization}} levies must be levied against the entire membership if it's for Common Expenses, or only against the {{lot:plural}} in the {{neighborhood}} whose Neighborhood Expenses it covers.",
       "citations": [
         {
           "provisionKey": "declaration:8.4",
@@ -84388,13 +84701,78 @@
       "authority": null,
       "effectiveFrom": "2001-12-04",
       "kind": "norm",
-      "modality": "permission",
+      "modality": "obligation",
       "bearer": "organization",
-      "beneficiary": null,
+      "beneficiary": "owner",
       "decidedBy": null,
       "overrides": [],
       "noExceptions": null,
-      "check": null,
+      "check": {
+        "type": "test",
+        "test": {
+          "type": "any",
+          "of": [
+            {
+              "type": "all",
+              "of": [
+                {
+                  "type": "compare",
+                  "left": {
+                    "type": "ref",
+                    "path": ["assessment.funds-expense-type"]
+                  },
+                  "op": "=",
+                  "right": {
+                    "type": "value",
+                    "term": "expense-type.common"
+                  }
+                },
+                {
+                  "type": "compare",
+                  "left": {
+                    "type": "ref",
+                    "path": ["assessment.levied-against"]
+                  },
+                  "op": "=",
+                  "right": {
+                    "type": "value",
+                    "term": "levy-scope.entire-membership"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "all",
+              "of": [
+                {
+                  "type": "compare",
+                  "left": {
+                    "type": "ref",
+                    "path": ["assessment.funds-expense-type"]
+                  },
+                  "op": "=",
+                  "right": {
+                    "type": "value",
+                    "term": "expense-type.neighborhood"
+                  }
+                },
+                {
+                  "type": "compare",
+                  "left": {
+                    "type": "ref",
+                    "path": ["assessment.levied-against"]
+                  },
+                  "op": "=",
+                  "right": {
+                    "type": "value",
+                    "term": "levy-scope.neighborhood-units"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
       "remedy": null,
       "recurs": null,
       "cure": null,
@@ -85052,17 +85430,47 @@
       "requestTypes": ["assessment"],
       "appliesTo": "assessment",
       "appliesWhen": {
-        "type": "compare",
-        "left": {
-          "type": "ref",
-          "path": ["assessment.due-on"]
-        },
-        "op": "<=",
-        "right": {
-          "type": "ref",
-          "from": "lot",
-          "path": ["lot.owner-took-title-on"]
-        }
+        "type": "all",
+        "of": [
+          {
+            "type": "compare",
+            "left": {
+              "type": "ref",
+              "path": ["assessment.due-on"]
+            },
+            "op": "<=",
+            "right": {
+              "type": "ref",
+              "from": "lot",
+              "path": ["lot.owner-took-title-on"]
+            }
+          },
+          {
+            "type": "any",
+            "of": [
+              {
+                "type": "not",
+                "of": {
+                  "type": "exists",
+                  "path": ["assessment.paid-on"]
+                }
+              },
+              {
+                "type": "compare",
+                "left": {
+                  "type": "ref",
+                  "path": ["assessment.paid-on"]
+                },
+                "op": ">",
+                "right": {
+                  "type": "ref",
+                  "from": "lot",
+                  "path": ["lot.owner-took-title-on"]
+                }
+              }
+            ]
+          }
+        ]
       },
       "scope": null,
       "authority": null,
@@ -85075,22 +85483,11 @@
       "overrides": [],
       "noExceptions": null,
       "check": {
-        "type": "deadline",
-        "act": {
-          "type": "ref",
+        "type": "test",
+        "test": {
+          "type": "exists",
           "path": ["assessment.paid-on"]
-        },
-        "anchor": {
-          "type": "ref",
-          "path": ["assessment.due-on"]
-        },
-        "earliest": null,
-        "latest": {
-          "value": 0,
-          "unit": "calendar-day",
-          "at": null
-        },
-        "onMiss": []
+        }
       },
       "remedy": null,
       "recurs": null,

@@ -16,17 +16,20 @@ describe("judgmentCalls", () => {
     const unjudged = evaluate({ rulesFile, request, answers, evaluatedAt: "2026-09-10T12:00:00Z" })
     const calls = judgmentCalls(unjudged, rulesFile.rules, vocabulary)
     expect(calls.map((call) => [call.ruleKey, call.entity, call.evidenceTerms])).toEqual([
+      ["declaration:4.2(d)#reasonable-fees", "request", []],
       ["declaration:4.3(b)/p2#harmony", "work-1", ["plans", "photo"]]
     ])
     const judged = evaluate({ rulesFile, request, answers: fenceAnswers(), evaluatedAt: "2026-09-10T12:00:00Z" })
-    expect(judgmentCalls(judged, rulesFile.rules, vocabulary)).toEqual([])
+    expect(judgmentCalls(judged, rulesFile.rules, vocabulary).map((call) => [call.ruleKey, call.entity])).toEqual([
+      ["declaration:4.2(d)#reasonable-fees", "request"]
+    ])
     const [first] = calls
     if (!first) {
       throw new Error("Expected a judgment call.")
     }
     expect(toJudgment(first, { answer: "yes", confidence: 0.9, rationale: "Fits.", evidence: [] })).toMatchObject({
-      ruleKey: "declaration:4.3(b)/p2#harmony",
-      entity: "work-1",
+      ruleKey: "declaration:4.2(d)#reasonable-fees",
+      entity: "request",
       answer: "yes"
     })
   })
