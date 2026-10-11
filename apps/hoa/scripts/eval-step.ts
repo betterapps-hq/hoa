@@ -4,7 +4,7 @@ import { parseArgs } from "node:util"
 import { z } from "zod"
 import { createAiContext } from "../src/ai/aiContext.server.ts"
 import { findTermCandidates } from "../src/encoding/definedTerms.ts"
-import { crossReferenceLines } from "../src/encoding/steps/consolidation.ts"
+import { crossReferenceLines, exceptionLines } from "../src/encoding/steps/consolidation.ts"
 import { relatedOutlines, structuringBatches } from "../src/encoding/steps/ruleStructuring.ts"
 import type { StepAi } from "../src/encoding/steps/run.ts"
 import { vocabularyGroups, withReadKeys } from "../src/encoding/steps/vocabulary.ts"
@@ -615,7 +615,8 @@ switch (stage) {
                 references: goldenSet.references,
                 sectionOf: section,
                 unresolved: fromStep.unresolved
-              })
+              }),
+              exceptions: exceptionLines({ rules, sectionOf: section })
             }
           }
         })

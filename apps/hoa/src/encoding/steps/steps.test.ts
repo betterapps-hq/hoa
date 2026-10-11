@@ -3,7 +3,7 @@ import type { z } from "zod"
 import { outputSchema } from "@/ai/runPrompt"
 import { termDraft, type TermContent } from "@/schema/zod"
 import type { TermCandidate } from "../definedTerms"
-import { consolidationAnswer, crossReferenceLines } from "./consolidation"
+import { consolidationAnswer, crossReferenceLines, exceptionLines } from "./consolidation"
 import {
   checkDefinedTerms,
   citableProvisions,
@@ -725,5 +725,49 @@ describe("consolidation", () => {
       unresolved: [{ key: "rules:1#a", target: "rules:9" }]
     })
     expect(lines).toEqual(["rules:1#a | rules:5 | rules:5#b", "rules:1#a | rules:9 | nothing resolved"])
+  })
+
+  it("lists exceptions that override nothing with the norms elsewhere on their subject and request type", () => {
+    const base = {
+      domain: "use" as const,
+      title: "T",
+      statement: "S.",
+      requestTypes: ["violation"],
+      appliesTo: "lot",
+      appliesWhen: null,
+      scope: null,
+      authority: null,
+      effectiveFrom: "2024-01-01",
+      beneficiary: null,
+      noExceptions: null,
+      decidedBy: null,
+      check: null,
+      remedy: null,
+      recurs: null,
+      cure: null
+    }
+    const cite = (key: string) => [{ provisionKey: key.slice(0, key.indexOf("#")), highlight: null, region: null }]
+    const permission = {
+      ...base,
+      key: "rules:1#may",
+      citations: cite("rules:1#may"),
+      kind: "norm" as const,
+      modality: "permission" as const,
+      bearer: "owner",
+      overrides: []
+    }
+    const norm = (key: string, appliesTo: string) => ({
+      ...base,
+      key,
+      appliesTo,
+      citations: cite(key),
+      kind: "norm" as const,
+      modality: "obligation" as const,
+      bearer: "owner",
+      overrides: [],
+      check: { type: "test" as const, test: { type: "text" as const, text: "ok" } }
+    })
+    const rules = [permission, norm("rules:2#must", "lot"), norm("rules:3#fence", "fence"), norm("rules:1#same", "lot")]
+    expect(exceptionLines({ rules, sectionOf: (key) => key })).toEqual(["rules:1#may | rules:2#must"])
   })
 })

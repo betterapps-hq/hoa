@@ -1,7 +1,7 @@
 import { candidateTermPairs } from "@/encoding/consolidate"
 import type { TermCandidate } from "@/encoding/definedTerms"
 import type { EncodingUnit } from "@/encoding/plan"
-import { crossReferenceLines } from "@/encoding/steps/consolidation"
+import { crossReferenceLines, exceptionLines } from "@/encoding/steps/consolidation"
 import { definingProvisions } from "@/encoding/steps/definedTerms"
 import { keysIn } from "@/encoding/steps/drafts"
 import type { Outline } from "@/encoding/steps/outline"
@@ -21,6 +21,7 @@ import {
   goldenOutlines,
   goldenSections,
   goldenTerms,
+  interpretationReadings,
   outlinesAsFound,
   ruleContent,
   termContent,
@@ -97,6 +98,10 @@ export type ConsolidationItem = DatasetItem<
     documents: DocumentLine[]
     precedence: T.DocumentKind[][]
     crossReferences: string[]
+    /** `exceptionLines`: exceptions that override nothing yet, with the norms they may be about. */
+    exceptions: string[]
+    /** Rules that are one reading of an ambiguous passage (an interpretation question's options). */
+    readings: T.RuleKey[]
   },
   { overrides: { rule: T.RuleKey; target: T.RuleKey }[]; duplicates: string[][]; conflicts: string[][] }
 >
@@ -374,7 +379,9 @@ export function buildDatasets(context: GoldenContext) {
         terms: goldenTerms(golden),
         documents: golden.documents.map((document) => documentLine(golden, document.key)),
         precedence: golden.settings.clauses.precedence.order,
-        crossReferences: crossReferenceLines({ rules: withoutCrossOverrides, references, sectionOf: section })
+        crossReferences: crossReferenceLines({ rules: withoutCrossOverrides, references, sectionOf: section }),
+        exceptions: exceptionLines({ rules: withoutCrossOverrides, sectionOf: section }),
+        readings: interpretationReadings(golden).filter((key) => inSplit.some((rule) => rule.key === key))
       },
       expected: { overrides: removed, duplicates: [], conflicts: [] }
     }

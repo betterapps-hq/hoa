@@ -80,6 +80,15 @@ function readOf(key: string, vocabulary: ReturnType<typeof createVocabulary>): R
   return null
 }
 
+/** The rules an interpretation question keeps in one of its options: each is one reading of an ambiguous passage. */
+export const interpretationReadings = (golden: T.RulesFile) => [
+  ...new Set(
+    golden.questions
+      .filter((question) => question.kind === "interpretation")
+      .flatMap((question) => question.options.flatMap((option) => option.keeps))
+  )
+]
+
 /**
  * The golden rules as outlines (E's answer at its best): each with its section, its statement as its summary, its
  * reads in plain words (the properties and values it tests) and the term keys they are (what C serves).
@@ -89,12 +98,7 @@ export function goldenOutlines(golden: T.RulesFile, sections: readonly EncodingU
   const vocabulary = createVocabulary(terms)
   const byKey = new Map([...coreTerms.map((term) => termContent(term)), ...terms].map((term) => [term.key, term]))
   const section = sectionOf(sections)
-  // A rule an interpretation question keeps in one of its options is one reading of an ambiguous passage.
-  const readings = new Set(
-    golden.questions
-      .filter((question) => question.kind === "interpretation")
-      .flatMap((question) => question.options.flatMap((option) => option.keeps))
-  )
+  const readings = new Set(interpretationReadings(golden))
   const outlines = golden.rules.map((rule): Outline => {
     const content = ruleContent(rule)
     const read = termsRead(content, byKey).filter((key) => {

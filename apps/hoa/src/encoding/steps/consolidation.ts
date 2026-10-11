@@ -44,8 +44,11 @@ function overridesText(rule: RuleContent) {
   return Array.isArray(rule.overrides) ? rule.overrides.join(", ") || "none" : "selector"
 }
 
-/** One rule line: key | kind and modality | request types | subject | main citation | overrides | statement. */
-export function ruleLine(rule: RuleContent, vocabulary: ReturnType<typeof createVocabulary>) {
+/**
+ * One rule line: key | kind and modality | request types | subject | main citation | overrides | statement, marked when
+ * the rule is one reading of an ambiguous passage (an alternative to the others, not their duplicate or conflict).
+ */
+export function ruleLine(rule: RuleContent, vocabulary: ReturnType<typeof createVocabulary>, reading = false) {
   const kind = rule.kind === "norm" || rule.kind === "sanction" ? `${rule.kind} ${rule.modality}` : rule.kind
   const overrides = overridesText(rule)
   const statement = renderStatement(rule.statement, (key, plural) => vocabulary.label(key, plural))
@@ -56,7 +59,7 @@ export function ruleLine(rule: RuleContent, vocabulary: ReturnType<typeof create
     rule.appliesTo ?? "-",
     mainCitation(rule),
     overrides,
-    statement
+    reading ? `one reading of an ambiguous passage: ${statement}` : statement
   ].join(" | ")
 }
 
@@ -91,6 +94,41 @@ export function crossReferenceLines(input: {
   return lines
 }
 
+/** How many candidate targets an exception line lists at most. */
+const exceptionCandidates = 8
+
+/**
+ * Exceptions that override nothing yet (a permission or discretion whose overrides is an empty list has no effect),
+ * each with the norms in other sections on the same subject that share a request type: rule | candidates there.
+ */
+export function exceptionLines(input: {
+  rules: readonly RuleContent[]
+  sectionOf: (provisionKey: ProvisionKey) => string | undefined
+}) {
+  const isException = (rule: RuleContent) =>
+    (rule.kind === "discretion" || (rule.kind === "norm" && rule.modality === "permission")) &&
+    Array.isArray(rule.overrides) &&
+    rule.overrides.length === 0
+  return input.rules.filter(isException).map((rule) => {
+    const section = input.sectionOf(mainCitation(rule))
+    const candidates = input.rules
+      .filter(
+        (other) =>
+          other.kind === "norm" &&
+          other.modality !== "permission" &&
+          other.appliesTo !== null &&
+          other.appliesTo === rule.appliesTo &&
+          input.sectionOf(mainCitation(other)) !== section &&
+          other.requestTypes.some((type) => rule.requestTypes.includes(type))
+      )
+      .map((other) => other.key)
+      .toSorted(compareCodeUnits)
+    const shown = candidates.slice(0, exceptionCandidates).join(", ") || "none on its subject"
+    const more = candidates.length > exceptionCandidates ? `, and ${candidates.length - exceptionCandidates} more` : ""
+    return `${rule.key} | ${shown}${more}`
+  })
+}
+
 /** The precedence of document kinds as a rank, highest first, when the settings give one. */
 function rankOf(kind: DocumentKind, order: readonly (readonly DocumentKind[])[]) {
   const index = order.findIndex((kinds) => kinds.includes(kind))
@@ -104,7 +142,12 @@ export function consolidationVariables(input: {
   documents: readonly Pick<GoverningDocument, "key" | "kind" | "title" | "edition">[]
   precedence: readonly (readonly DocumentKind[])[]
   crossReferences: readonly string[]
+  /** `exceptionLines`. */
+  exceptions: readonly string[]
+  /** Rules that are one reading of an ambiguous passage. */
+  readings: readonly RuleKey[]
 }): PromptVariables<typeof stepPrompts.consolidation> {
+  const readings = new Set(input.readings)
   const vocabulary = createVocabulary([...input.terms])
   const pairs = candidateRulePairs(input.rules, input.terms)
   return {
@@ -115,10 +158,11 @@ export function consolidationVariables(input: {
       .map(documentLine)
       .join("\n"),
     crossReferences: input.crossReferences.join("\n") || "none",
+    exceptions: input.exceptions.join("\n") || "none",
     rulePairs: pairs.map((pair) => `${pair.keys[0]} | ${pair.keys[1]} | ${pair.score}`).join("\n") || "none",
     rules: input.rules
       .toSorted((a, b) => compareCodeUnits(a.key, b.key))
-      .map((rule) => ruleLine(rule, vocabulary))
+      .map((rule) => ruleLine(rule, vocabulary, readings.has(rule.key)))
       .join("\n")
   }
 }

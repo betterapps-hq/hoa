@@ -71,7 +71,7 @@ export const stepPrompts = {
   /** Consolidation over rule lines with their overrides, cross-references and similar pairs; no term merges. */
   consolidation: {
     name: "hoa-consolidation",
-    variables: ["documents", "crossReferences", "rulePairs", "rules"],
+    variables: ["documents", "crossReferences", "exceptions", "rulePairs", "rules"],
     chat: true
   }
 } as const satisfies Record<string, PromptDefinition>
