@@ -151,7 +151,32 @@ const continuesAcrossPage = (previous: CleanLine, line: CleanLine) =>
 /** A scrap a scan read as a heading: "K", "at". */
 const isFragment = (text: string) => text.replace(/\W/g, "").length <= 3 && !isMarkerOnly(text)
 
-/** Blank lines end paragraphs; headings and marker-only lines ("(a)", "42") start new ones. */
+/** The longest unmarked paragraph read as an exhibit's heading rather than a sentence about one. */
+const maxExhibitHeading = 60
+
+/** An exhibit's marker, alone or with a title in capitals: "EXHIBIT Q", "Exhibit B", "EXHIBIT O LATTICE STYLES". */
+function isExhibitHeading(text: string) {
+  const marker = parseExhibitMarker(text)
+  return marker !== null && text.length <= maxExhibitHeading && !/\p{Ll}/u.test(marker.rest)
+}
+
+/**
+ * Whether a line ends a paragraph that opened with an exhibit's heading: the heading takes the title lines in capitals
+ * under it, and the text that follows without a blank line ("Approved Colors (Revised 2025) …", a table) is its body.
+ */
+function endsExhibitHeading(current: readonly CleanLine[], line: CleanLine) {
+  const first = current[0]
+  if (!first || !isExhibitHeading(first.text)) {
+    return false
+  }
+  const joined = [...current, line].map((each) => each.text).join(" ")
+  return /\p{Ll}/u.test(line.text) || joined.length > maxExhibitHeading
+}
+
+/**
+ * Blank lines end paragraphs; headings and marker-only lines ("(a)", "42") start new ones, and an exhibit's heading is
+ * a paragraph of its own.
+ */
 export function paragraphsOf(clean: CleanDocument): Paragraph[] {
   const paragraphs: Paragraph[] = []
   let current: CleanLine[] = []
@@ -182,7 +207,7 @@ export function paragraphsOf(clean: CleanDocument): Paragraph[] {
     } else {
       const isNewPage = previous !== undefined && previous.page !== line.page
       const breaks = previous && isNewPage ? !continuesAcrossPage(previous, line) : isAfterBlank
-      if (breaks || isMarkerOnly(line.text)) {
+      if (breaks || isMarkerOnly(line.text) || endsExhibitHeading(current, line)) {
         close()
       }
       current.push(line)
@@ -711,7 +736,7 @@ function build(paragraphs: readonly Paragraph[], options: StructureOptions) {
         return
       }
       const exhibit = parseExhibitMarker(candidate)
-      if (exhibit && (paragraph.isHeading || candidate.length <= 60)) {
+      if (exhibit && (paragraph.isHeading || candidate.length <= maxExhibitHeading)) {
         tree.exhibit(exhibit.printed, exhibit.rest, paragraph)
         return
       }

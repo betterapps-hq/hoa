@@ -233,3 +233,70 @@ describe("documents that don't divide into articles", () => {
     ).toEqual(["preamble", "1", "2", "2/p2", "3"])
   })
 })
+
+describe("exhibits", () => {
+  it("starts an exhibit at its heading when its body follows without a blank line", () => {
+    const provisions = structureDocument(
+      cleanPages(
+        pagesOf([
+          {
+            text: [
+              "EXHIBIT A",
+              "LOTS WITH SHARED DRIVEWAYS",
+              "",
+              "Lot 12 and Lot 13 share the driveway north of the clubhouse.",
+              "",
+              "The Board keeps the plans showing each shared driveway."
+            ].join("\n")
+          },
+          {
+            text: [
+              "EXHIBIT B",
+              "APPROVED STAIN COLORS",
+              "Approved Stains (Revised: 2024) Color Fence Deck Cedar Natural ☒ ☒ Weathered Gray ☒",
+              "Owners may use other brands matched to a color in this table.",
+              "",
+              "EXHIBIT C",
+              "MAILBOX STYLES",
+              "STANDARD MAILBOX (Revised: 2023)",
+              "Each mailbox post is painted black."
+            ].join("\n")
+          }
+        ])
+      ),
+      { documentKey: "guidelines", fileId: "f" }
+    ).flatMap((document) => document.provisions)
+    expect(provisions.map(({ label, heading }) => [label, heading])).toEqual([
+      ["exhibit-a", "Lots with Shared Driveways"],
+      ["exhibit-b", "Approved Stain Colors"],
+      ["exhibit-c", "Mailbox Styles"]
+    ])
+    const [first, second, third] = provisions
+    expect(first?.text).not.toContain("EXHIBIT B")
+    expect(first?.text).toContain("The Board keeps the plans")
+    expect(second?.text).toMatch(/^Approved Stains \(Revised: 2024\)/)
+    expect(second?.text).toContain("Owners may use other brands")
+    expect(third?.text).toMatch(/^STANDARD MAILBOX \(Revised: 2023\)/)
+  })
+
+  it("keeps a sentence that opens with an exhibit's name in its paragraph", () => {
+    const provisions = structureDocument(
+      cleanPages(
+        pagesOf([
+          {
+            text: [
+              "1\\. Fences shall be stained in a color listed in",
+              "Exhibit B or approved by the Board.",
+              "",
+              "2\\. Mailboxes shall follow",
+              "Exhibit C",
+              "unless the Board approves another style."
+            ].join("\n")
+          }
+        ])
+      ),
+      { documentKey: "covenants", fileId: "f" }
+    ).flatMap((document) => document.provisions)
+    expect(provisions.map(({ label }) => label)).toEqual(["1", "2"])
+  })
+})

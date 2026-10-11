@@ -82,7 +82,9 @@ Page records are already stored by ingest ([ocr.md](ocr.md)). Structure turns on
    are repaired and marked `inferred`.
 3. **Split.** Text between markers belongs to the open provision. Unnumbered paragraphs inside a numbered provision
    become counted paragraphs (`/p2`). A paragraph ending in a colon directly before its children is the parent's
-   `intro`; text after the last child that continues the parent is its `wrapUp`.
+   `intro`; text after the last child that continues the parent is its `wrapUp`. An exhibit's heading (its marker and
+   any title lines in capitals) ends at the first line after it, so an exhibit whose body follows with no blank line
+   still starts there.
 4. **Key.** `{document key}:{label}`, with labels per the schema's convention. Exhibit C of the sample is its own
    document (`use-restrictions`) when the administrator marks it as one at upload; otherwise it's an `exhibit`. An
    upload's structure (its key, kind, the names its text uses for itself, and its exhibits that are documents of their
