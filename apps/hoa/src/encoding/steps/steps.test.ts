@@ -13,7 +13,14 @@ import {
   definingProvisions
 } from "./definedTerms"
 import { resolveOutlines, type Outline } from "./outline"
-import { checkFinding, findingKeys, ruleFindingAnswer, subjectKey } from "./ruleFinding"
+import {
+  checkFinding,
+  findingKeys,
+  isHeadingOnly,
+  ruleFindingAnswer,
+  subjectKey,
+  withHeadingReasons
+} from "./ruleFinding"
 import { changedPaths, collateralChanges, outlineOfRecord, retryProblemsText } from "./ruleRetry"
 import { clausesOf, draftsOf, ruleStructuringAnswer, structuringBatches } from "./ruleStructuring"
 import { checkSharedVocabulary, sharedVocabularyAnswer } from "./vocabulary"
@@ -278,6 +285,35 @@ describe("B", () => {
 })
 
 describe("E", () => {
+  it("gives the reason heading to a provision that is only its number and heading, when the model left it bare", () => {
+    const provision = (key: string, text: string, heading: string | null) => ({
+      key,
+      num: { printed: key.slice(6), normalized: key.slice(6), source: "printed" as const },
+      heading,
+      text,
+      intro: null,
+      wrapUp: null
+    })
+    const provisions = [
+      provision("rules:7.4", "7.4 Compliance and Enforcement.", "Compliance and Enforcement"),
+      provision("rules:7.5", "The Board may adopt rules.", "Rules")
+    ]
+    const answer = ruleFindingAnswer(findingKeys([])).parse({
+      provisions: [
+        { key: "rules:7.4", outlines: [], settings: [], noRule: null },
+        { key: "rules:7.5", outlines: [], settings: [], noRule: null }
+      ],
+      questions: [],
+      referencedDocuments: [],
+      notes: []
+    })
+    expect(withHeadingReasons(answer, provisions).provisions.map((entry) => entry.noRule)).toEqual([
+      { reason: "heading" },
+      null
+    ])
+    expect(isHeadingOnly(provisions[0] ?? provisions[1])).toBe(true)
+  })
+
   it("resolves labels whole, never by a part of a longer label", () => {
     expect(subjectKey("storage sheds", [shed])).toBe("shed")
     expect(subjectKey("shed", [shed])).toBe("shed")

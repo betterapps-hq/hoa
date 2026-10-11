@@ -402,6 +402,35 @@ export function checkFinding(input: {
   return problems
 }
 
+/** Whether a provision's text is only its number and heading ("7.4 Compliance and Enforcement."). */
+export function isHeadingOnly(provision: Pick<Provision, "num" | "heading" | "text" | "intro" | "wrapUp">) {
+  if (provision.intro || provision.wrapUp) {
+    return false
+  }
+  const words = (text: string) => text.toLowerCase().match(/[a-z0-9]+/g) ?? []
+  const label = new Set([...words(provision.num?.printed ?? ""), ...words(provision.heading ?? "")])
+  return words(provision.text).every((word) => label.has(word))
+}
+
+/**
+ * An answer with the reason heading given by code to each provision the model left with no outline, setting or reason
+ * whose text is only its number and heading: deterministic, so the model's call isn't needed for it.
+ */
+export function withHeadingReasons(
+  answer: RuleFindingAnswer,
+  provisions: readonly Pick<Provision, "key" | "num" | "heading" | "text" | "intro" | "wrapUp">[]
+): RuleFindingAnswer {
+  const headingOnly = new Set(provisions.filter(isHeadingOnly).map((provision) => provision.key))
+  return {
+    ...answer,
+    provisions: answer.provisions.map((entry) =>
+      entry.noRule === null && entry.outlines.length === 0 && entry.settings.length === 0 && headingOnly.has(entry.key)
+        ? { ...entry, noRule: { reason: "heading" } }
+        : entry
+    )
+  }
+}
+
 /** The reasons code keeps: a no-rule reason on a provision some outline cites is dropped (the decisions' step 4). */
 export function reasonsOf(answer: RuleFindingAnswer, outlines: readonly Outline[]) {
   const cited = new Set(outlines.flatMap((item) => [item.provisionKey, ...item.citations]))

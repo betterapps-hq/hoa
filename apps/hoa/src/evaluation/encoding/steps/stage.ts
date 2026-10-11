@@ -20,6 +20,7 @@ import {
   ruleFindingAnswer,
   ruleFindingVariables,
   settingsFlagsOf,
+  withHeadingReasons,
   type RuleFindingAnswer
 } from "@/encoding/steps/ruleFinding"
 import { outlineOfRecord, retryBatches, retryProblemsText, type ProblemRecord } from "@/encoding/steps/ruleRetry"
@@ -254,10 +255,11 @@ export async function runRuleFinding(
     if (!result.isValid) {
       return { issues: zodProblems(item.id, result.issues) }
     }
-    const outlines = outlinesOf(result.object, item.input.unit.id).map((outline) =>
+    const answer = withHeadingReasons(result.object, item.input.unit.provisions)
+    const outlines = outlinesOf(answer, item.input.unit.id).map((outline) =>
       keyedOutline(outline, context.definedTerms)
     )
-    found.set(item.id, { item, answer: result.object, outlines })
+    found.set(item.id, { item, answer, outlines })
     return { issues: [] }
   }
   const check = (entry: { item: RuleFindingItem; answer: RuleFindingAnswer }) =>
