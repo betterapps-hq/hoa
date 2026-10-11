@@ -41,8 +41,8 @@ saved build run or an earlier step run (`pnpm eval:step`; [evaluation.md](evalua
 | R.2 | B defined terms. | Done: `hoa-defined-terms` v6 on Opus at high effort. |
 | R.3 | E find the rules. | Done: `hoa-rule-finding` v5 (with `hoa-guide-rule-kinds` v5) on Opus at high effort, checked on four held-out organizations. |
 | R.4 | C shared vocabulary and C-merge. | Done: `hoa-vocabulary-group` v2 and `hoa-vocabulary-merge` v1 (implementation-log.md, 2026-10-11). Open: C-merge's clusters miss duplicates whose labels differ. |
-| R.5 | F structure the rules, with its retry. | Built; `hoa-rule-structuring` v1 created; testing on the dev split. The judged-requirement gap is settled (below). |
-| R.6 | Consolidation. | Built, not yet tested: clears its dataset on `pnpm eval:step`. |
+| R.5 | F structure the rules, with its retry. | Done: `hoa-rule-structuring` v4 with `hoa-guide-rule-structure` v3 (implementation-log.md, 2026-10-11). |
+| R.6 | Consolidation. | Runs: `hoa-consolidation` v2. The golden holds 3 cross-section overrides, too few to measure it; needs a larger held-out set. |
 | R.7 | Wire the steps into `RulebookBuild` in place of vocabulary, plan, encode, verify and repair; `pnpm eval:step` chained runs match the build's. | A build of the sample documents runs end to end on the steps. |
 | R.8 | Update the build's UX (steps, estimate, results as they arrive) for the new stages. | Browser check during a build. |
 
