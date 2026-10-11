@@ -155,7 +155,7 @@ describe("RulebookPage", () => {
 
   it("reviews the draft as a focused mode: the next step, the to-do list, and what changed", async () => {
     const { user } = setup({ isReviewing: true })
-    expect(screen.getByText("911 terms need your review before you can publish.")).toBeInTheDocument()
+    expect(screen.getByText("1039 terms need your review before you can publish.")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Answer 15 questions" })).toBeInTheDocument()
     expect(screen.getByRole("tab", { name: "Changes", selected: true })).toBeInTheDocument()
     expect(screen.getByRole("region", { name: /^New rules/ })).toBeInTheDocument()

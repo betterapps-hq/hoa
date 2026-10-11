@@ -1328,3 +1328,64 @@ From the defined-terms step run with every defining provision given in full (pro
 - Not changed: residence (3.1(a)(i)) and association-maintained-landscaping (7.2(c)) are encoded and cited; the step
   isn't expected to return them only because the candidate finder misses their phrasing ("referred to individually as
   a", "collectively referred to ... as the").
+
+**Judged obligations (2026-10-11).** A judgment check is only for a quality no fact settles. Of the 129 obligations
+added with a judgment check when every requirement became a rule, 95 now carry a fact check (a test, a deadline, a
+document or an approval) with the properties they read, 30 stay judged (reasonableness, business judgment, good faith,
+similar treatment, upkeep), and 10 new judged rules hold a quality split off a fact that can fail on its own.
+
+- 3.5(c): Split the occupancy-limit rule: what the limits rest on (Unit size, fair use of the Common Area, King County
+  ordinances) is a fact, while whether they're reasonable is a judgment; a limit can fail either one alone, so the
+  reasonableness is its own rule, 3.5(c)#reasonable-occupancy-limits.
+- 7.2/p3: Converted maintain-other-property: whether the maintenance is necessary or desirable is the Board's own
+  determination, so the rule asks only whether the Board made it, a fact.
+- 7.3(a)(vi): Converted additional-insurance: what's advisable is the Board's own determination, so whether the
+  Association obtained and kept the coverage the Board determined advisable is a fact.
+- 7.3(c): Split repair-estimates: obtaining an estimate of the restoration cost is a document check, while whether the
+  estimates are reliable and detailed is a judgment an estimate can fail on its own, so it's 7.3(c)#reliable-estimates.
+- 7.7/p2: Converted required-action-scope: whether a required action is in connection with the Neighborhood
+  Association's obligations is read from those obligations, a fact; kept veto-grounds judged, since it turns on the
+  Board reasonably determining adversity or inconsistency with the Community-Wide Standard.
+- 8.6/p1: commencement compares the start of the charged period with the commencement date shifted back one month,
+  because the obligation starts in the month of the later event: a period starting on the first of that month complies,
+  one starting in an earlier month doesn't.
+- 3, 4, 5, 6, 7: Kept judged where compliance turns on a quality: business judgment and reasonableness (3.3(a), 3.3(e)),
+  similar treatment of the similarly situated (3.5(a), 5.3/p1), the open-ended exceptions for activities within
+  dwellings (3.5(d)), reasonable fees and charges (3.5(e), 4.2(d), 6.4(a)/p3), unreasonable impediment (3.5(g)),
+  management of the Common Area (7.1(c)) and reasonable rules for it, arbitrary or capricious enforcement (7.4(c)), the
+  By-Laws' standards of conduct (7.5/p3), indemnity of reasonably incurred expenses and good-faith acts (7.6/p1,
+  7.6/p2#hold-harmless), and vetoes on the Board's reasonable determination (7.7/p2).
+- 7.2/p3, 7.6/p2, 8.3/p2: The liability shields keep a judgment only for the quality the exception turns on (negligence,
+  willful misconduct or bad faith, good faith); what the Claim seeks is a fact, now in the rule's applicability.
+- Articles 6 to 8: The duties on how an assessment is built now read stated facts instead of a Board judgment:
+  8.8/p2#pro-rata-share tests assessment.includes-foreclosed-unit-share while
+  assessment.association-owned-foreclosed-unit holds, and 8.8/p3#reallocated-common-expense tests
+  assessment.reallocated-as-common-expense on an unpaid assessment due before the first Mortgage's foreclosure (the
+  condition 8.8/p3#foreclosure-extinguishes uses). 8.6/p2's advance payment at closing is a deadline of 0 days after
+  title-transfer.transferred-on, as 8.13#immediately is. The refund bars in 8.10 and 8.11 test whether the Claim seeks
+  the refund.
+- Articles 9 to 13: Where a provision joins a fact to a quality, the fact is the rule's check and the quality is its own
+  judgment rule, since each can fail alone: damage repaired by, and at the expense of, the Person exercising the
+  easement (10.9(c)#repair-damage, 11.3(a)/p2#repair-damage, on property-damage.repaired-at-exerciser-expense) and its
+  promptness (#repair-promptly); the 11.4/p2 cost-sharing agreement (a document check signed by the Association) and its
+  reasonableness (#reasonable-agreement). 11.3(d)#restore-property stays one judgment: 'to the extent reasonably
+  possible' qualifies the restoration itself, so an incomplete restoration isn't a failure by itself. The duties to
+  comply with law and obtain permits are an approval check by a governmental entity when
+  easement.government-approval-required holds (11.3(a)/p2#permits, 11.9#applicable-law); 10.12's, on the community,
+  reads community.declarant-article-10-law-complied, since an approval can't cover the community. 10.7/p1#maximum-charge
+  compares the user fee with the maximum allowable charge, and holds when the government authority defines none.
+- Articles 14 to 21 and Exhibits A and B: The liability waivers and risk assumptions of 11.8, 15.3 and 17.2 to 17.7 are
+  obligations on the claimant that the Claim not seek what the provision bars; each now tests a stated dispute.seeks-*
+  fact (absent when unstated), naming the parties and the cause the provision protects. The Owner's indemnities
+  (15.3/p2, 17.5) apply when the Claim is by someone on the Owner's Unit about the Unit's proximity to the Private
+  Amenity or the natural areas, and test that the Owner indemnified. 14.4(b)(iii) is split: appearing for the mediation
+  is a fact (#waiver-nonparticipation, on dispute.claimant-appeared-at-mediation), participating in good faith a
+  judgment (#good-faith-participation). 15.4's parking is split the same way: the function, the Private Amenity's
+  insufficient parking and the parking laws are facts; 'reasonable times' is #amenity-parking-reasonable-times. 16.1's
+  'timely written notice' is split into the written notice (a fact) and its timeliness (#...-notice-timely, a judgment),
+  since the Declaration sets no period; 16.1(b) and 16.1(d) still judge both together.
+- Residential Design Guidelines: 3.1.2's bar on approving a deviation from a PROHIBITED guideline tests the
+  application's decision on work.deviates-from-prohibited-guideline. 3.3.1's outside permits are an approval check by
+  King County or another governmental entity when work.needs-outside-permit holds. 5.8.1's boundary verification is a
+  deadline: verified on or before the fence's construction started. 5.8.2's recorded prohibition and the Owner's cost of
+  a utility's removal apply to a fence-run.within-utility-easement.

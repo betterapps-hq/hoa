@@ -8,7 +8,7 @@ describe("draftTodos", () => {
     const todos = draftTodos(records, { uncovered: ["declaration:3.1(a)"] })
     expect(todos.map((todo) => todo.id)).toEqual(["terms", "questions", "rules", "settings", "reasons", "uncovered"])
     expect(todos[0]).toMatchObject({
-      sentence: "911 terms need your review",
+      sentence: "1039 terms need your review",
       action: "Review terms",
       view: { tab: "terms", filter: "proposed" }
     })

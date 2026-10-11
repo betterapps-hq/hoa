@@ -11,12 +11,12 @@ reviewed, redacted copy is added here.
 
 ## declaration/
 
-| File                                 | What it is                                                                                                                                                                                                                                                                                                 |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [rules.json](declaration/rules.json) | The rules file: 6 documents (3 loaded, 3 referenced), 680 provisions, 893 organization terms, 18 proposed core terms, 669 rules, 15 interpretation questions and the settings clauses. Valid against the schema's Zod `rulesFile`. Every record's review status is `proposed`: nobody has reviewed it yet. |
-| [notes.md](declaration/notes.md)     | The encoders' judgment calls and the remaining `SCHEMA GAP` notes, by article, and the Design Guidelines slice's parser fixes and judgment calls                                                                                                                                                           |
+| File                                 | What it is                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [rules.json](declaration/rules.json) | The rules file: 6 documents (3 loaded, 3 referenced), 680 provisions, 1021 organization terms, 18 proposed core terms, 679 rules, 15 interpretation questions and the settings clauses. Valid against the schema's Zod `rulesFile`. Every record's review status is `proposed`: nobody has reviewed it yet. |
+| [notes.md](declaration/notes.md)     | The encoders' judgment calls and the remaining `SCHEMA GAP` notes, by article, and the Design Guidelines slice's parser fixes and judgment calls                                                                                                                                                            |
 
-The Declaration and Use Restrictions (537 provisions, 512 rules, 7 questions) were produced by hand-run model encoders,
+The Declaration and Use Restrictions (537 provisions, 522 rules, 7 questions) were produced by hand-run model encoders,
 one per group of articles, each checked by the type checker and the schema's validators, then merged and validated as
 one file. Provision text is the recorded wording with OCR noise and page stamps removed; the signature and notary pages
 aren't included.

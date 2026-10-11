@@ -11,14 +11,19 @@ vi.mock("sonner", () => ({
 }))
 
 const records = sampleRecords()
-// 3.1(a) loses its reason for having no rule (if it had one) and its rules, so nothing covers it.
+// 3.1(a) loses its reason for having no rule (if it had one), its rules and the terms' citations of it, so nothing
+// covers it.
 const uncoveredKey = "declaration:3.1(a)"
 const withUncovered = {
   ...records,
   provisions: records.provisions.map((provision) =>
     provision.key === uncoveredKey ? { ...provision, noRule: null } : provision
   ),
-  rules: records.rules.filter((rule) => !rule.citations.some((citation) => citation.provisionKey === uncoveredKey))
+  rules: records.rules.filter((rule) => !rule.citations.some((citation) => citation.provisionKey === uncoveredKey)),
+  terms: records.terms.map((term) => ({
+    ...term,
+    citations: term.citations.filter((citation) => citation.provisionKey !== uncoveredKey)
+  }))
 }
 
 // Synthetic pages: each provision of the sample sits on a page of its own, at the start of the page's text; 3.1(a)
