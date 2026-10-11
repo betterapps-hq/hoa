@@ -430,6 +430,20 @@ describe("C", () => {
     )
   })
 
+  it("reports an outline whose subject is a label no term of the vocabulary has", () => {
+    const group = (appliesTo: string) => ({
+      groupId: "g1",
+      terms: [shed],
+      serves: new Map([["shed", ["rules:1#a"]]]),
+      outlines: [outline("rules:1#a", { appliesTo })],
+      problems: []
+    })
+    const codes = (appliesTo: string) =>
+      (checkSharedVocabulary([group(appliesTo)], []).get("g1") ?? []).map((problem) => problem.code)
+    expect(codes("garden gazebo")).toContain("unresolved-subject")
+    expect(codes("shed")).not.toContain("unresolved-subject")
+  })
+
   it("resolves a thing the answer adds by its label, a broader value by its full key, and reports a made-up key", () => {
     const named = (text: string) => ({ preferred: { text, plural: null }, alternatives: [] })
     const answer = sharedVocabularyAnswer.parse({

@@ -22,6 +22,7 @@ import {
 } from "./drafts"
 import { kindName, vocabularyLine, type Outline } from "./outline"
 import { none, type stepPrompts } from "./prompts"
+import { subjectKey } from "./ruleFinding"
 import { termKeyBuilder } from "./termKeys"
 
 // C. The shared vocabulary (hoa-vocabulary-group, prompt drafts v2): one call per group of sections builds every
@@ -301,7 +302,7 @@ const readsFacts = (outline: Outline) => ["obligation", "recommendation", "requi
 
 /**
  * C's check of one group (prompt drafts v2, the C check): keys build and are unique, every reference resolves (core,
- * defined, previous, this group or another group of the round), no key has two kinds or value types within the group,
+ * defined, previous, this group or another group of the round), every outline's subject and parties are terms, no key has two kinds or value types within the group,
  * every outline served is one of the group's, and every outline that reads facts is served.
  */
 export function checkSharedVocabulary(groups: readonly GroupVocabulary[], known: readonly TermContent[]) {
@@ -323,6 +324,20 @@ export function checkSharedVocabulary(groups: readonly GroupVocabulary[], known:
           code: "unknown-outline",
           message: `${key} serves ${outline}, which isn't an outline of the group`
         })
+      }
+    }
+    // A subject or party E gave as a label must be a term now (C adds the things E found no term for), or F's rules
+    // can't name it.
+    const named = [...all.values()]
+    for (const outline of group.outlines) {
+      for (const text of [outline.appliesTo, outline.bearer, outline.decidedBy]) {
+        if (text && subjectKey(text, named) === null) {
+          report(group.groupId, {
+            recordKey: outline.key,
+            code: "unresolved-subject",
+            message: `${outline.key} is about "${text}", which no term of the vocabulary is: add it as a thing or category`
+          })
+        }
       }
     }
     const servedOutlines = new Set([...group.serves.values()].flat())

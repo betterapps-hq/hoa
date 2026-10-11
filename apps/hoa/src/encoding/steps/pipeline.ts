@@ -430,7 +430,11 @@ export type StructuringBatch = {
   settingsFlags: SettingsFlag[]
 }
 
-/** F's batches over every outline (with the term keys that serve it), each with what it reads beside its own. */
+/**
+ * F's batches over every outline (with the term keys that serve it), each with what it reads beside its own. Subjects
+ * and parties E gave as labels (things C was to add) are keyed against the frozen vocabulary first, as E's were against
+ * B's terms, so F's rules name terms.
+ */
 export function structuringBatchesOf(input: {
   outlines: readonly Outline[]
   vocabulary: TermContent[]
@@ -438,14 +442,15 @@ export function structuringBatchesOf(input: {
   provisions: readonly Provision[]
   settingsFlags: readonly SettingsFlag[]
 }): StructuringBatch[] {
-  return structuringBatches(input.outlines).map((batch) => {
+  const outlines = input.outlines.map((outline) => keyedOutline(outline, input.vocabulary))
+  return structuringBatches(outlines).map((batch) => {
     const cited = new Set(batch.flatMap((outline) => [outline.provisionKey, ...outline.citations]))
     const settingsFlags = input.settingsFlags.filter((flag) => cited.has(flag.provisionKey))
     const shown = new Set([...cited, ...settingsFlags.map((flag) => flag.provisionKey)])
     return {
       id: batch[0]?.key ?? "",
       outlines: batch,
-      related: relatedOutlines(batch, input.outlines),
+      related: relatedOutlines(batch, outlines),
       vocabulary: input.vocabulary,
       documents: input.documents,
       provisions: input.provisions.filter((provision) => shown.has(provision.key)),
