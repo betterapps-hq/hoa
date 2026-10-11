@@ -19,47 +19,6 @@ export type StepAi = {
   /** Pinned versions by prompt name; a prompt left out is loaded by the default label. */
   promptVersions: Readonly<Record<string, number>>
   cache?: (stage: string) => PromptCache | undefined
-  /** Hard limits on a test's spend, checked before every call (`spendingLimit`). */
-  budget?: Budget
-}
-
-/**
- * A test's spending limit: at most `maxCalls` model calls (an answer from the content cache isn't one), and no call
- * that could take the spend past `maxCostUsd`, judged by the dearest call so far (or `estimateUsd` before the first).
- */
-export type Budget = {
-  maxCalls: number
-  maxCostUsd: number
-  estimateUsd: number
-  calls: number
-  costUsd: number
-  dearestUsd: number
-}
-
-export const spendingLimit = (maxCalls: number, maxCostUsd: number, estimateUsd: number): Budget => ({
-  maxCalls,
-  maxCostUsd,
-  estimateUsd,
-  calls: 0,
-  costUsd: 0,
-  dearestUsd: 0
-})
-
-export class BudgetExceededError extends Error {}
-
-function checkBudget(budget: Budget | undefined) {
-  if (!budget) {
-    return
-  }
-  const next = Math.max(budget.dearestUsd, budget.estimateUsd)
-  if (budget.calls >= budget.maxCalls) {
-    throw new BudgetExceededError(`Stopped: ${budget.calls} model calls is the limit.`)
-  }
-  if (budget.costUsd + next > budget.maxCostUsd) {
-    throw new BudgetExceededError(
-      `Stopped: $${budget.costUsd.toFixed(4)} spent, and another call (about $${next.toFixed(2)}) could pass $${budget.maxCostUsd}.`
-    )
-  }
 }
 
 const traceNames = Object.fromEntries(
@@ -85,7 +44,6 @@ export async function runStepPrompt<N extends StepPromptName, T>(input: {
   cacheStage: string
 }): Promise<StepResult<T>> {
   const prompt = stepPrompts[input.step]
-  checkBudget(input.ai.budget)
   const result = await runCheckedObjectPrompt({
     loadPrompt: input.ai.loadPrompt,
     createModel: input.ai.createModel,
@@ -101,12 +59,6 @@ export async function runStepPrompt<N extends StepPromptName, T>(input: {
     sharedDefinitions: true
   })
   const call = modelCallOf(input.itemId, result, traceNames)
-  const { budget } = input.ai
-  if (budget && !call.isCached) {
-    budget.calls += 1
-    budget.costUsd += call.costUsd ?? budget.estimateUsd
-    budget.dearestUsd = Math.max(budget.dearestUsd, call.costUsd ?? budget.estimateUsd)
-  }
   return result.isValid
     ? { isValid: true, object: result.object, call }
     : { isValid: false, answer: result.answer, issues: result.issues, call }

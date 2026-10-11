@@ -6,7 +6,7 @@ import { createAiContext } from "../src/ai/aiContext.server.ts"
 import { findTermCandidates } from "../src/encoding/definedTerms.ts"
 import { crossReferenceLines } from "../src/encoding/steps/consolidation.ts"
 import { structuringBatches } from "../src/encoding/steps/ruleStructuring.ts"
-import { spendingLimit, type StepAi } from "../src/encoding/steps/run.ts"
+import type { StepAi } from "../src/encoding/steps/run.ts"
 import { vocabularyGroups, withReadKeys } from "../src/encoding/steps/vocabulary.ts"
 import { buildDatasets, settingsFlags, type DatasetItem } from "../src/evaluation/encoding/steps/datasets.ts"
 import { retryDataset } from "../src/evaluation/encoding/steps/evaluate.ts"
@@ -74,10 +74,8 @@ import { readFinder, withFinder } from "./stepFinder.ts"
 //
 // Model calls cost money: without --yes this prints what it would run and stops. Usage, from apps/hoa:
 //   pnpm eval:step --stage <step> [--from <run>] [--items <id part>,...] [--prompts <name>=<version>,...]
-//     [--golden <sample>] [--max-calls <n>] [--max-cost <usd>] [--repeat <n>] [--reruns <0-1>] [--retries <0-2>] [--runs <label>=<run id>,...] [--yes]
+//     [--golden <sample>] [--repeat <n>] [--reruns <0-1>] [--retries <0-2>] [--runs <label>=<run id>,...] [--yes]
 //   pnpm eval:step --rescore <step run id> [--items <id part>,...] [--golden <sample>]
-// --max-calls and --max-cost stop the run before a call past either limit (--call-estimate is the cost assumed for the
-// first call); what ran so far is still written.
 // --finder <file> gives B the provisions another finder picked (a JSON map of item id to provision keys), and
 // --expect all scores B against every term the golden defines in the document (stepFinder.ts), to compare finders.
 // --reruns reruns a failing item of B, E or C once with its problems (as the pipeline does); --retries runs F's retry
@@ -97,9 +95,6 @@ const { values } = parseArgs({
     golden: { type: "string", default: "declaration" },
     runs: { type: "string", default: defaultRuns },
     "retry-quota": { type: "string", default: defaultRetryQuota },
-    "max-calls": { type: "string" },
-    "max-cost": { type: "string" },
-    "call-estimate": { type: "string", default: "0.5" },
     finder: { type: "string" },
     expect: { type: "string", default: "picked" },
     yes: { type: "boolean", default: false }
@@ -133,15 +128,6 @@ const pinned = Object.fromEntries(
 )
 
 let context: ReturnType<typeof createAiContext> | null = null
-/** --max-calls and --max-cost: hard limits for the whole run, repeats and reruns included. */
-const budget =
-  values["max-calls"] || values["max-cost"]
-    ? spendingLimit(
-        Number(values["max-calls"] ?? Number.POSITIVE_INFINITY),
-        Number(values["max-cost"] ?? Number.POSITIVE_INFINITY),
-        Number(values["call-estimate"])
-      )
-    : undefined
 
 /** The models and Langfuse, created only once the run is confirmed. */
 function stepAi(): StepAi {
@@ -157,8 +143,7 @@ function stepAi(): StepAi {
     environment: ai.environment,
     sessionId: runId,
     promptVersions: pinned,
-    cache: (name) => fileCache(name),
-    budget
+    cache: (name) => fileCache(name)
   }
 }
 

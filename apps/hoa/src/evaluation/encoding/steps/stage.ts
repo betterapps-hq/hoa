@@ -30,7 +30,7 @@ import {
   ruleStructuringVariables,
   type RuleStructuringAnswer
 } from "@/encoding/steps/ruleStructuring"
-import { BudgetExceededError, runStepPrompt, type StepAi } from "@/encoding/steps/run"
+import { runStepPrompt, type StepAi } from "@/encoding/steps/run"
 import {
   checkSharedVocabulary,
   sharedVocabularyAnswer,
@@ -151,19 +151,21 @@ type Context = {
   ai: StepAi
   cacheStage: string
   /** Reruns of a failing item, with its problems (0 or 1). */ reruns?: number
+  /** Calls in flight at once for steps whose items are independent (default 8). */
+  concurrency?: number
 }
 
-/** A call, or null when the spending limit stopped it (recorded as a problem; what ran so far is kept). */
-async function stoppable<T>(call: Promise<T>, stopped: (message: string) => void) {
-  try {
-    return await call
-  } catch (error) {
-    if (error instanceof BudgetExceededError) {
-      stopped(error.message)
-      return null
+/** Runs `work` over the items with at most `limit` in flight; a failure stops it as a sequential loop would. */
+async function inParallel<T>(items: readonly T[], limit: number, work: (item: T) => Promise<void>) {
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const item = items[next]
+      next += 1
+      await work(item)
     }
-    throw error
   }
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker))
 }
 
 const zodProblems = (itemId: string, issues: readonly { message: string; path: PropertyKey[] }[]) =>
@@ -192,24 +194,13 @@ export async function runDefinedTerms(
   for (const item of items) {
     let problemsBlock: string | undefined
     for (let attempt = 0; attempt <= (context.reruns ?? 0); attempt += 1) {
-      const result = await stoppable(
-        runStepPrompt({
-          ...context,
-          step: "definedTerms",
-          itemId: item.id,
-          schema: definedTermsAnswer,
-          variables: definedTermsVariables({ ...item.input, problems: problemsBlock })
-        }),
-        (message) => problems.push({ itemId: item.id, code: "budget", message })
-      )
-      if (result === null) {
-        return {
-          outputs,
-          calls,
-          problems,
-          handoff: { definedTerms: [...outputs.values()].flatMap((output) => output?.terms ?? []) }
-        }
-      }
+      const result = await runStepPrompt({
+        ...context,
+        step: "definedTerms",
+        itemId: item.id,
+        schema: definedTermsAnswer,
+        variables: definedTermsVariables({ ...item.input, problems: problemsBlock })
+      })
       calls.push(result.call)
       if (!result.isValid) {
         outputs.set(item.id, null)
@@ -277,12 +268,13 @@ export async function runRuleFinding(
       outlines: [...found.values()].flatMap((value) => value.outlines)
     }).filter((problem) => problem.code !== "no-reads")
   const failed = new Map<string, StepProblem[]>()
-  for (const item of items) {
+  // Sections are independent, so their calls run in parallel, as the build runs them.
+  await inParallel(items, context.concurrency ?? 8, async (item) => {
     const { issues } = await run(item)
     if (issues.length > 0) {
       failed.set(item.id, issues)
     }
-  }
+  })
   if ((context.reruns ?? 0) > 0) {
     for (const item of items) {
       const entry = found.get(item.id)

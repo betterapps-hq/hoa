@@ -195,7 +195,8 @@ describe("B", () => {
               valueType: { type: "count" },
               many: false,
               ifUnstated: "unknown",
-              definition: null
+              definition: null,
+              citations: []
             },
             {
               of: "Occupants",
@@ -203,7 +204,8 @@ describe("B", () => {
               valueType: { type: "choice", set: "tenure-kind" },
               many: false,
               ifUnstated: "unknown",
-              definition: null
+              definition: null,
+              citations: []
             },
             {
               of: "Unknown Thing",
@@ -211,10 +213,21 @@ describe("B", () => {
               valueType: { type: "count" },
               many: false,
               ifUnstated: "unknown",
-              definition: null
+              definition: null,
+              citations: []
             }
           ],
-          valueSets: [{ ...labels("Tenure Kinds"), complete: false, values: [labels("Owned")] }],
+          valueSets: [
+            { ...labels("Tenure Kinds"), complete: false, values: [{ ...labels("Owned"), citations: [] }] },
+            {
+              ...labels("Fee Kind"),
+              complete: false,
+              values: [
+                { ...labels("Annual Fee"), citations: ["rules:2"] },
+                { ...labels("Transfer Fee"), citations: ["rules:3"] }
+              ]
+            }
+          ],
           units: []
         },
         refinements: [],
@@ -228,7 +241,18 @@ describe("B", () => {
       "occupant.years-of-residence",
       "occupant.tenure",
       "tenure-kind",
-      "tenure-kind.owned"
+      "tenure-kind.owned",
+      "fee-kind",
+      "fee-kind.annual-fee",
+      "fee-kind.transfer-fee"
+    ])
+    // A defined type cites its own definition; its set cites them all.
+    expect(built.terms.find((term) => term.key === "fee-kind.transfer-fee")?.citations).toEqual([
+      { provisionKey: "rules:3", highlight: null, region: null }
+    ])
+    expect(built.terms.find((term) => term.key === "fee-kind")?.citations.map((c) => c.provisionKey)).toEqual([
+      "rules:2",
+      "rules:3"
     ])
     const category = built.terms.find((term) => term.key === "long-term-occupant")
     expect(JSON.stringify(category)).toContain('"path":["occupant.tenure"]')

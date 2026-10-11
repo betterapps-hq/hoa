@@ -32,6 +32,8 @@ import { termKeyBuilder } from "./termKeys"
 // provisions candidates are defined in, and a used candidate's sample provisions), criteria resolving.
 
 const citations = z.array(provisionKey).min(1)
+/** The provisions that define a criteria term; empty when only a category's criteria read it. */
+const ownCitations = z.array(provisionKey)
 const definition = z.string().nullable()
 
 /** B's answer: one fixed format; code builds the keys and checks that citations name this call's provisions. */
@@ -39,9 +41,13 @@ export const definedTermsAnswer = z.object({
   things: z.array(z.object({ nature: thingNature, ...labelsDraft, definition, citations })),
   categories: z.array(z.object({ of: reference, ...labelsDraft, definition, criteria: condition, citations })),
   criteriaTerms: z.object({
-    properties: z.array(z.object(labeledPropertyFields)),
+    properties: z.array(z.object({ ...labeledPropertyFields, citations: ownCitations })),
     valueSets: z.array(
-      z.object({ ...labelsDraft, complete: z.boolean(), values: z.array(z.object({ ...labelsDraft })).min(1) })
+      z.object({
+        ...labelsDraft,
+        complete: z.boolean(),
+        values: z.array(z.object({ ...labelsDraft, citations: ownCitations })).min(1)
+      })
     ),
     /** A unit a criterion's quantity is in that isn't a core unit. */
     units: z.array(z.object({ ...labelsDraft, dimension, perBase: decimal.nullable() }))
@@ -110,8 +116,8 @@ function refinement(item: DefinedTermsAnswer["refinements"][number]): TermConten
 /**
  * The answer as terms, with the problems building them: keys built from preferred labels (things, categories, value
  * sets and units first, then values under their sets and properties under their things), `of` and the criteria's
- * references resolved by label or key, and the criteria's properties and value sets cited to the citations of the
- * categories that read them.
+ * references resolved by label or key, and each property and value cited to the provisions that define it, else (with
+ * its value set) to the citations of the categories that read it.
  */
 export function definedTermsOf(answer: DefinedTermsAnswer): { terms: TermContent[]; problems: StepProblem[] } {
   const keys = termKeyBuilder()
@@ -183,7 +189,7 @@ export function definedTermsOf(answer: DefinedTermsAnswer): { terms: TermContent
               { ...property, valueType: keys.rewrite(property.valueType) },
               built.key,
               built.of,
-              citedBy(built.key)
+              property.citations.length > 0 ? property.citations : citedBy(built.key)
             )
           ]
         : []
@@ -193,12 +199,13 @@ export function definedTermsOf(answer: DefinedTermsAnswer): { terms: TermContent
       if (!setKey) {
         return []
       }
-      const cited = citedBy(setKey)
+      const own = [...new Set(set.values.flatMap((value) => value.citations))]
+      const cited = [...new Set([...citedBy(setKey), ...own])]
       return [
         valueSetTerm(set, setKey, cited),
         ...set.values.flatMap((value, valueIndex) => {
           const key = valueKeys[index]?.[valueIndex]
-          return key ? [valueTerm(value, key, setKey, [], cited)] : []
+          return key ? [valueTerm(value, key, setKey, [], value.citations.length > 0 ? value.citations : cited)] : []
         })
       ]
     }),

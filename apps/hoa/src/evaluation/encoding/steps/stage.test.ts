@@ -3,7 +3,7 @@ import { citableProvisions, definingProvisions } from "@/encoding/steps/definedT
 import { kindName, type Outline } from "@/encoding/steps/outline"
 import { findingKeys } from "@/encoding/steps/ruleFinding"
 import { structureOf } from "@/encoding/steps/ruleStructuring"
-import { spendingLimit, type StepAi } from "@/encoding/steps/run"
+import type { StepAi } from "@/encoding/steps/run"
 import { keySegment } from "@/encoding/steps/termKeys"
 import { coreTerms } from "@/schema/coreTerms"
 import { termDraft, type TermContent } from "@/schema/zod"
@@ -131,6 +131,8 @@ function definedTermsAnswer(item: DefinedTermsItem) {
   const citable = new Set(citableProvisions(item.input.definitions, item.input.candidates))
   const fallback = definingProvisions(item.input.definitions, item.input.candidates)[0] ?? ""
   const own = (term: TermContent) => !coreKeys.has(term.key)
+  const givenCitations = (term: TermContent) =>
+    term.citations.map((citation) => citation.provisionKey).filter((key) => citable.has(key))
   return {
     things: expected.flatMap((term) =>
       term.kind === "thing" && own(term)
@@ -158,10 +160,18 @@ function definedTermsAnswer(item: DefinedTermsItem) {
         : []
     ),
     criteriaTerms: {
-      properties: expected.flatMap((term) => (term.kind === "property" && own(term) ? [property(term)] : [])),
+      properties: expected.flatMap((term) =>
+        term.kind === "property" && own(term) ? [{ ...property(term), citations: givenCitations(term) }] : []
+      ),
       valueSets: expected.flatMap((term) => {
         const values =
-          term.kind === "value-set" ? valuesOf(term.key, expected).map(({ broader: _broader, ...value }) => value) : []
+          term.kind === "value-set"
+            ? expected.flatMap((value) =>
+                value.kind === "value" && value.set === term.key
+                  ? [{ ...labelsOf(value), citations: givenCitations(value) }]
+                  : []
+              )
+            : []
         return term.kind === "value-set" && values.length > 0
           ? [{ ...labelsOf(term), complete: term.complete, values }]
           : []
@@ -361,18 +371,6 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
     const withHelper = { ...item, expected: { terms: [...item.expected.terms, helper] } }
     const score = scoreDefinedTerms(withHelper, { terms: item.expected.terms })
     expect(score.metrics["thing-recall"]).toBe(1)
-  })
-
-  it("B stops before a call past its spending limit and keeps what ran", async () => {
-    const items = [1, 2].flatMap((copy) =>
-      datasets["defined-terms"].map((item) => ({ ...item, id: `${item.id}~${copy}` }))
-    )
-    const answers = items.map(definedTermsAnswer)
-    const ai = { ...answering(answers), budget: spendingLimit(1, 1.5, 0.5) }
-    const run = await runDefinedTerms(items, { ai, cacheStage: "test", reruns: 0 })
-    expect(run.calls).toHaveLength(1)
-    expect(run.problems.filter((problem) => problem.code === "budget")).toHaveLength(1)
-    expect(run.outputs.size).toBe(1)
   })
 
   it(

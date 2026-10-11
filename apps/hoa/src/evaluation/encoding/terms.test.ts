@@ -61,6 +61,29 @@ describe("alignTerms", () => {
     expect(matches.get("porch.painted")).toMatchObject({ pipeline: "porch.coated", by: "label" })
   })
 
+  it("matches a value set by its values when the sets are named differently", () => {
+    const set = (key: string, label: string) =>
+      termDraft.parse({ key, kind: "value-set", complete: false, labels: [{ text: label, role: "preferred" }] })
+    const value = (key: string, label: string, of: string) =>
+      termDraft.parse({ key, kind: "value", set: of, labels: [{ text: label, role: "preferred" }] })
+    const reference = [
+      set("fee-type", "fee type"),
+      value("fee-type.annual", "Annual Fee", "fee-type"),
+      value("fee-type.transfer", "Transfer Fee", "fee-type")
+    ]
+    const pipeline = [
+      set("fee-kind", "fee kind"),
+      value("fee-kind.annual-fee", "Annual Fee", "fee-kind"),
+      value("fee-kind.transfer-fee", "Transfer Fee", "fee-kind")
+    ]
+    const matches = alignTerms(reference, pipeline)
+    expect(matches.get("fee-type")).toMatchObject({ pipeline: "fee-kind", by: "label" })
+    expect(matches.get("fee-type.transfer")).toMatchObject({ pipeline: "fee-kind.transfer-fee" })
+    expect(alignTerms(reference, [set("color", "color"), value("color.red", "red", "color")]).has("fee-type")).toBe(
+      false
+    )
+  })
+
   it("matches each pipeline term once, and leaves a golden term without a match out", () => {
     const pipeline = golden.terms.filter((term) => term.key !== "fence-run.lattice-height")
     const matches = alignTerms(golden.terms, pipeline)

@@ -40,6 +40,29 @@ function labelScore(golden: TermContent, pipeline: TermContent) {
 }
 
 /**
+ * How well two value sets' values match: the share of the golden set's values with a label match among the pipeline
+ * set's, counted only when at least half match. Two sets holding the same values ("Base Assessment", "Special
+ * Assessment") are the same set whatever each calls itself ("assessment type", "assessment kind").
+ */
+function memberScore(
+  golden: TermContent,
+  pipeline: TermContent,
+  goldenTerms: readonly TermContent[],
+  pipelineTerms: readonly TermContent[]
+) {
+  const membersOf = (set: TermKey, terms: readonly TermContent[]) =>
+    terms.filter((term) => term.kind === "value" && term.set === set)
+  const wanted = membersOf(golden.key, goldenTerms)
+  const offered = membersOf(pipeline.key, pipelineTerms)
+  if (wanted.length === 0 || offered.length === 0) {
+    return 0
+  }
+  const share =
+    wanted.filter((value) => offered.some((candidate) => labelScore(value, candidate) > 0)).length / wanted.length
+  return share >= 0.5 ? share : 0
+}
+
+/**
  * Aligns golden terms with pipeline terms one to one: the same key and kind (every one reserved before any other
  * match), else the coding agent's pair, else the best label match; a pair and a label match must be of the same kind,
  * with a parent (a property's thing, a value's set) that is the golden parent's match. A parent that isn't among the
@@ -101,7 +124,10 @@ export function alignTerms(
       if (!fits(candidate)) {
         continue
       }
-      const score = labelScore(term, candidate)
+      const score =
+        term.kind === "value-set"
+          ? Math.max(labelScore(term, candidate), memberScore(term, candidate, golden, pipeline))
+          : labelScore(term, candidate)
       if (score > (best?.score ?? 0)) {
         best = { golden: term.key, pipeline: candidate.key, by: "label", score }
       }
