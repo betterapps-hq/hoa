@@ -43,7 +43,7 @@ saved build run or an earlier step run (`pnpm eval:step`; [evaluation.md](evalua
 | R.4 | C shared vocabulary and C-merge. | Done: `hoa-vocabulary-group` v2 and `hoa-vocabulary-merge` v1 (implementation-log.md, 2026-10-11). Open: C-merge's clusters miss duplicates whose labels differ. |
 | R.5 | F structure the rules, with its retry. | Done: `hoa-rule-structuring` v4 with `hoa-guide-rule-structure` v3 (implementation-log.md, 2026-10-11). |
 | R.6 | Consolidation. | Runs: `hoa-consolidation` v2. The golden holds 3 cross-section overrides, too few to measure it; needs a larger held-out set. |
-| R.7 | Wire the steps into `RulebookBuild` in place of vocabulary, plan, encode, verify and repair; `pnpm eval:step` chained runs match the build's. | A build of the sample documents runs end to end on the steps. |
+| R.7 | Wire the steps into `RulebookBuild` in place of vocabulary, plan, encode, verify and repair; `pnpm eval:step` chained runs match the build's. | Done (implementation-log.md, 2026-10-11): the full sample build runs end to end, 1,330 valid rules, judged rule recall 0.93 and precision 0.97 on a sample of 80 provisions, about $126. |
 | R.8 | Update the build's UX (steps, estimate, results as they arrive) for the new stages. | Browser check during a build. |
 
 Tested one step at a time: revise a prompt, run it alone, judge every miss, then move to the next step.
