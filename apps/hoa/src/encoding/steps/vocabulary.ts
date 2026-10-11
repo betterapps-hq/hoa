@@ -183,7 +183,9 @@ export function sharedVocabularyTerms(answer: SharedVocabularyAnswer, known: rea
     values.flatMap((value, index) => {
       const key = built[index]
       const broader = value.broader.flatMap((text) => {
-        const found = keys.named(`${setKey}.${text}`, key ?? setKey, "broader")
+        // A sibling named by its full key is already under the set.
+        const sibling = text.startsWith(`${setKey}.`) ? text : `${setKey}.${text}`
+        const found = keys.named(sibling, key ?? setKey, "broader")
         return found === null ? [] : [found]
       })
       return key ? [valueTerm(value, key, setKey, broader)] : []

@@ -23,7 +23,7 @@ import {
 } from "./ruleFinding"
 import { changedPaths, collateralChanges, outlineOfRecord, retryProblemsText } from "./ruleRetry"
 import { clausesOf, draftsOf, ruleStructuringAnswer, structuringBatches } from "./ruleStructuring"
-import { checkSharedVocabulary, sharedVocabularyAnswer } from "./vocabulary"
+import { checkSharedVocabulary, sharedVocabularyAnswer, sharedVocabularyTerms } from "./vocabulary"
 import { applyVocabularyMerge, mergeClusters, vocabularyMergeAnswer, vocabularyMergeVariables } from "./vocabularyMerge"
 
 // The redesigned steps' code (prompt drafts v2): what each check finds, what code refuses, and the answer formats the
@@ -422,6 +422,65 @@ describe("C", () => {
     expect(new Set((problems.get("g1") ?? []).map((problem) => problem.code))).toEqual(
       new Set(["conflict", "undefined-term", "unknown-outline", "unserved-outline"])
     )
+  })
+
+  it("resolves a thing the answer adds by its label, a broader value by its full key, and reports a made-up key", () => {
+    const named = (text: string) => ({ preferred: { text, plural: null }, alternatives: [] })
+    const answer = sharedVocabularyAnswer.parse({
+      reused: [],
+      things: [{ nature: "event", ...named("drawing of surface water"), definition: null, servesOutlines: ["r:1#a"] }],
+      categories: [],
+      properties: [
+        {
+          of: "drawing of surface water",
+          ...named("drawn by"),
+          valueType: { type: "party", among: null },
+          many: false,
+          ifUnstated: "unknown",
+          definition: null,
+          derived: null,
+          servesOutlines: ["r:1#a"]
+        },
+        {
+          of: "water-draw",
+          ...named("allowed"),
+          valueType: { type: "boolean" },
+          many: false,
+          ifUnstated: "unknown",
+          definition: null,
+          derived: null,
+          servesOutlines: ["r:1#a"]
+        }
+      ],
+      valueSets: [
+        {
+          ...named("hedge style"),
+          complete: false,
+          values: [
+            { ...named("formal"), broader: [] },
+            { ...named("formal boxwood"), broader: ["hedge-style.formal"] }
+          ],
+          servesOutlines: ["r:1#a"]
+        }
+      ],
+      addValues: [],
+      units: [],
+      notes: []
+    })
+    const built = sharedVocabularyTerms(answer, [])
+    expect(built.terms.map((term) => term.key)).toEqual([
+      "drawing-of-surface-water",
+      "drawing-of-surface-water.drawn-by",
+      "hedge-style",
+      "hedge-style.formal",
+      "hedge-style.formal-boxwood"
+    ])
+    expect(built.terms.find((term) => term.key === "hedge-style.formal-boxwood")).toMatchObject({
+      broader: ["hedge-style.formal"]
+    })
+    expect(built.problems.map((problem) => `${problem.recordKey} ${problem.code}`)).toEqual([
+      "allowed unresolved-reference"
+    ])
   })
 })
 

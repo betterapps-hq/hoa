@@ -1,3 +1,4 @@
+import { keySegment } from "@/encoding/steps/termKeys"
 import { compareCodeUnits } from "@/rulebook/canonical"
 import { coreTerms } from "@/schema/coreTerms"
 import type { TermKey } from "@/schema/types"
@@ -29,7 +30,17 @@ export function parentOf(term: TermContent) {
 // Things, value sets and units first, so properties, categories and values can require their parents to align.
 const order = (term: TermContent) => (parentOf(term) === null ? 0 : 1)
 
+/** A key with each segment's last word in the singular, as code builds keys: plural golden keys still align. */
+const keyForm = (key: TermKey) =>
+  key
+    .split(".")
+    .map((part) => keySegment(part))
+    .join(".")
+
 function labelScore(golden: TermContent, pipeline: TermContent) {
+  if (keyForm(golden.key) === keyForm(pipeline.key)) {
+    return 1
+  }
   let best = 0
   for (const label of golden.labels) {
     for (const candidate of pipeline.labels) {
@@ -64,8 +75,9 @@ function memberScore(
 
 /**
  * Aligns golden terms with pipeline terms one to one: the same key and kind (every one reserved before any other
- * match), else the coding agent's pair, else the best label match; a pair and a label match must be of the same kind,
- * with a parent (a property's thing, a value's set) that is the golden parent's match. A parent that isn't among the
+ * match), else the coding agent's pair, else the same key up to plurals or the best label match; a pair and a label
+ * match must be of the same kind, with a parent (a property's thing, a value's set) that is the golden parent's match,
+ * or for a property of a category, the match of the thing the category narrows. A parent that isn't among the
  * golden terms aligned (a thing the golden list only refers to) must be the same key. Core terms align with themselves.
  * A golden term `pairedOnly` picks matches only through its pair (reserved first), never by key or label: a step that
  * builds keys from labels pairs those terms by its own measure (B's labels and citations), so a key's spelling neither
@@ -79,6 +91,7 @@ export function alignTerms(
 ) {
   const pipelineByKey = new Map(pipeline.map((term) => [term.key, term]))
   const goldenKeys = new Set(golden.map((term) => term.key))
+  const goldenByKey = new Map(golden.map((term) => [term.key, term]))
   const pairedByGolden = new Map(paired.map((pair) => [pair.golden, pair.pipeline]))
   const matches = new Map<TermKey, TermMatch>()
   const taken = new Set<TermKey>()
@@ -107,12 +120,14 @@ export function alignTerms(
       continue
     }
     const parent = parentOf(term)
-    const wantedParent = parent === null ? null : aligned(parent)
+    // A property of a category may sit on the thing the category narrows: the category's members are those things.
+    const owner = parent === null ? undefined : goldenByKey.get(parent)
+    const base = term.kind === "property" && owner?.kind === "category" ? owner.of : null
+    const wantedParents = parent === null ? [null] : [aligned(parent), base === null ? undefined : aligned(base)]
     const fits = (candidate: TermContent) =>
       candidate.kind === term.kind &&
       !taken.has(candidate.key) &&
-      wantedParent !== undefined &&
-      (wantedParent === null || parentOf(candidate) === wantedParent)
+      (parent === null || wantedParents.some((wanted) => wanted !== undefined && parentOf(candidate) === wanted))
     const pick = pipelineByKey.get(pairedByGolden.get(term.key) ?? "")
     if (pick && fits(pick)) {
       matches.set(term.key, { golden: term.key, pipeline: pick.key, by: "agent", score: 1 })

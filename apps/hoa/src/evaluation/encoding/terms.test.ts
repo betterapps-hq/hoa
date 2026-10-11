@@ -42,6 +42,35 @@ describe("alignTerms", () => {
           }
     )
 
+  it("matches a key up to plurals, and a category's property on the thing the category narrows", () => {
+    const category = termDraft.parse({
+      key: "deck",
+      kind: "category",
+      of: "outdoor-area",
+      criteria: {
+        type: "compare",
+        left: { type: "ref", path: ["outdoor-area.raised"] },
+        op: "=",
+        right: { type: "boolean", value: true }
+      },
+      labels: [{ text: "deck", role: "preferred" }]
+    })
+    const reference = [
+      draft("outdoor-area", "outdoor area"),
+      category,
+      draft("deck.screened", "screened underneath", "deck"),
+      draft("outdoor-area.guest-days", "days with guests", "outdoor-area")
+    ]
+    const pipeline = [
+      draft("outdoor-area", "outdoor area"),
+      draft("outdoor-area.underside-screened", "screened underneath", "outdoor-area"),
+      draft("outdoor-area.guest-day", "guest day count", "outdoor-area")
+    ]
+    const matches = alignTerms(reference, pipeline)
+    expect(matches.get("deck.screened")).toMatchObject({ pipeline: "outdoor-area.underside-screened", by: "label" })
+    expect(matches.get("outdoor-area.guest-days")).toMatchObject({ pipeline: "outdoor-area.guest-day", score: 1 })
+  })
+
   it("reserves every same-key match before matching labels", () => {
     const reference = [draft("fence", "fence panel"), draft("fence-panel", "fence panel")]
     const matches = alignTerms(reference, [draft("fence-panel", "fence panel")])

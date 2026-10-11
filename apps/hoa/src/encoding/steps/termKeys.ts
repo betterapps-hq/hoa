@@ -152,7 +152,7 @@ export function termKeyBuilder(known: readonly TermContent[] = []) {
         problems.push({
           recordKey,
           code: "unresolved-reference",
-          message: `${path} names "${text}", which is neither a term of this answer nor a given one`,
+          message: `${path} names "${text}", which is neither a term of this answer nor a given one: name a term this answer adds by its exact preferred label, or add the term`,
           path: [path]
         })
       }

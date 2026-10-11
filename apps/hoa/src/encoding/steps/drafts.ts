@@ -12,7 +12,10 @@ import { ifUnstated, termDraft, termKey, valueType, type TermContent } from "@/s
 export const segment = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "one key segment like height")
 
 /** A term named by one of its labels, or by its key when it's a given term. */
-export const reference = z.string().min(1)
+export const reference = z
+  .string()
+  .min(1)
+  .describe("A given term's key, or the exact preferred label of a term this answer adds (never a key made up for it)")
 
 /** A term's labels as the model writes them: exactly one preferred wording, then the others the documents use. */
 export const labelsDraft = {
