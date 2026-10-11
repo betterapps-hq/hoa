@@ -1,2 +1,9 @@
 [agents]
 max_concurrent_threads_per_session = 8
+
+[mcp_servers.openrouter]
+url = "https://mcp.openrouter.ai/mcp"
+
+[mcp_servers.shadcn]
+command = "npx"
+args = ["shadcn@latest", "mcp"]
