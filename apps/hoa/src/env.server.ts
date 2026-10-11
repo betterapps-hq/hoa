@@ -8,7 +8,7 @@ export const env = createEnv({
     OPENROUTER_MODEL: z.string().min(1).default("anthropic/claude-haiku-5.5"),
     // Routing, structure and classification. Defaults to OPENROUTER_MODEL.
     OPENROUTER_SMALL_MODEL: z.string().min(1).optional(),
-    // Encoding and repair calls a rulebook build runs at once (encoding.md, Cost and scale).
+    // Model calls a rulebook build stage runs at once (encoding.md, Cost and scale).
     ENCODING_CONCURRENCY: z.coerce.number().int().min(1).max(64).default(16),
     LANGFUSE_PUBLIC_KEY: z.string().min(1).optional(),
     LANGFUSE_SECRET_KEY: z.string().min(1).optional(),

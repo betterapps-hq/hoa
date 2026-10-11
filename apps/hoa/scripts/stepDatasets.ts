@@ -5,20 +5,14 @@ import { defaultDocumentStructure, knownDocumentsOf } from "../src/documents/doc
 import { governingDocumentKinds } from "../src/documents/governingDocument.ts"
 import { splitMembership } from "../src/evaluation/encoding/provisions.ts"
 import { noSplit, type GoldenContext } from "../src/evaluation/encoding/steps/datasets.ts"
-import type { LabeledRun } from "../src/evaluation/encoding/steps/evaluate.ts"
 import { goldenReferences } from "../src/evaluation/encoding/steps/golden.ts"
-import { readSavedRun } from "../src/evaluation/encoding/steps/savedRun.ts"
 import { rulesFile } from "../src/schema/zod.ts"
 import { splitSelectors } from "./encodingSplits.ts"
-import { encodingRuns, readJson } from "./evalFiles.ts"
+import { readJson } from "./evalFiles.ts"
 import { sampleDocuments } from "./sampleDocuments.ts"
 
-// What the step datasets' scripts share: the golden encoding with its splits and references, the old runs they're
-// compared with, and comma-separated `name=value` options.
-
-// v5 only: the v3 runs had problems and an overfitted prompt, so they're no fair baseline.
-export const defaultRuns = "v5=2026-10-09T23-14-52-dev"
-export const defaultRetryQuota = "undefined-term=10,type-mismatch=8,invariant=4,shape=8"
+// What the step datasets' scripts share: the golden encoding with its splits and references, and comma-separated
+// `name=value` options.
 
 export const pairs = (option: string | undefined) =>
   (option ?? "")
@@ -36,8 +30,8 @@ const peerGoldens = join(import.meta.dirname, "../../../.fixtures/goldens")
 const withRules = (folder: string) =>
   existsSync(folder) ? readdirSync(folder).filter((name) => existsSync(join(folder, name, "rules.json"))) : []
 
-/** The samples with a golden encoding (samples/<name>/rules.json), which the old runs encoded. Other organizations'
- * goldens (.fixtures/goldens/<name>) were never encoded by them: `eval:step --golden <name>` runs those. */
+/** The samples with a golden encoding (samples/<name>/rules.json). Other organizations' goldens
+ * (.fixtures/goldens/<name>) stay out of the datasets: `eval:step --golden <name>` runs those. */
 export const goldenSamples = () => withRules(samples).toSorted()
 
 /** A golden encoding with its splits (dev, test) and the references the build's grammar finds in it. */
@@ -75,16 +69,4 @@ function peerGoldenContext(sample: string): GoldenContext {
     names: defaults.find((structure) => structure.kind === document.kind)?.names ?? []
   }))
   return { golden, references: goldenReferences(golden, known), splitOf: () => split }
-}
-
-/** Saved runs by label; a run that isn't there is left out with a warning. */
-export function labeledRuns(option: string): LabeledRun[] {
-  return pairs(option).flatMap(([label, runId]) => {
-    const folder = join(encodingRuns, runId)
-    if (!existsSync(folder)) {
-      console.warn(`No run ${runId}: its column is left out.`)
-      return []
-    }
-    return [{ label, run: readSavedRun(folder) }]
-  })
 }

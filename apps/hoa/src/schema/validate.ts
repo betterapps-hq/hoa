@@ -6,7 +6,7 @@ import { createVocabulary } from "./vocabulary"
 import type { QuestionContent, RuleContent, TermContent } from "./zod"
 
 // Checks a rulebook across its records: references resolve, the rule invariants hold, expressions type-check and every
-// provision is covered (schema.md, Invariants; encoding.md, Verify). The Zod schemas have already checked each record's
+// provision is covered (schema.md, Invariants; encoding.md, Merge). The Zod schemas have already checked each record's
 // shape and what it can check alone. The build runs it on parsed drafts, the editor on edited records, and a rules file
 // is a rulebook as it stands.
 

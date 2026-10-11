@@ -1,6 +1,4 @@
 import { describe, expect, it } from "vitest"
-import { createVocabulary } from "@/schema/vocabulary"
-import { termDraft } from "@/schema/zod"
 import {
   draftDocuments,
   draftProvisions,
@@ -9,7 +7,7 @@ import {
   secondDraft,
   vocabulary
 } from "@/tests/encodingDrafts"
-import { applyConsolidation, candidateRulePairs, candidateTermPairs, summarizeRule } from "./consolidate"
+import { applyConsolidation, candidateRulePairs, candidateTermPairs } from "./consolidate"
 import { mergeDrafts } from "./merge"
 
 const { rulebook } = mergeDrafts({
@@ -24,14 +22,7 @@ const { rulebook } = mergeDrafts({
 })
 const findRule = (rules: typeof rulebook.rules, key: string) => rules.find((rule) => rule.key === key)
 
-describe("summaries and candidate pairs", () => {
-  it("summarizes a rule in one line, with labels in its statement", () => {
-    const rule = findRule(rulebook.rules, "rules:1#max-height")
-    expect(rule && summarizeRule(rule, createVocabulary(rulebook.terms))).toBe(
-      "rules:1#max-height | norm requirement | architectural-application | shed | rules:1 | A shed is at most 10 feet tall."
-    )
-  })
-
+describe("candidate pairs", () => {
   it("pairs rules on the same subject that read alike", () => {
     expect(candidateRulePairs(rulebook.rules, rulebook.terms)).toEqual([
       { keys: ["rules:1#max-height", "rules:1#max-height-2"], score: 1 },
@@ -55,8 +46,7 @@ describe("applyConsolidation", () => {
       { rule: "declaration:4.1#sheds-allowed", overrides: ["rules:1#max-height"] },
       { rule: "rules:1#max-height", overrides: ["declaration:4.1#sheds-allowed"] }
     ],
-    conflicts: [{ rules: ["rules:1#max-height", "declaration:4.1#sheds-allowed"], description: "Which applies?" }],
-    termMerges: [{ keep: "shed", merge: ["garden-shed"] }]
+    conflicts: [{ rules: ["rules:1#max-height", "declaration:4.1#sheds-allowed"], description: "Which applies?" }]
   })
 
   it("merges duplicates, keeping every citation and rewriting references to them", () => {
@@ -82,11 +72,6 @@ describe("applyConsolidation", () => {
     ])
   })
 
-  it("merges terms, rewriting every reference to the merged one", () => {
-    expect(applied.rulebook.terms.map((term) => term.key)).toEqual(["shed", "shed.height"])
-    expect(applied.rulebook.questions[0]?.about.terms).toEqual(["shed"])
-  })
-
   it("turns conflicts into questions with an option per rule", () => {
     expect(applied.rulebook.questions[1]).toEqual({
       id: "conflict-1",
@@ -110,29 +95,6 @@ describe("applyConsolidation", () => {
     expect(rulebook.rules).toHaveLength(4)
   })
 
-  it("rewrites statement links and property keys of a merged term", () => {
-    const linked = {
-      ...rulebook,
-      rules: rulebook.rules.map((rule) =>
-        rule.key === "rules:2(a)#max-height" ? { ...rule, statement: "A {{garden-shed:plural}} is short." } : rule
-      ),
-      terms: [
-        ...rulebook.terms,
-        termDraft.parse({
-          key: "garden-shed.roof",
-          kind: "property",
-          of: "garden-shed",
-          valueType: { type: "boolean" },
-          ifUnstated: "absent",
-          labels: [{ text: "roof", role: "preferred" }]
-        })
-      ]
-    }
-    const result = applyConsolidation(linked, { termMerges: [{ keep: "shed", merge: ["garden-shed"] }] })
-    expect(findRule(result.rulebook.rules, "rules:2(a)#max-height")?.statement).toBe("A {{shed:plural}} is short.")
-    expect(result.rulebook.terms.map((term) => term.key)).toContain("shed.roof")
-  })
-
   it("reports what the answer names but the rulebook doesn't hold", () => {
     const result = applyConsolidation(rulebook, {
       duplicates: [{ keep: "rules:9#x", drop: [] }],
@@ -140,14 +102,12 @@ describe("applyConsolidation", () => {
         { rule: "rules:9#x", overrides: [] },
         { rule: "declaration:4.1#sheds-allowed", overrides: ["rules:9#y"] },
         { rule: "rules:1#max-height", overrides: [] }
-      ],
-      termMerges: [{ keep: "gazebo", merge: ["shed"] }]
+      ]
     })
     expect(result.problems.map((problem) => problem.code)).toEqual([
       "undefined-rule",
       "undefined-rule",
-      "undefined-rule",
-      "undefined-term"
+      "undefined-rule"
     ])
   })
 })

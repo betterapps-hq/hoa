@@ -2,9 +2,8 @@ import { normalizeForMatching } from "@/ocr/page"
 import { canonicalJson } from "@/rulebook/canonical"
 import type { RulebookCoverage } from "@/rulebook/coverage"
 import type { GoverningDocument, Provision, RuleKey, Settings } from "@/schema/types"
-import { validateRulebook, type JsonPath } from "@/schema/validate"
+import { validateRulebook } from "@/schema/validate"
 import type { EncodingDraftContent, QuestionContent, RuleContent, TermContent } from "@/schema/zod"
-import { candidateTermPairs, type TermPair } from "./consolidate"
 import { mergeLabels, uniqueCitations } from "./records"
 
 // Merge (encoding.md, Merge): every unit's draft into one rulebook, as the hand-run's build-rules-file.ts did. Terms
@@ -32,9 +31,6 @@ export type MergedRulebook = {
   settings: { clauses: Partial<Settings["clauses"]> }
   questions: (QuestionContent & { id: string })[]
 }
-
-/** Where a merged record came from: a unit's draft and the record's path in it. */
-export type DraftLocation = { unitId: string; path: JsonPath }
 
 /** A disagreement between units, raised as a `conflict` issue on the record. */
 export type MergeConflict = { recordKey: string; message: string; related: RuleKey[] }
@@ -152,7 +148,7 @@ function termMerger(organizationId: string, conflicts: MergeConflict[]) {
   return { add, terms: () => [...terms.values()] }
 }
 
-/** The documents' vocabularies as one (encoding.md, Vocabulary): terms merged by key. */
+/** The documents' defined terms as one (encoding.md, Defined terms): terms merged by key. */
 export function mergeTerms(organizationId: string, terms: readonly TermContent[]) {
   const conflicts: MergeConflict[] = []
   const merger = termMerger(organizationId, conflicts)
@@ -162,9 +158,6 @@ export function mergeTerms(organizationId: string, terms: readonly TermContent[]
 
 export function mergeDrafts(input: MergeInput) {
   const conflicts: MergeConflict[] = []
-  const sources = new Map<string, DraftLocation[]>()
-  const from = (recordKey: string, location: DraftLocation) =>
-    sources.set(recordKey, [...(sources.get(recordKey) ?? []), location])
   const terms = termMerger(input.organizationId, conflicts)
   const addTerm = terms.add
   input.vocabulary.forEach(addTerm)
@@ -176,11 +169,8 @@ export function mergeDrafts(input: MergeInput) {
   const uploaded = new Set(input.documents.map((document) => document.key))
 
   for (const { unitId, draft } of input.units) {
-    draft.terms.forEach((term, i) => {
-      addTerm(term)
-      from(term.key, { unitId, path: ["terms", i] })
-    })
-    draft.rules.forEach((rule, i) => {
+    draft.terms.forEach(addTerm)
+    for (const rule of draft.rules) {
       const key = rules.has(rule.key) ? freeKey(rule.key, new Set(rules.keys())) : rule.key
       if (key !== rule.key) {
         const message = `unit ${unitId} gave a second rule the key ${rule.key}`
@@ -190,27 +180,20 @@ export function mergeDrafts(input: MergeInput) {
         )
       }
       rules.set(key, { ...rule, key })
-      from(key, { unitId, path: ["rules", i] })
-    })
-    draft.questions.forEach((question, i) => {
-      const id = questionId(questions.length + 1)
-      questions.push({ ...question, id })
-      from(id, { unitId, path: ["questions", i] })
-    })
-    if (Object.keys(draft.clauses).length > 0) {
-      from("settings", { unitId, path: [] })
+    }
+    for (const question of draft.questions) {
+      questions.push({ ...question, id: questionId(questions.length + 1) })
     }
     for (const document of draft.referencedDocuments) {
       if (!uploaded.has(document.key) && !referenced.has(document.key)) {
         referenced.set(document.key, { ...document, issuedBy: null, governs: null, edition: null })
       }
     }
-    draft.provisions.forEach((provision, i) => {
-      from(provision.key, { unitId, path: ["provisions", i] })
+    for (const provision of draft.provisions) {
       if (provision.noRule) {
         noRules.set(provision.key, provision.noRule)
       }
-    })
+    }
   }
 
   const clauses = mergeClauses(input.units, (message) =>
@@ -236,6 +219,5 @@ export function mergeDrafts(input: MergeInput) {
       .filter((provision) => !cited.has(provision.key) && provision.noRule === null)
       .map((provision) => provision.key)
   }
-  const termPairs: TermPair[] = candidateTermPairs(rulebook.terms)
-  return { rulebook, conflicts, coverage, termPairs, sources, issues: validateRulebook(rulebook) }
+  return { rulebook, conflicts, coverage, issues: validateRulebook(rulebook) }
 }

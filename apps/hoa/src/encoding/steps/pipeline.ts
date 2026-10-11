@@ -1,7 +1,6 @@
 import type { ModelCall } from "@/jobs/steps"
 import type { GoverningDocument, Provision, ProvisionKey } from "@/schema/types"
 import type { EncodingDraftContent, QuestionContent, RuleContent, TermContent } from "@/schema/zod"
-import { applyConsolidation } from "../consolidate"
 import { findTermCandidates, type TermCandidate } from "../definedTerms"
 import type { MergedRulebook } from "../merge"
 import type { EncodingUnit } from "../plan"
@@ -657,9 +656,3 @@ export const consolidateRules = (input: Call & { input: ConsolidationInput }) =>
     schema: consolidationAnswer(input.input.rules),
     variables: consolidationVariables(input.input)
   })
-
-/** Consolidation's answer applied: term merges are C-merge's, so it has none. */
-export const applyConsolidationAnswer = (
-  rulebook: MergedRulebook,
-  answer: Pick<Parameters<typeof applyConsolidation>[1], "duplicates" | "overrides" | "conflicts">
-) => applyConsolidation(rulebook, { ...answer, termMerges: [] })

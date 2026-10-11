@@ -3,36 +3,30 @@ import { compareCodeUnits } from "@/rulebook/canonical"
 import { renderStatement } from "@/schema/statement"
 import type { RuleKey, TermKey } from "@/schema/types"
 import { validateRulebook } from "@/schema/validate"
-import { createVocabulary, type Vocabulary } from "@/schema/vocabulary"
+import { createVocabulary } from "@/schema/vocabulary"
 import { encodingDraft, questionDraft, ruleDraft, termDraft, type RuleContent, type TermContent } from "@/schema/zod"
 import { matchLabel, similarity } from "@/text/match"
 import type { MergedRulebook } from "./merge"
-import { mergeLabels, uniqueCitations } from "./records"
+import { uniqueCitations } from "./records"
 
-// Consolidate (encoding.md, Consolidate): candidate pairs of near-duplicate terms and rules, one-line rule summaries for
-// hoa-rulebook-consolidation, and applying its answer: duplicates merged keeping every citation, overrides added when
-// precedence allows them, terms merged with every reference rewritten, conflicts turned into questions.
+// Consolidate (encoding.md, Consolidate): candidate pairs of near-duplicate terms and rules, and applying
+// hoa-consolidation's answer: duplicates merged keeping every citation, overrides added when precedence allows them,
+// conflicts turned into questions. Term merges are C-merge's, before any rule is drafted.
 
 const ruleKeys = z.array(z.string())
 
 /** The model's answer (encoding.md, Consolidate). */
-export const consolidation = z.object({
+const consolidation = z.object({
   duplicates: z.array(z.object({ keep: z.string(), drop: ruleKeys })).default([]),
   overrides: z.array(z.object({ rule: z.string(), overrides: ruleKeys })).default([]),
-  conflicts: z.array(z.object({ rules: ruleKeys, description: z.string() })).default([]),
-  termMerges: z.array(z.object({ keep: z.string(), merge: ruleKeys })).default([])
+  conflicts: z.array(z.object({ rules: ruleKeys, description: z.string() })).default([])
 })
-export type Consolidation = z.input<typeof consolidation>
+type Consolidation = z.input<typeof consolidation>
 
 export type TermPair = { keys: [TermKey, TermKey]; labels: [string, string]; score: number }
 export type RulePair = { keys: [RuleKey, RuleKey]; score: number }
 
-export const consolidationProblemCodes = [
-  "undefined-rule",
-  "undefined-term",
-  "override-not-allowed",
-  "invalid-override"
-] as const
+export const consolidationProblemCodes = ["undefined-rule", "override-not-allowed", "invalid-override"] as const
 
 export type ConsolidationProblem = {
   code: (typeof consolidationProblemCodes)[number]
@@ -41,14 +35,6 @@ export type ConsolidationProblem = {
 }
 
 const ruleThreshold = 0.85
-
-/** One line per rule: key, kind and modality, request types, subject, main citation, statement with labels. */
-export function summarizeRule(rule: RuleContent, vocabulary: Pick<Vocabulary, "label">) {
-  const statement = renderStatement(rule.statement, (key, plural) => vocabulary.label(key, plural))
-  const kind = rule.kind === "norm" || rule.kind === "sanction" ? `${rule.kind} ${rule.modality}` : rule.kind
-  const citation = rule.citations[0]?.provisionKey ?? "-"
-  return [rule.key, kind, rule.requestTypes.join(", "), rule.appliesTo ?? "-", citation, statement].join(" | ")
-}
 
 const scopeOf = (term: TermContent) => {
   if (term.kind === "property") {
@@ -142,7 +128,7 @@ function rank(rulebook: MergedRulebook, rule: RuleContent) {
 }
 
 /**
- * Applies hoa-rulebook-consolidation's answer to the merged rulebook, then verifies it again. Anything the answer names
+ * Applies hoa-consolidation's answer to the merged rulebook, then verifies it again. Anything the answer names
  * that doesn't exist, and overrides precedence forbids, are reported and skipped.
  */
 export function applyConsolidation(merged: MergedRulebook, answer: Consolidation) {
@@ -187,32 +173,6 @@ export function applyConsolidation(merged: MergedRulebook, answer: Consolidation
         rule.overrides = [...rule.overrides, target]
       }
     }
-  }
-
-  const findTerm = (key: TermKey) => rulebook.terms.find((term) => term.key === key)
-  for (const { keep, merge } of result.termMerges) {
-    const kept = findTerm(keep)
-    const absorbed = merge.flatMap((key) => findTerm(key) ?? [])
-    if (!kept || absorbed.length !== merge.length) {
-      problem("undefined-term", keep, `the merge into ${keep} names a term that doesn't exist`)
-      continue
-    }
-    mergeLabels(
-      kept,
-      absorbed.flatMap((term) => term.labels)
-    )
-    kept.citations = uniqueCitations([...kept.citations, ...absorbed.flatMap((term) => term.citations)])
-    rulebook = { ...rulebook, terms: rulebook.terms.filter((term) => !merge.includes(term.key)) }
-    const renamed = (text: string) => {
-      const from = merge.find((key) => text === key || text.startsWith(`${key}.`))
-      return from ? keep + text.slice(from.length) : text
-    }
-    rulebook = rewriteAll(rulebook, (text) =>
-      renamed(text).replace(
-        /\{\{([a-z0-9.-]+)(:plural)?\}\}/g,
-        (_link, key: string, plural?: string) => `{{${renamed(key)}${plural ?? ""}}}`
-      )
-    )
   }
 
   const questions = result.conflicts.map((conflict, i) => ({

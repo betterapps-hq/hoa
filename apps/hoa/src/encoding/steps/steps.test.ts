@@ -21,7 +21,7 @@ import {
   subjectKey,
   withHeadingReasons
 } from "./ruleFinding"
-import { changedPaths, collateralChanges, outlineOfRecord, retryProblemsText } from "./ruleRetry"
+import { outlineOfRecord, retryProblemsText } from "./ruleRetry"
 import { clausesOf, draftsOf, relatedOutlines, ruleStructuringAnswer, structuringBatches } from "./ruleStructuring"
 import { checkSharedVocabulary, sharedVocabularyAnswer, sharedVocabularyTerms } from "./vocabulary"
 import {
@@ -679,7 +679,7 @@ describe("F and its retry", () => {
     expect(clauses.deciders?.[0]?.citations).toEqual([{ provisionKey: "rules:4", highlight: null, region: null }])
   })
 
-  it("shows a failing rule in F's format with its problems, and counts collateral changes", () => {
+  it("shows a failing rule in F's format with its problems", () => {
     const record = {
       key: "rules:1#limit",
       kind: "norm",
@@ -700,17 +700,6 @@ describe("F and its retry", () => {
     }
     expect(outlineOfRecord(item).modality).toBe("obligation")
     expect(retryProblemsText([item])).toContain("rules:1#limit: check.test: x isn't a term [undefined-term]")
-    const after = {
-      ...record,
-      title: "Size limit",
-      check: { type: "test", test: { type: "text", text: "tiny" } },
-      bearer: "board"
-    }
-    expect(changedPaths(record, after)).toEqual([["bearer"], ["check", "test", "text"], ["title"]])
-    expect(collateralChanges(record, after, [["check", "test"]])).toMatchObject({
-      collateral: [["bearer"]],
-      wordingChanged: true
-    })
   })
 })
 

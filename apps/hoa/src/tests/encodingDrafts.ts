@@ -1,7 +1,7 @@
 import type { GoverningDocument, Provision } from "@/schema/types"
 import { encodingDraft, termDraft, type EncodingDraft, type RuleDraft, type TermDraft } from "@/schema/zod"
 
-// Made-up encoding drafts for the merge, consolidation, repair and prompt tests: a declaration and a set of board rules
+// Made-up encoding drafts for the merge, consolidation and prompt tests: a declaration and a set of board rules
 // about sheds, two units whose drafts overlap the way parallel encoders' do.
 
 const edition = {

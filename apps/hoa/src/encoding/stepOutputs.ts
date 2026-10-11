@@ -19,8 +19,8 @@ import { vocabularyMergeAnswer } from "./steps/vocabularyMerge"
 
 // What each build step returns (encoding.md, Stages). A Workflow stores step outputs in R2 and reads them back on
 // replay, so every output is plain JSON, checked by these schemas when it's read. A model step stores its answer, or
-// what code built from it, and each code step between rounds what the next round reads. The plan's units and each
-// unit's state are also how the naive encoder's saved runs read back (savedRun.ts).
+// what code built from it, and each code step between rounds what the next round reads. A saved build run's plan,
+// structure and merge also read back through them as frozen inputs for one step's evaluation (savedRun.ts).
 
 const jsonPath = z.array(z.union([z.string(), z.number()]))
 
@@ -71,22 +71,6 @@ export const encodingUnit = z.object({
     z.object({ key: z.string(), kind: z.enum(["exact", "fuzzy"]), score: z.number(), found: z.string() })
   ),
   requestTypes: z.array(termDraft)
-})
-
-const unitProblem = z.object({
-  source: z.enum(["zod", "validator"]),
-  code: z.string(),
-  message: z.string(),
-  path: jsonPath,
-  reference: z.string().nullable()
-})
-
-/** A unit's latest answer, its draft when the answer passes Zod, and its problems. */
-export const unitState = z.object({
-  unitId: z.string(),
-  answer: z.unknown(),
-  draft: encodingDraft.nullable(),
-  problems: z.array(unitProblem)
 })
 
 const itemProblem = z.object({ code: z.string(), message: z.string() })
@@ -216,8 +200,6 @@ export const structureCheckOutput = z.array(
   })
 )
 
-export const unitProblems = z.array(z.tuple([z.string(), z.array(unitProblem)]))
-
 const rulebookIssue = z.object({ code: issueCode, message: z.string(), recordKey: z.string(), path: jsonPath })
 
 export const mergedRulebook = z.object({
@@ -235,9 +217,6 @@ export const mergeOutput = z.object({
   rulebook: mergedRulebook,
   conflicts: z.array(z.object({ recordKey: z.string(), message: z.string(), related: z.array(z.string()) })),
   coverage: rulebookCoverage,
-  termPairs: z.array(
-    z.object({ keys: z.tuple([z.string(), z.string()]), labels: z.tuple([z.string(), z.string()]), score: z.number() })
-  ),
   issues: z.array(rulebookIssue)
 })
 export type MergeOutput = z.infer<typeof mergeOutput>

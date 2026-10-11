@@ -434,7 +434,8 @@ export async function runObjectPrompt<T, Prompt extends PromptDefinition>(
 
 /**
  * Like `runObjectPrompt`, but an answer that fails Zod comes back with its issues instead of throwing, so a stage that
- * repairs answers (encoding) sends it to repair rather than retrying the call blind. Invalid answers are cached too.
+ * reruns failing answers (the rulebook build's steps) sends it back with its problems rather than retrying the call
+ * blind. Invalid answers are cached too.
  */
 export async function runCheckedObjectPrompt<T, Prompt extends PromptDefinition>(
   options: ObjectPromptOptions<T, Prompt>

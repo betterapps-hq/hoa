@@ -11,11 +11,10 @@ import { keyEnum } from "./drafts"
 import type { UnresolvedTarget } from "./outline"
 import type { stepPrompts } from "./prompts"
 
-// Consolidation over the merged rules (hoa-consolidation, prompt drafts v2; the naive encoder keeps the text prompt
-// hoa-rulebook-consolidation): each rule line shows its existing overrides, code lists the cross-references between
-// sections (and the targets E named that resolved to no rule) and the similar pairs it found, and term merges are gone
-// (C-merge does them before any rule is drafted). Only a norm or discretion rule whose overrides is a list can take
-// more; code applies the answer (applyConsolidation).
+// Consolidation over the merged rules (hoa-consolidation, prompt drafts v2): each rule line shows its existing
+// overrides, code lists the cross-references between sections (and the targets E named that resolved to no rule) and
+// the similar pairs it found; term merges are C-merge's, before any rule is drafted. Only a norm or discretion rule
+// whose overrides is a list can take more; code applies the answer (applyConsolidation).
 
 /**
  * Consolidation's answer for a build (one call, so its rule keys are build-wide enums): only a norm or discretion whose

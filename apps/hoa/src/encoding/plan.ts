@@ -7,8 +7,8 @@ import { findLabels, type MatchKind } from "@/text/match"
 // Plan (encoding.md, Plan): each document divides into encoding units within a token budget of provision text. An
 // article that fits stays whole; a larger one splits by section, and a large section by its items. Neighbouring pieces
 // of one document, articles included, pack together up to the budget, and no provision's subtree is divided unless it
-// alone is over the budget. Each unit carries the context its encoder needs: its references and vocabulary slice cover
-// all of its provisions.
+// alone is over the budget. Each unit carries the context finding its rules needs: its references and vocabulary slice
+// cover all of its provisions.
 
 export type UnitAncestor = Pick<Provision, "key" | "kind" | "label" | "heading" | "intro" | "wrapUp">
 export type UnitReference = Pick<Provision, "key" | "label" | "heading"> & { text: string; isTruncated: boolean }
@@ -38,11 +38,7 @@ export type PlanInput = {
 
 export type PlanOptions = { maxTokens?: number; referenceTokens?: number }
 
-/**
- * The most provision text one unit holds, in estimated tokens (encoding.md, Cost and scale). An encode call at this
- * size already writes about 22,000 tokens, half of them reasoning; doubling it would approach the 40,000-token answers
- * that nearly reach a build step's timeout, and a longer answer has more to repair.
- */
+/** The most provision text one unit holds, in estimated tokens (encoding.md, Cost and scale). */
 export const unitTokenBudget = 3000
 
 const charactersPerToken = 4
@@ -118,7 +114,7 @@ function related(term: TermContent, vocabulary: readonly TermContent[]) {
   )
 }
 
-/** The value sets the slice's choice properties choose from, with their values, so the encoder can name each value. */
+/** The value sets the slice's choice properties choose from, with their values, so the model can name each value. */
 function choiceSets(slice: readonly TermContent[], vocabulary: readonly TermContent[]) {
   const sets = new Set(
     slice.flatMap((term) => (term.kind === "property" && term.valueType.type === "choice" ? [term.valueType.set] : []))

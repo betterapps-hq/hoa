@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest"
 import { runCost, validityScores } from "./run"
 
 const call = (costUsd: number | null) => ({
-  stage: "provision-encoding",
+  stage: "find-rules",
   itemId: "unit",
-  promptName: "hoa-provision-encoding",
+  promptName: "hoa-rule-finding",
   promptVersion: 1,
   modelId: "model",
   inputTokens: 1,

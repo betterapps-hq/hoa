@@ -1,11 +1,10 @@
-import { z } from "zod"
 import { canonicalJson, compareCodeUnits } from "@/rulebook/canonical"
 import type { Tags } from "./datasets"
 import type { ItemScore, Verdict } from "./scores"
 
-// The datasets' summary per step and the comparison file per item (evaluation.md, Datasets): item counts by slice,
-// each old run's (or a new step run's) accuracy per metric and per slice, and the items every run got wrong, which are
-// the most useful test items. The comparison files hold what code can't judge, for the coding agent.
+// A step run's summary and the comparison file per item (evaluation.md, Running one step): item counts by slice, each
+// run's (or repeat's) accuracy per metric and per slice, and the items every run got wrong, which are the most useful
+// test items. The comparison files hold what code can't judge, for the coding agent.
 
 /** A metric across a step run's repeats: its mean, min and max (null where no repeat measured it). */
 export type Spread = { mean: number; min: number; max: number }
@@ -18,31 +17,7 @@ export type ItemResult = {
   results: Record<string, ItemScore>
 }
 
-const spread = z.object({ mean: z.number(), min: z.number(), max: z.number() })
-
-/** Item results as results.json stores them. */
-export const itemResults = z.array(
-  z.object({
-    id: z.string(),
-    tags: z.object({
-      document: z.string(),
-      split: z.string(),
-      topics: z.array(z.string()),
-      features: z.array(z.string())
-    }),
-    repeats: z.record(z.string(), spread).optional(),
-    results: z.record(
-      z.string(),
-      z.object({
-        verdict: z.enum(["correct", "partly", "wrong", "missing", "no-equivalent"]),
-        metrics: z.record(z.string(), z.number().nullable()),
-        notes: z.array(z.string())
-      })
-    )
-  })
-)
-
-const verdicts: Verdict[] = ["correct", "partly", "wrong", "missing", "no-equivalent"]
+const verdicts: Verdict[] = ["correct", "partly", "wrong", "missing"]
 function number(value: number | null) {
   if (value === null) {
     return "-"
@@ -69,7 +44,7 @@ export function accuracy(items: readonly ItemResult[], run: string) {
   const counts = Object.fromEntries(
     verdicts.map((verdict) => [verdict, scores.filter((score) => score.verdict === verdict).length])
   )
-  const judged = scores.filter((score) => score.verdict !== "missing" && score.verdict !== "no-equivalent")
+  const judged = scores.filter((score) => score.verdict !== "missing")
   const metricNames = [...new Set(scores.flatMap((score) => Object.keys(score.metrics)))].toSorted(compareCodeUnits)
   return {
     counts,
@@ -103,8 +78,8 @@ export function repeatSpread(runs: readonly Record<string, number | null | undef
 /** A spread as text: "0.480 (0.470–0.490)". */
 export const spreadText = (value: Spread) => `${number(value.mean)} (${number(value.min)}–${number(value.max)})`
 
-/** One step's summary as Markdown. */
-export function stepSummary(step: string, items: readonly ItemResult[], runs: readonly string[]) {
+/** A step run's scores as Markdown. */
+function scoresSummary(items: readonly ItemResult[], runs: readonly string[]) {
   const slices = [...new Set(items.flatMap((item) => slicesOf(item.tags)))].toSorted(compareCodeUnits)
   const overall = runs.map((run) => ({ run, ...accuracy(items, run) }))
   const metricNames = [...new Set(overall.flatMap((item) => Object.keys(item.metrics)))].toSorted(compareCodeUnits)
@@ -113,9 +88,9 @@ export function stepSummary(step: string, items: readonly ItemResult[], runs: re
     (item) => runs.length > 0 && runs.every((run) => item.results[run]?.verdict === "wrong")
   )
   return [
-    `# Dataset ${step}`,
+    "## Scores against the expected outputs",
     "",
-    `${items.length} items. Runs compared: ${runs.join(", ") || "none"}. Verdicts and metrics are code's; the comparison files in compare/ are for the coding agent (evaluation.md, Datasets).`,
+    `${items.length} items. Runs compared: ${runs.join(", ") || "none"}. Verdicts and metrics are code's; the comparison files in compare/ are for the coding agent (evaluation.md, Running one step).`,
     "",
     "## Verdicts",
     "",
@@ -251,7 +226,7 @@ function repeatsSection(items: readonly ItemResult[], repeats: readonly string[]
   ]
 }
 
-/** One step run's report: what ran, its calls, its problems by class, and its scores beside the old runs'. */
+/** One step run's report: what ran, its calls, its problems by class, and its scores. */
 export function stepRunReport(input: {
   runId: string
   stage: string
@@ -260,12 +235,11 @@ export function stepRunReport(input: {
   wallSeconds: number
   calls: readonly CallLike[]
   problems: readonly { code: string }[]
-  /** This run's item results (each repeat a column), and the dataset's old-run results when there are any. */
+  /** This run's item results, each repeat a column. */
   items: readonly ItemResult[]
   runs: readonly string[]
   /** The columns that are repeats of this run: each metric's mean over items is shown with its spread across them. */
   repeats?: readonly string[]
-  extra: readonly string[]
 }) {
   const figures = callFigures(input.calls)
   const classes = new Map<string, number>()
@@ -289,12 +263,8 @@ export function stepRunReport(input: {
       ? ["- none"]
       : [...classes].toSorted(([a], [b]) => compareCodeUnits(a, b)).map(([code, count]) => `- ${code}: ${count}`)),
     "",
-    ...input.extra,
     ...repeatsSection(input.items, input.repeats ?? []),
     "",
-    stepSummary(input.stage, input.items, input.runs).replace(
-      /^# Dataset .*\n/,
-      "## Scores against the expected outputs\n"
-    )
+    scoresSummary(input.items, input.runs)
   ].join("\n")
 }

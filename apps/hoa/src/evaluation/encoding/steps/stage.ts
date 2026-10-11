@@ -1,9 +1,9 @@
 import { z } from "zod"
+import { applyConsolidation } from "@/encoding/consolidate"
 import { outlineSchema } from "@/encoding/stepOutputs"
 import { checkDefinedTerms, citableProvisions } from "@/encoding/steps/definedTerms"
 import { proposedPropertyTerm } from "@/encoding/steps/drafts"
 import {
-  applyConsolidationAnswer,
   buildGroupVocabulary,
   checkFindings,
   checkStructured,
@@ -18,7 +18,6 @@ import {
   resolveFindings,
   retryBatch,
   retryRecords,
-  structureBatch,
   structureFirstPass,
   unresolvedProblem,
   vocabularyEntries,
@@ -29,7 +28,6 @@ import {
   type Structured,
   type StructuringBatch
 } from "@/encoding/steps/pipeline"
-import { outlineOfRecord, retryBatches, retryProblemsText } from "@/encoding/steps/ruleRetry"
 import type { StepAi } from "@/encoding/steps/run"
 import { checkSharedVocabulary, type GroupVocabulary } from "@/encoding/steps/vocabulary"
 import { mergeExactKeys } from "@/encoding/steps/vocabularyMerge"
@@ -44,20 +42,12 @@ import type {
   SharedVocabularyItem,
   VocabularyMergeItem
 } from "./datasets"
-import { retryOutcome, type RetryItem } from "./oldRuns"
-import type {
-  ConsolidationOutput,
-  FindingOutput,
-  MergeOutput,
-  RetryOutput,
-  StructuringOutput,
-  VocabularyOutput
-} from "./scores"
+import type { ConsolidationOutput, FindingOutput, MergeOutput, StructuringOutput, VocabularyOutput } from "./scores"
 
 // Runs one drafted step over dataset items (evaluation.md, Running one step), as the build runs it: each item's input
 // becomes the step's prompt variables, the answer goes through the step's code (keys built, checks, merges), a failing
-// item is rerun once with its problems (B, E and C; F's retry is its own mode), and the output takes the shape the
-// item's expected output has, so the step's scores compare them. The per-item work is the build's own
+// item is rerun once with its problems (B, E and C; F retries its failing rules in up to two rounds), and the output
+// takes the shape the item's expected output has, so the step's scores compare them. The per-item work is the build's own
 // (src/encoding/steps/pipeline.ts). Every call is recorded; an answer that fails Zod is kept with its issues and
 // counted. `cacheStage` keeps repeats apart in the content cache.
 
@@ -400,66 +390,6 @@ export async function runRuleStructuring(
   }
 }
 
-export async function runRuleRetry(
-  items: readonly RetryItem[],
-  context: Context & { documents: readonly T.GoverningDocument[] }
-): Promise<StepRun<RetryOutput>> {
-  const calls: ModelCall[] = []
-  const problems: StepProblem[] = []
-  const outputs = new Map<string, RetryOutput | null>()
-  const byKey = new Map(items.map((item) => [item.input.record.key, item]))
-  for (const records of retryBatches(items.map((item) => item.input.record))) {
-    const [first] = records
-    const firstItem = first ? byKey.get(first.key) : undefined
-    if (!firstItem) {
-      continue
-    }
-    const unique = <V extends { key: string }>(values: V[]) => [
-      ...new Map(values.map((value) => [value.key, value])).values()
-    ]
-    const vocabulary = unique(records.flatMap((record) => byKey.get(record.key)?.input.vocabulary ?? []))
-    const provisions = unique(records.flatMap((record) => byKey.get(record.key)?.input.provisions ?? []))
-    const batch: StructuringBatch = {
-      id: firstItem.id,
-      outlines: records.map(outlineOfRecord),
-      related: [],
-      vocabulary,
-      documents: context.documents.map(({ key, kind, title, edition }) => ({ key, kind, title, edition })),
-      provisions,
-      settingsFlags: []
-    }
-    const result = await structureBatch({
-      ai: context.ai,
-      cacheStage: context.cacheStage,
-      batch,
-      effectiveFrom: evaluationDate,
-      problems: retryProblemsText(records)
-    })
-    calls.push(result.call)
-    problems.push(...ofItem(batch.id, result.issues))
-    for (const record of records) {
-      const item = byKey.get(record.key)
-      const structured = result.structured.find((entry) => entry.outline.key === record.key)
-      if (item) {
-        outputs.set(
-          item.id,
-          structured
-            ? retryOutcome({
-                record,
-                after: structured.draft,
-                terms: vocabulary,
-                rules: [],
-                provisions,
-                documents: context.documents
-              })
-            : null
-        )
-      }
-    }
-  }
-  return { outputs, calls, problems, handoff: {} }
-}
-
 export async function runConsolidation(
   items: readonly ConsolidationItem[],
   context: Context
@@ -480,7 +410,7 @@ export async function runConsolidation(
       outputs.set(item.id, null)
       continue
     }
-    const applied = applyConsolidationAnswer(
+    const applied = applyConsolidation(
       {
         organization: { id: "evaluation" },
         documents: item.input.documents.map((document) => ({ ...document, issuedBy: null, governs: null })),

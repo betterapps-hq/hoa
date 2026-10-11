@@ -47,12 +47,13 @@ describe("rulebook build prompts", () => {
   })
 
   it("refuse a version whose text uses another variable or leaves one out", () => {
-    const prompt = pipelinePrompts.encodingRepair
-    expect(contractProblem(prompt, "{{draft}} {{problems}} {{terms}} {{coreTerms}}")).toBeNull()
-    expect(contractProblem(prompt, "{{draft}} {{problems}} {{terms}}")).toContain("doesn't use {{coreTerms}}")
-    expect(contractProblem(prompt, "{{draft}} {{problems}} {{terms}} {{coreTerms}} {{fence-run}}")).toContain(
-      "{{fence-run}}"
+    const prompt = pipelinePrompts.structureRepair
+    const text = "{{documentTitle}} {{pageText}} {{parserOutline}} {{problems}}"
+    expect(contractProblem(prompt, text)).toBeNull()
+    expect(contractProblem(prompt, "{{documentTitle}} {{pageText}} {{parserOutline}}")).toContain(
+      "doesn't use {{problems}}"
     )
+    expect(contractProblem(prompt, `${text} {{fence-run}}`)).toContain("{{fence-run}}")
   })
 })
 

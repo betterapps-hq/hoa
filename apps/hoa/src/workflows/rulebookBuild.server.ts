@@ -31,8 +31,7 @@ import {
 
 export type RulebookBuildParams = { hoaId: string; rulebookId: string; jobId: string }
 
-// A model step may make a call and its rerun; the naive encoder's calls wrote up to about 40,000 tokens and took five
-// minutes on the sample (implementation-log.md).
+// A model step may make a call and its rerun, and a long answer takes minutes to write.
 const buildModelStep = { ...modelStep, timeout: "15 minutes" } as const
 
 function errorText(error: unknown) {

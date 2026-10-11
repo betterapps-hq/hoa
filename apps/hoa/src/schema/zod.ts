@@ -824,7 +824,7 @@ export const questionDraft = z.object({
   answer: d(answer)
 })
 
-// One encoding unit's answer (encoding.md, Encode). Provisions come back by key; code attaches their stored text.
+// One section's or batch's draft (encoding.md, Merge). Provisions come back by key; code attaches their stored text.
 export const encodingDraft = z.object({
   provisions: z.array(
     z.object({ key: provisionKey, noRule: d(z.object({ reason: noRuleReason, note: d(z.string()) })) })
@@ -836,39 +836,6 @@ export const encodingDraft = z.object({
   referencedDocuments: list(z.object({ key: documentKey, kind: documentKind, title: z.string().min(1) })),
   notes: list(z.string())
 })
-
-// A repair's answer (encoding.md, Repair): only the records it changes, adds or removes, by key. Code applies it to the
-// draft and verifies the result, so the model doesn't write the draft out again.
-export const encodingPatch = z.object({
-  provisions: z
-    .array(encodingDraft.shape.provisions.element)
-    .default([])
-    .describe("Provisions whose entry changes or was missing, by key; each replaces the draft's entry with its key."),
-  terms: list(termDraft).describe("Terms to add, or to replace the draft's term with the same key."),
-  rules: list(ruleDraft).describe("Rules to add, or to replace the draft's rule with the same key."),
-  questions: list(
-    questionDraft.extend({
-      replaces: d(z.string()).describe("The id of the question this replaces, such as question-2; null for a new one.")
-    })
-  ),
-  clauses: clauses.partial().default({}).describe("Clauses to set; each replaces the draft's clause of that name."),
-  referencedDocuments: list(z.object({ key: documentKey, kind: documentKind, title: z.string().min(1) })).describe(
-    "Referenced documents to add, or to replace the draft's document with the same key."
-  ),
-  notes: list(z.string()).describe("Notes to add to the draft's notes."),
-  remove: z
-    .object({
-      terms: list(termKey),
-      rules: list(ruleKey),
-      questions: list(z.string()).describe("Question ids, such as question-2."),
-      clauses: list(clauses.keyof()),
-      referencedDocuments: list(documentKey)
-    })
-    .prefault({})
-    .describe("Records to remove from the draft, by key.")
-})
-
-export type EncodingPatchContent = z.output<typeof encodingPatch>
 
 export type RuleDraft = z.input<typeof ruleDraft>
 export type TermDraft = z.input<typeof termDraft>

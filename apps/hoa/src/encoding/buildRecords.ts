@@ -16,7 +16,6 @@ const proposed: Review = { status: "proposed", by: null, at: null, note: null }
 
 const consolidationCodes: Record<ConsolidateOutput["problems"][number]["code"], IssueCode> = {
   "undefined-rule": "undefined-rule",
-  "undefined-term": "undefined-term",
   "override-not-allowed": "override-not-allowed",
   "invalid-override": "invariant"
 }

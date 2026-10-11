@@ -20,7 +20,6 @@ const merged: MergeOutput = {
   rulebook,
   conflicts: [{ recordKey: "shed", message: "shed has two definitions", related: [] }],
   coverage: { provisions: 5, uncovered: [] },
-  termPairs: [],
   issues: []
 }
 const consolidated: ConsolidateOutput = {

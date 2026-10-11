@@ -2,7 +2,7 @@ import { compareCodeUnits } from "@/rulebook/canonical"
 import type { Provision, ProvisionKey } from "@/schema/types"
 import { definedNames } from "./provisions"
 
-// Defined-term candidates for the vocabulary stage (encoding.md, Vocabulary): terms the documents define ("Unit"
+// Defined-term candidates for B (encoding.md, Defined terms): terms the documents define ("Unit"
 // means, "Unit": …, (the "Act")), and capitalized multi-word phrases used at least three times away from sentence
 // starts ("Common Area", "Class "B" Control Period"), each with its count and three sample sentences with the
 // provisions they come from. An inline definition that opens the paragraph after a list ("(collectively, the "X")")

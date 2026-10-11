@@ -88,7 +88,7 @@ export function definedTermsVariables(input: {
     coreTerms: coreTermsText(),
     document: documentLine(input.document),
     definitions: none(input.definitions.map(provisionBlock).join("\n\n")),
-    candidates: none(input.candidates.map((candidate) => candidateText(candidate, true)).join("\n")),
+    candidates: none(input.candidates.map(candidateText).join("\n")),
     problems: input.problems ?? "none"
   }
 }

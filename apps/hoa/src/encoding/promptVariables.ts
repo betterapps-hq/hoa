@@ -4,15 +4,12 @@ import { canonicalJson, compareCodeUnits } from "@/rulebook/canonical"
 import { coreTerms } from "@/schema/coreTerms"
 import type { GoverningDocument, Provision, ValueType } from "@/schema/types"
 import type { JsonPath } from "@/schema/validate"
-import { createVocabulary } from "@/schema/vocabulary"
-import type { RuleContent, TermContent } from "@/schema/zod"
+import type { TermContent } from "@/schema/zod"
 import type { StructureCheck } from "./check"
 import type { CleanDocument } from "./clean"
-import { summarizeRule, type TermPair } from "./consolidate"
 import type { TermCandidate } from "./definedTerms"
-import type { EncodingUnit, UnitAncestor, UnitReference } from "./plan"
+import type { UnitAncestor, UnitReference } from "./plan"
 import type { StructuredDocument } from "./provisions"
-import type { UnitProblem } from "./repair"
 import { cleanText, parserOutline } from "./structureRepair"
 
 // The prompt variables of the build's prompts (encoding.md, Prompts and models), as compact text in a fixed order, so
@@ -93,7 +90,7 @@ function headingOf(provision: Pick<Provision, "kind" | "label" | "heading">) {
   return `${provision.kind} ${provision.label}${provision.heading ? `: ${provision.heading}` : ""}`
 }
 
-/** A provision as the encoder reads it: its key and heading, then its text, intro and wrap-up in reading order. */
+/** A provision as a step reads it: its key and heading, then its text, intro and wrap-up in reading order. */
 export function provisionBlock(provision: Provision) {
   return [
     `[${provision.key}] ${headingOf(provision)}`,
@@ -128,19 +125,6 @@ export function referencesText(references: readonly UnitReference[]) {
   return blocks.join("\n\n") || "none"
 }
 
-/** hoa-provision-encoding: one unit and its context. */
-export function provisionEncodingVariables(unit: EncodingUnit, document: DocumentLine): Variables<"provisionEncoding"> {
-  return {
-    document: documentLine(document),
-    provisions: unit.provisions.map(provisionBlock).join("\n\n"),
-    context: contextText(unit.context),
-    references: referencesText(unit.references),
-    terms: termLines(unit.terms) || "none",
-    coreTerms: coreTermsText(),
-    requestTypes: termLines(unit.requestTypes)
-  }
-}
-
 /** A JSON path as people write it: rules[1].appliesTo. */
 export function pathText(path: JsonPath) {
   return path
@@ -149,65 +133,15 @@ export function pathText(path: JsonPath) {
     .replace(/^\./, "")
 }
 
-/** hoa-encoding-repair: the draft as canonical JSON, its problems with their paths, and the unit's vocabulary. */
-export function encodingRepairVariables(
-  draft: unknown,
-  problems: readonly UnitProblem[],
-  terms: readonly TermContent[]
-): Variables<"encodingRepair"> {
-  return {
-    draft: canonicalJson(draft),
-    problems: problems
-      .map((problem) => `- ${pathText(problem.path) || "(draft)"}: ${problem.message} [${problem.code}]`)
-      .join("\n"),
-    terms: termLines(terms) || "none",
-    coreTerms: coreTermsText()
-  }
-}
-
 /**
- * A candidate with its sample sentences; with `keys`, each sample starts with the key of the provision it's from
- * (`e.g. [doc:4.1] …`), so a term found only in use can be cited. The build's hoa-term-extraction reads them without.
+ * A candidate with its sample sentences, each starting with the key of the provision it's from (`e.g. [doc:4.1] …`),
+ * so a term found only in use can be cited.
  */
-export function candidateText(candidate: TermCandidate, keys = false) {
+export function candidateText(candidate: TermCandidate) {
   const where = candidate.definedIn.length > 0 ? `defined in ${candidate.definedIn.join(", ")}; ` : ""
-  const samples = candidate.samples.map((sample) => `  e.g. ${keys ? `[${sample.provisionKey}] ` : ""}${sample.text}`)
+  const samples = candidate.samples.map((sample) => `  e.g. [${sample.provisionKey}] ${sample.text}`)
   const uses = `${candidate.count} use${candidate.count === 1 ? "" : "s"}`
   return [`"${candidate.phrase}" (${candidate.source}; ${where}${uses})`, ...samples].join("\n")
-}
-
-/** hoa-term-extraction: one document's definitions provisions and the candidates code found. */
-export function termExtractionVariables(
-  document: DocumentLine,
-  definitions: readonly Provision[],
-  candidates: readonly TermCandidate[]
-): Variables<"termExtraction"> {
-  return {
-    document: documentLine(document),
-    definitions: definitions.map(provisionBlock).join("\n\n"),
-    candidates: candidates.map((candidate) => candidateText(candidate)).join("\n") || "none",
-    coreTerms: coreTermsText()
-  }
-}
-
-/** hoa-rulebook-consolidation: rule summaries, near-duplicate term pairs and the documents with their kinds. */
-export function rulebookConsolidationVariables(
-  rules: readonly RuleContent[],
-  terms: readonly TermContent[],
-  termPairs: readonly TermPair[],
-  documents: readonly (DocumentLine & { edition?: GoverningDocument["edition"] })[]
-): Variables<"rulebookConsolidation"> {
-  const vocabulary = createVocabulary([...terms])
-  const pairs = termPairs.map(
-    (pair) => `${pair.keys[0]} "${pair.labels[0]}" ~ ${pair.keys[1]} "${pair.labels[1]}" (${pair.score})`
-  )
-  return {
-    rules: byKey(rules)
-      .map((rule) => summarizeRule(rule, vocabulary))
-      .join("\n"),
-    termPairs: pairs.join("\n") || "none",
-    documents: byKey(documents).map(documentLine).join("\n")
-  }
 }
 
 /** hoa-structure-repair: the cleaned text, the parser's outline of it and why the outline failed its check. */

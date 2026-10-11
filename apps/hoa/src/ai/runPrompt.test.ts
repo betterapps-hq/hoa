@@ -245,7 +245,7 @@ describe("runCheckedObjectPrompt", () => {
         variables: { applicant: "Lot 12" },
         schema,
         codeFields,
-        traceName: "provision-encoding",
+        traceName: "rule-finding",
         environment: "test",
         ...(cache ? { cache } : {})
       })
@@ -290,7 +290,7 @@ describe("runCheckedObjectPrompt", () => {
         prompt: applicantPrompt,
         variables: { applicant: "Lot 12" },
         schema: strict,
-        traceName: "provision-encoding",
+        traceName: "rule-finding",
         environment: "test"
       })
     expect(await check({ outlines: [{ kind: "obligation", kind_: null }] })).toMatchObject({
@@ -480,7 +480,7 @@ describe("prompt caching", () => {
       defaultModelId: "anthropic/claude-opus-5.5",
       prompt: encodingPrompt,
       variables: { unit: "Section 4.2", coreTerms: "owner | party" },
-      traceName: "provision-encoding",
+      traceName: "rule-finding",
       environment: "test"
     })
 
@@ -542,7 +542,7 @@ describe("prompt caching", () => {
       defaultModelId: "anthropic/claude-opus-5.5",
       prompt: chatPrompt,
       variables: { unit: "Section 4.2", coreTerms: "owner | party" },
-      traceName: "provision-encoding",
+      traceName: "rule-finding",
       environment: "test"
     })
     expect(bodies[0]).toMatchObject({
@@ -624,7 +624,7 @@ describe("retries", () => {
       prompt: applicantPrompt,
       variables: { applicant: "Lot 12" },
       schema: z.object({ recommendation: z.string() }),
-      traceName: "provision-encoding",
+      traceName: "rule-finding",
       environment: "test",
       retry: { ...defaultRetry, sleep: async (ms) => void waits.push(ms) }
     })

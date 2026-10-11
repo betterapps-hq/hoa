@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { parseArgs } from "node:util"
 import { z } from "zod"
@@ -9,7 +9,6 @@ import { structuringBatchesOf } from "../src/encoding/steps/pipeline.ts"
 import type { StepAi } from "../src/encoding/steps/run.ts"
 import { vocabularyGroups, withReadKeys } from "../src/encoding/steps/vocabulary.ts"
 import { buildDatasets, settingsFlags, type DatasetItem } from "../src/evaluation/encoding/steps/datasets.ts"
-import { retryDataset } from "../src/evaluation/encoding/steps/evaluate.ts"
 import {
   goldenOutlines,
   goldenSections,
@@ -17,11 +16,9 @@ import {
   ruleContent,
   sectionOf
 } from "../src/evaluation/encoding/steps/golden.ts"
-import { replayStage, replayStages, written } from "../src/evaluation/encoding/steps/replay.ts"
 import {
   clippedInput,
   itemComparison,
-  itemResults,
   repeatSpread,
   stepRunReport,
   type ItemResult
@@ -33,7 +30,6 @@ import {
   scoreFinding,
   type FindingOutput,
   scoreMerge,
-  scoreRetry,
   scoreStructuring,
   scoreVocabulary,
   termAlignment,
@@ -45,7 +41,6 @@ import {
   runConsolidation,
   runDefinedTerms,
   runRuleFinding,
-  runRuleRetry,
   runRuleStructuring,
   runSharedVocabulary,
   runVocabularyMerge,
@@ -63,18 +58,16 @@ import {
 } from "../src/evaluation/encoding/steps/stepRuns.ts"
 import { termDraft } from "../src/schema/zod.ts"
 import { encodingRuns, fileCache, fixtures, readJson, writeJson } from "./evalFiles.ts"
-import { defaultRetryQuota, defaultRuns, goldenContext, labeledRuns, pairs } from "./stepDatasets.ts"
+import { goldenContext, pairs } from "./stepDatasets.ts"
 import { readFinder, withFinder } from "./stepFinder.ts"
 
 // Runs one encoding step alone (evaluation.md, Running one step), with the build's own per-item code
-// (src/encoding/steps/pipeline.ts), so a prompt is tested on its own and a chain of step runs makes the build's calls;
-// a stage of the naive encoder can be replayed. A step runs over its dataset's items (inputs built from the golden, so
-// the step is measured against perfect upstream input), or over the frozen output of an earlier run: a build run's
-// saved steps (--from <run under .fixtures/eval/encoding>) for B, E and the retry, or an earlier step run (--from <run
-// under .fixtures/eval/steps>) for the next step in the chain. A replayed stage of the naive encoder (vocabulary,
-// encode, repair, consolidate) reads one of its saved runs and checks that the content cache gives back exactly what
-// the run saved. Each run writes run.json, outputs/, handoff.json, report.md (calls, cost, time, cached
-// tokens, problems by class, scores beside the old runs') and compare/ to .fixtures/eval/steps/<run id>/.
+// (src/encoding/steps/pipeline.ts), so a prompt is tested on its own and a chain of step runs makes the build's calls.
+// A step runs over its dataset's items (inputs built from the golden, so the step is measured against perfect upstream
+// input), or over the frozen output of an earlier run: a build run's saved steps (--from <run under
+// .fixtures/eval/encoding>) for B and E, or an earlier step run (--from <run under .fixtures/eval/steps>) for the next
+// step in the chain. Each run writes run.json, outputs/, handoff.json, report.md (calls, cost, time, cached tokens,
+// problems by class, scores) and compare/ to .fixtures/eval/steps/<run id>/.
 // --rescore <run under .fixtures/eval/steps> calls no model: it scores that run's saved outputs again, against the
 // dataset as it is now (rebuilt from the golden) and with the current scorers and checks, into a new run folder, with
 // the coding agent's judgments.json from that run (B's confirmed golden gaps) applied and copied along.
@@ -83,15 +76,13 @@ import { readFinder, withFinder } from "./stepFinder.ts"
 //
 // Model calls cost money: without --yes this prints what it would run and stops. Usage, from apps/hoa:
 //   pnpm eval:step --stage <step> [--from <run>] [--items <id part>,...] [--split <split>,...]
-//     [--prompts <name>=<version>,...] [--golden <sample>] [--repeat <n>] [--reruns <0-1>] [--retries <0-2>]
-//     [--runs <label>=<run id>,...] [--yes]
+//     [--prompts <name>=<version>,...] [--golden <sample>] [--repeat <n>] [--reruns <0-1>] [--retries <0-2>] [--yes]
 //   pnpm eval:step --rescore <step run id> [--items <id part>,...] [--golden <sample>]
 // --finder <file> gives B the provisions another finder picked (a JSON map of item id to provision keys), and
 // --expect all scores B against every term the golden defines in the document (stepFinder.ts), to compare finders.
 // --reruns reruns a failing item of B, E or C once with its problems (as the pipeline does); --retries runs F's retry
 // on the rules still failing, at most twice.
-// Steps: defined-terms, rule-finding, shared-vocabulary, vocabulary-merge, rule-structuring, rule-retry,
-// consolidation; and the naive encoder's vocabulary, encode, repair, consolidate.
+// Steps: defined-terms, rule-finding, shared-vocabulary, vocabulary-merge, rule-structuring, consolidation.
 const { values } = parseArgs({
   options: {
     stage: { type: "string" },
@@ -104,8 +95,6 @@ const { values } = parseArgs({
     retries: { type: "string", default: "0" },
     reruns: { type: "string", default: "1" },
     golden: { type: "string", default: "declaration" },
-    runs: { type: "string", default: defaultRuns },
-    "retry-quota": { type: "string", default: defaultRetryQuota },
     finder: { type: "string" },
     expect: { type: "string", default: "picked" },
     yes: { type: "boolean", default: false }
@@ -175,52 +164,6 @@ const flush = async () => {
   }
 }
 
-// ─── Replays of the build's stages ──────────────────────────────────────────────────────────────
-
-const replay = replayStages.find((name) => name === stage)
-if (replay) {
-  if (!values.from) {
-    throw new Error("A build stage replays from a saved run: --from <run id under .fixtures/eval/encoding>")
-  }
-  const run = readSavedRun(join(encodingRuns, values.from))
-  confirm(
-    stage === "consolidate" ? 1 : run.units.filter((unit) => wanted(unit.id)).length,
-    `replay from ${values.from}`
-  )
-  const started = performance.now()
-  const items = await replayStage({ stage: replay, run, ai: stepAi(), select: wanted })
-  await flush()
-  for (const item of items) {
-    writeJson(join(out, "steps", stage, `${fileName(item.itemId)}.json`), { output: item.output, call: item.call })
-  }
-  const reproduced = items.filter((item) => item.reproduced).length
-  writeJson(join(out, "run.json"), {
-    runId,
-    stage,
-    from: values.from,
-    promptVersions: pinned,
-    items: items.map(({ itemId, reproduced, call }) => ({ itemId, reproduced, call }))
-  })
-  const report = stepRunReport({
-    runId,
-    stage,
-    source: `build run ${values.from}`,
-    promptVersions: pinned,
-    wallSeconds: (performance.now() - started) / 1000,
-    calls: items.map((item) => item.call),
-    problems: [],
-    items: [],
-    runs: [],
-    extra: [
-      `Reproduced exactly: ${reproduced} of ${items.length}.`,
-      ...items.filter((item) => !item.reproduced).map((item) => `- ${item.itemId} differs from the saved output`)
-    ]
-  })
-  writeFileSync(join(out, "report.md"), report)
-  console.warn(report)
-  process.exit(0)
-}
-
 // ─── Drafted steps ──────────────────────────────────────────────────────────────────────────────
 
 const goldenSet = goldenContext(values.golden)
@@ -233,7 +176,6 @@ const datasets = {
     expectAll: values.expect === "all"
   })
 }
-const oldRuns = labeledRuns(values.runs)
 const fromBuild =
   values.from && existsSync(join(encodingRuns, values.from)) ? readSavedRun(join(encodingRuns, values.from)) : null
 const fromStep =
@@ -250,16 +192,6 @@ const goldenSides = {
 }
 const allGoldenTerms = goldenTerms(golden)
 const sections = goldenSections(golden, goldenSet.references)
-
-/** The dataset's old-run results for the step, when eval:datasets has written them. */
-function oldResults(step: string): Map<string, Record<string, ItemScore>> {
-  const path = join(fixtures, "eval/datasets", step, "results.json")
-  if (!existsSync(path)) {
-    return new Map()
-  }
-  const items = itemResults.parse(JSON.parse(readFileSync(path, "utf8")))
-  return new Map(items.map((item) => [item.id, item.results]))
-}
 
 /** A saved run's outputs, read back for --rescore; its problems found again by the step's check, where it has one. */
 function savedRuns<I extends DatasetItem<unknown, unknown>, O>(
@@ -323,9 +255,7 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
     ? `the saved outputs of ${rescored.info.runId} (${rescored.info.from}), rescored with no model call`
     : input.source
   const promptVersions = rescored?.info.promptVersions ?? pinned
-  const old = oldResults(stage)
   const labels = runs.map((_run, index) => (repeats === 1 ? "this run" : `repeat ${index + 1}`))
-  const oldLabels = [...new Set([...old.values()].flatMap((results) => Object.keys(results)))]
   const results: ItemResult[] = items.map((item) => ({
     id: item.id,
     tags: item.tags,
@@ -334,14 +264,11 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
           repeats: repeatSpread(runs.map((run) => input.score?.(item, run.outputs.get(item.id) ?? null).metrics ?? {}))
         }
       : {}),
-    results: {
-      ...Object.fromEntries(
-        runs.flatMap((run, index) =>
-          input.score ? [[labels[index] ?? "", input.score(item, run.outputs.get(item.id) ?? null)] as const] : []
-        )
-      ),
-      ...old.get(item.id)
-    }
+    results: Object.fromEntries(
+      runs.flatMap((run, index) =>
+        input.score ? [[labels[index] ?? "", input.score(item, run.outputs.get(item.id) ?? null)] as const] : []
+      )
+    )
   }))
   const calls = runs.flatMap((run) => run.calls)
   const problems = runs.flatMap((run) => run.problems)
@@ -372,7 +299,7 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
       itemComparison({
         id: item.id,
         tags: item.tags,
-        inputText: clippedInput(written(item.input)),
+        inputText: clippedInput(JSON.stringify(item.input, null, 1)),
         expected: item.expected,
         outputs: runs.map((run, index) => ({
           run: labels[index] ?? "",
@@ -391,9 +318,8 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
     calls,
     problems,
     items: results,
-    runs: input.score ? [...labels, ...oldLabels] : oldLabels,
-    repeats: input.score && runs.length > 1 ? labels : [],
-    extra: []
+    runs: input.score ? labels : [],
+    repeats: input.score && runs.length > 1 ? labels : []
   })
   writeFileSync(join(out, "report.md"), report)
   console.warn(report)
@@ -421,7 +347,7 @@ switch (stage) {
         ].flatMap((documentKey) => {
           const provisions = fromBuild.provisions.filter((provision) => provision.key.startsWith(`${documentKey}:`))
           const definitions = provisions.filter((provision) => provision.kind === "definition")
-          const document = fromBuild.merge?.rulebook.documents.find((found) => found.key === documentKey)
+          const document = fromBuild.merge.rulebook.documents.find((found) => found.key === documentKey)
           const id = `defined-terms:${documentKey}`
           const golden = expected.get(id)
           return !document || !golden
@@ -446,7 +372,7 @@ switch (stage) {
     const items = fromBuild
       ? fromBuild.units.flatMap((unit) => {
           const golden = expected.get(`rule-finding:${unit.id}`)
-          const documents = (fromBuild.merge?.rulebook.documents ?? []).map(({ key, kind, title, edition }) => ({
+          const documents = fromBuild.merge.rulebook.documents.map(({ key, kind, title, edition }) => ({
             key,
             kind,
             title,
@@ -579,19 +505,6 @@ switch (stage) {
     })
     break
   }
-  case "rule-retry": {
-    const quota = new Map(pairs(values["retry-quota"]).map(([prefix, count]) => [prefix, Number(count)]))
-    const sources = fromBuild ? [{ label: fromBuild.runId, run: fromBuild }] : oldRuns
-    await runDrafted({
-      items: retryDataset(sources, quota, golden.rules),
-      calls: 0,
-      source: fromBuild ? `build run ${fromBuild.runId}` : "the old runs' recorded failures",
-      run: (selected, cacheStage) => runRuleRetry(selected, { ai: stepAi(), cacheStage, documents: goldenDocuments }),
-      score: (_item, output) => scoreRetry(output),
-      previous: {}
-    })
-    break
-  }
   case "consolidation": {
     // From an F run: its rules, per split, with the golden's cross-references.
     const section = sectionOf(sections)
@@ -629,6 +542,6 @@ switch (stage) {
   }
   default:
     throw new Error(
-      `--stage is one of defined-terms, rule-finding, shared-vocabulary, vocabulary-merge, rule-structuring, rule-retry, consolidation, ${replayStages.join(", ")}`
+      "--stage is one of defined-terms, rule-finding, shared-vocabulary, vocabulary-merge, rule-structuring, consolidation"
     )
 }

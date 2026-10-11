@@ -118,15 +118,8 @@ describe("mergeDrafts", () => {
     expect(merged.coverage).toEqual({ provisions: 5, uncovered: ["rules:3"] })
   })
 
-  it("lists near-duplicate terms for consolidation", () => {
-    expect(merged.termPairs).toEqual([{ keys: ["shed", "garden-shed"], labels: ["shed", "Sheds"], score: 0.9 }])
-  })
-
-  it("numbers questions and records where every record came from", () => {
+  it("numbers questions", () => {
     expect(merged.rulebook.questions.map((question) => question.id)).toEqual(["question-1"])
-    expect(merged.sources.get("rules:1#max-height-2")).toEqual([{ unitId: "unit-2", path: ["rules", 0] }])
-    expect(merged.sources.get("shed")?.map((source) => source.unitId)).toEqual(["unit-1", "unit-2"])
-    expect(merged.sources.get("settings")).toHaveLength(2)
   })
 
   it("verifies the merged set across units", () => {

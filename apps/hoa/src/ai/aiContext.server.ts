@@ -32,7 +32,7 @@ export function createAiContext() {
     modelId: env.OPENROUTER_MODEL,
     /** The cheaper model for routing, structure and classification. */
     smallModelId: env.OPENROUTER_SMALL_MODEL ?? env.OPENROUTER_MODEL,
-    /** Encoding and repair calls a rulebook build runs at once. */
+    /** Model calls a rulebook build stage runs at once. */
     encodingConcurrency: env.ENCODING_CONCURRENCY,
     loadPrompt: createPromptLoader(
       {

@@ -6,14 +6,14 @@ describe("scoreReport", () => {
   const report = scoreReport({
     runId: "run-1",
     split: "dev",
-    promptVersions: { "hoa-provision-encoding": 2 },
+    promptVersions: { "hoa-rule-finding": 2 },
     encodingCost: 12.5,
     hasAgentPairs: true,
     scores: exampleRun().scores
   })
 
   it("leads with the bar table of the scores code computes", () => {
-    expect(report).toContain("Prompts: hoa-provision-encoding v2. Encoding cost $12.50.")
+    expect(report).toContain("Prompts: hoa-rule-finding v2. Encoding cost $12.50.")
     expect(report).toContain("2 pairs (1 by key, 1 from pairs.json)")
     expect(report).toContain("7 of 9 bars computed by code cleared.")
     expect(report).toContain("| Modality agreement on paired rules | 0.500 | at least 0.950 | no |")

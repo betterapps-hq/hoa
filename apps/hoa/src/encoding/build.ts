@@ -16,6 +16,7 @@ import type { EncodingDraftContent, TermContent } from "@/schema/zod"
 import { draftContent, type BuildFailure } from "./buildRecords"
 import { checkStructure } from "./check"
 import { cleanPages } from "./clean"
+import { applyConsolidation } from "./consolidate"
 import { mergeDrafts, mergeTerms, type MergeInput } from "./merge"
 import { planUnits, type EncodingUnit } from "./plan"
 import { structureRepairVariables } from "./promptVariables"
@@ -41,7 +42,6 @@ import {
 } from "./stepOutputs"
 import { proposedPropertyTerm } from "./steps/drafts"
 import {
-  applyConsolidationAnswer,
   buildGroupVocabulary,
   checkFindings,
   checkStructured,
@@ -845,13 +845,12 @@ export async function buildRulebook(input: BuildInput) {
   const mergeInput: MergeInput = { organizationId, documents: governing, provisions, vocabulary, units: drafts }
   await progress("merge", 0, 1)
   const mergedRulebook = await step("merge", mergeOutput, async () => {
-    const { rulebook, conflicts, coverage, termPairs, issues } = mergeDrafts(mergeInput)
+    const { rulebook, conflicts, coverage, issues } = mergeDrafts(mergeInput)
     const uncovered = coverage.uncovered.filter((key) => encodedKeys.has(key))
     return {
       rulebook,
       conflicts,
       coverage: { provisions: encodedKeys.size, uncovered },
-      termPairs,
       issues: inScope(issues)
     }
   })
@@ -888,7 +887,7 @@ export async function buildRulebook(input: BuildInput) {
       if (!result.isValid) {
         return { ...unchanged, calls: made, answerProblems: zodProblems(result.issues) }
       }
-      const applied = applyConsolidationAnswer(rulebook, result.object)
+      const applied = applyConsolidation(rulebook, result.object)
       return { ...applied, issues: inScope(applied.issues), calls: made, answerProblems: [] }
     },
     "model"

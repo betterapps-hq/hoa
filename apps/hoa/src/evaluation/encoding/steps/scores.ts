@@ -6,7 +6,6 @@ import { keySegment } from "@/encoding/steps/termKeys"
 import { isStopWord } from "@/lib/search"
 import { coreTerms } from "@/schema/coreTerms"
 import type * as T from "@/schema/types"
-import type { JsonPath } from "@/schema/validate"
 import type { RuleContent, TermContent } from "@/schema/zod"
 import { matchLabel } from "@/text/match"
 import { labelForms, singularOf } from "@/text/normalize"
@@ -21,12 +20,12 @@ import type {
   VocabularyMergeItem
 } from "./datasets"
 
-// Scores code computes for one dataset item: what a step (or the old pipeline's equivalent) produced against the
-// item's expected output, and a verdict: correct, partly correct (with what's wrong), wrong or missing. What code can't
-// decide (whether a rule is faithful, whether two terms mean the same) is left to the coding agent from the comparison
-// files (evaluation.md, Judging by the coding agent).
+// Scores code computes for one dataset item: what a step produced against the item's expected output, and a verdict:
+// correct, partly correct (with what's wrong), wrong or missing. What code can't decide (whether a rule is faithful,
+// whether two terms mean the same) is left to the coding agent from the comparison files (evaluation.md, Judging by the
+// coding agent).
 
-export type Verdict = "correct" | "partly" | "wrong" | "missing" | "no-equivalent"
+export type Verdict = "correct" | "partly" | "wrong" | "missing"
 
 export type ItemScore = {
   verdict: Verdict
@@ -37,7 +36,6 @@ export type ItemScore = {
 }
 
 export const missing = (why: string): ItemScore => ({ verdict: "missing", metrics: {}, notes: [why] })
-export const noEquivalent = (why: string): ItemScore => ({ verdict: "no-equivalent", metrics: {}, notes: [why] })
 
 const share = (count: number, of: number) => (of === 0 ? null : count / of)
 
@@ -634,22 +632,6 @@ export function scoreStructuring(
     problems: output.rules.reduce((sum, rule) => sum + rule.problems.length, 0)
   }
   return { verdict: verdictOf(metrics, "valid-before-repair", ["problems"]), metrics, notes }
-}
-
-// ─── F's retry ───────────────────────────────────────────────────────────────────────────────────
-
-export type RetryOutput = { fixed: boolean; remaining: string[]; collateral: JsonPath[]; wordingChanged: boolean }
-
-export function scoreRetry(output: RetryOutput | null): ItemScore {
-  if (output === null) {
-    return missing("not retried")
-  }
-  const metrics = { fixed: output.fixed ? 1 : 0, "collateral-changes": output.collateral.length }
-  const notes = [
-    ...output.remaining.map((problem) => `still: ${problem}`),
-    ...output.collateral.map((path) => `changed outside the problems: ${path.join(".")}`)
-  ]
-  return { verdict: verdictOf(metrics, "fixed", ["collateral-changes"]), metrics, notes }
 }
 
 // ─── Consolidation ───────────────────────────────────────────────────────────────────────────────
