@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Page } from "@/ocr/page"
 import type * as T from "@/schema/types"
-import { documentReading, printedNumber, type ReadingInput } from "./reading"
+import { documentReading, printedNumber, provisionBlocks, type ReadingInput } from "./reading"
 
 // A synthetic two-page document: an article with a section, two points and a counted paragraph, and a line of page
 // text no provision holds.
@@ -172,6 +172,18 @@ describe("documentReading", () => {
       })
     )
     expect(reading.edition).toBe("Version 2, effective Mar 1, 2026")
+  })
+})
+
+describe("provisionBlocks", () => {
+  it("lays out the provisions alone, in reading order, as a running build has them before the page text", () => {
+    expect(provisionBlocks(provisions).map((block) => block.key)).toEqual([
+      "rules:article-1",
+      "rules:1.1",
+      "rules:1.1(a)",
+      "rules:1.1(b)",
+      "rules:1.1/wrap-up"
+    ])
   })
 })
 

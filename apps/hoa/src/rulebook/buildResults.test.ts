@@ -55,7 +55,14 @@ const term = (key: string, label: string) => ({
 const finding = (provisionKey: string, aspect: string, summary: string) => ({
   answer: {
     provisions: [
-      { key: provisionKey, outlines: [{ aspect, summary, kind: "prohibition" }], settings: [], noRule: null }
+      { key: "declaration:article-3", outlines: [], settings: [], noRule: { reason: "heading" } },
+      { key: provisionKey, outlines: [{ aspect, summary, kind: "prohibition" }], settings: [], noRule: null },
+      {
+        key: "declaration:3.9",
+        outlines: [],
+        settings: [{ clause: "liability", summary: "Owners answer for their guests" }],
+        noRule: null
+      }
     ],
     questions: [],
     referencedDocuments: [],
@@ -64,8 +71,15 @@ const finding = (provisionKey: string, aspect: string, summary: string) => ({
   problems: [],
   call
 })
-const structured = (key: string, title: string) => ({
-  rules: [{ key, draft: { key, title, citations: [{ provisionKey: key.split("#")[0] }] }, rule: null, issues: [] }],
+const structured = (key: string, title: string, statement?: string) => ({
+  rules: [
+    {
+      key,
+      draft: { key, title, statement, citations: [{ provisionKey: key.split("#")[0] }] },
+      rule: null,
+      issues: []
+    }
+  ],
   proposedTerms: [],
   clauses: {},
   notes: [],
@@ -84,7 +98,11 @@ const outputs: [string, number, unknown][] = [
   ["find-rules:declaration:article-3", 3, finding("declaration:3.1", "no-pets", "No pets on a lot")],
   ["find-rules:check", 4, [["declaration:article-3", []]]],
   ["find-rules:resolve", 4, { outlines: [] }],
-  ["structure-rules:declaration:3.1#no-pets", 6, structured("declaration:3.1#no-pets", "No pets")],
+  [
+    "structure-rules:declaration:3.1#no-pets",
+    6,
+    structured("declaration:3.1#no-pets", "No pets", "No {{pet:plural}} may be kept on a {{lot}}.")
+  ],
   [
     "structure-rules:check:1",
     7,
@@ -111,12 +129,29 @@ describe("buildResultsSince", () => {
       rules: [{ key: "declaration:3.1#no-pets", title: "No pets on a lot", provisionKey: "declaration:3.1" }],
       isRerun: false
     })
+    // Every provision E answered, with the settings it flags and its reason for no rule, for the build's picture.
+    expect(page.results[1]).toMatchObject({
+      provisions: [
+        { key: "declaration:article-3", settings: [], noRule: "heading" },
+        { key: "declaration:3.1", settings: [], noRule: null },
+        { key: "declaration:3.9", settings: ["Owners answer for their guests"], noRule: null }
+      ]
+    })
     expect(page.results[2]).toMatchObject({ unitsWithProblems: 0, problems: 0 })
     expect(page.results[3]).toMatchObject({
       batchId: "declaration:3.1#no-pets",
-      rules: [{ key: "declaration:3.1#no-pets", title: "No pets", provisionKey: "declaration:3.1" }],
+      rules: [
+        {
+          key: "declaration:3.1#no-pets",
+          title: "No pets",
+          provisionKey: "declaration:3.1",
+          statement: "No {{pet:plural}} may be kept on a {{lot}}."
+        }
+      ],
       round: 0
     })
+    // A draft without a statement shows none.
+    expect(page.results[5]).toMatchObject({ rules: [expect.not.objectContaining({ statement: expect.anything() })] })
     expect(page.results[4]).toMatchObject({ round: 1, rulesWithProblems: 1 })
     expect(page.results[5]).toMatchObject({ batchId: "declaration:3.1#no-pets", round: 1 })
     expect(page.cursor).toBe("2026-10-09T12:09:00.000Z")

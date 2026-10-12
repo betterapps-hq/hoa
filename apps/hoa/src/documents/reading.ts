@@ -160,6 +160,11 @@ function blockOf(passage: ReadingPassage): ReadingBlock {
   }
 }
 
+/** Provisions alone as the reader lays them out, with no page text: a document a running build has only structured. */
+export function provisionBlocks(provisions: readonly T.Provision[]): ReadingBlock[] {
+  return readingOrder(provisions).flatMap(({ passages }) => passages.map(blockOf))
+}
+
 export type ReadingInput = {
   upload: Pick<GoverningDocument, "id" | "title" | "version" | "effectiveDate" | "pageCount">
   /**

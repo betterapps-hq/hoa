@@ -39,27 +39,38 @@ export type FindingsLayout = {
   radius: number
   /** Where the grids' space starts, under the counts. */
   gridTop: number
+  /** What the piles stand on. */
+  gridBottom: number
   page: Box
   terms: GridLayout
   rules: GridLayout
 }
 
-/** The picture at `width` for this many finds of each kind. */
-export function findingsLayout(width: number, counts: Record<FindKind, number>): FindingsLayout {
-  const gridWidth = Math.max(0, (width - pageColumn - 2 * columnGap) / 2)
+/**
+ * The largest dots that keep this many finds of each kind in two grids `gridWidth` wide within `gridHeight`, with the
+ * grids' height: dots shrink to keep every find in it, and only the smallest let it grow.
+ */
+export function gridFit(gridWidth: number, counts: Record<FindKind, number>, gridHeight: number) {
   const columnsAt = (pitch: number) => Math.max(1, Math.floor(gridWidth / pitch))
   const rowsAt = (pitch: number) =>
     Math.max(Math.ceil(counts.terms / columnsAt(pitch)), Math.ceil(counts.rules / columnsAt(pitch)))
   const pitch = pitches.find((candidate) => rowsAt(candidate) * candidate <= gridHeight) ?? pitches.at(-1) ?? 4
   // Before the picture is measured it has no grid to fill: it keeps its usual height so nothing jumps.
-  const gridsHeight = gridWidth > 0 ? Math.max(gridHeight, rowsAt(pitch) * pitch) : gridHeight
-  const columns = columnsAt(pitch)
+  const height = gridWidth > 0 ? Math.max(gridHeight, rowsAt(pitch) * pitch) : gridHeight
+  return { pitch, columns: columnsAt(pitch), height }
+}
+
+/** The picture at `width` for this many finds of each kind. */
+export function findingsLayout(width: number, counts: Record<FindKind, number>): FindingsLayout {
+  const gridWidth = Math.max(0, (width - pageColumn - 2 * columnGap) / 2)
+  const { pitch, columns, height: gridsHeight } = gridFit(gridWidth, counts, gridHeight)
   return {
     width,
     height: headerHeight + gridsHeight,
     pitch,
     radius: pitch * 0.34,
     gridTop: headerHeight,
+    gridBottom: headerHeight + gridsHeight,
     page: {
       x: gridWidth + columnGap + (pageColumn - pageWidth) / 2,
       y: headerHeight + Math.round((gridsHeight - pageHeight) / 2),
@@ -71,13 +82,16 @@ export function findingsLayout(width: number, counts: Record<FindKind, number>):
   }
 }
 
+/** The piles' part of a picture's layout. */
+export type PilesLayout = Pick<FindingsLayout, "pitch" | "gridBottom" | "terms" | "rules">
+
 /** Where the dot for a kind's `index`th find sits: row by row up from the bottom, each row from beside the page out. */
-export function slotCenter(layout: FindingsLayout, kind: FindKind, index: number): Point {
-  const { pitch, height } = layout
+export function slotCenter(layout: PilesLayout, kind: FindKind, index: number): Point {
+  const { pitch, gridBottom } = layout
   const { inner, side, columns } = layout[kind]
   return {
     x: inner + side * ((index % columns) * pitch + pitch / 2),
-    y: height - Math.floor(index / columns) * pitch - pitch / 2
+    y: gridBottom - Math.floor(index / columns) * pitch - pitch / 2
   }
 }
 

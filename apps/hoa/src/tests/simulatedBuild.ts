@@ -67,11 +67,27 @@ const written: Written[] = [
   },
   {
     at: 150,
-    result: { id: "find-rules-1", at: "", kind: "outlines", unitId: "one", rules: rules(1, 50), isRerun: false }
+    result: {
+      id: "find-rules-1",
+      at: "",
+      kind: "outlines",
+      unitId: "one",
+      rules: rules(1, 50),
+      provisions: [],
+      isRerun: false
+    }
   },
   {
     at: 279,
-    result: { id: "find-rules-2", at: "", kind: "outlines", unitId: "two", rules: rules(51, 95), isRerun: false }
+    result: {
+      id: "find-rules-2",
+      at: "",
+      kind: "outlines",
+      unitId: "two",
+      rules: rules(51, 95),
+      provisions: [],
+      isRerun: false
+    }
   },
   ...[
     [420, 5, 60],

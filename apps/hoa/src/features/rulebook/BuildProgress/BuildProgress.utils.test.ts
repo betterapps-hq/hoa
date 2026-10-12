@@ -73,9 +73,25 @@ describe("stepFindings", () => {
   const rule = (key: string) => ({ key, title: key, provisionKey: null })
   const results: BuildResult[] = [
     { id: "t", at: at(1), kind: "terms", documentKey: "declaration", labels: ["Lot", "Owner"] },
-    { id: "o1", at: at(2), kind: "outlines", unitId: "a", rules: [rule("a#1")], isRerun: false },
-    { id: "o2", at: at(3), kind: "outlines", unitId: "b", rules: [rule("b#1"), rule("b#2")], isRerun: false },
-    { id: "o3", at: at(4), kind: "outlines", unitId: "a", rules: [rule("a#1"), rule("a#2")], isRerun: true },
+    { id: "o1", at: at(2), kind: "outlines", unitId: "a", rules: [rule("a#1")], provisions: [], isRerun: false },
+    {
+      id: "o2",
+      at: at(3),
+      kind: "outlines",
+      unitId: "b",
+      rules: [rule("b#1"), rule("b#2")],
+      provisions: [],
+      isRerun: false
+    },
+    {
+      id: "o3",
+      at: at(4),
+      kind: "outlines",
+      unitId: "a",
+      rules: [rule("a#1"), rule("a#2")],
+      provisions: [],
+      isRerun: true
+    },
     { id: "v", at: at(5), kind: "vocabulary", unitId: "a", labels: ["Height", "Fence", "Material"] },
     { id: "v2", at: at(6), kind: "vocabulary", unitId: "a", labels: ["Height", "Fence"] },
     { id: "r1", at: at(6), kind: "rules", batchId: "a#1", rules: [rule("a#1"), rule("a#2")], round: 0 },
