@@ -140,7 +140,7 @@ describe("estimateBuild", () => {
   it("waits for finding the rules to know how many sections there are", () => {
     const estimate = estimateBuild(job(progressOf([["defined-terms", 0, 2, 1]])), start + 2 * 60_000)
     expect(estimate.remaining).toBeNull()
-    expect(timeLeftText(estimate.remaining)).toBe("Working out how long this takes")
+    expect(timeLeftText(estimate.remaining)).toBe("Estimating time left")
   })
 
   it("starts from the sections, then follows the build's own pace", () => {
@@ -185,14 +185,17 @@ describe("estimateBuild", () => {
 })
 
 describe("text", () => {
-  it("says the time left as a rounded range, the time so far, and the build in one line", () => {
-    expect(timeLeftText({ low: 33, high: 48 })).toBe("About 30–50 minutes left")
-    expect(timeLeftText({ low: 3.2, high: 6.1 })).toBe("About 3–7 minutes left")
-    expect(timeLeftText({ low: 0.2, high: 1.5 })).toBe("About a minute or two left")
-    expect(elapsedText(0.4)).toBe("Started just now")
-    expect(elapsedText(12.7)).toBe("12 minutes so far")
-    expect(elapsedText(65)).toBe("1 hour 5 minutes so far")
+  it("says the time left as a rounded range, the time so far, and the build in one line, briefly", () => {
+    expect(timeLeftText({ low: 33, high: 48 })).toBe("30–50 min left")
+    expect(timeLeftText({ low: 3.2, high: 6.1 })).toBe("3–7 min left")
+    expect(timeLeftText({ low: 0.2, high: 1.5 })).toBe("1–2 min left")
+    expect(timeLeftText({ low: 5, high: 5 })).toBe("About 5 min left")
+    expect(elapsedText(0.4)).toBe("Just started")
+    expect(elapsedText(12.7)).toBe("12 min in")
+    expect(elapsedText(65)).toBe("1 hr 5 min in")
+    expect(elapsedText(120)).toBe("2 hr in")
     const steps = buildSteps(progressOf([["find-rules", 47, 64, 9]]))
-    expect(summaryText(steps, { low: 35, high: 50 })).toBe("Finding rules, step 3 of 7, about 35–50 minutes left")
+    expect(summaryText(steps, { low: 35, high: 50 })).toBe("Finding rules, 35–50 min left")
+    expect(summaryText([], { low: 0.5, high: 1 })).toBe("Finishing, 1–2 min left")
   })
 })

@@ -334,9 +334,9 @@ describe("RulebookPage", () => {
       onStop: vi.fn<RulebookPageProps["onStop"]>(async () => ({ status: "already-finished" }))
     })
     expect(await screen.findByRole("listitem", { current: "step" })).toHaveTextContent("Drafting rules")
-    expect(screen.queryByText(/step 2 of 2/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Drafting rules, /)).not.toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Hide steps" }))
-    expect(screen.getByText(/Drafting rules, step 2 of 2/)).toBeInTheDocument()
+    expect(screen.getByText(/^Drafting rules, .* left$/)).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Stop building" }))
     const dialog = await screen.findByRole("alertdialog")
     expect(

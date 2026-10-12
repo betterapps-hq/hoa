@@ -306,39 +306,37 @@ export function estimateBuild(job: Pick<Job, "createdAt" | "progress">, now: num
 
 const roundTo = (value: number, step: number, round: (value: number) => number) => round(value / step) * step
 
-/** "About 35–50 minutes left", rounded to five minutes past ten. */
+/** "35–50 min left", rounded to five minutes past ten: a range already says it's an estimate. */
 export function timeLeftText(remaining: Range | null) {
   if (remaining === null) {
-    return "Working out how long this takes"
+    return "Estimating time left"
   }
   if (remaining.high <= 2) {
-    return "About a minute or two left"
+    return "1–2 min left"
   }
   const isLong = remaining.low >= 10
   const low = isLong ? roundTo(remaining.low, 5, Math.floor) : Math.max(1, Math.floor(remaining.low))
   const high = isLong ? roundTo(remaining.high, 5, Math.ceil) : Math.ceil(remaining.high)
-  return low >= high ? `About ${high} minutes left` : `About ${low}–${high} minutes left`
+  return low >= high ? `About ${high} min left` : `${low}–${high} min left`
 }
 
-/** "12 minutes so far". */
+/** "12 min in". */
 export function elapsedText(minutes: number) {
   const whole = Math.floor(minutes)
   if (whole < 1) {
-    return "Started just now"
-  }
-  if (whole < 60) {
-    return `${whole} ${whole === 1 ? "minute" : "minutes"} so far`
+    return "Just started"
   }
   const hours = Math.floor(whole / 60)
   const rest = whole % 60
-  const hourText = `${hours} ${hours === 1 ? "hour" : "hours"}`
-  return `${rest === 0 ? hourText : `${hourText} ${rest} ${rest === 1 ? "minute" : "minutes"}`} so far`
+  if (hours === 0) {
+    return `${rest} min in`
+  }
+  return rest === 0 ? `${hours} hr in` : `${hours} hr ${rest} min in`
 }
 
-/** "Finding rules, step 3 of 7, about 35–50 minutes left": the build in one line. */
+/** "Finding rules, 35–50 min left": the build in one line, for when its steps are hidden. */
 export function summaryText(steps: readonly BuildStep[], remaining: Range | null) {
   const current = steps.find((step) => step.status === "current") ?? steps.find((step) => step.status === "upcoming")
-  const position = current ? `${current.label}, step ${steps.indexOf(current) + 1} of ${steps.length}` : "Finishing"
   const left = timeLeftText(remaining)
-  return `${position}, ${left.charAt(0).toLowerCase()}${left.slice(1)}`
+  return `${current?.label ?? "Finishing"}, ${left.charAt(0).toLowerCase()}${left.slice(1)}`
 }

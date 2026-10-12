@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Progress } from "@/components/ui/progress"
 import { Spinner } from "@/components/ui/spinner"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { cn } from "@/lib/utils"
@@ -45,9 +46,10 @@ export type BuildProgressProps = {
 }
 
 /**
- * A running build's progress (encoding.md, UX, The build's progress): one line with the time left (and the current step
- * while the steps are hidden), one bar for the whole build that's never full before it ends, every step in plain words behind a disclosure, and a
- * quiet way to stop it. Polls the job every 2 seconds.
+ * A running build's progress (encoding.md, UX, The build's progress): one row with the time left (and the current step
+ * while the steps are hidden), the time so far and the steps' toggle, one bar for the whole build that's never full
+ * before it ends, every step in plain words behind the toggle, and a quiet way to stop it. Polls the job every 2
+ * seconds.
  */
 export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults, now = Date.now }: BuildProgressProps) {
   const [isOpen, setIsOpen] = useState(true)
@@ -78,22 +80,40 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults,
   // With the steps showing, the line above them gives only the time left: the list already names the current step.
   const remaining = estimate?.remaining ?? null
   const summary = isOpen ? timeLeftText(remaining) : summaryText(steps, remaining)
+  const stepsLabel = isOpen ? "Hide steps" : "Show steps"
 
   return (
     <div className="flex flex-col gap-3">
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="flex flex-col gap-3">
-        <div className="flex items-start justify-between gap-3">
-          <output className="flex items-start gap-2 text-sm">
+        <div className="flex items-center gap-3">
+          <output className="flex min-w-0 flex-1 items-start gap-2 text-sm">
             {isRunning ? <Spinner aria-hidden className="mt-0.5 shrink-0" /> : null}
-            <span>{job ? summary : "Starting"}</span>
+            <span className="text-pretty">{job ? summary : "Starting"}</span>
           </output>
-          <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="group/steps -my-1 shrink-0" />}>
-            {isOpen ? "Hide steps" : "Show steps"}
-            <ChevronDownIcon aria-hidden className="transition-transform group-aria-expanded/steps:rotate-180" />
-          </CollapsibleTrigger>
+          {estimate ? (
+            <span className="shrink-0 text-sm text-muted-foreground tabular-nums">{elapsedText(estimate.elapsed)}</span>
+          ) : null}
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <CollapsibleTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={stepsLabel}
+                      className="group/steps -my-1.5 shrink-0"
+                    />
+                  }
+                />
+              }
+            >
+              <ChevronDownIcon aria-hidden className="transition-transform group-aria-expanded/steps:rotate-180" />
+            </TooltipTrigger>
+            <TooltipContent>{stepsLabel}</TooltipContent>
+          </Tooltip>
         </div>
         <Progress value={Math.round((estimate?.fraction ?? 0) * 100)} aria-label="Build progress" />
-        {estimate ? <p className="text-sm text-muted-foreground">{elapsedText(estimate.elapsed)}.</p> : null}
         <CollapsibleContent>
           <ol aria-label="Build steps" className="flex flex-col gap-2">
             {steps.map((step) => (

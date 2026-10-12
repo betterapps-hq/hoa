@@ -290,13 +290,14 @@ one stage's bar at a time. The job records every stage it will report when it st
 `src/jobs/progress.ts`), and each report marks the stages before it done and its own current, with its count and
 times. The page groups the stages into steps in plain words: Reading documents, Finding defined terms, Finding rules,
 Building the vocabulary (merging it only if needed), Drafting rules, Combining and checking for conflicts, Saving the
-draft. A stage the page has no words for is a step of its own, so the list stays true to the build's stages. Above the list: one line with the time left ("About
-35–50 minutes left"; the list already names the current step), one bar for the whole build, and the time so far. The estimate starts from the
+draft. A stage the page has no words for is a step of its own, so the list stays true to the build's stages. Above the list, one
+row: the time left ("35–50 min left"; the list already names the current step), the time so far ("21 min in") and an
+icon button that shows or hides the steps; under it, one bar for the whole build. The estimate starts from the
 sections (each stage's calls, `concurrency` at a time, with its reruns or retries, and the time each step's call takes)
-and follows the build's own pace once finding or drafting the rules has done some of its work; it says "Working out
-how long this takes" until the sections are known. The bar never
-reads full before the build ends. The steps fold away, and the line then names the current step too ("Drafting
-rules, step 3 of 7, about 35–50 minutes left").
+and follows the build's own pace once finding or drafting the rules has done some of its work; it says "Estimating
+time left" until the sections are known. The bar never
+reads full before the build ends. The steps fold away, and the row then names the current step too ("Drafting
+rules, 35–50 min left").
 
 **Counts as they arrive.** Each step's line counts what it has produced so far, never the items themselves: "2 terms
 found", "92 rules found" (a section looked at again replaces its first count), the vocabulary's terms, "40 of 92 rules
