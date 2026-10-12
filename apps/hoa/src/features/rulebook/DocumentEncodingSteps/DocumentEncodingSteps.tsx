@@ -1,7 +1,7 @@
 import { useInterval } from "@mantine/hooks"
 import { useQuery } from "@tanstack/react-query"
-import { CheckIcon, ChevronDownIcon, CircleIcon, MinusIcon } from "lucide-react"
-import { useState } from "react"
+import { CheckIcon, ChevronDownIcon, CircleIcon, MinusIcon, TriangleAlertIcon } from "lucide-react"
+import { useState, type ReactNode } from "react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -114,11 +114,7 @@ export function DocumentEncodingSteps({
         </div>
         <Progress value={Math.round((estimate?.fraction ?? 0) * 100)} aria-label="Processing progress" />
         <CollapsibleContent>
-          <ol aria-label="Processing steps" className="flex flex-col gap-2">
-            {steps.map((step) => (
-              <StepRow key={step.label} step={step} />
-            ))}
-          </ol>
+          <StepList steps={steps} />
         </CollapsibleContent>
       </Collapsible>
       {isRunning ? <StopBuild onStop={onStop} /> : null}
@@ -133,7 +129,27 @@ const statusWords: Record<BuildStep["status"], string> = {
   skipped: "Skipped"
 }
 
-function StepRow({ step }: { step: BuildStep }) {
+/**
+ * The steps in order, each with its state. A step with `problems` didn't finish everything: it shows a warning, and
+ * what it left undone under it.
+ */
+export function StepList({
+  steps,
+  problems
+}: {
+  steps: readonly BuildStep[]
+  problems?: ReadonlyMap<string, ReactNode>
+}) {
+  return (
+    <ol aria-label="Processing steps" className="flex flex-col gap-2">
+      {steps.map((step) => (
+        <StepRow key={step.label} step={step} problem={problems?.get(step.label)} />
+      ))}
+    </ol>
+  )
+}
+
+function StepRow({ step, problem }: { step: BuildStep; problem?: ReactNode }) {
   const optionalWords: Partial<Record<BuildStep["status"], string>> = { skipped: "Not needed", upcoming: "If needed" }
   const detail = step.isOptional ? optionalWords[step.status] : undefined
   return (
@@ -145,14 +161,19 @@ function StepRow({ step }: { step: BuildStep }) {
       )}
     >
       <span className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
-        <StepIcon status={step.status} />
+        {problem ? (
+          <TriangleAlertIcon aria-hidden className="size-4 text-destructive" />
+        ) : (
+          <StepIcon status={step.status} />
+        )}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className={step.status === "current" ? "font-medium" : ""}>
           {step.label}
-          <span className="sr-only">: {statusWords[step.status]}</span>
+          <span className="sr-only">: {problem ? "Not finished" : statusWords[step.status]}</span>
         </span>
         {detail ? <span className="text-muted-foreground">{detail}</span> : null}
+        {problem}
       </span>
     </li>
   )

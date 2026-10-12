@@ -179,7 +179,11 @@ describe("RulebookPage", () => {
     const { props, user } = setup({ draft: skipped, isReviewing: true })
     const notice = screen.getByRole("alert")
     expect(within(notice).getByText("1 part wasn't finished")).toBeInTheDocument()
-    expect(within(notice).getByRole("listitem")).toHaveTextContent("Declaration 21: 2 rules not drafted")
+    // The places sit under the step that skipped them; the other steps are done.
+    expect(within(notice).getByText("Drafting rules").closest("li")).toHaveTextContent(
+      /^Drafting rules: Not finishedDeclaration 21: 2 rules not drafted$/
+    )
+    expect(within(notice).getByText("Finding rules").closest("li")).toHaveTextContent(/^Finding rules: Done$/)
     expect(within(notice).getByRole("link", { name: "Declaration 21" })).toHaveAttribute(
       "href",
       expect.stringContaining("provision=declaration%3A21")

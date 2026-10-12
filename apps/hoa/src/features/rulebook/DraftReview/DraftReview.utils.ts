@@ -112,7 +112,13 @@ export function draftTodos(records: RulebookRecords, coverage: Pick<Coverage, "u
  * Something the build skipped, in a few words: where ("Declaration 21", linked to it in the documents), and what
  * ("2 rules not drafted"); a skip of the whole draft has no place.
  */
-export type SkippedPart = { id: string; place: { label: string; href: string } | null; text: string }
+export type SkippedPart = {
+  id: string
+  /** The job stage that skipped it. */
+  stage: string
+  place: { label: string; href: string } | null
+  text: string
+}
 
 // What a stage didn't do, said of the section it started at, or of the whole draft.
 const sectionWords: Partial<Record<string, string>> = {
@@ -174,7 +180,7 @@ export function skippedParts(
       }
     })()
     return place && what
-      ? { id, place: { label: place.label, href: place.href }, text: what }
-      : { id, place: null, text: draftWords[stage] ?? "Part of the draft not finished" }
+      ? { id, stage, place: { label: place.label, href: place.href }, text: what }
+      : { id, stage, place: null, text: draftWords[stage] ?? "Part of the draft not finished" }
   })
 }

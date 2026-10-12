@@ -1,10 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { fn } from "storybook/test"
 import { Button } from "@/components/ui/button"
+import { citationHref } from "@/features/documents/citationLink"
+import type { Job } from "@/jobs/job"
 import { simulatedBuildSeconds, simulatedJob } from "@/tests/simulatedBuild"
 import { readingDocuments, readingResults } from "@/tests/simulatedReading"
 import { DocumentEncodingSteps } from "../DocumentEncodingSteps/DocumentEncodingSteps"
+import type { SkippedPart } from "../DraftReview/DraftReview.utils"
+import { SkippedNotice } from "../SkippedNotice/SkippedNotice"
 import { DocumentEncodingReader } from "./DocumentEncodingReader"
 
 // A build of Maple Hollow's made-up declaration (src/tests/simulatedReading.ts), timed like Sudden Valley's, as the
@@ -137,6 +141,55 @@ export const OnTheRulebookPage: Story = {
 export const OnTheRulebookPageOnAPhone: Story = {
   parameters: { width: "max-w-[375px]" },
   render: () => <Replay speed={4} withProgress />
+}
+
+// What the review says a build of Maple Hollow's declaration skipped, as `skippedParts` words it.
+const skipped: SkippedPart[] = [
+  {
+    id: "find-rules section Declaration 3.1",
+    stage: "find-rules",
+    place: { label: "Declaration 3.1", href: citationHref("declaration", "declaration:3.1") },
+    text: "not read for rules"
+  },
+  {
+    id: "structure-rules rule Declaration 4.5",
+    stage: "structure-rules",
+    place: { label: "Declaration 4.5", href: citationHref("declaration", "declaration:4.5") },
+    text: "1 rule not drafted"
+  }
+]
+
+/** One state of the page's status, named. */
+function State({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs font-medium text-muted-foreground uppercase">{label}</p>
+      <section className="flex flex-col gap-4 rounded-lg border p-5">{children}</section>
+    </div>
+  )
+}
+
+const steps = (jobId: string, loadJob: () => Promise<Job | null>) => (
+  <div className="text-sm text-muted-foreground">
+    <DocumentEncodingSteps jobId={jobId} loadJob={loadJob} onFinished={fn()} onStop={async () => undefined} />
+  </div>
+)
+
+/** Processing from start to end, side by side: starting, partway, and done with parts skipped as the review says. */
+export const EveryState: Story = {
+  parameters: { width: "max-w-3xl" },
+  render: () => (
+    <div className="flex flex-col gap-8">
+      <State label="Starting">{steps("every-state-starting", () => new Promise<Job | null>(() => undefined))}</State>
+      <State label="Partway">
+        <DocumentEncodingReader results={readingResults(600)} documents={readingDocuments(600)} isRunning />
+        {steps("every-state-partway", async () => simulatedJob(600))}
+      </State>
+      <State label="Done, with parts skipped">
+        <SkippedNotice parts={skipped} onRetry={fn()} />
+      </State>
+    </div>
+  )
 }
 
 export const ReplayedOnAPhone: Story = {

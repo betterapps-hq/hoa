@@ -87,7 +87,7 @@ function groupStatus(steps: readonly JobStep[]): JobStep["status"] {
 export function buildSteps(progress: JobProgress): BuildStep[] {
   const groups: { label: string; steps: JobStep[] }[] = []
   for (const step of progress.steps) {
-    const label = stepWords[step.stage]?.label ?? stageLabel(step.stage)
+    const label = stepLabelOf(step.stage)
     const last = groups.at(-1)
     if (last?.label === label) {
       last.steps.push(step)
@@ -101,6 +101,9 @@ export function buildSteps(progress: JobProgress): BuildStep[] {
     isOptional: steps.every((step) => step.isOptional)
   }))
 }
+
+/** The step a stage belongs to, in plain words. */
+export const stepLabelOf = (stage: string) => stepWords[stage]?.label ?? stageLabel(stage)
 
 /** The build's steps before it reports any, every one upcoming: the page shows the whole build from the start. */
 export const startingSteps = (): BuildStep[] =>
