@@ -7,6 +7,7 @@ import { saveRulebookChanges } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus } from "@/db/rulebookRepository"
 import { loadRulebookRecords, type RulebookRecords } from "@/rulebook/assemble"
 import { answerQuestion, resolveIssue, reviewIssues, reviewRecords, type RecordRef } from "@/rulebook/review"
+import { withLawFirst } from "@/schema/law"
 import type * as Rules from "@/schema/types"
 import { rule as ruleSchema, ruleDraft, settings as settingsSchema } from "@/schema/zod"
 import { requireAdministrator } from "@/session/requestContext.server"
@@ -177,7 +178,13 @@ export const saveRulebookSettings = createServerFn({ method: "POST" })
     const { db, hoaId, records } = await openDraft(data.rulebookId)
     const settings = settingsSchema.parse({
       ...records.settings,
-      clauses: { ...records.settings.clauses, ...data.clauses },
+      clauses: {
+        ...records.settings.clauses,
+        ...data.clauses,
+        ...(data.clauses.precedence
+          ? { precedence: { ...data.clauses.precedence, order: withLawFirst(data.clauses.precedence.order) } }
+          : {})
+      },
       policy: data.policy ?? records.settings.policy,
       review: { status: "proposed", by: null, at: null, note: null }
     })

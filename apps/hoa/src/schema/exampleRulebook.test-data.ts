@@ -9,7 +9,7 @@ const stubDocuments: Record<string, DocumentKind> = {
   declaration: "declaration",
   rules: "rules",
   bylaws: "bylaws",
-  "property-code": "statute",
+  "property-code": "state-law",
   "decision-2026-0142": "decision"
 }
 

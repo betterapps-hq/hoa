@@ -28,8 +28,10 @@ export type Review = {
 // ─── Sources: documents, provisions, citations ───────────────────────────────────────────────────
 
 export type DocumentKind =
-  | "statute"
-  | "ordinance"
+  | "federal-law"
+  | "state-law"
+  | "county-ordinance"
+  | "city-ordinance"
   | "declaration"
   | "supplemental-declaration"
   | "plat"

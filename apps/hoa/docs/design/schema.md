@@ -112,8 +112,10 @@ type Review = {
 
 ```ts
 type DocumentKind =
-  | "statute"
-  | "ordinance"
+  | "federal-law"
+  | "state-law"
+  | "county-ordinance"
+  | "city-ordinance"
   | "declaration"
   | "supplemental-declaration"
   | "plat"
@@ -175,7 +177,7 @@ type Citation = {
 - **A governing document** is the Declaration, the guidelines, the By-Laws, one decision letter. Its `edition` is the
   text the file holds: when it was adopted and took effect, and the files it came from. `adoptedBy` cites the
   resolution or minutes that adopted it, when the organization has them.
-- **Kinds:** `statute` and `ordinance` are state and local law. `declaration` is the recorded covenants (CC&Rs);
+- **Kinds:** `federal-law`, `state-law`, `county-ordinance` and `city-ordinance` are law. `declaration` is the recorded covenants (CC&Rs);
   `supplemental-declaration` adds to them for part of the community, which its `governs` condition names; `plat` is the
   recorded subdivision map. `articles` are the articles of incorporation; `bylaws` say how the organization governs
   itself. `rules`, `policy`, `design-guidelines` and `resolution` are adopted by the board or a committee. `minutes` count only where they record a binding decision; `decision` is a decision on
@@ -231,9 +233,10 @@ type Dimension =
   | "speed"
   | "money"
   | "ratio"
-  | "elapsed-time" // minute, hour, calendar-day, week
+  | "elapsed-time" // second, minute, hour, calendar-day, week
   | "calendar-period" // month, year
   | "business-time" // business-day
+  | "sound-level" // decibel
 
 type ValueType =
   | { type: "quantity"; unit: TermKey } // stored in this unit; any unit of the same dimension converts
@@ -287,18 +290,11 @@ type Term = {
 
 ### Core and organization terms
 
-- **Core terms** (`organizationId: null`) ship with the portal and are the same for every organization: the parties
-  (owner, tenant, guest, occupant, applicant, organization, members, board, committee, declarant, managing agent), the
-  community and its lots, the request types with the fields their features supply (submitted on, notice delivered on,
-  due on, total votes), the documents the portal's application form provides (`application-form`,
-  `project-description`), units, and what nearly every association's documents name the same way: the declaration,
-  by-laws, rules, plat, amendments, residences, common area, streets, easements, landscaping, trees, vehicles, animals
-  (with dog, cat, livestock and poultry), leases, liens and reserve funds. A word joins the core only on evidence: it
-  appears in the rule-bearing provisions of at least 8 of the 10 organizations studied, means the same in each, and
-  builds agree on its shape (taxonomy-ingestion.md, Core terms). Common words that documents define with their own
-  meaning ("Notice" as a claim's notice) or that builds model differently (fences, walls, signs, structures) stay
-  organization terms until the evidence settles them. Each core term costs prompt length in every encoding step, so the
-  core stays small; the rest belongs to the catalog of organization terms.
+- **Core terms** (`organizationId: null`) ship with the portal and are the same for every organization. A term is core
+  only if portal code reads or writes it: the parties (owner, tenant, guest, occupant, applicant, organization,
+  members, board, committee), the community and its lots, the request types with the fields their features supply
+  (submitted on, notice delivered on, due on, total votes), the documents the portal's application form provides
+  (`application-form`, `project-description`), and units.
 - **Organization terms** are generated from one organization's documents and edited by its administrators: everything
   its documents define or regulate, such as fence runs, composite colors, Trex, return fences and commercial vehicles.
 - **Refining a core term.** An organization term with a core term's key replaces the core term's labels, definition,
@@ -349,14 +345,10 @@ instead of a yes-or-no flag per party ("declarant-owned").
 - A choice fact names a value term. In an open set, a value that matches no term is kept as text (`term: null`), and
   text is never equal to or in any listed value. In a complete set, a value that matches no term makes the fact
   `uncertain` and raises `invalid-value`.
-- Units convert by `perBase`, an exact decimal count of the dimension's base unit. Each base is the dimension's smallest
-  metric unit, so every US and metric unit converts exactly (an inch is 25.4 millimeters): millimeter, square
-  millimeter, milliliter, milligram, millimeter per hour, US dollar, 1 for ratios (a percent is 0.01), second for
-  elapsed time (a date moves by whole days of it) and month for calendar periods. Decibels are their own dimension.
-  Months and years never convert to days, and business days never convert to anything; both are applied by date
-  arithmetic ([section 3](#3-expressions)). The base never shows: rules and answers keep the unit they're written in.
-  A core unit's dimension and `perBase` are physical facts, so an organization may refine its labels but never its
-  conversion; the vocabulary keeps the core's, and validation flags a refinement that changes it.
+- Units convert by `perBase`, an exact decimal count of the dimension's base unit: inch, square inch, cubic inch,
+  pound, mile per hour, US dollar, 1 for ratios (a percent is 0.01), calendar day for elapsed time and month for
+  calendar periods. Months and years never convert to days, and business days never convert to anything; both are
+  applied by date arithmetic ([section 3](#3-expressions)).
 - **`ifUnstated`** says what silence means for a property. `unknown`: not stated is missing (a fence's height).
   `absent`: not stated means there is none (lattice). It's set per property, because only the organization's documents
   and practice can say which.
@@ -734,7 +726,9 @@ naming the facts that rule needs.
 
 - **Rank.** A rule's rank is the position of its main citation's document kind in the organization's precedence. A
   decision rule ranks as the document of its `authority`, the
-  provision granting the power it used. "Law" means `statute` and `ordinance`.
+  provision granting the power it used. "Law" means federal law, state law and county and city ordinances. Every
+  order of authority starts with law, each a rank of its own: federal, then state, then county and city ordinances
+  equal. A document can't rank itself above law, so a build and a save put law first whatever order they're given.
 - **Valid overrides.** An override is valid only when the overriding rule ranks at or above the rule it overrides, and
   only law overrides a rule with `noExceptions`. Overrides can't form a cycle. Selectors are checked on what they
   resolve to. Anything else is `override-not-allowed`.

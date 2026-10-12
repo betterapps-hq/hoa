@@ -1,5 +1,6 @@
 import { z } from "zod"
 import type { PromptVariables } from "@/ai/prompts"
+import { withLawFirst } from "@/schema/law"
 import type { GoverningDocument, Provision, ProvisionKey, RuleKey, TermKey } from "@/schema/types"
 import { createVocabulary } from "@/schema/vocabulary"
 import {
@@ -119,7 +120,7 @@ export function clausesOf(answer: RuleStructuringAnswer) {
   })
   const { precedence, time, liability, cure: cureClause, deciders, sanctionPreconditions } = answer.clauses
   return clauses.partial().parse({
-    ...(precedence ? { precedence: cite(precedence) } : {}),
+    ...(precedence ? { precedence: { ...cite(precedence), order: withLawFirst(precedence.order) } } : {}),
     ...(time ? { time: cite(time) } : {}),
     ...(liability ? { liability: liability.map(cite) } : {}),
     ...(cureClause ? { cure: cite(cureClause) } : {}),

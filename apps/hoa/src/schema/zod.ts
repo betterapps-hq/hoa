@@ -131,8 +131,10 @@ export const condition: z.ZodType<T.Condition, T.Condition> = z.lazy(() =>
 // ─── Sources ──────────────────────────────────────────────────────────────────────────────────────
 
 export const documentKind = z.enum([
-  "statute",
-  "ordinance",
+  "federal-law",
+  "state-law",
+  "county-ordinance",
+  "city-ordinance",
   "declaration",
   "supplemental-declaration",
   "plat",

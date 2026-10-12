@@ -140,7 +140,7 @@ export function SettingsTab() {
 
 type SettingCardProps = { name: ClauseName; description: string; children: ReactNode }
 
-/** One setting: what it means, the form, and the passages it comes from, or that it's the usual default. */
+/** One setting: what it means, the form, and the passages it comes from, when its documents state it. */
 function SettingCard({ name, description, children }: SettingCardProps) {
   const { records, citations, source } = useRulebookWorkspace()
   const cited = [
@@ -165,9 +165,7 @@ function SettingCard({ name, description, children }: SettingCardProps) {
               />
             ))}
           </p>
-        ) : (
-          <p className="text-muted-foreground">Your documents don&rsquo;t say, so this is the usual default.</p>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   )

@@ -29,9 +29,13 @@ describe("SettingsTab", () => {
     const ranks = within(precedence.getByRole("list", { name: "Documents in order of authority" })).getAllByRole(
       "listitem"
     )
-    expect(ranks[0]).toHaveAccessibleName("1st: State and federal laws, City and county ordinances")
-    expect(ranks[1]).toHaveAccessibleName(
-      "2nd: Declaration (CC&Rs), Supplemental declarations, Plat (the recorded map of the lots)"
+    expect(ranks.slice(0, 3).map((rank) => rank.getAttribute("aria-label"))).toEqual([
+      "1st: Federal laws",
+      "2nd: State laws",
+      "3rd: County ordinances, City ordinances"
+    ])
+    expect(ranks[3]).toHaveAccessibleName(
+      "4th: Declaration (CC&Rs), Supplemental declarations, Plat (the recorded map of the lots)"
     )
     expect(precedence.getByRole("link", { name: "Declaration 1.3, paragraph 3" })).toBeInTheDocument()
     expect(card("Who decides each request").getByText(/decided by the Reviewer/)).toBeInTheDocument()
@@ -45,15 +49,13 @@ describe("SettingsTab", () => {
     await user.click(screen.getByRole("button", { name: "Approve" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "settings" }], "approved", null)
     const precedence = card("Which document wins")
-    expect(precedence.queryByRole("button", { name: "Drag State and federal laws" })).not.toBeInTheDocument()
-    expect(precedence.getByLabelText("Law always comes first")).toBeInTheDocument()
+    expect(precedence.queryByRole("button", { name: "Drag Federal laws" })).not.toBeInTheDocument()
+    expect(precedence.getAllByRole("button", { name: "Law always comes first" })).toHaveLength(3)
     await user.click(precedence.getByRole("button", { name: "Move Declaration (CC&Rs)" }))
     await user.click(await screen.findByRole("menuitem", { name: "Just below its rank now" }))
     expect(actions?.saveSettings).not.toHaveBeenCalled()
     await user.click(precedence.getByRole("button", { name: "Reset" }))
-    expect(precedence.getByRole("listitem", { name: /^1st: / })).toHaveAccessibleName(
-      "1st: State and federal laws, City and county ordinances"
-    )
+    expect(precedence.getByRole("listitem", { name: /^5th: / })).toHaveAccessibleName("5th: Articles of incorporation")
     await user.click(precedence.getByRole("button", { name: "Move Declaration (CC&Rs)" }))
     await user.click(await screen.findByRole("menuitem", { name: "Just below its rank now" }))
     await user.click(precedence.getByRole("button", { name: "Save the order" }))
@@ -61,10 +63,10 @@ describe("SettingsTab", () => {
       clauses: {
         precedence: expect.objectContaining({
           order: [
-            ["statute", "ordinance"],
+            ...records.settings.clauses.precedence.order.slice(0, 3),
             ["supplemental-declaration", "plat"],
             ["declaration"],
-            ...records.settings.clauses.precedence.order.slice(2)
+            ...records.settings.clauses.precedence.order.slice(4)
           ]
         })
       },
@@ -114,18 +116,22 @@ describe("SettingsTab", () => {
 })
 
 describe("placeDocument", () => {
-  const order: T.DocumentKind[][] = [["statute", "ordinance"], ["declaration"], ["rules", "policy", "resolution"]]
+  const order: T.DocumentKind[][] = [
+    ["state-law", "county-ordinance"],
+    ["declaration"],
+    ["rules", "policy", "resolution"]
+  ]
 
   it("ranks a document equal to another rank's, dropping a rank it leaves empty", () => {
     expect(placeDocument(order, "declaration", { type: "rank", index: 2 })).toEqual([
-      ["statute", "ordinance"],
+      ["state-law", "county-ordinance"],
       ["rules", "policy", "resolution", "declaration"]
     ])
   })
 
   it("places a document before or after another, in its rank", () => {
     expect(placeDocument(order, "declaration", { type: "beside", kind: "policy", side: "before" })).toEqual([
-      ["statute", "ordinance"],
+      ["state-law", "county-ordinance"],
       ["rules", "declaration", "policy", "resolution"]
     ])
     expect(placeDocument(order, "resolution", { type: "beside", kind: "rules", side: "after" })[2]).toEqual([
@@ -136,16 +142,18 @@ describe("placeDocument", () => {
   })
 
   it("keeps law at the top: it doesn't move, and nothing goes into or above it", () => {
-    expect(placeDocument(order, "statute", { type: "gap", index: 2 })).toEqual(order)
+    expect(placeDocument(order, "state-law", { type: "gap", index: 2 })).toEqual(order)
     expect(placeDocument(order, "declaration", { type: "rank", index: 0 })).toEqual(order)
-    expect(placeDocument(order, "declaration", { type: "beside", kind: "ordinance", side: "after" })).toEqual(order)
+    expect(placeDocument(order, "declaration", { type: "beside", kind: "county-ordinance", side: "after" })).toEqual(
+      order
+    )
     expect(placeDocument(order, "policy", { type: "gap", index: 0 })).toEqual(order)
     expect(placeDocument(order, "policy", { type: "gap", index: 1 })[1]).toEqual(["policy"])
   })
 
   it("ranks a document on its own at a gap", () => {
     expect(placeDocument(order, "policy", { type: "gap", index: 3 })).toEqual([
-      ["statute", "ordinance"],
+      ["state-law", "county-ordinance"],
       ["declaration"],
       ["rules", "resolution"],
       ["policy"]

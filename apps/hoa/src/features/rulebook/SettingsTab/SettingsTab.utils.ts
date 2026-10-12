@@ -2,6 +2,7 @@ import { match } from "ts-pattern"
 import { sentenceCase } from "@/lib/text"
 import { coreTerms } from "@/schema/coreTerms"
 import { describeCondition } from "@/schema/describe"
+import { isLaw } from "@/schema/law"
 import type * as T from "@/schema/types"
 import type { Vocabulary } from "@/schema/vocabulary"
 import type { TermContent } from "@/schema/zod"
@@ -13,8 +14,10 @@ export type ClauseName = keyof Clauses
 
 /** Each kind of governing document by the name an owner knows it by, saying whose it is where that's unclear. */
 const documentKindLabels: Record<T.DocumentKind, string> = {
-  statute: "State and federal laws",
-  ordinance: "City and county ordinances",
+  "federal-law": "Federal laws",
+  "state-law": "State laws",
+  "county-ordinance": "County ordinances",
+  "city-ordinance": "City ordinances",
   declaration: "Declaration (CC&Rs)",
   "supplemental-declaration": "Supplemental declarations",
   plat: "Plat (the recorded map of the lots)",
@@ -51,9 +54,6 @@ export type RankTarget =
   | { type: "rank"; index: number }
   | { type: "gap"; index: number }
   | { type: "beside"; kind: T.DocumentKind; side: "before" | "after" }
-
-/** Law (schema.md, Rank and conflicts): it outranks every document an organization writes, so it can't be moved. */
-export const isLaw = (kind: T.DocumentKind) => kind === "statute" || kind === "ordinance"
 
 /** How many ranks at the top hold only law, and stay fixed there. */
 export function lawRanks(order: readonly (readonly T.DocumentKind[])[]) {

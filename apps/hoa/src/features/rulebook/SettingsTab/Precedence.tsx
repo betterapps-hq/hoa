@@ -27,16 +27,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { isLaw } from "@/schema/law"
 import type * as T from "@/schema/types"
-import {
-  canPlace,
-  documentKindLabel,
-  isLaw,
-  lawRanks,
-  ordinal,
-  placeDocument,
-  type RankTarget
-} from "./SettingsTab.utils"
+import { canPlace, documentKindLabel, lawRanks, ordinal, placeDocument, type RankTarget } from "./SettingsTab.utils"
 
 // The order of authority as ranks (encoding.md, UX, Settings): each rank a row of the documents equal in it. A
 // document is dragged by its handle onto another rank, to rank equal with what's there, or into a gap between ranks,
