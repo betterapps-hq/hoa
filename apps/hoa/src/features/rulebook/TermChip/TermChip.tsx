@@ -52,7 +52,7 @@ export function TermChip({ termKey, plural = false, vocabulary, isStandalone = f
         </PopoverHeader>
         {term.definition ? <p>{term.definition}</p> : null}
         {term.scopeNote ? <p className="text-muted-foreground">{term.scopeNote}</p> : null}
-        {others.length > 0 ? <p>Also written: {others.join(", ")}</p> : null}
+        {others.length > 0 ? <p>Also called: {others.join(", ")}</p> : null}
         {avoided.length > 0 ? <p>Not used: {avoided.join(", ")}</p> : null}
         <div className="flex flex-wrap items-center gap-2">
           <code className="text-xs text-muted-foreground">{term.key}</code>

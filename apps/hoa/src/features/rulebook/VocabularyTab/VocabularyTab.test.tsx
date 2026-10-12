@@ -17,14 +17,14 @@ describe("VocabularyTab", () => {
     const headings = screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent)
     expect(headings.slice(0, 5)).toEqual(["Things", "Requests", "People and organizations", "Events", "Documents"])
     const things = within(screen.getByRole("list", { name: "Things" }))
-    expect(things.getByRole("button", { name: "Fence run" })).toHaveAccessibleDescription(/^\d+ details and 3 kinds$/)
+    expect(things.getByRole("button", { name: "Fence run" })).toHaveAccessibleDescription(/^\d+ questions and 3 kinds$/)
     expect(screen.getByRole("button", { name: /^Show all \d+ things$/ })).toBeInTheDocument()
   })
 
   it("opens a subject to its kinds and details, each detail with its choices", async () => {
     const { user } = renderInWorkspace(<VocabularyTab />)
     await user.click(subject("Fence run"))
-    const details = within(screen.getByRole("region", { name: "Details of fence run" }))
+    const details = within(screen.getByRole("region", { name: "Questions about fence run" }))
     expect(details.getByText("Material")).toBeInTheDocument()
     for (const choice of ["Wood", "Composite", "Metal", "Vinyl"]) {
       expect(details.getAllByRole("button", { name: choice }).length).toBeGreaterThan(0)
@@ -36,7 +36,7 @@ describe("VocabularyTab", () => {
     // A detail drops the subject's name it repeats: "gate height" under gate is "Height".
     await user.click(screen.getByRole("button", { name: /^Show all \d+ things$/ }))
     await user.click(subject("Gate"))
-    expect(within(screen.getByRole("region", { name: "Details of gate" })).getByText("Height")).toBeInTheDocument()
+    expect(within(screen.getByRole("region", { name: "Questions about gate" })).getByText("Height")).toBeInTheDocument()
   })
 
   it("finds a term through a typo, a partial word and any word order, with the subject it's under", async () => {
@@ -46,9 +46,9 @@ describe("VocabularyTab", () => {
       await user.clear(box)
       await user.type(box, query)
       expect(screen.getByRole("heading", { name: "Best matches" })).toBeInTheDocument()
-      expect(screen.getByRole("region", { name: "Details of lease registration" })).toBeInTheDocument()
+      expect(screen.getByRole("region", { name: "Questions about lease registration" })).toBeInTheDocument()
     }
-    await user.click(screen.getByRole("button", { name: /^Premises leased: used by \d+ rules?$/ }))
+    await user.click(screen.getByRole("button", { name: /^Premises leased: asked by \d+ rules?$/ }))
     const rules = screen.getByRole("list", { name: "Rules using Premises leased" })
     // The first button of a rule link is its title, which opens the rule.
     await user.click(within(rules).getAllByRole("button")[0]!)
@@ -91,7 +91,7 @@ describe("VocabularyTab", () => {
     await user.click(subject("Fence run"))
     await user.click(screen.getByRole("button", { name: /^Approve all \d+ terms$/ }))
     expect(
-      await screen.findByRole("alertdialog", { name: /^Approve the \d+ terms for Fence run, its details/ })
+      await screen.findByRole("alertdialog", { name: /^Approve the \d+ terms for Fence run, its questions/ })
     ).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Approve them" }))
     expect(actions?.review).toHaveBeenCalledWith(
@@ -129,7 +129,7 @@ describe("VocabularyTab", () => {
     await user.selectOptions(await screen.findByRole("combobox", { name: "Review" }), "approved")
     await user.keyboard("{Escape}")
     expect(screen.getByText(/^1 of 1096 terms approved/)).toBeInTheDocument()
-    expect(subject("Gate")).toHaveAccessibleDescription(/^1 of \d+ details$/)
+    expect(subject("Gate")).toHaveAccessibleDescription(/^1 of \d+ questions$/)
     await user.click(screen.getByRole("button", { name: "Clear filters" }))
     expect(screen.getByText(/^1095 of 1096 terms to review/)).toBeInTheDocument()
   })

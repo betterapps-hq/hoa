@@ -248,14 +248,15 @@ export function filterSubjects(
   })
 }
 
-/** "37 details", "3 of 37 details"; nothing for none. */
+/** "37 questions", "3 of 37 questions"; nothing for none. */
 const counted = (count: number, of: number, one: string, many: string) =>
   count === 0 ? null : `${count < of ? `${count} of ${of}` : count} ${of === 1 ? one : many}`
 
-/** What a subject holds, in words: "37 details and 3 kinds", "3 of 37 details", "4 choices". */
+/** What a subject holds, in words: "37 questions and 3 kinds", "3 of 37 questions", "4 choices". Its details are
+ * what the rules ask about it, so the page calls them questions. */
 export function subjectSummary(shown: TermNode, subject: TermNode) {
   return [
-    counted(shown.details.length, subject.details.length, "detail", "details"),
+    counted(shown.details.length, subject.details.length, "question", "questions"),
     counted(shown.kinds.length, subject.kinds.length, "kind", "kinds"),
     counted(subject.values.length, subject.values.length, "choice", "choices")
   ]

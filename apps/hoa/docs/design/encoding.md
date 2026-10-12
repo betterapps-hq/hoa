@@ -360,15 +360,17 @@ list is ordered by relevance; without, in its usual order. The other filters sti
   and no delete.
 - **Terms:** grouped under what they describe. Each subject (a thing, request, party, event or document the
   organization's terms hang off, core ones included, then the lists of choices no detail uses and the units) is a
-  collapsed row in its section, most used first, the first eight until "Show all", saying what it holds ("37 details
-  and 3 kinds") and how many rules read it or anything under it. Open, it shows its definition and other labels, its
+  collapsed row in its section, most used first, the first eight until "Show all", saying what it holds ("37 questions
+  and 3 kinds") and how many rules read it or anything under it ("Used in 5 rules"). The page calls a
+  detail a question, since it's what the rules ask about the thing (as on the homeowner's form): "What the rules ask
+  about it", each "Asked by 1 rule"; other labels are "Also called". Open, it shows its definition and other labels, its
   kinds (categories, with their definition or criteria) and its details (properties, by the name they're shown by
   under it: "height" under gate, not "gate height"), each with what it holds in words, its definition, the rules that
   read it and its review. A choice detail shows its list's choices as chips (folded past eight; "or another" when the
   list is open), each opening what it means, the rules that read it and its review; a later detail in the same
   subject choosing from the same list refers back to it ("as for material"). Kinds and details come most used first.
   The review filter (to review by default in a draft) keeps a subject for any term under it that matches, and only
-  those kinds and details ("3 of 37 details"); "Approve all N terms" approves what an open subject keeps, its details
+  those kinds and details ("3 of 37 questions"); "Approve all N terms" approves what an open subject keeps, its details
   and their choices included. A search lists the subjects it finds best first, opened: a found subject shows all of
   itself, otherwise only the details holding a match, and a found choice is marked.
 - **Questions:** the open questions one at a time (shadcn's Questionnaire, "Question 1 of 4"), each with its citations

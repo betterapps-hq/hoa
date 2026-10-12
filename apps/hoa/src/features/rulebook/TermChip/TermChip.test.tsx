@@ -12,7 +12,7 @@ describe("TermChip", () => {
     const user = userEvent.setup()
     render(<TermChip termKey="organization" vocabulary={vocabulary} />)
     await user.click(screen.getByRole("button", { name: "Association" }))
-    expect(await screen.findByText(/Also written: Trilogy at Redmond Ridge/)).toBeInTheDocument()
+    expect(await screen.findByText(/Also called: Trilogy at Redmond Ridge/)).toBeInTheDocument()
     expect(screen.getByText(/^the Trilogy at Redmond Ridge Residential Community Association/)).toBeInTheDocument()
     expect(screen.getByText("A party")).toBeInTheDocument()
     expect(screen.getByText("organization")).toBeInTheDocument()

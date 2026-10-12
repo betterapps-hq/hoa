@@ -155,8 +155,8 @@ describe("filterSubjects", () => {
 describe("subjectSummary", () => {
   it("says what a subject holds, and how much of it the filters keep", () => {
     const gate = subjectOf("gate")
-    expect(subjectSummary(gate, gate)).toBe("3 details and 1 kind")
-    expect(subjectSummary({ ...gate, details: gate.details.slice(0, 1), kinds: [] }, gate)).toBe("1 of 3 details")
+    expect(subjectSummary(gate, gate)).toBe("3 questions and 1 kind")
+    expect(subjectSummary({ ...gate, details: gate.details.slice(0, 1), kinds: [] }, gate)).toBe("1 of 3 questions")
     expect(subjectSummary(subjectOf("unused-list"), subjectOf("unused-list"))).toBe("1 choice")
   })
 })
