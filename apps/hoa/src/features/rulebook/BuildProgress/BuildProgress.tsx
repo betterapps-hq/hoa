@@ -21,7 +21,14 @@ import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { cn } from "@/lib/utils"
 import type { BuildResults } from "@/rulebook/buildResults.server"
-import { buildSteps, elapsedText, estimateBuild, summaryText, type BuildStep } from "./BuildProgress.utils"
+import {
+  buildSteps,
+  elapsedText,
+  estimateBuild,
+  summaryText,
+  timeLeftText,
+  type BuildStep
+} from "./BuildProgress.utils"
 import { useBuildResults } from "./useBuildResults"
 
 export type BuildProgressProps = {
@@ -38,8 +45,8 @@ export type BuildProgressProps = {
 }
 
 /**
- * A running build's progress (encoding.md, UX, The build's progress): one line with the current step and the time left,
- * one bar for the whole build that's never full before it ends, every step in plain words behind a disclosure, and a
+ * A running build's progress (encoding.md, UX, The build's progress): one line with the time left (and the current step
+ * while the steps are hidden), one bar for the whole build that's never full before it ends, every step in plain words behind a disclosure, and a
  * quiet way to stop it. Polls the job every 2 seconds.
  */
 export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults, now = Date.now }: BuildProgressProps) {
@@ -68,6 +75,9 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults,
   }
   const steps = job?.progress ? buildSteps(job.progress, results) : []
   const estimate = job ? estimateBuild(job, now()) : null
+  // With the steps showing, the line above them gives only the time left: the list already names the current step.
+  const remaining = estimate?.remaining ?? null
+  const summary = isOpen ? timeLeftText(remaining) : summaryText(steps, remaining)
 
   return (
     <div className="flex flex-col gap-3">
@@ -75,7 +85,7 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults,
         <div className="flex items-start justify-between gap-3">
           <output className="flex items-start gap-2 text-sm">
             {isRunning ? <Spinner aria-hidden className="mt-0.5 shrink-0" /> : null}
-            <span>{job ? summaryText(steps, estimate?.remaining ?? null) : "Starting"}</span>
+            <span>{job ? summary : "Starting"}</span>
           </output>
           <CollapsibleTrigger render={<Button variant="ghost" size="sm" className="group/steps -my-1 shrink-0" />}>
             {isOpen ? "Hide steps" : "Show steps"}

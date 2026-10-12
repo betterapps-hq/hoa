@@ -308,7 +308,10 @@ describe("RulebookPage", () => {
       loadJob: vi.fn<(jobId: string) => Promise<Job | null>>(async () => running),
       onStop: vi.fn<RulebookPageProps["onStop"]>(async () => ({ status: "already-finished" }))
     })
-    expect(await screen.findByText(/Drafting rules, step 2 of 2/)).toBeInTheDocument()
+    expect(await screen.findByRole("listitem", { current: "step" })).toHaveTextContent("Drafting rules")
+    expect(screen.queryByText(/step 2 of 2/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Hide steps" }))
+    expect(screen.getByText(/Drafting rules, step 2 of 2/)).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Stop building" }))
     const dialog = await screen.findByRole("alertdialog")
     expect(
