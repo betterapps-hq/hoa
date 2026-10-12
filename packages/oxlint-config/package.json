@@ -9,9 +9,6 @@
   "exports": {
     "./base": "./base.json"
   },
-  "scripts": {
-    "check:unused": "knip --directory ../.. --workspace packages/oxlint-config"
-  },
   "publishConfig": {
     "access": "public"
   }

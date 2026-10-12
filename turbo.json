@@ -16,9 +16,6 @@
     "check:types": {
       "dependsOn": ["^check:types"]
     },
-    "check:unused": {
-      "dependsOn": ["^check:unused"]
-    },
     "test": {
       "outputs": ["coverage/**"]
     },

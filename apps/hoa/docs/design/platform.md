@@ -254,18 +254,14 @@ to the real services. `vite.config.ts` sets `process.env.CLOUDFLARE_ENV ??= "dev
 `dev` environment on every platform (a `CLOUDFLARE_ENV=dev` prefix in a pnpm script doesn't work in Windows' shell). R2
 is then the real `hoa-dev` bucket through a remote binding, because presigned browser uploads and Layout's `urlSource`
 both need a real S3 endpoint; D1 and Workflows stay simulated on disk. Scripts in `apps/hoa`: `db:migrate:local`
-(`wrangler d1 migrations apply hoa-dev --local --env dev`), `db:seed:local` (the one HOA), `db:seed:sample`,
-`db:reset:rules` and `cf-typegen` (`wrangler types`).
+(`wrangler d1 migrations apply hoa-dev --local --env dev`), `db:seed:local` (the one HOA, the only seeded data),
+`db:reset:rules` and `cf-typegen` (`wrangler types`). Documents, rulebooks and applications are made through the app,
+never seeded: a seed writes states the app can't, which then pass for the app's own.
 
-- **`db:seed:sample`** publishes `samples/declaration/rules.json` as the seeded HOA's rulebook, every record approved,
-  so reviews can run before the rules UX exists. `src/rulebook/seedRulebook.ts` writes the D1 rows as SQL, which
-  `wrangler d1 execute --local` runs, and assembles the rules file from the same records, which
-  `wrangler r2 object put --local` stores. Running it again replaces the same rulebook.
 - **`db:reset:rules`** empties rulebooks, their records, provisions, referenced documents, rulebook-build
-  and review jobs and reviews, with their R2 objects, through `getPlatformProxy` (`src/db/resetRules.ts`). Uploaded
-  documents, applications (back to `draft`), model caches and settings stay.
-- Both use Wrangler's local R2 by default. `pnpm dev` binds the real `hoa-dev` bucket instead, so add `--dev-bucket`
-  to write or delete the objects there. Neither script ever reaches the preview or demo databases or buckets.
+  and review jobs and reviews, with their objects in the `hoa-dev` bucket `pnpm dev` binds, through
+  `getPlatformProxy` (`src/db/resetRules.ts`). Uploaded documents, applications (back to `draft`), model caches and
+  settings stay. It never reaches the preview or demo databases or buckets.
 
 ## Tracing on Workers
 

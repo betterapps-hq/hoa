@@ -30,7 +30,7 @@ import { reviewRulesFile } from "./reviewRulesFile.ts"
 // fresh model answers (each sample is cached, so it reruns for free).
 // Cases: the synthetic garage enclosure packets in samples/garage-enclosure/, and the fence packet's case in the
 // git-ignored .fixtures/eval/review/fence-application/ (its packet comes from `pnpm ocr:fixture --packet`). The rules
-// file is the one `pnpm db:seed:sample --review` publishes for the app (scripts/reviewRulesFile.ts).
+// file is scripts/reviewRulesFile.ts.
 // --config overrides prompt versions' model and effort for an experiment, without new Langfuse versions:
 //   --config "review=anthropic/claude-haiku-5.5@high,hoa-document-review=anthropic/claude-sonnet-5.5"
 // `review` names every review prompt; any other name is a Langfuse prompt.

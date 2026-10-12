@@ -307,15 +307,6 @@ export async function updateProvisions(db: Database, hoaId: string, items: reado
   }
 }
 
-export async function getProvision(db: Database, hoaId: string, key: string): Promise<Rules.Provision | null> {
-  const row = await db
-    .select({ provision: provisions.provision })
-    .from(provisions)
-    .where(and(eq(provisions.hoaId, hoaId), eq(provisions.key, key)))
-    .get()
-  return row ? provisionSchema.parse(row.provision) : null
-}
-
 // ─── What a build writes (encoding.md, Save draft) ──────────────────────────────────────────────
 
 /** The structures set for uploads, by id; an upload without one is missing. */
@@ -328,14 +319,6 @@ export async function getDocumentStructures(db: Database, hoaId: string, ids: re
     .from(governingDocuments)
     .where(and(eq(governingDocuments.hoaId, hoaId), inArray(governingDocuments.id, [...ids])))
   return new Map(rows.flatMap((row) => (row.structure ? [[row.id, documentStructure.parse(row.structure)]] : [])))
-}
-
-/** Sets how builds structure an upload. */
-export async function setDocumentStructure(db: Database, hoaId: string, id: string, structure: DocumentStructure) {
-  await db
-    .update(governingDocuments)
-    .set({ structure: documentStructure.parse(structure) })
-    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id)))
 }
 
 /** The documents a build read: each upload's own documents (itself first, then its exhibits) with their provisions. */
