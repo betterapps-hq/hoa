@@ -30,7 +30,7 @@ export function PublishedRulebook({ published, sources, uploads, source, loadJob
       <header className="flex flex-col gap-1">
         <h2 className="text-xl font-semibold">{sources.organization.name} rules</h2>
         <p className="max-w-prose text-muted-foreground">
-          Your project is reviewed against these rules. Open a citation to read the original wording.
+          The rules in your association&rsquo;s governing documents. Open a citation to read the original wording.
         </p>
       </header>
       {rulebook && content ? (
