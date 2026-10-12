@@ -165,21 +165,21 @@ function StatusLine({
   const reading = (titles: string[]) => (titles.length === 1 ? titles[0] : `${titles.length} documents`)
   switch (status.kind) {
     case "building":
-      return line(
-        "Updating the rulebook from your documents.",
-        <div className="flex flex-col gap-4">
-          <p>
-            You can leave this page. When it&rsquo;s done, you review what changed here before it&rsquo;s published.
-          </p>
+      // A short title over the progress, which says the rest.
+      return (
+        <section aria-label="Status" className="flex flex-col gap-4 rounded-lg border p-5">
+          <p className="font-medium">Processing your documents</p>
           {props.draft.buildJobId ? (
-            <DocumentEncodingSteps
-              jobId={props.draft.buildJobId}
-              loadJob={props.loadJob}
-              onFinished={props.onChanged}
-              onStop={stop}
-            />
+            <div className="text-sm text-muted-foreground">
+              <DocumentEncodingSteps
+                jobId={props.draft.buildJobId}
+                loadJob={props.loadJob}
+                onFinished={props.onChanged}
+                onStop={stop}
+              />
+            </div>
           ) : null}
-        </div>
+        </section>
       )
     case "reading":
       return line(

@@ -77,12 +77,9 @@ function Replaying({ speed, from = 0, withProgress = false, onReplay }: ReplayPr
     <div className="flex flex-col gap-6">
       {withProgress ? (
         // The rulebook page's status while it builds (RulebookPage), with the reader above the progress.
-        <section aria-label="Status" className="flex flex-col gap-3 rounded-lg border p-5">
-          <p className="text-lg leading-snug">Updating the rulebook from your documents.</p>
-          <p className="text-sm text-muted-foreground">
-            You can leave this page. When it&rsquo;s done, you review what changed here before it&rsquo;s published.
-          </p>
-          <div className="pt-2 pb-4">{reader}</div>
+        <section aria-label="Status" className="flex flex-col gap-4 rounded-lg border p-5">
+          <p className="font-medium">Processing your documents</p>
+          <div className="pb-2">{reader}</div>
           <div className="text-sm text-muted-foreground">
             <DocumentEncodingSteps
               jobId={`replay-${speed}`}
