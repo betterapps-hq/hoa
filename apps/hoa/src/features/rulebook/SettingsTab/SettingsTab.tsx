@@ -173,24 +173,35 @@ function SettingCard({ name, description, children }: SettingCardProps) {
   )
 }
 
-/** The order of authority, saved as it changes. */
+/** The order of authority as a draft: moves show at once, and save or reset together. */
 function PrecedenceSetting() {
   const { records, actions } = useRulebookWorkspace()
   const save = useSaveClauses()
   const { precedence } = records.settings.clauses
   const [order, setOrder] = useState(precedence.order)
+  const [isSaving, setIsSaving] = useState(false)
+  const isChanged = JSON.stringify(order) !== JSON.stringify(precedence.order)
   return (
-    <Precedence
-      order={order}
-      onChange={
-        actions
-          ? (next) => {
-              setOrder(next)
-              void save({ precedence: { ...precedence, order: next } })
-            }
-          : null
-      }
-    />
+    <div className="flex flex-col gap-3">
+      <Precedence order={order} onChange={actions ? setOrder : null} />
+      {actions ? (
+        <div className="flex gap-2">
+          <Button
+            disabled={!isChanged || isSaving}
+            onClick={async () => {
+              setIsSaving(true)
+              await save({ precedence: { ...precedence, order } })
+              setIsSaving(false)
+            }}
+          >
+            {isSaving ? "Saving" : "Save the order"}
+          </Button>
+          <Button variant="ghost" disabled={!isChanged || isSaving} onClick={() => setOrder(precedence.order)}>
+            Reset
+          </Button>
+        </div>
+      ) : null}
+    </div>
   )
 }
 

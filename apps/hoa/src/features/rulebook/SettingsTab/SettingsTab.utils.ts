@@ -11,8 +11,24 @@ import type { TermContent } from "@/schema/zod"
 type Clauses = T.Settings["clauses"]
 export type ClauseName = keyof Clauses
 
-/** "Supplemental declaration" for `supplemental-declaration`. */
-export const documentKindLabel = (kind: string) => sentenceCase(kind.replaceAll("-", " "))
+/** Each kind of governing document by the name an owner knows it by, saying whose it is where that's unclear. */
+const documentKindLabels: Record<T.DocumentKind, string> = {
+  statute: "State and federal laws",
+  ordinance: "City and county ordinances",
+  declaration: "Declaration (CC&Rs)",
+  "supplemental-declaration": "Supplemental declarations",
+  plat: "Plat (the recorded map of the lots)",
+  articles: "Articles of incorporation",
+  bylaws: "Bylaws",
+  rules: "Rules and regulations",
+  policy: "Board policies",
+  "design-guidelines": "Design guidelines",
+  resolution: "Board resolutions",
+  minutes: "Meeting minutes",
+  decision: "Committee decisions"
+}
+
+export const documentKindLabel = (kind: T.DocumentKind) => documentKindLabels[kind]
 
 const ordinals = new Intl.PluralRules("en-US", { type: "ordinal" })
 const suffixes: Record<Intl.LDMLPluralRule, string> = {

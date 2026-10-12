@@ -29,8 +29,10 @@ describe("SettingsTab", () => {
     const ranks = within(precedence.getByRole("list", { name: "Documents in order of authority" })).getAllByRole(
       "listitem"
     )
-    expect(ranks[0]).toHaveAccessibleName("1st: Statute, Ordinance")
-    expect(ranks[1]).toHaveAccessibleName("2nd: Declaration, Supplemental declaration, Plat")
+    expect(ranks[0]).toHaveAccessibleName("1st: State and federal laws, City and county ordinances")
+    expect(ranks[1]).toHaveAccessibleName(
+      "2nd: Declaration (CC&Rs), Supplemental declarations, Plat (the recorded map of the lots)"
+    )
     expect(precedence.getByRole("link", { name: "Declaration 1.3, paragraph 3" })).toBeInTheDocument()
     expect(card("Who decides each request").getByText(/decided by the Reviewer/)).toBeInTheDocument()
     expect(card("Deadlines").getByText("US federal holidays")).toBeInTheDocument()
@@ -46,8 +48,16 @@ describe("SettingsTab", () => {
     expect(precedence.getAllByRole("button", { name: /^Drag / }).length).toBe(
       records.settings.clauses.precedence.order.flat().length
     )
-    await user.click(precedence.getByRole("button", { name: "Move Ordinance" }))
+    await user.click(precedence.getByRole("button", { name: "Move City and county ordinances" }))
     await user.click(await screen.findByRole("menuitem", { name: "Just below its rank now" }))
+    expect(actions?.saveSettings).not.toHaveBeenCalled()
+    await user.click(precedence.getByRole("button", { name: "Reset" }))
+    expect(precedence.getByRole("listitem", { name: /^1st: / })).toHaveAccessibleName(
+      "1st: State and federal laws, City and county ordinances"
+    )
+    await user.click(precedence.getByRole("button", { name: "Move City and county ordinances" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Just below its rank now" }))
+    await user.click(precedence.getByRole("button", { name: "Save the order" }))
     expect(actions?.saveSettings).toHaveBeenLastCalledWith({
       clauses: {
         precedence: expect.objectContaining({
