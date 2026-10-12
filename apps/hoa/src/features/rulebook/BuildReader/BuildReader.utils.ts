@@ -272,9 +272,9 @@ export const blankCount = (statement: string | null) =>
 /** Under this width the window takes the whole width, with the piles under it. */
 export const stackedBelow = 520
 const gap = 20
-/** The counts above each pile beside the window, and below each under it. */
+/** The counts above each pile beside the window, and below each under it: a label, the count and what's drafted. */
 const header = 66
-const footer = 44
+const footer = 66
 export const windowHeight = 252
 /** The piles' height under the window: dots shrink to keep every find in it. */
 const stackedGrid = 56

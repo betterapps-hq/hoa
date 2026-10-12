@@ -78,7 +78,7 @@ function Replaying({ speed, from = 0, withProgress = false, onReplay }: ReplayPr
           <p className="text-sm text-muted-foreground">
             You can leave this page. When it&rsquo;s done, you review what changed here before it&rsquo;s published.
           </p>
-          <div className="py-2">{reader}</div>
+          <div className="pt-2 pb-4">{reader}</div>
           <div className="text-sm text-muted-foreground">
             <BuildProgress
               jobId={`replay-${speed}`}

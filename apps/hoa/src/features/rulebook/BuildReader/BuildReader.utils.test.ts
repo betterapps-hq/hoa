@@ -207,7 +207,7 @@ describe("readerLayout", () => {
       isStacked: true,
       window: { x: 0, y: 0, width: 343, height: 252 },
       gridBottom: 324,
-      height: 368,
+      height: 390,
       ceiling: 0
     })
     expect(layout.counts.terms.y).toBeGreaterThan(layout.gridBottom)
