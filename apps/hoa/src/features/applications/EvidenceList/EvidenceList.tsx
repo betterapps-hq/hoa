@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { FileTextIcon, ImageIcon } from "lucide-react"
 import type { Evidence } from "@/schema/types"
 import { evidenceFile, type ReviewContext } from "../reviewContext"
 
@@ -24,7 +25,7 @@ function Thumbnail({
   )
 }
 
-/** Where the review read something: the file, its page, the words quoted, and the photo when it's one. */
+/** Where the review read something: the words quoted, then the file and its page, and the photo when it's one. */
 export function EvidenceList({ evidence, context }: EvidenceListProps) {
   if (evidence.length === 0) {
     return null
@@ -35,20 +36,26 @@ export function EvidenceList({ evidence, context }: EvidenceListProps) {
         const file = evidenceFile(context, item.fileId)
         const name = file?.fileName ?? item.fileId
         const isPhoto = file?.mediaType.startsWith("image/") === true
+        const Icon = isPhoto ? ImageIcon : FileTextIcon
         return (
           // Evidence has no id; a fact's list never reorders.
           <li key={index} className="flex gap-3 text-sm">
             {isPhoto && file && context.loadImage ? (
               <Thumbnail fileId={file.id} name={name} loadImage={context.loadImage} />
             ) : null}
-            <div className="flex min-w-0 flex-col gap-1">
-              <span className="break-words text-muted-foreground">
-                {name}
-                {item.page !== null && !isPhoto ? `, page ${item.page}` : ""}
-              </span>
+            <div className="flex min-w-0 flex-col gap-1.5">
               {item.quote ? (
-                <blockquote className="border-l-2 pl-3 break-words italic">“{item.quote}”</blockquote>
+                <blockquote className="rounded-md border-l-2 bg-muted/50 px-3 py-1.5 break-words text-muted-foreground italic">
+                  “{item.quote}”
+                </blockquote>
               ) : null}
+              <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                <Icon className="size-3.5 shrink-0" aria-hidden />
+                <span className="truncate" title={name}>
+                  {name}
+                </span>
+                {item.page !== null && !isPhoto ? <span className="-ml-1.5 shrink-0">, page {item.page}</span> : null}
+              </span>
             </div>
           </li>
         )

@@ -7,9 +7,10 @@ import { cn } from "@/lib/utils"
 import type { ActionItem } from "@/review/reviewModel"
 import { renderRuleMarkers } from "@/review/ruleMarkers"
 import type { Finding } from "@/schema/types"
+import { MarkedText } from "../MarkedText/MarkedText"
 import { shownItems, stepGroupId, stepOutcomes, type StepGroup } from "../NextSteps/NextSteps.utils"
 import { outcomeIcons } from "../OutcomeChip/OutcomeChip"
-import { actionItemId, entityLabel, itemFindings, type ReviewContext } from "../reviewContext"
+import { actionItemId, entityLabel, itemFindings, ruleName, type ReviewContext } from "../reviewContext"
 import { ReviewRuleReference } from "../ReviewRuleReference/ReviewRuleReference"
 
 export type ActionItemListProps = {
@@ -74,7 +75,7 @@ export function ActionItemList({ group, context, isExpanded, onExpandedChange, o
   const headingId = useId()
   const shown = shownItems(group, isExpanded)
   const collapsible = group.items.length - shownItems(group, false).length
-  const title = (ruleKey: string) => context.rules.get(ruleKey)?.title ?? ruleKey
+  const title = (ruleKey: string) => ruleName(context.rules, ruleKey)
   const { icon: Icon, className } = outcomeIcons[stepOutcomes[group.key]]
   return (
     <section
@@ -103,16 +104,21 @@ export function ActionItemList({ group, context, isExpanded, onExpandedChange, o
           {shown.map((item) => (
             <li key={item.id}>
               <Collapsible>
-                <CollapsibleTrigger
-                  id={actionItemId(item)}
-                  className="group/step flex w-full items-start justify-between gap-4 px-4 py-3 text-left outline-none hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
-                >
-                  <span className="text-pretty">{renderRuleMarkers(item.text, title)}</span>
+                {/* The whole line opens the item; the rules it names stay links of their own above it. */}
+                <div className="group/step relative flex items-start justify-between gap-4 px-4 py-3 hover:bg-muted/40">
+                  <CollapsibleTrigger
+                    id={actionItemId(item)}
+                    aria-label={renderRuleMarkers(item.text, title)}
+                    className="absolute inset-0 outline-none focus-visible:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
+                  />
+                  <span className="pointer-events-none relative text-pretty [&_a]:pointer-events-auto">
+                    <MarkedText text={item.text} context={context} />
+                  </span>
                   <ChevronDownIcon
                     aria-hidden
-                    className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-aria-expanded/step:rotate-180"
+                    className="pointer-events-none relative mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-has-[[data-panel-open]]/step:rotate-180"
                   />
-                </CollapsibleTrigger>
+                </div>
                 <CollapsibleContent className="px-4 pb-3">
                   <ItemDetail group={group} item={item} context={context} onOpenFinding={onOpenFinding} />
                 </CollapsibleContent>

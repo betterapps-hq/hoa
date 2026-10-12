@@ -1,3 +1,4 @@
+import { useUncontrolled } from "@mantine/hooks"
 import { ListChecksIcon, type LucideIcon } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import type { Application } from "@/applications/application"
@@ -35,6 +36,9 @@ export type ReviewReportProps = {
   decision: Application["decision"]
   /** More tabs from the page, after the review's own. */
   tabs?: readonly ReportTab[]
+  /** The open tab, for a page that lays itself out around it; "overview" first otherwise. */
+  tab?: string
+  onTabChange?: (tab: string) => void
 }
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
@@ -111,9 +115,9 @@ function Counts({ counts }: { counts: readonly Count[] }) {
  * then tabs: the next steps first, in the order that changes the outcome, then how each rule was checked, what the
  * review read, its written summary, and whatever the page adds.
  */
-export function ReviewReport({ context, decision, tabs = [] }: ReviewReportProps) {
+export function ReviewReport({ context, decision, tabs = [], tab: openTab, onTabChange }: ReviewReportProps) {
   const { review, audience } = context
-  const [tab, setTab] = useState("overview")
+  const [tab, setTab] = useUncontrolled({ value: openTab, defaultValue: "overview", onChange: onTabChange })
   const [selected, setSelected] = useState<Finding | null>(null)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
   const [expanded, setExpanded] = useState<ReadonlySet<StepKey>>(new Set())

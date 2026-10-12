@@ -3,6 +3,7 @@ import { workType } from "@/review/subjects"
 import type * as T from "@/schema/types"
 import { attentionOutcomes, outcomeOrder } from "../applicationDisplay"
 import type { ReportRule } from "../applicationView"
+import { ruleName } from "../reviewContext"
 import { rootEntityIds } from "../reviewContext"
 
 // The rule matrix (application-review.md, UX, Rule matrix): every rule the review found something for against every
@@ -52,7 +53,7 @@ export function reviewMatrix(
   const byRule = Map.groupBy(review.findings, (finding) => finding.ruleKey)
   const rows = [...byRule].map(([ruleKey, findings]): MatrixRow => ({
     ruleKey,
-    title: rules.get(ruleKey)?.title ?? ruleKey,
+    title: ruleName(rules, ruleKey),
     cells: columns.map((column) => ({
       entity: column.id,
       finding: findings.find((finding) => finding.entity === column.id) ?? null

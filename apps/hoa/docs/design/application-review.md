@@ -405,7 +405,9 @@ written summary, the committee's view), it's a `RuleReference`: the rule's title
 ("Guidelines 5.4.2(i)"). Activating it opens `DocumentViewer` at the cited provision with the operative words
 highlighted (or the region on a plat); hovering or focusing it shows the provision's text. A rule with several
 citations lists the main one and "2 more". The text shown is always the stored provision, so it can't drift from the
-document.
+document. In running text (an action item, the written summary), a rule marker is the rule's title itself as the link
+to its main citation. A reader never sees a key: a rule or term the page has no record of reads as its key in words
+("Photos (Guidelines 3.4.2)" for `guidelines:3.4.2#photos`, "review fee" for `architectural-application.review-fee`).
 
 - **Start an application:** the project type picker lists the organization's active project types
   ([Project types](#project-types)) and "Something else". Choosing one renders its form (its questions, repeatable
@@ -426,14 +428,14 @@ document.
     committee (each jumps to its group), and the rules met out of those that apply to the project (it opens the
     matrix). Once the committee decides, its decision and note take the recommendation's place, with the
     recommendation in the muted line.
-  - **Tabs:** Overview, Rules (the rule matrix), Facts (what the review read from the packet: the facts per entity,
-    with evidence and confidence, so a misread can be corrected before submitting), Summary (the review's written
-    summary, rule markers as `RuleReference`s), Files and History (every review, the latest marked), each with its
-    count.
+  - **Tabs:** Overview, Rules (the rule matrix, given the page's whole width: the side column steps aside, keeping a
+    decision being written), Facts (what the review read from the packet: a card per entity, each fact with its value,
+    confidence, and the words it was read from, so a misread can be corrected before submitting), Summary (the review's
+    written summary), Files and History (every review, the latest marked), each with its count.
   - **Overview:** the action items as a card per group, ordered by what changes the outcome: what to provide, what to
     change (as "possible conditions" when the review recommends conditions), what the committee decides itself; a
     denial puts the changes first. A group's header has its outcome's icon and its count. Each item is one line in the
-    writer's words (rule markers as plain titles); opening it shows its rule as a `RuleReference` and the parts it
+    writer's words, the rules it marks as links; opening the line shows its rule as a `RuleReference` and the parts it
     covers, each opening the finding sheet. A group shows its first five items and "Show N more"; suggestions, which
     don't affect the decision, start hidden. With nothing to do, the page says so.
   - **One primary action,** in the side column: the homeowner adds files while information is missing (the review runs

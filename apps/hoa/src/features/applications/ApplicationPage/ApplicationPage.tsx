@@ -58,7 +58,7 @@ import {
 } from "../applicationDisplay"
 import { applicationFileUrl } from "../applicationFile"
 import type { ApplicationView } from "../applications.functions"
-import { createReviewContext, type ReviewAudience } from "../reviewContext"
+import { createReviewContext, ruleName, type ReviewAudience } from "../reviewContext"
 import { ReviewReport, type ReportTab } from "../ReviewReport/ReviewReport"
 import { verdictTones } from "../ReviewVerdict/ReviewVerdict"
 import { decisionTones, suggestedDecisions } from "../ReviewVerdict/ReviewVerdict.utils"
@@ -466,8 +466,11 @@ export function ApplicationPage({
   const { application, review, job } = view
   const [isBusy, setIsBusy] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
+  const [tab, setTab] = useState("overview")
   const fileCount = packetFiles(view.files).length
   const isReviewing = application.status === "reviewing"
+  // The rule matrix wants the page's whole width, so the side column steps aside while it's open.
+  const isWide = tab === "rules" && review !== null && !isReviewing
   const canSubmit =
     view.isOwner &&
     review !== null &&
@@ -549,7 +552,7 @@ export function ApplicationPage({
     audience === "committee" && view.canDecide && review ? (
       <DecisionForm
         review={review}
-        ruleTitle={(ruleKey) => view.rules.find((rule) => rule.key === ruleKey)?.title ?? ruleKey}
+        ruleTitle={(ruleKey) => ruleName(new Map(view.rules.map((rule) => [rule.key, rule])), ruleKey)}
         onDecide={(outcome, note) =>
           busy(() => actions.decide(outcome, note), "The decision wasn't saved.").then(() => undefined)
         }
@@ -623,6 +626,8 @@ export function ApplicationPage({
           })}
           decision={application.decision}
           tabs={tabs}
+          tab={tab}
+          onTabChange={setTab}
         />
       )
     }
@@ -655,12 +660,18 @@ export function ApplicationPage({
         </Button>
         <ApplicationHeader view={view} />
       </div>
-      <div className="grid items-start gap-6 @4xl/main:grid-cols-[minmax(0,1fr)_19rem] @6xl/main:grid-cols-[minmax(0,1fr)_21rem]">
+      <div
+        className={cn(
+          "grid items-start gap-6",
+          !isWide && "@4xl/main:grid-cols-[minmax(0,1fr)_19rem] @6xl/main:grid-cols-[minmax(0,1fr)_21rem]"
+        )}
+      >
         <div className="flex min-w-0 flex-col gap-6">
           {failed}
           {body()}
         </div>
-        <aside aria-label="About this application" className="flex min-w-0 flex-col gap-4">
+        {/* Hidden, not removed, beside a wide tab, so a decision being written keeps its words. */}
+        <aside aria-label="About this application" hidden={isWide} className="flex min-w-0 flex-col gap-4">
           {action}
           <ApplicationDetails view={view} />
         </aside>

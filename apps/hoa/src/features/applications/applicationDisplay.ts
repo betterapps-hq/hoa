@@ -3,7 +3,7 @@ import type { ApplicationFile, ApplicationStatus, decisionOutcomes } from "@/app
 import type { Recommendation } from "@/review/reviewModel"
 import type { Fact, FactValue, Outcome } from "@/schema/types"
 import type { Vocabulary } from "@/schema/vocabulary"
-import { amountText } from "../rulebook/rulebookRecords"
+import { amountText, documentName, readableLabel } from "../rulebook/rulebookRecords"
 
 // Labels, groupings and value formats for the application pages.
 
@@ -100,6 +100,24 @@ export function packetFiles(files: readonly ApplicationFile[]) {
 
 /** "Fence run" for `fence-run`: a term's label as a heading starts. */
 export const sentenceCase = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+/**
+ * A term's key in words, for a term the page has no record of: "review fee" for
+ * `architectural-application.review-fee`, its own part without the thing it belongs to.
+ */
+export const termKeyLabel = (termKey: string) => (termKey.split(".").at(-1) ?? termKey).replaceAll("-", " ")
+
+/**
+ * A rule's key in words, for a rule the page has no record of: "Photos (Guidelines 3.4.2)" for
+ * `guidelines:3.4.2#photos`, so a reader never sees a key.
+ */
+export function ruleKeyLabel(ruleKey: string) {
+  const [, document, provision, name] = /^([^:#]+):([^#]+)#(.+)$/.exec(ruleKey) ?? []
+  if (!document || !provision || !name) {
+    return ruleKey
+  }
+  return `${sentenceCase(name.replaceAll("-", " "))} (${documentName(document)} ${readableLabel(provision)})`
+}
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" })
 const dateTimeFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" })

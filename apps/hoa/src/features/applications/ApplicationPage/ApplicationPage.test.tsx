@@ -139,6 +139,15 @@ describe("ApplicationPage", () => {
     }
   })
 
+  it("gives the rule matrix the page's width, keeping the decision being written", async () => {
+    const { user } = setup(committeeView, "committee")
+    await user.type(screen.getByLabelText("Note to the homeowner"), "Use a listed color.")
+    await user.click(screen.getByRole("tab", { name: /^Rules \d+$/ }))
+    expect(screen.queryByRole("complementary", { name: "About this application" })).not.toBeInTheDocument()
+    await user.click(screen.getByRole("tab", { name: "Overview" }))
+    expect(screen.getByLabelText("Note to the homeowner")).toHaveValue("Use a listed color.")
+  })
+
   it("goes back to the applications", async () => {
     const { props, user } = setup()
     await user.click(screen.getByRole("button", { name: "Applications" }))

@@ -114,6 +114,25 @@ describe("ReviewReport", () => {
     expect(within(sheet).getByText("Right side run")).toBeInTheDocument()
   })
 
+  it("names each rule a line marks, linked to its citation, and opens the line from the rest of it", async () => {
+    const fence = fenceReview()
+    const [first] = fence.review.changes
+    const title = fence.rules.find((rule) => rule.key === first?.ruleKey)?.title ?? ""
+    const { user } = setup({
+      change: (review) => ({
+        ...review,
+        changes: review.changes.map((item, index) =>
+          index === 0 ? { ...item, text: `Choose a listed color under {{rule:${item.ruleKey}}}.` } : item
+        )
+      })
+    })
+    const changes = group("Change in your plans")
+    expect(changes.getByRole("link", { name: title })).toBeInTheDocument()
+    const line = changes.getByRole("button", { name: `Choose a listed color under ${title}.` })
+    await user.click(line)
+    expect(line).toHaveAttribute("aria-expanded", "true")
+  })
+
   it("hides suggestions until asked, since they don't affect the recommendation", async () => {
     const { user } = setup({
       change: (review) => ({ ...review, suggestions: items(2, "Suggestion") })
@@ -177,13 +196,13 @@ describe("ReviewReport", () => {
     await user.click(screen.getByRole("tab", { name: /^Rules \d+$/ }))
     expect(screen.getByRole("table")).toBeInTheDocument()
     await user.click(screen.getByRole("tab", { name: /^Facts \d+$/ }))
-    await user.click(screen.getByRole("button", { name: /^Left side run(?!:)/ }))
-    expect(screen.getByText("Written as “River Birtch”")).toBeInTheDocument()
+    const run = within(screen.getByRole("region", { name: "Left side run" }))
+    expect(run.getAllByText(/River Birtch/).length).toBeGreaterThan(0)
     await user.click(screen.getByRole("tab", { name: "Files 2" }))
     expect(screen.getByText("The packet")).toBeInTheDocument()
     await user.click(screen.getByRole("tab", { name: "Summary" }))
     const feedback = screen.getByText(/Choose a listed color under/)
-    expect(within(feedback).getByRole("link", { name: "Guidelines 5.4.2(i)" })).toBeInTheDocument()
+    expect(within(feedback).getByRole("link", { name: colors })).toBeInTheDocument()
   })
 
   it("links from a finding in the matrix back to its next step, showing it if it was hidden", async () => {

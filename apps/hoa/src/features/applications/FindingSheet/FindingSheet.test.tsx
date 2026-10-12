@@ -130,7 +130,7 @@ describe("FindingSheet", () => {
     const { sheet } = setup(signatures, "request")
     const documents = within(sheet.getByRole("region", { name: "Documents" }))
     expect(documents.getByText(/in the packet, signed by The owner on the form and the appendix/)).toBeInTheDocument()
-    expect(documents.getByText("application-form.pdf, page 1")).toBeInTheDocument()
+    expect(documents.getByTitle("application-form.pdf").parentElement).toHaveTextContent("application-form.pdf, page 1")
   })
 
   it("shows each statement a document must make as confirmed, contradicted or not found, with its quote", () => {

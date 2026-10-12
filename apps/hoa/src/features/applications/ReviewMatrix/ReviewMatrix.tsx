@@ -11,7 +11,7 @@ import type { Finding, Outcome } from "@/schema/types"
 import { cellLabels, findingLabels, outcomeOrder } from "../applicationDisplay"
 import { EntityHeader } from "../EntityHeader/EntityHeader"
 import { OutcomeChip } from "../OutcomeChip/OutcomeChip"
-import { entityLabel, type ReviewContext } from "../reviewContext"
+import { entityLabel, ruleName, type ReviewContext } from "../reviewContext"
 import { ReviewRuleReference } from "../ReviewRuleReference/ReviewRuleReference"
 import {
   entityCards,
@@ -40,7 +40,7 @@ type CellButtonProps = {
 
 /** A finding's chip; activating it opens the finding. */
 function CellButton({ finding, context, onOpen }: CellButtonProps) {
-  const title = context.rules.get(finding.ruleKey)?.title ?? finding.ruleKey
+  const title = ruleName(context.rules, finding.ruleKey)
   return (
     <Button
       variant="ghost"
@@ -139,9 +139,7 @@ function MatrixCards({ model, groups, context, onOpen }: LayoutProps) {
                     ruleKey={finding.ruleKey}
                     context={context}
                     title={
-                      <span className="font-medium">
-                        {sentenceCase(context.rules.get(finding.ruleKey)?.title ?? finding.ruleKey)}
-                      </span>
+                      <span className="font-medium">{sentenceCase(ruleName(context.rules, finding.ruleKey))}</span>
                     }
                   />
                   <CellButton finding={finding} context={context} onOpen={onOpen} />
