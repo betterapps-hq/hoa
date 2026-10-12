@@ -12,6 +12,7 @@ import {
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import { CitationsOpenInSheet } from "@/features/documents/ReaderSheet/ReaderSheet"
 import type { JobFailure } from "@/jobs/job"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import { coverageOf } from "@/rulebook/coverage"
@@ -97,139 +98,142 @@ export function DraftReview({
   })()
 
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-3">
-        {onBack ? (
-          <Button variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" onClick={onBack}>
-            <ArrowLeftIcon />
-            Rules in force{publishedVersion ? ` (version ${publishedVersion})` : ""}
-          </Button>
-        ) : null}
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h2 className="text-xl font-semibold">{changes ? "Review the new draft" : "Review the rulebook"}</h2>
-            <p className="text-muted-foreground">{headline}</p>
-          </div>
-          <AlertDialog>
-            <AlertDialogTrigger render={<Button variant="outline" disabled={isBusy} />}>
-              Discard draft
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Discard this draft?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {decided > 0
-                    ? `The ${countOf(decided, "review decision", "review decisions")} made on it (approvals, rejections, answers and edits) are lost.`
-                    : "Nothing has been reviewed on it yet."}{" "}
-                  {publishedVersion
-                    ? `Version ${publishedVersion} stays in force.`
-                    : "Nothing is published, so there will be no rulebook until you process your documents again."}{" "}
-                  Uploading a document starts a new draft.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Keep reviewing</AlertDialogCancel>
-                <AlertDialogAction
-                  variant="destructive"
-                  onClick={() => void run(onDiscard, "The draft wasn't discarded.")}
-                >
-                  Discard draft
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-        {isRebuilding ? (
-          <p className="text-sm text-muted-foreground">
-            Your latest documents are being processed into a newer draft. It replaces this one and keeps your decisions
-            on everything that didn&rsquo;t change.
-          </p>
-        ) : null}
-        {skipped.length > 0 ? (
-          <SkippedNotice
-            parts={skipped}
-            isBusy={isBusy}
-            onRetry={isRebuilding ? null : () => void run(onRetry, "Processing didn’t start.")}
-          />
-        ) : null}
-      </header>
-
-      <section aria-labelledby="draft-next" className="flex flex-col gap-4 rounded-lg border p-5">
-        {next ? (
-          <>
-            <p id="draft-next" className="text-lg leading-snug">
-              {next.sentence} before you can publish.
-            </p>
-            <Button className="w-fit" onClick={() => go(next)}>
-              {next.action}
+    // Reviewing is work in progress: a citation opens its document over the page, not in place of it.
+    <CitationsOpenInSheet>
+      <div className="flex flex-col gap-8">
+        <header className="flex flex-col gap-3">
+          {onBack ? (
+            <Button variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" onClick={onBack}>
+              <ArrowLeftIcon />
+              Rules in force{publishedVersion ? ` (version ${publishedVersion})` : ""}
             </Button>
-            {rest.length > 0 ? (
-              <div className="flex flex-col gap-1">
-                <p className="text-sm text-muted-foreground">Then:</p>
-                <ul className="flex flex-col gap-0.5">
-                  {rest.map((todo) => (
-                    <li key={todo.id}>
-                      <Button variant="link" className="h-auto p-0 text-link" onClick={() => go(todo)}>
-                        {todo.label}
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-          </>
-        ) : null}
-        {!next && blockers.length > 0 ? (
-          <>
-            <p id="draft-next" className="text-lg leading-snug">
-              Everything is reviewed, but the draft can&rsquo;t be published yet.
-            </p>
-            <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
-              {blockers.map((blocker) => (
-                <li key={blocker}>{blocker}</li>
-              ))}
-            </ul>
-          </>
-        ) : null}
-        {!next && blockers.length === 0 ? (
-          <>
-            <p id="draft-next" className="text-lg leading-snug">
-              Everything is reviewed. Publishing makes this the rulebook applications are checked against.
-            </p>
+          ) : null}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-xl font-semibold">{changes ? "Review the new draft" : "Review the rulebook"}</h2>
+              <p className="text-muted-foreground">{headline}</p>
+            </div>
             <AlertDialog>
-              <AlertDialogTrigger render={<Button className="w-fit" disabled={isBusy} />}>Publish</AlertDialogTrigger>
+              <AlertDialogTrigger render={<Button variant="outline" disabled={isBusy} />}>
+                Discard draft
+              </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Publish this rulebook?</AlertDialogTitle>
+                  <AlertDialogTitle>Discard this draft?</AlertDialogTitle>
                   <AlertDialogDescription>
+                    {decided > 0
+                      ? `The ${countOf(decided, "review decision", "review decisions")} made on it (approvals, rejections, answers and edits) are lost.`
+                      : "Nothing has been reviewed on it yet."}{" "}
                     {publishedVersion
-                      ? `It replaces version ${publishedVersion}. New reviews of applications use it; past reviews keep the version they used.`
-                      : "Reviews of applications use it from now on."}
+                      ? `Version ${publishedVersion} stays in force.`
+                      : "Nothing is published, so there will be no rulebook until you process your documents again."}{" "}
+                    Uploading a document starts a new draft.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Not yet</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => void run(onPublish, "Publishing failed.")}>
-                    Publish
+                  <AlertDialogCancel>Keep reviewing</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => void run(onDiscard, "The draft wasn't discarded.")}
+                  >
+                    Discard draft
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          </>
-        ) : null}
-      </section>
+          </div>
+          {isRebuilding ? (
+            <p className="text-sm text-muted-foreground">
+              Your latest documents are being processed into a newer draft. It replaces this one and keeps your
+              decisions on everything that didn&rsquo;t change.
+            </p>
+          ) : null}
+          {skipped.length > 0 ? (
+            <SkippedNotice
+              parts={skipped}
+              isBusy={isBusy}
+              onRetry={isRebuilding ? null : () => void run(onRetry, "Processing didn’t start.")}
+            />
+          ) : null}
+        </header>
 
-      <section id="draft-records" aria-label="The draft" className="scroll-mt-4">
-        <RulebookWorkspace
-          records={records}
-          source={source}
-          actions={actions}
-          audience="administrator"
-          changes={changes}
-          view={view}
-          onViewChange={setView}
-        />
-      </section>
-    </div>
+        <section aria-labelledby="draft-next" className="flex flex-col gap-4 rounded-lg border p-5">
+          {next ? (
+            <>
+              <p id="draft-next" className="text-lg leading-snug">
+                {next.sentence} before you can publish.
+              </p>
+              <Button className="w-fit" onClick={() => go(next)}>
+                {next.action}
+              </Button>
+              {rest.length > 0 ? (
+                <div className="flex flex-col gap-1">
+                  <p className="text-sm text-muted-foreground">Then:</p>
+                  <ul className="flex flex-col gap-0.5">
+                    {rest.map((todo) => (
+                      <li key={todo.id}>
+                        <Button variant="link" className="h-auto p-0 text-link" onClick={() => go(todo)}>
+                          {todo.label}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+          {!next && blockers.length > 0 ? (
+            <>
+              <p id="draft-next" className="text-lg leading-snug">
+                Everything is reviewed, but the draft can&rsquo;t be published yet.
+              </p>
+              <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
+                {blockers.map((blocker) => (
+                  <li key={blocker}>{blocker}</li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {!next && blockers.length === 0 ? (
+            <>
+              <p id="draft-next" className="text-lg leading-snug">
+                Everything is reviewed. Publishing makes this the rulebook applications are checked against.
+              </p>
+              <AlertDialog>
+                <AlertDialogTrigger render={<Button className="w-fit" disabled={isBusy} />}>Publish</AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Publish this rulebook?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {publishedVersion
+                        ? `It replaces version ${publishedVersion}. New reviews of applications use it; past reviews keep the version they used.`
+                        : "Reviews of applications use it from now on."}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Not yet</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => void run(onPublish, "Publishing failed.")}>
+                      Publish
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          ) : null}
+        </section>
+
+        <section id="draft-records" aria-label="The draft" className="scroll-mt-4">
+          <RulebookWorkspace
+            records={records}
+            source={source}
+            actions={actions}
+            audience="administrator"
+            changes={changes}
+            view={view}
+            onViewChange={setView}
+          />
+        </section>
+      </div>
+    </CitationsOpenInSheet>
   )
 }

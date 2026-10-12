@@ -59,8 +59,8 @@ without a stored PDF (a referenced document, one read from a rules file) has tex
 A form or an editor with unsaved work wraps itself in `CitationsOpenInSheet`
 (`src/features/documents/ReaderSheet`). Every `ReaderLink` inside it then opens the reader in a large sheet over the
 page on a plain click, keeping the form mounted underneath, with "Open in new tab" in the sheet's header; a
-middle-click or a modifier still opens the route in a new tab. The homeowner's application form and the project type
-editor do this. The application form also keeps a draft of its answers (not its files) in session storage, restored
+middle-click or a modifier still opens the route in a new tab. The homeowner's application form, the project type
+editor and the draft rulebook's review do this. The application form also keeps a draft of its answers (not its files) in session storage, restored
 after a reload with a dismissible "We restored your answers".
 
 ## Embedding
