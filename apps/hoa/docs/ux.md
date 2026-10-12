@@ -38,6 +38,8 @@ feedback; follow them everywhere, and fix a violation when you touch the code ar
 - **A list with columns people compare or sort is a table** on the shared data table (TanStack Table); otherwise it's a
   list of rows or cards.
 - **Search uses the shared MiniSearch helper**, so every search box tolerates typos and ranks by relevance.
+- **An uploaded file is an attachment** (shadcn's `Attachment`, its media `FileTypeMedia`: the extension on a tile
+  tinted by kind), with its name, what became of it, and its actions (open, download, remove).
 
 ## Citations
 
@@ -45,6 +47,8 @@ feedback; follow them everywhere, and fix a violation when you touch the code ar
   rule's citation carries its other citations to step through.
 - Several citations open a designed picker (grouped by document, with label, heading and a snippet), never a plain text
   dropdown.
+- A rule named in running text is its title as the link to its citation; a term is its label. Never show a rule or term
+  key: one the page has no record of reads as its key in words.
 
 ## Checking
 

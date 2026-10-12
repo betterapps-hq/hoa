@@ -1,11 +1,11 @@
 import { ChevronDownIcon, FileTextIcon, UploadIcon } from "lucide-react"
 import { useState } from "react"
+import { FileTypeMedia } from "@/components/FileTypeMedia/FileTypeMedia"
 import {
   Attachment,
   AttachmentActions,
   AttachmentContent,
   AttachmentDescription,
-  AttachmentMedia,
   AttachmentTitle,
   AttachmentTrigger
 } from "@/components/ui/attachment"
@@ -169,9 +169,7 @@ function DocumentRow({
   ].filter((item) => item !== null)
   return (
     <Attachment className="w-full" state={documentState(document.status)}>
-      <AttachmentMedia>
-        <FileTextIcon aria-hidden />
-      </AttachmentMedia>
+      <FileTypeMedia fileName={document.fileName} mediaType={document.mediaType} />
       <AttachmentContent className="flex flex-col gap-0.5">
         <AttachmentTitle title={document.title}>{document.title}</AttachmentTitle>
         <AttachmentDescription>{details.join(", ")}</AttachmentDescription>
@@ -232,16 +230,24 @@ function EarlierVersions({ versions }: { versions: GoverningDocument[] }) {
         {versions.length === 1 ? "1 earlier version" : `${versions.length} earlier versions`}
       </Button>
       {isOpen ? (
-        <ul className="flex flex-col gap-1 border-l pl-3">
+        <ul className="flex flex-col gap-2">
           {versions.map((version) => (
-            <li key={version.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-              <span className="text-muted-foreground">
-                Version {version.version}
-                {dateText(version.uploadedAt) ? `, added ${dateText(version.uploadedAt)}` : ""}
-              </span>
-              {version.status === "uploading" ? null : (
-                <DocumentDownload documentId={version.id} title={`${version.title}, version ${version.version}`} />
-              )}
+            <li key={version.id}>
+              <Attachment size="sm" className="w-full" state={version.status === "uploading" ? "idle" : "done"}>
+                <FileTypeMedia fileName={version.fileName} mediaType={version.mediaType} />
+                <AttachmentContent>
+                  <AttachmentTitle>Version {version.version}</AttachmentTitle>
+                  <AttachmentDescription title={version.fileName}>
+                    {dateText(version.uploadedAt) ? `Added ${dateText(version.uploadedAt)}, ` : ""}
+                    {version.fileName}
+                  </AttachmentDescription>
+                </AttachmentContent>
+                {version.status === "uploading" ? null : (
+                  <AttachmentActions>
+                    <DocumentDownload documentId={version.id} title={`${version.title}, version ${version.version}`} />
+                  </AttachmentActions>
+                )}
+              </Attachment>
             </li>
           ))}
         </ul>

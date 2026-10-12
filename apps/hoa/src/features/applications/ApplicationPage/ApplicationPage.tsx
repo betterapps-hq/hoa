@@ -1,10 +1,11 @@
 import { useForm } from "@tanstack/react-form"
-import { ArrowLeftIcon, DownloadIcon, FileIcon, Trash2Icon } from "lucide-react"
+import { ArrowLeftIcon, DownloadIcon, Trash2Icon } from "lucide-react"
 import { useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 import { decisionOutcomes, type Application, type ApplicationStatus } from "@/applications/application"
 import { FileDropzone } from "@/components/FileDropzone/FileDropzone"
+import { FileTypeMedia } from "@/components/FileTypeMedia/FileTypeMedia"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -22,7 +23,6 @@ import {
   AttachmentActions,
   AttachmentContent,
   AttachmentDescription,
-  AttachmentMedia,
   AttachmentTitle,
   AttachmentTrigger
 } from "@/components/ui/attachment"
@@ -291,9 +291,7 @@ function PacketFileList({ view, isBusy, onRemove }: PacketFileListProps) {
         return (
           <li key={file.id}>
             <Attachment className="w-full" state={fileState(file.status, isReading)}>
-              <AttachmentMedia>
-                <FileIcon aria-hidden />
-              </AttachmentMedia>
+              <FileTypeMedia fileName={file.fileName} mediaType={file.mediaType} />
               <AttachmentContent>
                 <AttachmentTitle title={file.fileName}>{file.fileName}</AttachmentTitle>
                 {/* What the review made of it, whole: a reason it couldn't be read is worth reading. */}
