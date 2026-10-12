@@ -18,6 +18,13 @@ Build links with `citationHref(documentId, provisionKey?, cites?)` or `citedProv
 work) that moves within the app on a plain click. The server function behind the reader checks the document belongs to
 the reader's organization; both roles can read every governing document.
 
+When there's nothing to read, the reader says why instead of showing an empty document (`ReadingUnavailable`):
+
+- **Removed:** the upload was removed from the governing documents. The reader names it and the day it was removed.
+  A removed document whose provisions a rulebook still cites shows their text, with a line saying it was removed.
+- **Not one of the governing documents:** no upload or record has that id or key.
+- **Not ready:** it's still being read (with "Try again"), or it couldn't be read and needs uploading again.
+
 ## Text
 
 The whole document, in one continuous scroll, from its provisions: articles and sections as headings with their

@@ -72,6 +72,16 @@ export async function getGoverningDocument(db: Database, hoaId: string, id: stri
   return row ? toDocument(row) : null
 }
 
+/** When an upload was removed from the governing documents, with its title; null for one in use, or no upload. */
+export async function getUploadRemoval(db: Database, hoaId: string, id: string) {
+  const row = await db
+    .select({ title: governingDocuments.title, removedAt: governingDocuments.removedAt })
+    .from(governingDocuments)
+    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id), hasFile))
+    .get()
+  return row?.removedAt ? { title: row.title, removedAt: row.removedAt } : null
+}
+
 export async function listGoverningDocuments(db: Database, hoaId: string) {
   const rows = await db
     .select()

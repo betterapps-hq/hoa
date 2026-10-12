@@ -113,6 +113,7 @@ const input = (overrides: Partial<ReadingInput> = {}): ReadingInput => ({
   pages: new Map([["upload-1", [page(1), page(2)]]]),
   fileTitles: new Map([["upload-1", "Rules (scan)"]]),
   newerVersionId: null,
+  removedAt: null,
   original: { hasWordBoxes: true },
   ...overrides
 })

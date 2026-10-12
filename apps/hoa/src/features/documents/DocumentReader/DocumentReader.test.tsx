@@ -3,12 +3,12 @@ import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import type { DocumentReading, ReadingBlock } from "@/documents/reading"
+import type { DocumentReading, ReadingBlock, ReadingUnavailable } from "@/documents/reading"
 import { getDocumentReading, locateProvisions } from "../documents.functions"
 import { DocumentReader } from "./DocumentReader"
 
 vi.mock("../documents.functions", () => ({
-  getDocumentReading: vi.fn<() => Promise<DocumentReading>>(),
+  getDocumentReading: vi.fn<() => Promise<DocumentReading | ReadingUnavailable>>(),
   locateProvisions: vi.fn<() => Promise<Record<string, unknown>>>(async () => ({})),
   getPageGeometry: vi.fn<() => Promise<unknown[]>>(async () => [])
 }))
@@ -48,6 +48,7 @@ const reading = (overrides: Partial<DocumentReading> = {}): DocumentReading => (
   pageCount: 2,
   isStructured: true,
   newerVersionId: null,
+  removedAt: null,
   original: null,
   files: [{ id: "upload-1", title: "Community Rules" }],
   pages: [
@@ -169,6 +170,42 @@ describe("DocumentReader", () => {
     expect(window.localStorage.getItem("document-reader-view")).toBe("original")
     await user.click(screen.getByRole("button", { name: "Text" }))
     expect(screen.getByText("Lawns are mowed weekly.")).toBeVisible()
+  })
+
+  it("says a document was removed, and when", async () => {
+    vi.mocked(getDocumentReading).mockResolvedValue({
+      unavailable: "removed",
+      title: "Residential design guidelines",
+      removedAt: "2026-10-11T12:00:00.000Z"
+    })
+    render(<DocumentReader documentId="upload-old" provision="guidelines:5.4.2" />, { wrapper })
+    expect(await screen.findByText("This document was removed")).toBeInTheDocument()
+    expect(
+      screen.getByText("Residential design guidelines was removed from your governing documents on Oct 11, 2026.")
+    ).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument()
+  })
+
+  it("says a document isn't one of the governing documents, or isn't read yet", async () => {
+    vi.mocked(getDocumentReading).mockResolvedValue({ unavailable: "missing" })
+    const { unmount } = render(<DocumentReader documentId="guidelines" />, { wrapper })
+    expect(await screen.findByText("This document isn’t available")).toBeInTheDocument()
+    expect(screen.getByText("It isn’t one of your governing documents.")).toBeInTheDocument()
+    unmount()
+    vi.mocked(getDocumentReading).mockResolvedValue({ unavailable: "not-ready", title: "Bylaws", hasFailed: false })
+    render(<DocumentReader documentId="upload-new" />, { wrapper })
+    expect(await screen.findByText("This document isn’t ready yet")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument()
+  })
+
+  it("says when a document it shows was removed, since rules still cite it", async () => {
+    vi.mocked(getDocumentReading).mockResolvedValue(reading({ removedAt: "2026-10-11T12:00:00.000Z" }))
+    render(<DocumentReader documentId="upload-1" />, { wrapper })
+    expect(
+      await screen.findByText(
+        "Removed from your governing documents on Oct 11, 2026. It shows here because rules cite it."
+      )
+    ).toBeInTheDocument()
   })
 
   it("explains a document it can't show", async () => {

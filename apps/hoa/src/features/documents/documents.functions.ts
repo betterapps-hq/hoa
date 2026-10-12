@@ -5,6 +5,7 @@ import { getDb } from "@/db/client.server"
 import {
   createGoverningDocument,
   getGoverningDocument,
+  getUploadRemoval,
   listDocumentRecords,
   listGoverningDocuments,
   listProvisions,
@@ -13,7 +14,7 @@ import {
 import { getJob, getLatestJob, insertJob, newJob } from "@/db/jobRepository"
 import { governingDocumentKinds, type GoverningDocument } from "@/documents/governingDocument"
 import { pageGeometry, toTuples, type WordTuple } from "@/documents/pageGeometry"
-import { documentReading, type DocumentReading } from "@/documents/reading"
+import { documentReading, type DocumentReading, type ReadingUnavailable } from "@/documents/reading"
 import { analyzeResultOf } from "@/ocr/layoutClient"
 import { layoutResultSchema } from "@/ocr/layoutResult"
 import { pageSchema } from "@/ocr/page"
@@ -214,14 +215,15 @@ const ocrRangeOf = (page: number) => {
  */
 export const getDocumentReading = createServerFn({ method: "GET" })
   .validator((data: unknown) => z.object({ documentId: z.string() }).parse(data))
-  .handler(async ({ data }): Promise<DocumentReading> => {
+  .handler(async ({ data }): Promise<DocumentReading | ReadingUnavailable> => {
     const context = await getRequestContext()
     const db = getDb()
     const hoaId = context.hoa.id
-    const [found, records, uploads] = await Promise.all([
+    const [found, records, uploads, removal] = await Promise.all([
       getGoverningDocument(db, hoaId, data.documentId),
       listDocumentRecords(db, hoaId),
-      listGoverningDocuments(db, hoaId)
+      listGoverningDocuments(db, hoaId),
+      getUploadRemoval(db, hoaId, data.documentId)
     ])
     const provisions = await listProvisions(
       db,
@@ -230,18 +232,25 @@ export const getDocumentReading = createServerFn({ method: "GET" })
     )
     const isReadable = (item: GoverningDocument | undefined | null): item is GoverningDocument =>
       item?.status === "ready" && Boolean(item.pageCount)
+    // A removed upload's pages aren't read any more: it shows only through the provisions that cite it, if any.
+    const opened = removal ? null : found
     // A document asked for by its key or its record (a citation without pages names it so) reads from the upload its
     // provisions were read from, when there is one.
-    const record = isReadable(found)
+    const record = isReadable(opened)
       ? undefined
       : records.find((item) => item.id === data.documentId || item.document.key === data.documentId)
     const own = record ? provisions.filter((provision) => provision.key.startsWith(`${record.document.key}:`)) : []
     const anchoredId = own.flatMap((provision) => provision.anchors)[0]?.fileId
-    const upload = isReadable(found) ? found : uploads.find((item) => item.id === anchoredId && isReadable(item))
+    const upload = isReadable(opened) ? opened : uploads.find((item) => item.id === anchoredId && isReadable(item))
     if (!isReadable(upload)) {
       // A document whose text came from a rules file has provisions but no pages.
       if (!record || own.length === 0) {
-        throw new Error("That document isn't ready to read.")
+        if (removal) {
+          return { unavailable: "removed", ...removal }
+        }
+        return found
+          ? { unavailable: "not-ready", title: found.title, hasFailed: found.status === "failed" }
+          : { unavailable: "missing" }
       }
       return documentReading({
         upload: { id: record.id, title: record.document.title, version: 1, effectiveDate: null, pageCount: 0 },
@@ -250,6 +259,7 @@ export const getDocumentReading = createServerFn({ method: "GET" })
         pages: new Map(),
         fileTitles: new Map(),
         newerVersionId: null,
+        removedAt: removal?.removedAt ?? null,
         original: null
       })
     }
@@ -315,6 +325,7 @@ export const getDocumentReading = createServerFn({ method: "GET" })
       pages,
       fileTitles: new Map(files.map((file) => [file.id, file.title])),
       newerVersionId: newer?.id ?? null,
+      removedAt: null,
       original
     })
   })

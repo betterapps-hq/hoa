@@ -55,6 +55,8 @@ export type DocumentReading = {
   isStructured: boolean
   /** A later version of the same document, when this one has been replaced. */
   newerVersionId: string | null
+  /** When the document was removed from the governing documents; its text still shows for the rules that cite it. */
+  removedAt: string | null
   blocks: ReadingBlock[]
   outline: OutlineEntry[]
   pages: ReadingPage[]
@@ -63,6 +65,18 @@ export type DocumentReading = {
   /** The uploaded PDF to show beside the text, and whether its words' positions were kept to mark passages on it. */
   original: { hasWordBoxes: boolean } | null
 }
+
+/**
+ * Why a document can't be read: it was removed from the governing documents, it isn't one of them, or it hasn't been
+ * read yet (or couldn't be).
+ */
+export type ReadingUnavailable =
+  | { unavailable: "removed"; title: string; removedAt: string }
+  | { unavailable: "missing" }
+  | { unavailable: "not-ready"; title: string; hasFailed: boolean }
+
+export const isUnavailable = (result: DocumentReading | ReadingUnavailable): result is ReadingUnavailable =>
+  "unavailable" in result
 
 const letters = (text: string) => text.toLowerCase().replaceAll(/[^\p{L}\p{N}]/gu, "")
 
@@ -180,6 +194,7 @@ export type ReadingInput = {
   fileTitles: ReadonlyMap<string, string>
   original: DocumentReading["original"]
   newerVersionId: string | null
+  removedAt: string | null
 }
 
 const pageBlock = (page: Page): ReadingBlock => ({
@@ -207,6 +222,7 @@ export function documentReading({
   pages,
   fileTitles,
   newerVersionId,
+  removedAt,
   original
 }: ReadingInput): DocumentReading {
   const [record] = records
@@ -220,6 +236,7 @@ export function documentReading({
     edition: record?.edition?.label ?? uploadEdition(upload),
     pageCount: upload.pageCount ?? pages.get(upload.id)?.length ?? 0,
     newerVersionId,
+    removedAt,
     original,
     files: [upload.id, ...[...pages.keys()].filter((id) => id !== upload.id)].map((id) => ({
       id,
