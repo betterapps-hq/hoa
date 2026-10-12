@@ -1,11 +1,14 @@
 import { ChevronDownIcon } from "lucide-react"
 import { useId } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { cn } from "@/lib/utils"
 import type { ActionItem } from "@/review/reviewModel"
 import { renderRuleMarkers } from "@/review/ruleMarkers"
 import type { Finding } from "@/schema/types"
-import { shownItems, type StepGroup } from "../NextSteps/NextSteps.utils"
+import { shownItems, stepGroupId, stepOutcomes, type StepGroup } from "../NextSteps/NextSteps.utils"
+import { outcomeIcons } from "../OutcomeChip/OutcomeChip"
 import { actionItemId, entityLabel, itemFindings, type ReviewContext } from "../reviewContext"
 import { ReviewRuleReference } from "../ReviewRuleReference/ReviewRuleReference"
 
@@ -25,17 +28,15 @@ type ItemDetailProps = Omit<ActionItemListProps, "isExpanded" | "onExpandedChang
 function ItemDetail({ group, item, context, onOpenFinding }: ItemDetailProps) {
   const findings = itemFindings(context.review, group.key, item)
   return (
-    <div className="flex flex-col gap-2 text-muted-foreground">
-      <div className="flex flex-wrap items-baseline gap-x-2">
-        <span>Rule</span>
-        <span className="text-foreground">
-          <ReviewRuleReference ruleKey={item.ruleKey} context={context} />
-        </span>
-      </div>
+    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 rounded-lg bg-muted/50 p-3">
+      <dt className="text-muted-foreground">Rule</dt>
+      <dd>
+        <ReviewRuleReference ruleKey={item.ruleKey} context={context} />
+      </dd>
       {findings.length > 0 ? (
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <span>What the review read for</span>
-          <span className="inline-flex flex-wrap gap-x-3">
+        <>
+          <dt className="text-muted-foreground">Read for</dt>
+          <dd className="flex flex-wrap gap-x-3 gap-y-1">
             {findings.map((finding) => (
               <Button
                 key={finding.entity}
@@ -47,10 +48,10 @@ function ItemDetail({ group, item, context, onOpenFinding }: ItemDetailProps) {
                 {entityLabel(context, finding.entity)}
               </Button>
             ))}
-          </span>
-        </div>
+          </dd>
+        </>
       ) : null}
-    </div>
+    </dl>
   )
 }
 
@@ -66,43 +67,53 @@ function moreLabel(group: StepGroup, hidden: number, isExpanded: boolean) {
 }
 
 /**
- * One group of next steps: each item in a line, with its rule and the evidence behind it on demand. Long groups show
- * the first few.
+ * One group of next steps as a card: what it asks, how many, then each item in a row, with its rule and the evidence
+ * behind it on demand. Long groups show the first few.
  */
 export function ActionItemList({ group, context, isExpanded, onExpandedChange, onOpenFinding }: ActionItemListProps) {
   const headingId = useId()
   const shown = shownItems(group, isExpanded)
   const collapsible = group.items.length - shownItems(group, false).length
   const title = (ruleKey: string) => context.rules.get(ruleKey)?.title ?? ruleKey
+  const { icon: Icon, className } = outcomeIcons[stepOutcomes[group.key]]
   return (
-    <section aria-labelledby={headingId} className="flex flex-col">
-      <div className="flex items-baseline gap-2">
-        <h3 id={headingId} className="text-sm font-medium">
-          {group.title}
-        </h3>
-        <span className="text-sm text-muted-foreground" aria-hidden>
-          {group.items.length}
+    <section
+      id={stepGroupId(group.key)}
+      aria-labelledby={headingId}
+      className="scroll-mt-4 overflow-hidden rounded-xl border bg-card text-sm shadow-xs"
+    >
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
+          <Icon className={cn("size-4", className)} aria-hidden />
         </span>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <h3 id={headingId} className="font-medium">
+            {group.title}
+          </h3>
+          {group.key === "suggestions" ? (
+            <p className="text-xs text-muted-foreground">These don’t affect the recommendation.</p>
+          ) : null}
+        </div>
+        <Badge variant="secondary" className="tabular-nums" aria-hidden>
+          {group.items.length}
+        </Badge>
       </div>
-      {group.key === "suggestions" ? (
-        <p className="text-sm text-muted-foreground">These don’t affect the recommendation.</p>
-      ) : null}
       {shown.length > 0 ? (
-        <ul className="flex flex-col">
+        <ul className="flex flex-col divide-y border-t">
           {shown.map((item) => (
-            <li key={item.id} className="border-b last:border-b-0">
+            <li key={item.id}>
               <Collapsible>
                 <CollapsibleTrigger
                   id={actionItemId(item)}
-                  className="group/step -mx-2 flex w-[calc(100%+1rem)] items-start justify-between gap-4 rounded-md px-2 py-3 text-left text-sm outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+                  className="group/step flex w-full items-start justify-between gap-4 px-4 py-3 text-left outline-none hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset"
                 >
-                  <span>{renderRuleMarkers(item.text, title)}</span>
+                  <span className="text-pretty">{renderRuleMarkers(item.text, title)}</span>
                   <ChevronDownIcon
                     aria-hidden
                     className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform group-aria-expanded/step:rotate-180"
                   />
                 </CollapsibleTrigger>
-                <CollapsibleContent className="pb-3 text-sm">
+                <CollapsibleContent className="px-4 pb-3">
                   <ItemDetail group={group} item={item} context={context} onOpenFinding={onOpenFinding} />
                 </CollapsibleContent>
               </Collapsible>
@@ -111,15 +122,17 @@ export function ActionItemList({ group, context, isExpanded, onExpandedChange, o
         </ul>
       ) : null}
       {collapsible > 0 ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mt-1 self-start text-muted-foreground"
-          aria-expanded={isExpanded}
-          onClick={() => onExpandedChange(!isExpanded)}
-        >
-          {moreLabel(group, collapsible, isExpanded)}
-        </Button>
+        <div className="border-t p-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-muted-foreground"
+            aria-expanded={isExpanded}
+            onClick={() => onExpandedChange(!isExpanded)}
+          >
+            {moreLabel(group, collapsible, isExpanded)}
+          </Button>
+        </div>
       ) : null}
     </section>
   )

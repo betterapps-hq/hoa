@@ -14,7 +14,7 @@ import type { Outcome } from "@/schema/types"
 import { cellLabels } from "../applicationDisplay"
 
 // Status colors from Tailwind's palette, as shadcn's dashboard block colors its status icons.
-const icons: Record<Exclude<Outcome, "not-applicable">, { icon: LucideIcon; className: string }> = {
+export const outcomeIcons: Record<Exclude<Outcome, "not-applicable">, { icon: LucideIcon; className: string }> = {
   met: { icon: CircleCheckIcon, className: "text-green-600 dark:text-green-400" },
   "not-met": { icon: CircleXIcon, className: "text-red-600 dark:text-red-400" },
   "missing-information": { icon: CircleHelpIcon, className: "text-amber-600 dark:text-amber-400" },
@@ -33,7 +33,7 @@ export function OutcomeChip({ outcome }: OutcomeChipProps) {
   if (outcome === "not-applicable") {
     return <span className="text-xs text-muted-foreground">{cellLabels[outcome]}</span>
   }
-  const { icon: Icon, className } = icons[outcome]
+  const { icon: Icon, className } = outcomeIcons[outcome]
   return (
     <Badge variant="outline">
       <Icon className={className} aria-hidden />

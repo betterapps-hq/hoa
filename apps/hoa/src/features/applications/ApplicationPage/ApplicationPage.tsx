@@ -1,9 +1,9 @@
 import { useForm } from "@tanstack/react-form"
-import { FileIcon, Trash2Icon } from "lucide-react"
+import { ArrowLeftIcon, DownloadIcon, FileIcon, Trash2Icon } from "lucide-react"
 import { useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
-import { decisionOutcomes } from "@/applications/application"
+import { decisionOutcomes, type Application, type ApplicationStatus } from "@/applications/application"
 import { FileDropzone } from "@/components/FileDropzone/FileDropzone"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
@@ -23,23 +23,29 @@ import {
   AttachmentContent,
   AttachmentDescription,
   AttachmentMedia,
-  AttachmentTitle
+  AttachmentTitle,
+  AttachmentTrigger
 } from "@/components/ui/attachment"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Button, buttonVariants } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
   FieldLegend,
-  FieldSet
+  FieldSet,
+  FieldTitle
 } from "@/components/ui/field"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
+import { cn } from "@/lib/utils"
 import { hasOpenRequests, type Review } from "@/review/reviewModel"
 import { renderRuleMarkers } from "@/review/ruleMarkers"
 import {
@@ -50,11 +56,12 @@ import {
   statusLabels,
   type DecisionOutcome
 } from "../applicationDisplay"
+import { applicationFileUrl } from "../applicationFile"
 import type { ApplicationView } from "../applications.functions"
 import { createReviewContext, type ReviewAudience } from "../reviewContext"
-import { ReviewDetail } from "../ReviewDetail/ReviewDetail"
-import { ReviewReport } from "../ReviewReport/ReviewReport"
-import { countOf, suggestedDecisions } from "../ReviewVerdict/ReviewVerdict.utils"
+import { ReviewReport, type ReportTab } from "../ReviewReport/ReviewReport"
+import { verdictTones } from "../ReviewVerdict/ReviewVerdict"
+import { decisionTones, suggestedDecisions } from "../ReviewVerdict/ReviewVerdict.utils"
 
 export type ApplicationActions = {
   upload: (files: File[]) => Promise<void>
@@ -71,6 +78,8 @@ export type ApplicationPageProps = {
   loadJob: (jobId: string) => Promise<Job | null>
   actions: ApplicationActions
   onChanged: () => void
+  /** Back to the list of applications. */
+  onBack: () => void
   /** The governing documents' pages, for showing a cited provision where it is. */
   source?: CitationSource
   /** A packet photo's URL, for thumbnails beside what the review read from it. */
@@ -121,7 +130,10 @@ const reviewNote = (review: Review, ruleTitle: (ruleKey: string) => string) =>
     .map((item) => `- ${renderRuleMarkers(item.text, ruleTitle)}`)
     .join("\n")
 
-/** The committee's decision: preselected to follow the review, with a note to the homeowner unless approved as is. */
+/**
+ * The committee's decision as a card beside the review: each outcome a choice, the one that follows the review
+ * marked and preselected, and a note to the homeowner unless approved as is.
+ */
 function DecisionForm({ review, ruleTitle, onDecide }: DecisionFormProps) {
   const headingId = useId()
   const suggested = suggestedDecisions[review.recommendation]
@@ -137,83 +149,91 @@ function DecisionForm({ review, ruleTitle, onDecide }: DecisionFormProps) {
     }
   })
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 id={headingId} className="text-lg font-semibold">
-          Your decision
-        </h2>
-        <p className="text-sm text-muted-foreground">The review is a recommendation; the committee decides.</p>
-      </div>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault()
-          void form.handleSubmit()
-        }}
-      >
-        <FieldGroup>
-          <form.Field name="outcome">
-            {(field) => (
-              <FieldSet data-invalid={field.state.meta.errors.length > 0}>
-                <FieldLegend variant="label">Decision</FieldLegend>
-                {suggested ? <FieldDescription>Preselected to follow the review.</FieldDescription> : null}
-                <RadioGroup
-                  value={field.state.value}
-                  onValueChange={(value) => {
-                    if (isDecisionOutcome(value)) {
-                      field.handleChange(value)
-                    }
-                  }}
-                >
-                  {decisionOutcomes.map((outcome) => (
-                    <Field key={outcome} orientation="horizontal">
-                      <RadioGroupItem id={`outcome-${outcome}`} value={outcome} />
-                      <FieldLabel htmlFor={`outcome-${outcome}`} className="font-normal">
-                        {outcomeLabels[outcome]}
-                      </FieldLabel>
-                    </Field>
-                  ))}
-                </RadioGroup>
-                <FieldError errors={field.state.meta.errors} />
-              </FieldSet>
-            )}
-          </form.Field>
-          <form.Field name="note">
-            {(field) => (
-              <Field data-invalid={field.state.meta.errors.length > 0}>
-                <FieldLabel htmlFor="decision-note">Note to the homeowner</FieldLabel>
-                <Textarea
-                  id="decision-note"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => field.handleChange(event.target.value)}
-                  aria-invalid={field.state.meta.errors.length > 0}
-                />
-                <FieldDescription>Required unless the application is approved as submitted.</FieldDescription>
-                <FieldError errors={field.state.meta.errors} />
-                {note && !field.state.value ? (
-                  <Button
-                    type="button"
-                    variant="link"
-                    className="h-auto self-start p-0 text-link"
-                    onClick={() => field.handleChange(note)}
-                  >
-                    Start from the review’s next steps
+    <section aria-labelledby={headingId}>
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <h3 id={headingId}>Your decision</h3>
+          </CardTitle>
+          <CardDescription>The review is a recommendation; the committee decides.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              void form.handleSubmit()
+            }}
+          >
+            <FieldGroup className="gap-5">
+              <form.Field name="outcome">
+                {(field) => (
+                  <FieldSet data-invalid={field.state.meta.errors.length > 0}>
+                    <FieldLegend className="sr-only">Decision</FieldLegend>
+                    <RadioGroup
+                      className="gap-2"
+                      value={field.state.value}
+                      onValueChange={(value) => {
+                        if (isDecisionOutcome(value)) {
+                          field.handleChange(value)
+                        }
+                      }}
+                    >
+                      {decisionOutcomes.map((outcome) => (
+                        <FieldLabel key={outcome} htmlFor={`outcome-${outcome}`}>
+                          <Field orientation="horizontal" className="items-center gap-3 py-2.5!">
+                            <RadioGroupItem id={`outcome-${outcome}`} value={outcome} />
+                            <FieldContent className="gap-0.5">
+                              <FieldTitle className="font-normal">{outcomeLabels[outcome]}</FieldTitle>
+                              {outcome === suggested ? (
+                                <FieldDescription className="text-xs">Recommended by the review</FieldDescription>
+                              ) : null}
+                            </FieldContent>
+                          </Field>
+                        </FieldLabel>
+                      ))}
+                    </RadioGroup>
+                    <FieldError errors={field.state.meta.errors} />
+                  </FieldSet>
+                )}
+              </form.Field>
+              <form.Field name="note">
+                {(field) => (
+                  <Field data-invalid={field.state.meta.errors.length > 0}>
+                    <FieldLabel htmlFor="decision-note">Note to the homeowner</FieldLabel>
+                    <Textarea
+                      id="decision-note"
+                      className="min-h-24"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      aria-invalid={field.state.meta.errors.length > 0}
+                    />
+                    <FieldDescription>Required unless approved as submitted.</FieldDescription>
+                    <FieldError errors={field.state.meta.errors} />
+                    {note && !field.state.value ? (
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="h-auto self-start p-0 text-link"
+                        onClick={() => field.handleChange(note)}
+                      >
+                        Start from the review’s next steps
+                      </Button>
+                    ) : null}
+                  </Field>
+                )}
+              </form.Field>
+              <form.Subscribe selector={(state) => state.isSubmitting}>
+                {(isSubmitting) => (
+                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    Record decision
                   </Button>
-                ) : null}
-              </Field>
-            )}
-          </form.Field>
-          <form.Subscribe selector={(state) => state.isSubmitting}>
-            {(isSubmitting) => (
-              <Field orientation="horizontal">
-                <Button type="submit" disabled={isSubmitting}>
-                  Record decision
-                </Button>
-              </Field>
-            )}
-          </form.Subscribe>
-        </FieldGroup>
-      </form>
+                )}
+              </form.Subscribe>
+            </FieldGroup>
+          </form>
+        </CardContent>
+      </Card>
     </section>
   )
 }
@@ -257,7 +277,7 @@ function fileState(status: ApplicationView["files"][number]["status"], isReading
   return isReading ? "processing" : "done"
 }
 
-/** The files the homeowner uploaded, each with what the review made of it. */
+/** The files the homeowner uploaded, each with what the review made of it; each opens, and saves. */
 function PacketFileList({ view, isBusy, onRemove }: PacketFileListProps) {
   const files = packetFiles(view.files)
   const isReviewing = view.application.status === "reviewing"
@@ -284,17 +304,41 @@ function PacketFileList({ view, isBusy, onRemove }: PacketFileListProps) {
                   {file.error ? `: ${file.error.message}` : ""}
                 </AttachmentDescription>
               </AttachmentContent>
-              {view.canEdit ? (
-                <AttachmentActions>
+              {file.status === "uploading" ? null : (
+                <AttachmentTrigger
+                  render={
+                    <a
+                      href={applicationFileUrl(view.application.id, file.id)}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Open ${file.fileName}`}
+                    />
+                  }
+                />
+              )}
+              <AttachmentActions>
+                {file.status === "uploading" ? null : (
+                  <a
+                    className={buttonVariants({ variant: "ghost", size: "icon-xs" })}
+                    href={applicationFileUrl(view.application.id, file.id, { download: true })}
+                    download
+                    aria-label={`Download ${file.fileName}`}
+                    title="Download"
+                  >
+                    <DownloadIcon aria-hidden />
+                  </a>
+                )}
+                {view.canEdit ? (
                   <AttachmentAction
                     aria-label={`Remove ${file.fileName}`}
+                    title="Remove"
                     disabled={isBusy}
                     onClick={() => onRemove(file.id)}
                   >
                     <Trash2Icon />
                   </AttachmentAction>
-                </AttachmentActions>
-              ) : null}
+                ) : null}
+              </AttachmentActions>
             </Attachment>
           </li>
         )
@@ -303,48 +347,111 @@ function PacketFileList({ view, isBusy, onRemove }: PacketFileListProps) {
   )
 }
 
+/** An application's status by color: waiting on the committee, on the homeowner, or decided. */
+const statusDots: Record<ApplicationStatus, string> = {
+  draft: "bg-muted-foreground/50",
+  reviewing: "bg-sky-500",
+  reviewed: "bg-muted-foreground/50",
+  submitted: "bg-blue-500",
+  "information-requested": "bg-amber-500",
+  decided: "bg-green-500"
+}
+
+/** Where the application stands, as a badge with a colored dot; a decision takes its own outcome's color. */
+function StatusBadge({ application }: { application: Application }) {
+  const dot = application.decision
+    ? verdictTones[decisionTones[application.decision.outcome]].dot
+    : statusDots[application.status]
+  return (
+    <Badge variant="outline" className="gap-1.5">
+      <span aria-hidden className={cn("size-1.5 rounded-full", dot)} />
+      {statusLabels[application.status]}
+    </Badge>
+  )
+}
+
 type HeaderProps = { view: ApplicationView }
 
-/** The application's name, where it stands, and the homeowner's own description, quietly. */
+/** The application's name and where it stands, then the homeowner's own description. */
 function ApplicationHeader({ view }: HeaderProps) {
   const { application } = view
-  const started = dateFormat.format(new Date(application.createdAt))
-  const submitted = application.submittedAt ? dateFormat.format(new Date(application.submittedAt)) : null
   return (
-    <header className="flex flex-col gap-1">
-      <h2 className="text-xl font-semibold">{view.projectTypeLabel ?? "Project"} application</h2>
-      <p className="text-sm text-muted-foreground">
-        {statusLabels[application.status]}. Started {started}
-        {submitted ? `, submitted ${submitted}` : ""}.
-      </p>
+    <header className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h2 className="text-2xl font-semibold tracking-tight">{view.projectTypeLabel ?? "Project"} application</h2>
+        <StatusBadge application={application} />
+      </div>
       {application.description ? (
-        <p className="max-w-prose text-sm whitespace-pre-line text-muted-foreground">{application.description}</p>
+        <p className="max-w-3xl text-pretty whitespace-pre-line text-muted-foreground">{application.description}</p>
       ) : null}
     </header>
   )
 }
 
+/** The application's facts beside the review: its kind, its dates and its files. */
+function ApplicationDetails({ view }: HeaderProps) {
+  const { application, review } = view
+  const date = (value: string) => dateFormat.format(new Date(value))
+  const rows = [
+    { term: "Project", value: view.projectTypeLabel ?? "Something else" },
+    { term: "Started", value: date(application.createdAt) }
+  ]
+  if (application.submittedAt) {
+    rows.push({ term: "Submitted", value: date(application.submittedAt) })
+  }
+  if (review) {
+    rows.push({ term: "Reviewed", value: `${date(review.createdAt)}${review.provisional ? ", provisional" : ""}` })
+  }
+  if (application.decision) {
+    rows.push({ term: "Decided", value: date(application.decision.decidedAt) })
+  }
+  rows.push({ term: "Files", value: String(packetFiles(view.files).length) })
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>
+          <h3>Details</h3>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="flex flex-col divide-y">
+          {rows.map(({ term, value }) => (
+            <div key={term} className="flex items-baseline justify-between gap-4 py-2 first:pt-0 last:pb-0">
+              <dt className="text-muted-foreground">{term}</dt>
+              <dd className="text-right tabular-nums">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </CardContent>
+    </Card>
+  )
+}
+
 type StageProps = { title: string; description: string; children?: ReactNode }
 
-/** The top of the page before there's a review to show. */
+/** The application before there's a review to show: what's happening, and the packet. */
 function Stage({ title, description, children }: StageProps) {
   const headingId = useId()
   return (
-    <section aria-labelledby={headingId} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h2 id={headingId} className="text-2xl font-semibold tracking-tight">
-          {title}
-        </h2>
-        <p className="max-w-prose text-muted-foreground">{description}</p>
-      </div>
-      {children}
+    <section aria-labelledby={headingId}>
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <h2 id={headingId} className="text-xl font-semibold tracking-tight">
+              {title}
+            </h2>
+          </CardTitle>
+          <CardDescription className="max-w-prose">{description}</CardDescription>
+        </CardHeader>
+        <CardContent className="gap-4">{children}</CardContent>
+      </Card>
     </section>
   )
 }
 
 /**
- * One application. With a review, its recommendation leads, then the next steps and the one thing to do now; the
- * packet, the rule matrix, the evidence and earlier reviews wait behind disclosure.
+ * One application, as a record page: its name and status, then the review (the recommendation with its counts, and
+ * tabs from the next steps to the packet's files) beside the one thing to do now and the application's details.
  */
 export function ApplicationPage({
   view,
@@ -352,6 +459,7 @@ export function ApplicationPage({
   loadJob,
   actions,
   onChanged,
+  onBack,
   source,
   loadImage
 }: ApplicationPageProps) {
@@ -400,32 +508,41 @@ export function ApplicationPage({
       </Alert>
     ) : null
 
+  const isOpen = review !== null && hasOpenRequests(review)
+  const isSubmitFirst = canSubmit && !isOpen
   const homeownerAction =
     review && view.canEdit ? (
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {canSubmit && !hasOpenRequests(review) ? (
-            <Button disabled={isBusy} onClick={() => void submit(false)}>
-              Submit to the committee
-            </Button>
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <h3>{isSubmitFirst ? "Ready to submit" : "Add what’s missing"}</h3>
+          </CardTitle>
+          <CardDescription>
+            {isOpen
+              ? "Add pages that show what’s missing, and the review runs again on the whole packet."
+              : "The committee sees this review with your packet, and decides."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isSubmitFirst ? (
+            <>
+              <Button className="w-full" disabled={isBusy} onClick={() => void submit(false)}>
+                Submit to the committee
+              </Button>
+              <AddFiles id="add-files" size="compact" disabled={isBusy} onAdd={addFiles} />
+            </>
           ) : (
-            <AddFiles id="add-files" disabled={isBusy} onAdd={addFiles} />
+            <>
+              <AddFiles id="add-files" disabled={isBusy} onAdd={addFiles} />
+              {canSubmit ? (
+                <Button variant="outline" className="w-full" disabled={isBusy} onClick={() => setIsConfirming(true)}>
+                  Submit anyway
+                </Button>
+              ) : null}
+            </>
           )}
-          {canSubmit && hasOpenRequests(review) ? (
-            <Button variant="outline" disabled={isBusy} onClick={() => setIsConfirming(true)}>
-              Submit anyway
-            </Button>
-          ) : null}
-        </div>
-        {canSubmit && !hasOpenRequests(review) ? (
-          <AddFiles id="add-files" size="compact" disabled={isBusy} onAdd={addFiles} />
-        ) : null}
-        <p className="max-w-prose text-sm text-muted-foreground">
-          {hasOpenRequests(review)
-            ? "Add pages that show what’s missing, and the review runs again on the whole packet."
-            : "The committee sees this review with your packet, and decides."}
-        </p>
-      </div>
+        </CardContent>
+      </Card>
     ) : null
 
   const action =
@@ -441,32 +558,43 @@ export function ApplicationPage({
       homeownerAction
     )
 
-  const packetDetail = (
-    <ReviewDetail value="packet" title="Packet" meta={countOf(fileCount, "file", "files")}>
-      <div className="flex flex-col gap-3">
-        <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
-        {view.canEdit ? (
-          <Button variant="outline" size="sm" className="self-start" disabled={isBusy} onClick={runReview}>
-            Run review again
-          </Button>
-        ) : null}
-      </div>
-    </ReviewDetail>
-  )
-
-  const historyDetail =
-    view.history.length > 1 ? (
-      <ReviewDetail value="history" title="Earlier reviews" meta={String(view.history.length - 1)}>
-        <ul className="flex flex-col gap-1">
-          {view.history.slice(1).map((item) => (
-            <li key={item.id} className="flex flex-wrap justify-between gap-x-4">
-              <span>{recommendationLabels[item.recommendation]}</span>
-              <span className="text-muted-foreground">{dateFormat.format(new Date(item.createdAt))}</span>
+  const tabs: ReportTab[] = [
+    {
+      value: "files",
+      label: "Files",
+      count: fileCount,
+      content: (
+        <div className="flex flex-col gap-3">
+          <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
+          {view.canEdit ? (
+            <Button variant="outline" size="sm" className="self-start" disabled={isBusy} onClick={runReview}>
+              Run review again
+            </Button>
+          ) : null}
+        </div>
+      )
+    }
+  ]
+  if (view.history.length > 1) {
+    tabs.push({
+      value: "history",
+      label: "History",
+      count: view.history.length,
+      content: (
+        <ul className="flex flex-col divide-y rounded-xl border">
+          {view.history.map((item, index) => (
+            <li key={item.id} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3">
+              <span className="flex items-center gap-2 font-medium">
+                {recommendationLabels[item.recommendation]}
+                {index === 0 ? <Badge variant="secondary">Latest</Badge> : null}
+              </span>
+              <span className="text-muted-foreground tabular-nums">{dateFormat.format(new Date(item.createdAt))}</span>
             </li>
           ))}
         </ul>
-      </ReviewDetail>
-    ) : null
+      )
+    })
+  }
 
   const body = () => {
     if (isReviewing) {
@@ -494,14 +622,7 @@ export function ApplicationPage({
             loadImage
           })}
           decision={application.decision}
-          isActing={audience === "homeowner" ? canSubmit : view.canDecide}
-          action={action}
-          details={
-            <>
-              {packetDetail}
-              {historyDetail}
-            </>
-          }
+          tabs={tabs}
         />
       )
     }
@@ -512,9 +633,9 @@ export function ApplicationPage({
       >
         <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
         {view.canEdit ? (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-3">
             {fileCount > 0 ? (
-              <Button disabled={isBusy} onClick={runReview}>
+              <Button className="self-start" disabled={isBusy} onClick={runReview}>
                 Run review
               </Button>
             ) : null}
@@ -526,10 +647,24 @@ export function ApplicationPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-10 px-4 lg:px-6">
-      <ApplicationHeader view={view} />
-      {failed}
-      {body()}
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 lg:px-6">
+      <div className="flex flex-col gap-3">
+        <Button variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" onClick={onBack}>
+          <ArrowLeftIcon />
+          Applications
+        </Button>
+        <ApplicationHeader view={view} />
+      </div>
+      <div className="grid items-start gap-6 @4xl/main:grid-cols-[minmax(0,1fr)_19rem] @6xl/main:grid-cols-[minmax(0,1fr)_21rem]">
+        <div className="flex min-w-0 flex-col gap-6">
+          {failed}
+          {body()}
+        </div>
+        <aside aria-label="About this application" className="flex min-w-0 flex-col gap-4">
+          {action}
+          <ApplicationDetails view={view} />
+        </aside>
+      </div>
       <AlertDialog open={isConfirming} onOpenChange={setIsConfirming}>
         <AlertDialogContent>
           <AlertDialogHeader>

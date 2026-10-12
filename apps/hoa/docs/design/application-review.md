@@ -411,31 +411,41 @@ document.
   ([Project types](#project-types)) and "Something else". Choosing one renders its form (its questions, repeatable
   groups for several items of a kind, and an upload per document the rules require, with what each must show) above
   the general file upload. The application stores the type's id and the answers.
-- **The application page** (`ApplicationPage`, `ReviewReport`) is quiet: it shows what's needed to act and keeps the
-  rest behind disclosure. The reader is the homeowner, or the committee when an administrator opens someone else's
-  application (the role switcher's role), and every heading and sentence is worded for that reader. From the top:
-  - **Header:** the application type, its status and dates in one muted line, and the homeowner's description.
-  - **Verdict:** the recommendation in large, plain words ("More information needed" for the homeowner, "Request more
-    information" for the committee) with one sentence of why, written by code from the action items ("Your packet
-    doesn't yet show 11 things the rules ask for."), so it never mixes in rule titles or citations. Under it, one muted
-    line says when the review ran; a provisional review says so, with "What this means" on demand. Once the committee
-    decides, its decision and note take this place, with the review's recommendation in the muted line.
-  - **Next steps** ("What to do next" for the homeowner preparing the application, "Before you decide" for the
-    committee, "What the review found" otherwise): the action items in groups ordered by what changes the outcome:
-    what to provide, what to change (as "possible conditions" when the review recommends conditions), what the
-    committee decides itself; a denial puts the changes first. Each item is one line in the writer's words (rule markers
-    as plain titles). Opening it shows its rule as a `RuleReference` and the parts it covers, each opening the finding
-    sheet. A group shows its first five items and "Show N more"; suggestions, which don't affect the decision, start
-    hidden. With nothing to do, the page says so.
-  - **One primary action:** the homeowner adds files while information is missing (the review runs again; submitting
-    anyway asks for confirmation) and otherwise submits to the committee; the committee records its decision,
-    preselected to follow the recommendation (none for a referral) and with "Start from the review's next steps" to
-    draft the note.
-  - **Details**, each closed until opened: how each rule was checked (the rule matrix), what the review read from the
-    packet (the facts per entity, with evidence and confidence, so a misread can be corrected before submitting), the
-    review's written summary (rule markers as `RuleReference`s), the packet's files (remove, run the review again), and
-    earlier reviews.
-- **Rule matrix** (`ReviewMatrix`), under "How each rule was checked". It's the whole review at a glance: every
+- **The application page** (`ApplicationPage`, `ReviewReport`) is a record page: what's needed to act up front, the
+  rest a tab away. The reader is the homeowner, or the committee when an administrator opens someone else's
+  application (the role switcher's role), and every heading and sentence is worded for that reader. On a wide screen
+  the review fills the main column and a side column holds the one thing to do now and the application's details;
+  on a narrow one the side column follows the review. From the top:
+  - **Back to the applications**, then the **header:** the application type, its status as a badge with a colored dot
+    (a decision takes its outcome's color), and the homeowner's description.
+  - **Verdict card:** the recommendation in plain words beside a tinted icon ("More information needed" for the
+    homeowner, "Request more information" for the committee) with one sentence of why, written by code from the action
+    items ("Your packet doesn't yet show 11 things the rules ask for."), so it never mixes in rule titles or citations.
+    Under it, one muted line says when the review ran; a provisional review says so, with "What this means" on demand.
+    Then the counts it rests on, each a tile: what's missing, what doesn't meet the rules, what's left to the
+    committee (each jumps to its group), and the rules met out of those that apply to the project (it opens the
+    matrix). Once the committee decides, its decision and note take the recommendation's place, with the
+    recommendation in the muted line.
+  - **Tabs:** Overview, Rules (the rule matrix), Facts (what the review read from the packet: the facts per entity,
+    with evidence and confidence, so a misread can be corrected before submitting), Summary (the review's written
+    summary, rule markers as `RuleReference`s), Files and History (every review, the latest marked), each with its
+    count.
+  - **Overview:** the action items as a card per group, ordered by what changes the outcome: what to provide, what to
+    change (as "possible conditions" when the review recommends conditions), what the committee decides itself; a
+    denial puts the changes first. A group's header has its outcome's icon and its count. Each item is one line in the
+    writer's words (rule markers as plain titles); opening it shows its rule as a `RuleReference` and the parts it
+    covers, each opening the finding sheet. A group shows its first five items and "Show N more"; suggestions, which
+    don't affect the decision, start hidden. With nothing to do, the page says so.
+  - **One primary action,** in the side column: the homeowner adds files while information is missing (the review runs
+    again; submitting anyway asks for confirmation) and otherwise submits to the committee; the committee records its
+    decision, each outcome a choice card, the one that follows the recommendation marked "Recommended by the review"
+    and preselected (none for a referral), with "Start from the review's next steps" to draft the note. Under it, the
+    details: project type, started, submitted, reviewed (provisional or not), decided, and the number of files.
+  - **Files:** each packet file as an attachment with what the review made of it. It opens in a new tab (a PDF or photo
+    shows in the browser; anything else is saved) and saves from its download action, both served by
+    `/files/applications/$applicationId/$fileId` to the homeowner who made the application and to administrators. The
+    homeowner can remove a file and run the review again.
+- **Rule matrix** (`ReviewMatrix`), under the Rules tab. It's the whole review at a glance: every
   selected rule against every part of the project.
   - **Rows** are rules, grouped by their main citation's provision (5.3, 5.4, 5.5…), each a `RuleReference` linked to
     its citation.

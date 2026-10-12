@@ -1,4 +1,5 @@
 import type { ActionItem, Review } from "@/review/reviewModel"
+import type { Outcome } from "@/schema/types"
 import type { ActionListKey, ReviewAudience } from "../reviewContext"
 
 // The next steps under the recommendation (application-review.md, UX): the review's action items, grouped by what
@@ -61,10 +62,31 @@ export function shownItems(group: StepGroup, isExpanded: boolean) {
   return isExpanded || group.items.length <= limit + (limit === 0 ? 0 : 1) ? group.items : group.items.slice(0, limit)
 }
 
-/** The next steps' heading: what to do for whoever acts on the review now, otherwise what it found. */
-export function stepsHeading(audience: ReviewAudience, isActing: boolean) {
-  if (!isActing) {
-    return "What the review found"
-  }
-  return audience === "homeowner" ? "What to do next" : "Before you decide"
+/** What a group's items ask, as the finding outcome its icon and color come from. */
+export const stepOutcomes: Record<StepKey, Exclude<Outcome, "not-applicable">> = {
+  missingInformation: "missing-information",
+  changes: "not-met",
+  committeeDecisions: "committee",
+  suggestions: "advisory"
 }
+
+const countTitles: Record<ReviewAudience, Record<StepKey, string>> = {
+  homeowner: {
+    missingInformation: "To add",
+    changes: "To change",
+    committeeDecisions: "For the committee",
+    suggestions: "Suggestions"
+  },
+  committee: {
+    missingInformation: "Missing",
+    changes: "Not met",
+    committeeDecisions: "For your judgment",
+    suggestions: "Suggestions"
+  }
+}
+
+/** A group in a word or two, as the review's summary counts it. */
+export const stepCountTitle = (key: StepKey, audience: ReviewAudience) => countTitles[audience][key]
+
+/** The id of a group's section, for jumping to it. */
+export const stepGroupId = (key: StepKey) => `next-steps-${key}`

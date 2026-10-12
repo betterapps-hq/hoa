@@ -19,6 +19,7 @@ import { Route as ProjectTypesIndexRouteImport } from './routes/project-types.in
 import { Route as ProjectTypesProjectTypeIdRouteImport } from './routes/project-types.$projectTypeId'
 import { Route as RulesReviewRouteImport } from './routes/rules_.review'
 import { Route as FilesGoverningDocumentIdRouteImport } from './routes/files.governing.$documentId'
+import { Route as FilesApplicationsApplicationIdFileIdRouteImport } from './routes/files.applications.$applicationId.$fileId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -73,6 +74,12 @@ const FilesGoverningDocumentIdRoute =
     path: '/files/governing/$documentId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const FilesApplicationsApplicationIdFileIdRoute =
+  FilesApplicationsApplicationIdFileIdRouteImport.update({
+    id: '/files/applications/$applicationId/$fileId',
+    path: '/files/applications/$applicationId/$fileId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -85,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/documents/': typeof DocumentsIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
+  '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -97,6 +105,7 @@ export interface FileRoutesByTo {
   '/documents': typeof DocumentsIndexRoute
   '/project-types': typeof ProjectTypesIndexRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
+  '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -110,6 +119,7 @@ export interface FileRoutesById {
   '/documents/': typeof DocumentsIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
+  '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/project-types/'
     | '/files/governing/$documentId'
+    | '/files/applications/$applicationId/$fileId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -136,6 +147,7 @@ export interface FileRouteTypes {
     | '/documents'
     | '/project-types'
     | '/files/governing/$documentId'
+    | '/files/applications/$applicationId/$fileId'
   id:
     | '__root__'
     | '/'
@@ -148,6 +160,7 @@ export interface FileRouteTypes {
     | '/documents/'
     | '/project-types/'
     | '/files/governing/$documentId'
+    | '/files/applications/$applicationId/$fileId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -161,6 +174,7 @@ export interface RootRouteChildren {
   DocumentsIndexRoute: typeof DocumentsIndexRoute
   ProjectTypesIndexRoute: typeof ProjectTypesIndexRoute
   FilesGoverningDocumentIdRoute: typeof FilesGoverningDocumentIdRoute
+  FilesApplicationsApplicationIdFileIdRoute: typeof FilesApplicationsApplicationIdFileIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -235,6 +249,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FilesGoverningDocumentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/files/applications/$applicationId/$fileId': {
+      id: '/files/applications/$applicationId/$fileId'
+      path: '/files/applications/$applicationId/$fileId'
+      fullPath: '/files/applications/$applicationId/$fileId'
+      preLoaderRoute: typeof FilesApplicationsApplicationIdFileIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -249,6 +270,8 @@ const rootRouteChildren: RootRouteChildren = {
   DocumentsIndexRoute: DocumentsIndexRoute,
   ProjectTypesIndexRoute: ProjectTypesIndexRoute,
   FilesGoverningDocumentIdRoute: FilesGoverningDocumentIdRoute,
+  FilesApplicationsApplicationIdFileIdRoute:
+    FilesApplicationsApplicationIdFileIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

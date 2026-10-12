@@ -1,4 +1,5 @@
 import type { Recommendation, Review } from "@/review/reviewModel"
+import type { Finding, Outcome } from "@/schema/types"
 import type { DecisionOutcome } from "../applicationDisplay"
 import type { ReviewAudience } from "../reviewContext"
 
@@ -91,4 +92,24 @@ export function verdictReason(review: ReasonReview, audience: ReviewAudience) {
     missing: review.missingInformation.length,
     questions: review.committeeDecisions.length
   })
+}
+
+/** Outcomes that ask nothing of anyone: the rule holds, or doesn't apply. */
+const settled: ReadonlySet<Outcome> = new Set(["met", "exempt", "available", "not-applicable"])
+
+/**
+ * The rules the review checked that apply to the project (a finding that isn't "doesn't apply"), and how many of them
+ * it meets: nothing left to change, provide or decide.
+ */
+export function ruleCounts(review: {
+  selected: readonly string[]
+  findings: readonly Pick<Finding, "ruleKey" | "outcome">[]
+}) {
+  const applying = review.selected.filter((ruleKey) =>
+    review.findings.some((finding) => finding.ruleKey === ruleKey && finding.outcome !== "not-applicable")
+  )
+  const met = applying.filter((ruleKey) =>
+    review.findings.every((finding) => finding.ruleKey !== ruleKey || settled.has(finding.outcome))
+  )
+  return { applying: applying.length, met: met.length }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { recommendations, type ActionItem, type Recommendation } from "@/review/reviewModel"
-import { verdictHeadline, verdictReason } from "./ReviewVerdict.utils"
+import { ruleCounts, verdictHeadline, verdictReason } from "./ReviewVerdict.utils"
 
 const items = (count: number): ActionItem[] =>
   Array.from({ length: count }, (_, index) => ({ id: `item-${index}`, ruleKey: "r", entities: [], text: "t" }))
@@ -64,5 +64,24 @@ describe("verdictHeadline and verdictReason", () => {
     expect(
       verdictReason(review("approve-with-conditions", { changes: 1, missing: 0, questions: 0 }), "committee")
     ).toBe("1 detail doesn't meet the rules; you can make it a condition of approval.")
+  })
+})
+
+describe("ruleCounts", () => {
+  it("counts the rules that apply to the project, and those with nothing left to do", () => {
+    expect(
+      ruleCounts({
+        selected: ["met", "exempt", "mixed", "missing", "nowhere", "unchecked"],
+        findings: [
+          { ruleKey: "met", outcome: "met" },
+          { ruleKey: "met", outcome: "not-applicable" },
+          { ruleKey: "exempt", outcome: "exempt" },
+          { ruleKey: "mixed", outcome: "met" },
+          { ruleKey: "mixed", outcome: "not-met" },
+          { ruleKey: "missing", outcome: "missing-information" },
+          { ruleKey: "nowhere", outcome: "not-applicable" }
+        ]
+      })
+    ).toEqual({ applying: 4, met: 2 })
   })
 })

@@ -34,6 +34,7 @@ function ApplicationRoute() {
       audience={role.id === "administrator" && !view.isOwner ? "committee" : "homeowner"}
       loadJob={(jobId) => getJobStatus({ data: { jobId } })}
       onChanged={() => void router.invalidate()}
+      onBack={() => void router.navigate({ to: "/applications" })}
       source={{
         documents: view.sourceFiles,
         loadPage: (documentId, pageIndex) => getDocumentPage({ data: { documentId, pageIndex } })

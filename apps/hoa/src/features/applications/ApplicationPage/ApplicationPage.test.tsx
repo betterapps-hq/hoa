@@ -97,7 +97,8 @@ function setup(overrides: Partial<ApplicationView> = {}, audience: ReviewAudienc
     audience,
     loadJob: vi.fn<(jobId: string) => Promise<Job | null>>(async () => null),
     actions,
-    onChanged: vi.fn<() => void>()
+    onChanged: vi.fn<() => void>(),
+    onBack: vi.fn<() => void>()
   }
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={new QueryClient()}>{children}</QueryClientProvider>
@@ -123,27 +124,35 @@ function addFilesInput() {
 }
 
 describe("ApplicationPage", () => {
-  it("leads with the recommendation and next steps, and keeps the rest behind disclosure", () => {
+  it("leads with the recommendation and next steps, with the rest a tab away and the details beside", () => {
     setup()
-    expect(screen.getByRole("heading", { name: "Fence application" })).toBeInTheDocument()
-    expect(screen.getByText("Reviewed. Started Oct 8, 2026.")).toBeInTheDocument()
+    expect(screen.getByRole("heading", { name: "Fence application" }).nextElementSibling).toHaveTextContent("Reviewed")
+    const details = within(screen.getByRole("complementary", { name: "About this application" }))
+    expect(details.getByText("Started").nextElementSibling).toHaveTextContent("Oct 8, 2026")
+    expect(details.getByText("Files").nextElementSibling).toHaveTextContent("3")
     expect(screen.getByRole("heading", { name: "More information needed" })).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: "What to do next" })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true")
     expect(screen.queryByText("form.pdf")).not.toBeInTheDocument()
     expect(screen.queryByRole("table")).not.toBeInTheDocument()
-    for (const name of [
-      /^How each rule was checked/,
-      /^What the review read from your packet/,
-      /^Packet/,
-      /^Earlier reviews/
-    ]) {
-      expect(screen.getByRole("button", { name })).toHaveAttribute("aria-expanded", "false")
+    for (const name of [/^Rules \d+$/, /^Facts \d+$/, "Files 3", "History 2"]) {
+      expect(screen.getByRole("tab", { name })).toHaveAttribute("aria-selected", "false")
     }
   })
 
-  it("lists the packet on demand, with pictures and unreadable files, and removes a file", async () => {
+  it("goes back to the applications", async () => {
+    const { props, user } = setup()
+    await user.click(screen.getByRole("button", { name: "Applications" }))
+    expect(props.onBack).toHaveBeenCalled()
+  })
+
+  it("lists the packet on demand, with pictures and unreadable files, each to open and save, and removes a file", async () => {
     const { actions, props, user } = setup()
-    await user.click(screen.getByRole("button", { name: /^Packet/ }))
+    await user.click(screen.getByRole("tab", { name: "Files 3" }))
+    expect(screen.getByRole("link", { name: "Open form.pdf" })).toHaveAttribute("href", "/files/applications/app-1/f1")
+    expect(screen.getByRole("link", { name: "Download form.pdf" })).toHaveAttribute(
+      "href",
+      "/files/applications/app-1/f1?download"
+    )
     expect(screen.getByText("Read, 1 page, 1 picture")).toBeInTheDocument()
     expect(screen.getByText("Couldn't be read: Corrupt.")).toBeInTheDocument()
     expect(screen.queryByText("picture-1.png")).not.toBeInTheDocument()
@@ -220,10 +229,10 @@ describe("ApplicationPage", () => {
   it("lets the committee decide, preselecting the decision that follows the review", async () => {
     const { actions, user } = setup(committeeView, "committee")
     expect(screen.getByRole("heading", { name: "Request more information" })).toBeInTheDocument()
-    expect(screen.getByRole("heading", { name: "Before you decide" })).toBeInTheDocument()
+    expect(screen.getByRole("region", { name: "Your decision" })).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /Submit/ })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Add files" })).not.toBeInTheDocument()
-    expect(screen.getByRole("radio", { name: "Information requested" })).toBeChecked()
+    expect(screen.getByRole("radio", { name: "Information requested Recommended by the review" })).toBeChecked()
     await user.click(screen.getByRole("radio", { name: "Disapproved" }))
     await user.click(screen.getByRole("button", { name: "Record decision" }))
     expect(screen.getByText("Explain the conditions, the parts approved, or what's needed.")).toBeInTheDocument()
