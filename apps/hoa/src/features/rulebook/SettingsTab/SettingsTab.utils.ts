@@ -27,16 +27,28 @@ const suffixes: Record<Intl.LDMLPluralRule, string> = {
 /** "1st", "2nd", "3rd", "4th": a rank as people say it. */
 export const ordinal = (n: number) => `${n}${suffixes[ordinals.select(n)]}`
 
-/** Where a document is dropped: into a rank, equal to the documents there, or into the gap before a rank, alone. */
-export type RankTarget = { type: "rank"; index: number } | { type: "gap"; index: number }
+/**
+ * Where a document is dropped: into a rank, equal to the documents there and last among them; beside one of them,
+ * before or after it; or into the gap before a rank, alone.
+ */
+export type RankTarget =
+  | { type: "rank"; index: number }
+  | { type: "gap"; index: number }
+  | { type: "beside"; kind: T.DocumentKind; side: "before" | "after" }
 
 /**
  * Moves one document: into a rank (`index` of the rank) or into a rank of its own at a gap (`index` of the rank it
  * goes before; the number of ranks for the end). A rank left empty goes away.
  */
 export function placeDocument(order: readonly T.DocumentKind[][], kind: T.DocumentKind, target: RankTarget) {
+  if (target.type === "beside" && target.kind === kind) {
+    return order.map((rank) => [...rank])
+  }
   const next = order.map((rank) => rank.filter((item) => item !== kind))
-  if (target.type === "rank") {
+  if (target.type === "beside") {
+    const rank = next.find((items) => items.includes(target.kind))
+    rank?.splice(rank.indexOf(target.kind) + (target.side === "after" ? 1 : 0), 0, kind)
+  } else if (target.type === "rank") {
     next[target.index]?.push(kind)
   } else {
     next.splice(target.index, 0, [kind])

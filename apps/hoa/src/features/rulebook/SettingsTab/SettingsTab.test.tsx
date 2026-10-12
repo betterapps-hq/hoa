@@ -109,6 +109,18 @@ describe("placeDocument", () => {
     ])
   })
 
+  it("places a document before or after another, in its rank", () => {
+    expect(placeDocument(order, "declaration", { type: "beside", kind: "policy", side: "before" })).toEqual([
+      ["statute", "ordinance"],
+      ["rules", "declaration", "policy", "resolution"]
+    ])
+    expect(placeDocument(order, "resolution", { type: "beside", kind: "rules", side: "after" })[2]).toEqual([
+      "rules",
+      "resolution",
+      "policy"
+    ])
+  })
+
   it("ranks a document on its own at a gap", () => {
     expect(placeDocument(order, "policy", { type: "gap", index: 3 })).toEqual([
       ["statute", "ordinance"],
