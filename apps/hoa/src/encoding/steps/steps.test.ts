@@ -442,6 +442,16 @@ describe("C", () => {
       (checkSharedVocabulary([group(appliesTo)], []).get("g1") ?? []).map((problem) => problem.code)
     expect(codes("garden gazebo")).toContain("unresolved-subject")
     expect(codes("shed")).not.toContain("unresolved-subject")
+    const sanction = (imposedBy: string) => ({
+      ...group("shed"),
+      outlines: [
+        outline("rules:1#a", { appliesTo: "shed", sanction: { type: "legal-action", imposedBy, against: ["shed"] } })
+      ]
+    })
+    const sanctionCodes = (imposedBy: string) =>
+      (checkSharedVocabulary([sanction(imposedBy)], []).get("g1") ?? []).map((problem) => problem.code)
+    expect(sanctionCodes("party enforcing the covenants")).toContain("unresolved-subject")
+    expect(sanctionCodes("shed")).not.toContain("unresolved-subject")
   })
 
   it("resolves a thing the answer adds by its label, a broader value by its full key, and reports a made-up key", () => {

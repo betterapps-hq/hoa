@@ -327,10 +327,11 @@ export function checkSharedVocabulary(groups: readonly GroupVocabulary[], known:
       }
     }
     // A subject or party E gave as a label must be a term now (C adds the things E found no term for), or F's rules
-    // can't name it.
+    // can't name it: a sanction's imposer and the parties it's against too.
     const named = [...all.values()]
     for (const outline of group.outlines) {
-      for (const text of [outline.appliesTo, outline.bearer, outline.decidedBy]) {
+      const parties = outline.sanction ? [outline.sanction.imposedBy, ...outline.sanction.against] : []
+      for (const text of [outline.appliesTo, outline.bearer, outline.decidedBy, ...parties]) {
         if (text && subjectKey(text, named) === null) {
           report(group.groupId, {
             recordKey: outline.key,
