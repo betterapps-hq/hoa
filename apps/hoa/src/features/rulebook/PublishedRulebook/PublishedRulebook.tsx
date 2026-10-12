@@ -47,7 +47,7 @@ export function PublishedRulebook({ published, sources, uploads, source, loadJob
             ) : null}
           </div>
           <RulebookWorkspace
-            records={recordsOf(sources, content, "published")}
+            records={recordsOf(sources, rulebook, content, "published")}
             source={source}
             actions={null}
             audience="member"

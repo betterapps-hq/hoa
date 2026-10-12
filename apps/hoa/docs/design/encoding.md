@@ -220,7 +220,9 @@ rulebook didn't, and the reverse. Nothing is deleted from a draft: Reject replac
 discarded (`discardRulebookDraft`), which deletes it and its records and leaves the published rulebook as it is.
 
 Publishing requires every record approved or rejected, every no-rule reason approved, no blocking issue, no uncovered
-provision, and approved records that make a valid rules file. Code assembles the rules file from the approved records
+provision, and approved records that make a valid rules file. A rulebook covers only the provisions of the documents
+it was built from (its `sourceDocumentIds`): a replaced document's provisions stay stored for the rulebook that cites
+them, but a draft built without it doesn't count them. Code assembles the rules file from the approved records
 (schema.md, Rules file), validates it with `rulesFile`, writes it to R2, stores its SHA-256 on the rulebook and marks
 the previous published rulebook `superseded`.
 

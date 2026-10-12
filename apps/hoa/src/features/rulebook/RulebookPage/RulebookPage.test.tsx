@@ -37,6 +37,7 @@ const sources: RulebookSources = {
   organization: records.organization,
   documents: records.documents,
   provisions: records.provisions,
+  provisionDocumentIds: Object.fromEntries(records.provisions.map((provision) => [provision.key, "doc-1"])),
   files: []
 }
 const approved = { status: "approved" as const, by: "admin", at: "2026-10-09T00:00:00Z", note: null }

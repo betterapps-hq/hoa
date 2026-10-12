@@ -272,21 +272,26 @@ export async function saveProvisions(
   ])
 }
 
-/** The documents' provisions, each document's in order. */
-export async function listProvisions(
+/** The documents' provisions with the document each is in, each document's in order. */
+export async function listDocumentProvisions(
   db: Database,
   hoaId: string,
   documentIds: readonly string[]
-): Promise<Rules.Provision[]> {
+): Promise<{ documentId: string; provision: Rules.Provision }[]> {
   if (documentIds.length === 0) {
     return []
   }
   const rows = await db
-    .select({ provision: provisions.provision })
+    .select({ documentId: provisions.documentId, provision: provisions.provision })
     .from(provisions)
     .where(and(eq(provisions.hoaId, hoaId), inArray(provisions.documentId, [...documentIds])))
     .orderBy(asc(provisions.documentId), asc(provisions.ordinal))
-  return rows.map((row) => provisionSchema.parse(row.provision))
+  return rows.map((row) => ({ documentId: row.documentId, provision: provisionSchema.parse(row.provision) }))
+}
+
+/** The documents' provisions, each document's in order. */
+export async function listProvisions(db: Database, hoaId: string, documentIds: readonly string[]) {
+  return (await listDocumentProvisions(db, hoaId, documentIds)).map((row) => row.provision)
 }
 
 /** Saves provisions' review changes, such as a no-rule reason, in batches of 100 that each land whole. */

@@ -10,16 +10,32 @@ import type { ReferencedRule } from "./RuleReference/RuleReference"
 
 const isApproved = (record: { review: T.Review }) => record.review.status === "approved"
 
+/**
+ * The provisions a rulebook covers: those of the documents it was built from, not every document the association has
+ * had, such as one a later upload replaced.
+ */
+export function provisionsBuiltFrom(
+  sources: Pick<RulebookSources, "provisions" | "provisionDocumentIds">,
+  sourceDocumentIds: readonly string[]
+) {
+  const builtFrom = new Set(sourceDocumentIds)
+  return sources.provisions.filter((provision) => {
+    const documentId = sources.provisionDocumentIds[provision.key]
+    return documentId !== undefined && builtFrom.has(documentId)
+  })
+}
+
 /** A rulebook's records with the sources they cite. The published rulebook shows only what its rules file holds. */
 export function recordsOf(
   sources: RulebookSources,
+  rulebook: { sourceDocumentIds: readonly string[] },
   content: RulebookContent,
   which: "draft" | "published"
 ): RulebookRecords {
   return {
     organization: sources.organization,
     documents: sources.documents,
-    provisions: sources.provisions,
+    provisions: provisionsBuiltFrom(sources, rulebook.sourceDocumentIds),
     terms: which === "draft" ? content.terms : content.terms.filter(isApproved),
     rules: which === "draft" ? content.rules : content.rules.filter(isApproved),
     settings: content.settings,

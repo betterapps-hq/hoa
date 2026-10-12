@@ -74,11 +74,15 @@ const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
  */
 export function RulebookPage(props: RulebookPageProps) {
   const { draft, published, sources, source, actions, isReviewing, onReviewingChange } = props
-  const draftRecords = draft.rulebook && draft.content ? recordsOf(sources, draft.content, "draft") : null
+  const draftRecords =
+    draft.rulebook && draft.content ? recordsOf(sources, draft.rulebook, draft.content, "draft") : null
   const draftId = draft.rulebook?.id
 
   if (isReviewing && draftRecords && draftId) {
-    const publishedRecords = published.content ? recordsOf(sources, published.content, "published") : null
+    const publishedRecords =
+      published.rulebook && published.content
+        ? recordsOf(sources, published.rulebook, published.content, "published")
+        : null
     return (
       <DraftReview
         records={draftRecords}
@@ -338,7 +342,7 @@ function RulesInForce({
   if (!rulebook || !content) {
     return null
   }
-  const records = recordsOf(sources, content, "published")
+  const records = recordsOf(sources, rulebook, content, "published")
   const download = async () => {
     setIsDownloading(true)
     const json = await attempt(loadRulesFile, "The rules file couldn't be downloaded.")

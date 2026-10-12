@@ -3,7 +3,7 @@ import { env as bindings } from "cloudflare:workers"
 import { z } from "zod"
 import { getDb } from "@/db/client.server"
 import type { Database } from "@/db/database"
-import { listDocumentRecords, listGoverningDocuments, listProvisions } from "@/db/documentRepository"
+import { listDocumentProvisions, listDocumentRecords, listGoverningDocuments } from "@/db/documentRepository"
 import { getLatestJobOfKind } from "@/db/jobRepository"
 import {
   discardDraftRulebook,
@@ -33,6 +33,7 @@ import {
   stopRulebookBuild as stopBuild,
   type StopResult
 } from "@/workflows/rulebookTrigger.server"
+import { provisionsBuiltFrom } from "./rulebookRecords"
 import { buildFailuresOf, describeBuildProblem } from "./rulebookView"
 
 type Rulebook = z.infer<typeof rulebookSchema>
@@ -70,19 +71,23 @@ export type RulebookSources = {
   organization: { id: string; name: string }
   documents: Rules.GoverningDocument[]
   provisions: Rules.Provision[]
+  /** The document each provision is in, by provision key: a rulebook covers only the documents it was built from. */
+  provisionDocumentIds: Record<string, string>
   files: SourceFile[]
 }
 
 async function loadSources(db: Database, hoa: { id: string; name: string }): Promise<RulebookSources> {
   const [records, uploads] = await Promise.all([listDocumentRecords(db, hoa.id), listGoverningDocuments(db, hoa.id)])
+  const rows = await listDocumentProvisions(
+    db,
+    hoa.id,
+    records.map((record) => record.id)
+  )
   return {
     organization: { id: hoa.id, name: hoa.name },
     documents: records.map((record) => record.document),
-    provisions: await listProvisions(
-      db,
-      hoa.id,
-      records.map((record) => record.id)
-    ),
+    provisions: rows.map((row) => row.provision),
+    provisionDocumentIds: Object.fromEntries(rows.map((row) => [row.provision.key, row.documentId])),
     files: uploads.flatMap((upload) =>
       upload.status === "ready" && upload.pageCount
         ? [{ id: upload.id, title: upload.title, pageCount: upload.pageCount }]
@@ -238,7 +243,14 @@ async function draftReview(
     published && publishedContent ? { ...publishedContent, sourceDocumentIds: published.sourceDocumentIds } : null,
     uploads
   )
-  return { blockers: publishBlockers({ ...sources, ...content }), changes }
+  return {
+    blockers: publishBlockers({
+      ...sources,
+      provisions: provisionsBuiltFrom(sources, draft.sourceDocumentIds),
+      ...content
+    }),
+    changes
+  }
 }
 
 /** Publishes the draft: assembles the rules file, writes it to storage with its hash and supersedes the previous one. */
