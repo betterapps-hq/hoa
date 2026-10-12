@@ -83,7 +83,6 @@ function Replaying({ speed, from = 0, withProgress = false, onReplay }: ReplayPr
             <BuildProgress
               jobId={`replay-${speed}`}
               loadJob={async () => simulatedJob(replay.now())}
-              loadResults={async () => ({ results: readingResults(replay.now()), cursor: null, documents: [] })}
               onFinished={fn()}
               onStop={async () => undefined}
             />

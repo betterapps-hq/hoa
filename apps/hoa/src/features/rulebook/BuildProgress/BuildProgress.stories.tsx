@@ -2,21 +2,20 @@ import type { Meta, StoryObj } from "@storybook/react-vite"
 import { useState } from "react"
 import { fn } from "storybook/test"
 import type { Job } from "@/jobs/job"
-import { simulatedBuildSeconds, simulatedJob, simulatedResults } from "@/tests/simulatedBuild"
+import { simulatedBuildSeconds, simulatedJob } from "@/tests/simulatedBuild"
 import { BuildProgress, type BuildProgressProps } from "./BuildProgress"
 
-// Sudden Valley's build (src/tests/simulatedBuild.ts), held at a moment or replayed. The page polls the job and the
-// results as it does in the app, so every step shows its work and what it found.
+// Sudden Valley's build (src/tests/simulatedBuild.ts), held at a moment or replayed. The page polls the job as it does
+// in the app.
 
-type Source = Pick<BuildProgressProps, "loadJob" | "loadResults">
+type Source = Pick<BuildProgressProps, "loadJob">
 
 /** The build held `seconds` in: its clock keeps moving, as a long step's does. */
 function heldAt(seconds: number): Source {
   let now: number | null = null
   const startedAt = () => (now ??= Date.now())
   return {
-    loadJob: async () => simulatedJob(seconds, startedAt()),
-    loadResults: async () => ({ results: simulatedResults(seconds, startedAt()), cursor: null, documents: [] })
+    loadJob: async () => simulatedJob(seconds, startedAt())
   }
 }
 
@@ -25,8 +24,7 @@ function replayed(speed: number): Source {
   const start = Date.now()
   const seconds = () => Math.min(simulatedBuildSeconds, ((Date.now() - start) / 1000) * speed)
   return {
-    loadJob: async () => simulatedJob(seconds()),
-    loadResults: async () => ({ results: simulatedResults(seconds()), cursor: null, documents: [] })
+    loadJob: async () => simulatedJob(seconds())
   }
 }
 
@@ -57,7 +55,6 @@ export const Starting: Story = {
 
 export const FindingDefinedTerms: Story = { args: heldAt(10) }
 
-/** One of two sections read: its rules are counted. */
 export const FindingRules: Story = {}
 
 export const BuildingTheVocabulary: Story = { args: heldAt(600) }

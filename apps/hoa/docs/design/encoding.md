@@ -299,14 +299,12 @@ time left" until the sections are known. The bar never
 reads full before the build ends. The steps fold away, and the row then names the current step too ("Drafting
 rules, 35–50 min left").
 
-**Counts as they arrive.** Each step's line counts what it has produced so far, never the items themselves: "2 terms
-found", "92 rules found" (a section looked at again replaces its first count), the vocabulary's terms, "40 of 92 rules
-drafted" (a redrafted rule counts once) and the conflicts left to decide. The current step has a thin bar of its own,
-so a step whose calls take minutes doesn't look frozen. No step counts the parts the build divides its work into
-(documents, sections, groups of sections, batches of rules): they're how the build runs, not what anyone waits for, so
-they show only as that bar. The counts come from `getBuildResults` (administrators, the
-organization's own builds), which lists the build's step outputs in R2 and reads only those written since the page's
-cursor; the page polls it every four seconds. Polling, not server-sent events: a stream would hold a Worker request
+**Counts as they arrive.** The steps say only where the build is: the current one has a spinner, and none counts what
+it found or the parts the build divides its work into (documents, sections, groups of sections, batches of rules).
+What the build finds belongs to the reader (BuildReader), which shows each term, rule and draft as it arrives and
+counts them; it isn't on the page yet. Its results are to come from a server function (administrators, the
+organization's own builds) over `loadBuildResults`, which lists the build's step outputs in R2 and reads only those
+written since the page's cursor, polled every four seconds. Polling, not server-sent events: a stream would hold a Worker request
 open for the hour a build runs and still have to poll R2 inside it, while a poll is short, survives a dropped
 connection and reads nothing twice.
 

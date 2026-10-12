@@ -3,15 +3,7 @@ import { buildStages } from "@/encoding/build"
 import { advanceProgress, finishProgress, startProgress, type JobProgress } from "@/jobs/progress"
 import type { BuildResult } from "@/rulebook/buildResults"
 import { simulatedBuildSeconds, simulatedResults } from "@/tests/simulatedBuild"
-import {
-  buildSteps,
-  elapsedText,
-  estimateBuild,
-  findingCounts,
-  stepFindings,
-  summaryText,
-  timeLeftText
-} from "./BuildProgress.utils"
+import { buildSteps, elapsedText, estimateBuild, findingCounts, summaryText, timeLeftText } from "./BuildProgress.utils"
 
 const stages = ["resolve-prompts", ...buildStages, "save-draft"].map((stage) => ({
   stage,
@@ -32,7 +24,7 @@ function progressOf(reports: [stage: string, done: number, total: number, minute
 const job = (progress: JobProgress) => ({ createdAt: at(0), progress })
 
 describe("buildSteps", () => {
-  it("shows every step up front in plain words, done, current or upcoming, with a bar for the current one", () => {
+  it("shows every step up front in plain words, done, current or upcoming", () => {
     const steps = buildSteps(
       progressOf([
         ["structure", 0, 2, 0],
@@ -49,10 +41,7 @@ describe("buildSteps", () => {
       ["Combining and checking for conflicts", "upcoming"],
       ["Saving the draft", "upcoming"]
     ])
-    // How far the current step's work is shows as a bar, never as a count of the build's sections.
-    expect(steps[1]).toMatchObject({ fraction: null })
-    expect(steps[2]).toMatchObject({ fraction: 47 / 64 })
-    expect(steps[3]).toMatchObject({ isOptional: false, fraction: null })
+    expect(steps[3]).toMatchObject({ isOptional: false })
   })
 
   it("skips merging the vocabulary when it has nothing to decide", () => {
@@ -65,11 +54,11 @@ describe("buildSteps", () => {
     expect(progress.steps.find((step) => step.stage === "vocabulary-merge")?.status).toBe("skipped")
     const steps = buildSteps(progress)
     expect(steps.find((step) => step.label === "Building the vocabulary")?.status).toBe("done")
-    expect(steps.find((step) => step.label === "Drafting rules")).toMatchObject({ status: "current", fraction: 3 / 20 })
+    expect(steps.find((step) => step.label === "Drafting rules")).toMatchObject({ status: "current" })
   })
 })
 
-describe("stepFindings", () => {
+describe("findingCounts", () => {
   const rule = (key: string) => ({ key, title: key, provisionKey: null })
   const results: BuildResult[] = [
     { id: "t", at: at(1), kind: "terms", documentKey: "declaration", labels: ["Lot", "Owner"] },
@@ -98,20 +87,6 @@ describe("stepFindings", () => {
     { id: "r2", at: at(7), kind: "rules", batchId: "a#1", rules: [rule("a#2")], round: 1 }
   ]
 
-  it("counts what each step produced: a rerun replaces a section's rules, a retry doesn't count twice", () => {
-    expect(stepFindings(results)).toEqual({
-      "Finding defined terms": "2 terms found",
-      "Finding rules": "4 rules found",
-      "Building the vocabulary": "3 terms",
-      "Drafting rules": "2 of 4 rules drafted"
-    })
-    expect(
-      stepFindings([...results, { id: "c", at: at(9), kind: "consolidated", problems: 0, conflicts: 1 }])
-    ).toMatchObject({
-      "Combining and checking for conflicts": "1 conflict to decide"
-    })
-  })
-
   it("counts every find once for the picture of what's been found, whichever steps named it", () => {
     expect(findingCounts(results)).toEqual({ terms: 5, rulesFound: 4, rulesDrafted: 2 })
     expect(findingCounts([])).toEqual({ terms: 0, rulesFound: 0, rulesDrafted: 0 })
@@ -121,18 +96,6 @@ describe("stepFindings", () => {
       rulesFound: 95,
       rulesDrafted: 95
     })
-  })
-
-  it("puts the counts on their steps", () => {
-    const steps = buildSteps(
-      progressOf([
-        ["find-rules", 2, 2, 9],
-        ["vocabulary", 0, 1, 10]
-      ]),
-      results
-    )
-    expect(steps.find((step) => step.label === "Finding rules")?.found).toBe("4 rules found")
-    expect(steps.find((step) => step.label === "Saving the draft")?.found).toBeNull()
   })
 })
 

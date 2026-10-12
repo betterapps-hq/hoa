@@ -7,21 +7,20 @@ import type { BuildResult } from "@/rulebook/buildResults"
 // in plain words, each done, current, upcoming or skipped, and one estimate of the time left for the whole build.
 
 /**
- * How the build's stages read: consecutive stages with the same words are one step. A stage whose work is counted
- * (documents, sections, groups of sections, batches of rules) gives its step a bar while it runs; the step never says
- * those counts, which are how the build divides its work, only what the work has found.
+ * How the build's stages read: consecutive stages with the same words are one step. The steps say only where the build
+ * is: what it has found shows in the reader above them.
  */
-const stepWords: Record<string, { label: string; isCounted?: boolean }> = {
+const stepWords: Record<string, { label: string }> = {
   "resolve-prompts": { label: "Reading documents" },
   check: { label: "Reading documents" },
   structure: { label: "Reading documents" },
   analyze: { label: "Reading documents" },
-  "defined-terms": { label: "Finding defined terms", isCounted: true },
+  "defined-terms": { label: "Finding defined terms" },
   plan: { label: "Finding rules" },
-  "find-rules": { label: "Finding rules", isCounted: true },
-  vocabulary: { label: "Building the vocabulary", isCounted: true },
+  "find-rules": { label: "Finding rules" },
+  vocabulary: { label: "Building the vocabulary" },
   "vocabulary-merge": { label: "Building the vocabulary" },
-  "structure-rules": { label: "Drafting rules", isCounted: true },
+  "structure-rules": { label: "Drafting rules" },
   merge: { label: "Combining and checking for conflicts" },
   consolidate: { label: "Combining and checking for conflicts" },
   "save-draft": { label: "Saving the draft" }
@@ -32,13 +31,7 @@ export type BuildStep = {
   status: JobStep["status"]
   /** A step that runs only when there's something for it to do. */
   isOptional: boolean
-  /** How much of the step's work is done, from 0 to 1, while it runs; null otherwise. */
-  fraction: number | null
-  /** What the step has produced so far, as a count: "112 rules found", "40 of 112 rules drafted". */
-  found: string | null
 }
-
-const counted = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 
 /** The newest result of each section E looked at: a rerun replaces its first answer. */
 function latestOutlines(results: readonly BuildResult[]) {
@@ -75,41 +68,6 @@ export function findingCounts(results: readonly BuildResult[]): FindingCounts {
   }
 }
 
-/** What each step has produced so far, by the step's label, as counts from the build's results. */
-export function stepFindings(results: readonly BuildResult[]): Record<string, string> {
-  const findings: Record<string, string> = {}
-  const definedTerms = new Set(results.flatMap((result) => (result.kind === "terms" ? result.labels : [])))
-  if (results.some((result) => result.kind === "terms")) {
-    findings["Finding defined terms"] = `${counted(definedTerms.size, "term", "terms")} found`
-  }
-  const outlines = latestOutlines(results)
-  const ruleCount = outlines.reduce((sum, result) => sum + result.rules.length, 0)
-  if (outlines.length > 0) {
-    findings["Finding rules"] = `${counted(ruleCount, "rule", "rules")} found`
-  }
-  // A group looked at again lists its terms again: each term counts once.
-  const vocabulary = results.flatMap((result) => (result.kind === "vocabulary" ? [result.labels] : []))
-  if (vocabulary.length > 0) {
-    findings["Building the vocabulary"] = counted(new Set(vocabulary.flat()).size, "term", "terms")
-  }
-  const drafted = new Set(
-    results.flatMap((result) => (result.kind === "rules" ? result.rules.map((rule) => rule.key) : []))
-  )
-  if (results.some((result) => result.kind === "rules")) {
-    findings["Drafting rules"] =
-      ruleCount > 0
-        ? `${drafted.size} of ${ruleCount} rules drafted`
-        : `${counted(drafted.size, "rule", "rules")} drafted`
-  }
-  const combined =
-    results.find((result) => result.kind === "consolidated") ?? results.find((result) => result.kind === "combined")
-  if (combined && (combined.kind === "consolidated" || combined.kind === "combined")) {
-    findings["Combining and checking for conflicts"] =
-      combined.conflicts === 0 ? "No conflicts" : `${counted(combined.conflicts, "conflict", "conflicts")} to decide`
-  }
-  return findings
-}
-
 function groupStatus(steps: readonly JobStep[]): JobStep["status"] {
   if (steps.some((step) => step.status === "current")) {
     return "current"
@@ -124,12 +82,8 @@ function groupStatus(steps: readonly JobStep[]): JobStep["status"] {
   return steps.some((step) => step.status === "done") ? "current" : "upcoming"
 }
 
-/**
- * The job's stages as steps in plain words, in order, each with what it has produced so far. A stage with no words of
- * its own is a step by itself.
- */
-export function buildSteps(progress: JobProgress, results: readonly BuildResult[] = []): BuildStep[] {
-  const findings = stepFindings(results)
+/** The job's stages as steps in plain words, in order. A stage with no words of its own is a step by itself. */
+export function buildSteps(progress: JobProgress): BuildStep[] {
   const groups: { label: string; steps: JobStep[] }[] = []
   for (const step of progress.steps) {
     const label = stepWords[step.stage]?.label ?? stageLabel(step.stage)
@@ -140,16 +94,11 @@ export function buildSteps(progress: JobProgress, results: readonly BuildResult[
       groups.push({ label, steps: [step] })
     }
   }
-  return groups.map(({ label, steps }) => {
-    const work = steps.find((step) => stepWords[step.stage]?.isCounted && step.total > 0 && step.status === "current")
-    return {
-      label,
-      status: groupStatus(steps),
-      isOptional: steps.every((step) => step.isOptional),
-      fraction: work ? work.done / work.total : null,
-      found: findings[label] ?? null
-    }
-  })
+  return groups.map(({ label, steps }) => ({
+    label,
+    status: groupStatus(steps),
+    isOptional: steps.every((step) => step.isOptional)
+  }))
 }
 
 export type Range = { low: number; high: number }

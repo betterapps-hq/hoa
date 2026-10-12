@@ -21,7 +21,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { cn } from "@/lib/utils"
-import type { BuildResults } from "@/rulebook/buildResults.server"
 import {
   buildSteps,
   elapsedText,
@@ -30,7 +29,6 @@ import {
   timeLeftText,
   type BuildStep
 } from "./BuildProgress.utils"
-import { useBuildResults } from "./useBuildResults"
 
 export type BuildProgressProps = {
   jobId: string
@@ -39,8 +37,6 @@ export type BuildProgressProps = {
   onFinished: (job: Job) => void
   /** Stops the build; resolves once it's stopped or found already over. */
   onStop: () => Promise<void>
-  /** What the build has produced so far, since a cursor. */
-  loadResults: (since: string | null) => Promise<BuildResults>
   /** The time, in milliseconds; tests fix it. */
   now?: () => number
 }
@@ -48,10 +44,10 @@ export type BuildProgressProps = {
 /**
  * A running build's progress (encoding.md, UX, The build's progress): one row with the time left (and the current step
  * while the steps are hidden), the time so far and the steps' toggle, one bar for the whole build that's never full
- * before it ends, every step in plain words behind the toggle, and a quiet way to stop it. Polls the job every 2
- * seconds.
+ * before it ends, every step in plain words behind the toggle (where the build is, not what it has found), and a
+ * quiet way to stop it. Polls the job every 2 seconds.
  */
-export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults, now = Date.now }: BuildProgressProps) {
+export function BuildProgress({ jobId, loadJob, onFinished, onStop, now = Date.now }: BuildProgressProps) {
   const [isOpen, setIsOpen] = useState(true)
   const { data: job } = useQuery({
     queryKey: ["job", jobId],
@@ -66,7 +62,6 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults,
   })
 
   const isRunning = !job || job.status === "running"
-  const results = useBuildResults(jobId, loadResults, isRunning)
   // The time so far and the time left move with the clock, not only when the job changes: a step whose calls take
   // minutes would otherwise freeze them.
   const [, setTick] = useState(0)
@@ -75,7 +70,7 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, loadResults,
   if (job && !job.progress) {
     return <JobProgress jobId={jobId} loadJob={loadJob} onFinished={onFinished} />
   }
-  const steps = job?.progress ? buildSteps(job.progress, results) : []
+  const steps = job?.progress ? buildSteps(job.progress) : []
   const estimate = job ? estimateBuild(job, now()) : null
   // With the steps showing, the line above them gives only the time left: the list already names the current step.
   const remaining = estimate?.remaining ?? null
@@ -137,7 +132,6 @@ const statusWords: Record<BuildStep["status"], string> = {
 function StepRow({ step }: { step: BuildStep }) {
   const optionalWords: Partial<Record<BuildStep["status"], string>> = { skipped: "Not needed", upcoming: "If needed" }
   const detail = step.isOptional ? optionalWords[step.status] : undefined
-  const found = step.status === "upcoming" ? null : step.found
   return (
     <li
       aria-current={step.status === "current" ? "step" : undefined}
@@ -154,16 +148,7 @@ function StepRow({ step }: { step: BuildStep }) {
           {step.label}
           <span className="sr-only">: {statusWords[step.status]}</span>
         </span>
-        {detail || found ? (
-          <span className="text-muted-foreground">{[detail, found].filter(Boolean).join(", ")}</span>
-        ) : null}
-        {step.fraction === null ? null : (
-          <Progress
-            value={Math.round(step.fraction * 100)}
-            aria-label={`${step.label} progress`}
-            className="h-1 max-w-48"
-          />
-        )}
+        {detail ? <span className="text-muted-foreground">{detail}</span> : null}
       </span>
     </li>
   )
