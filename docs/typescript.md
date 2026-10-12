@@ -1,4 +1,4 @@
-# TypeScript & Type Helpers
+# TypeScript and Type Helpers
 
 Type conventions for all TypeScript in the monorepo, and a catalog of the type-helper libraries we install so you
 **don't reinvent them**. Many rules here are enforced by `oxlint` (see
@@ -27,7 +27,8 @@ Do **not** reach for `as`.
 
 ## `ts-extras` — type-safe stdlib helpers
 
-Typed replacements for unsafe built-ins. Import from `ts-extras`. Use these instead of casting.
+Typed replacements for unsafe built-ins. Import from `ts-extras`. Use these instead of casting. It isn't a dependency
+yet: add it to the package with the first import.
 
 ### Objects
 
@@ -65,7 +66,7 @@ Typed replacements for unsafe built-ins. Import from `ts-extras`. Use these inst
 - `safeCastTo<T>()` / `asWritable(x)` — controlled, explicit casts when unavoidable.
 - `isEqualType`, `stringSplit`, `setHas` — type-level equality, typed `split`, typed `Set#has`.
 
-## `ts-pattern` — pattern matching
+## `ts-pattern`: pattern matching
 
 Use for branching on unions/shapes instead of `switch` or nested conditionals.
 
@@ -89,7 +90,7 @@ Key API:
   `P.string.startsWith(...)`, `P.number.gte(...)`.
 - `isMatching(pattern)` — a standalone type guard built from a pattern.
 
-## `tiny-invariant` — runtime assertions
+## `tiny-invariant`: runtime assertions
 
 ```ts
 import invariant from "tiny-invariant"
@@ -101,7 +102,7 @@ user.name // narrowed to non-null here
 The message is stripped from production builds. Use it for assumptions that _should_ always hold (loaded data, found DOM
 nodes) rather than for expected/validation errors.
 
-## `zod` — schema validation
+## `zod`: schema validation
 
 Validate and parse untrusted input; infer static types from schemas.
 

@@ -6,30 +6,36 @@ links here. These conventions apply to all TypeScript/React code in the monorepo
 
 ## Quality gates
 
-- **`pnpm verify` must pass before finishing.** It runs formatting, lint, type-checking, unused-code analysis (knip) and
-  unit tests with coverage across every workspace.
+- **`pnpm verify` must be clean before finishing.** It runs, in order, `check:format` (oxfmt), `check:lint` and
+  `check:types` (per package through Turbo), `check:unused` (knip over the whole graph) and `test:coverage`. Formatting
+  is global; lint and type-checking are per package; knip runs only at the root.
+- **Check once the work is complete, not after each edit.** Finish the coherent implementation, run the smallest
+  relevant focused checks, then run `pnpm verify`. If a check exposes related defects, batch the repairs before
+  rerunning it. Test passes take a long time, so don't overtest.
 - **New code ships with co-located tests** and must keep the relevant app or package's Vitest coverage thresholds
   green.
-- Git hooks (lefthook) run `oxlint --fix` + `oxfmt` on commit and `check:types` on push. Don't bypass with
-  `--no-verify`.
+- **Git hooks (lefthook):** pre-commit runs `oxlint --fix` and `oxfmt` on staged files; pre-push runs
+  `pnpm check:types`. Don't bypass them with `--no-verify` unless the user explicitly authorizes it for a failure wholly
+  caused by unrelated work. That exception doesn't waive focused checks for the files being committed, and the commit
+  handoff must record the unrelated blocker and the checks run directly.
 
-## TypeScript & type helpers
+## TypeScript and type helpers
 
 See **[typescript.md](typescript.md)** for type conventions (no `any`, avoid `as`, narrowing order, `type` vs
-`interface`, `enum`s) and a full catalog of the type-helper libraries (`ts-extras`, `ts-pattern`, `tiny-invariant`,
-`zod`) — read it before writing a new type helper.
+`interface`, `enum`s) and the type-helper libraries (`ts-extras`, `ts-pattern`, `tiny-invariant`, `zod`). Read it
+before writing a new type helper.
 
 ## Hooks
 
-See **[hooks.md](hooks.md)** for hook conventions and the full `@mantine/hooks` catalog — read it before writing a new
+See **[hooks.md](hooks.md)** for hook conventions and when to reach for `@mantine/hooks`. Read it before writing a new
 hook.
 
 ## React
 
 See **[react.md](react.md)** for component conventions (function declarations, no `React.FC`, prop-type naming, the
-React Compiler), product-level UI-system selection and styling, and the state/error/URL/routing/form libraries.
+React Compiler), the UI system and styling, and the state, error, URL, routing and form libraries.
 
-## Imports & exports
+## Imports and exports
 
 - **Prefer named exports** — they keep renames consistent. Route files are the exception: TanStack Router requires the
   `Route` export.
@@ -56,7 +62,7 @@ React Compiler), product-level UI-system selection and styling, and the state/er
 
 <a id="files--component-layout"></a>
 
-## Files & component layout
+## Files and component layout
 
 Split a component by concern so the `.tsx` stays focused on rendering:
 

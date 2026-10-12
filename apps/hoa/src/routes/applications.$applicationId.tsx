@@ -4,6 +4,7 @@ import {
   completeApplicationUpload,
   createApplicationUpload,
   getApplicationView,
+  getPacketImage,
   recordDecision,
   removeApplicationFile,
   runReview,
@@ -11,7 +12,8 @@ import {
   uploadApplicationFile
 } from "@/features/applications/applications.functions"
 import { uploadApplicationFiles } from "@/features/applications/uploadApplicationFiles"
-import { getJobStatus } from "@/features/documents/documents.functions"
+import { getDocumentPage, getJobStatus } from "@/features/documents/documents.functions"
+import { useRole } from "@/features/role/RoleProvider"
 
 export const Route = createFileRoute("/applications/$applicationId")({
   staticData: { title: "Application" },
@@ -23,12 +25,20 @@ export const Route = createFileRoute("/applications/$applicationId")({
 function ApplicationRoute() {
   const view = Route.useLoaderData()
   const router = useRouter()
+  const { role } = useRole()
   const applicationId = view.application.id
   return (
     <ApplicationPage
       view={view}
+      // An administrator reads someone else's application as the committee; their own, as its applicant.
+      audience={role.id === "administrator" && !view.isOwner ? "committee" : "homeowner"}
       loadJob={(jobId) => getJobStatus({ data: { jobId } })}
       onChanged={() => void router.invalidate()}
+      source={{
+        documents: view.sourceFiles,
+        loadPage: (documentId, pageIndex) => getDocumentPage({ data: { documentId, pageIndex } })
+      }}
+      loadImage={async (fileId) => (await getPacketImage({ data: { applicationId, fileId } })).url}
       actions={{
         upload: (files) =>
           uploadApplicationFiles(

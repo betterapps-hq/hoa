@@ -11,6 +11,9 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     setupFiles: ["./src/tests/setup.ts"],
+    // Component tests type into tables of the whole sample rulebook (over a thousand terms) a key at a time: two to
+    // three seconds alone, past Vitest's five-second default when every worker runs under coverage at once.
+    testTimeout: 15_000,
     coverage: {
       provider: "v8",
       reporter: ["text", "text-summary", "html", "lcov", "json-summary"],

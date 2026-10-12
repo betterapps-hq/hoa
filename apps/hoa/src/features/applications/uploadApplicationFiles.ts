@@ -7,6 +7,8 @@ export type ApplicationUploadApi = {
     fileName: string
     mediaType: string
     sizeBytes: number
+    /** What the homeowner uploaded it as, such as a document the rules require; the review reads it with the file. */
+    contextText?: string
   }) => Promise<CreateFileUploadResult>
   uploadThroughServer: (form: FormData) => Promise<void>
   completeUpload: (fileId: string) => Promise<void>
@@ -28,7 +30,12 @@ export function uploadProblem(files: readonly File[]) {
  * Uploads application files one after another: straight to R2 with a presigned URL when the environment has one,
  * otherwise through the server. The files are read when the review runs.
  */
-export async function uploadApplicationFiles(api: ApplicationUploadApi, applicationId: string, files: readonly File[]) {
+export async function uploadApplicationFiles(
+  api: ApplicationUploadApi,
+  applicationId: string,
+  files: readonly File[],
+  purposes: ReadonlyMap<File, string> = new Map()
+) {
   const problem = uploadProblem(files)
   if (problem) {
     throw new Error(problem)
@@ -38,7 +45,8 @@ export async function uploadApplicationFiles(api: ApplicationUploadApi, applicat
       applicationId,
       fileName: file.name,
       mediaType: file.type,
-      sizeBytes: file.size
+      sizeBytes: file.size,
+      ...(purposes.has(file) ? { contextText: purposes.get(file) } : {})
     })
     if (created.uploadUrl) {
       const response = await (api.fetch ?? fetch)(created.uploadUrl, {

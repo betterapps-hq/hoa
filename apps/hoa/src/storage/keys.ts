@@ -39,3 +39,23 @@ export const jobOutputKey = (hoaId: string, jobId: string, stage: string, itemId
   `hoas/${hoaId}/jobs/${jobId}/${stage}/${itemId}.json`
 
 export const jobOutputPrefix = (hoaId: string, jobId: string) => `hoas/${hoaId}/jobs/${jobId}/`
+
+/** A rulebook's objects: its published rules file, written once (encoding.md, Storage). */
+export const rulebookKeys = (hoaId: string, rulebookId: string) => {
+  const root = `hoas/${hoaId}/rulebooks/${rulebookId}/`
+  return { root, file: `${root}rules.json` }
+}
+
+/**
+ * A job's step output by step name: `find-rules:declaration:article-4` is `find-rules/declaration:article-4.json`, and a
+ * step without an item, such as `merge`, is `merge/result.json`.
+ */
+export function jobStepKey(hoaId: string, jobId: string, name: string) {
+  const [stage = name, ...item] = name.split(":")
+  return jobOutputKey(hoaId, jobId, stage, item.join(":") || "result")
+}
+
+/** A rulebook build's step outputs (encoding.md, Storage). */
+export const rulebookBuildKeys = (hoaId: string, jobId: string) => ({
+  step: (name: string) => jobStepKey(hoaId, jobId, name)
+})

@@ -1,8 +1,6 @@
-import { PencilIcon, ScrollTextIcon } from "lucide-react"
-import { useState } from "react"
+import { DownloadIcon, UploadIcon } from "lucide-react"
+import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,318 +12,356 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { GoverningDocument } from "@/documents/governingDocument"
-import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
-import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
+import {
+  GoverningDocuments,
+  useUploadDialog,
+  type UploadDialog
+} from "@/features/documents/GoverningDocuments/GoverningDocuments"
+import type { DocumentDetails } from "@/features/documents/uploadDocument"
 import type { Job } from "@/jobs/job"
-import type { RulebookView } from "../rulebook.functions"
-import { readyToApprove } from "../rulebookEditing"
-import type { RuleCardActions } from "../RuleCard/RuleCard"
-import { RuleTable } from "../RuleTable/RuleTable"
+import type { BuildResults } from "@/rulebook/buildResults.server"
+import type { RefusedDocument } from "@/rulebook/buildSources"
+import type { StopResult } from "@/workflows/rulebookTrigger.server"
+import { attempt } from "../attempt"
+import { BuildProgress } from "../BuildProgress/BuildProgress"
+import { DraftReview } from "../DraftReview/DraftReview"
+import { saveFile } from "../PublishedRulebook/PublishedRulebook.utils"
+import type { RulebookSources, RulebookView } from "../rulebook.functions"
+import { recordsOf } from "../rulebookRecords"
+import { RulebookWorkspace } from "../RulebookWorkspace/RulebookWorkspace"
+import type { RulebookActions, RulebookSource } from "../useRulebookWorkspace"
+import { refusalSentence, rulebookStatus, type RulebookStatus } from "./RulebookPage.utils"
 
 export type RulebookPageProps = {
   draft: RulebookView
   published: RulebookView
-  documents: GoverningDocument[]
+  sources: RulebookSources
+  /** Every upload, each version of each document. */
+  uploads: GoverningDocument[]
+  /** The ingest job of each document being read, by document id. */
+  jobs: Record<string, string>
+  /** Loads document pages for citations and coverage. */
+  source: RulebookSource
+  /** What the administrator can do to the draft. */
+  actions: RulebookActions
+  /** Shows the draft for review instead of the rulebook in force. */
+  isReviewing: boolean
+  onReviewingChange: (isReviewing: boolean) => void
   loadJob: (jobId: string) => Promise<Job | null>
-  onBuild: (documentIds: string[]) => Promise<void>
-  /** Approves every pending rule with no open issues; resolves to how many. */
-  onApproveReady: () => Promise<number>
+  loadRulesFile: () => Promise<string>
+  onUpload: (file: File, details: DocumentDetails) => Promise<unknown>
+  /** Removes a governing document, every version of it, from the documents builds read. */
+  onRemoveDocument: (documentId: string) => Promise<void>
+  /** Builds a draft from the current documents, when one didn't start on its own or failed. */
+  onBuild: () => Promise<void>
+  /** Stops the running build. */
+  onStop: () => Promise<StopResult>
+  /** What a running build has produced so far, since a cursor. */
+  loadBuildResults: (jobId: string, since: string | null) => Promise<BuildResults>
   onPublish: (rulebookId: string) => Promise<void>
-  /** Copies the published rulebook into a draft to edit. */
-  onEditPublished: () => Promise<void>
-  onDiscardDraft: () => Promise<void>
-  actions: RuleCardActions
-  /** The documents citations come from. */
-  source: CitationSource
+  onDiscard: (rulebookId: string) => Promise<void>
   onChanged: () => void
 }
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
 
-async function attempt(action: () => Promise<unknown>, fallback: string) {
-  try {
-    await action()
-    return true
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : fallback)
-    return false
+/**
+ * The administrator's rulebook and governing documents in one place (encoding.md, UX): the rulebook in force, the
+ * documents it's built from, and one quiet line about what's happening or next. Uploading a document rebuilds the
+ * draft; reviewing the draft is a focused mode that ends in publishing or discarding it.
+ */
+export function RulebookPage(props: RulebookPageProps) {
+  const { draft, published, sources, source, actions, isReviewing, onReviewingChange } = props
+  const draftRecords = draft.rulebook && draft.content ? recordsOf(sources, draft.content, "draft") : null
+  const draftId = draft.rulebook?.id
+
+  if (isReviewing && draftRecords && draftId) {
+    const publishedRecords = published.content ? recordsOf(sources, published.content, "published") : null
+    return (
+      <DraftReview
+        records={draftRecords}
+        changes={
+          draft.changes && !draft.changes.isFirst && publishedRecords
+            ? { summary: draft.changes, published: publishedRecords }
+            : null
+        }
+        blockers={draft.blockers}
+        publishedVersion={published.rulebook?.version ?? null}
+        isRebuilding={draft.isBuilding}
+        source={source}
+        actions={actions}
+        onBack={published.rulebook ? () => onReviewingChange(false) : null}
+        onPublish={async () => {
+          await props.onPublish(draftId)
+          onReviewingChange(false)
+        }}
+        onDiscard={async () => {
+          await props.onDiscard(draftId)
+          onReviewingChange(false)
+        }}
+      />
+    )
+  }
+
+  return <RulebookOverview {...props} />
+}
+
+/** The rulebook page outside review: the status line, the documents and the rules in force. */
+function RulebookOverview(props: RulebookPageProps) {
+  const { draft, published, sources, uploads, source } = props
+  // The status line opens the documents' upload dialog too, when a document has to be uploaded again.
+  const uploadDialog = useUploadDialog()
+  const status = rulebookStatus({ draft, published, uploads })
+  return (
+    <div className="flex flex-col gap-10">
+      <StatusLine status={status} uploadDialog={uploadDialog} {...props} />
+      <GoverningDocuments
+        uploadDialog={uploadDialog}
+        uploads={uploads}
+        jobs={props.jobs}
+        loadJob={props.loadJob}
+        onUpload={props.onUpload}
+        onChanged={props.onChanged}
+      />
+      <RulesInForce published={published} sources={sources} source={source} loadRulesFile={props.loadRulesFile} />
+    </div>
+  )
+}
+
+function StatusLine({
+  status,
+  uploadDialog,
+  ...props
+}: { status: RulebookStatus; uploadDialog: UploadDialog } & RulebookPageProps) {
+  const [isBusy, setIsBusy] = useState(false)
+  const build = async () => {
+    setIsBusy(true)
+    await attempt(props.onBuild, "The build didn't start.")
+    setIsBusy(false)
+    props.onChanged()
+  }
+  const stop = async () => {
+    const result = await attempt(props.onStop, "The build couldn’t be stopped.")
+    if (result && result.status !== "stopped") {
+      toast("The build had already finished, so there was nothing to stop.")
+    }
+    props.onChanged()
+  }
+  const line = (sentence: ReactNode, detail: ReactNode, action: ReactNode = null) => (
+    <section aria-label="Status" className="flex flex-col gap-3 rounded-lg border p-5">
+      <p className="text-lg leading-snug">{sentence}</p>
+      {detail ? <div className="text-sm text-muted-foreground">{detail}</div> : null}
+      {action}
+    </section>
+  )
+  const reading = (titles: string[]) => (titles.length === 1 ? titles[0] : `${titles.length} documents`)
+  switch (status.kind) {
+    case "building":
+      return line(
+        "Updating the rulebook from your documents.",
+        <div className="flex flex-col gap-4">
+          <p>
+            You can leave this page. When it&rsquo;s done, you review what changed here before it&rsquo;s published.
+          </p>
+          {props.draft.buildJobId ? (
+            <BuildProgress
+              jobId={props.draft.buildJobId}
+              loadJob={props.loadJob}
+              onFinished={props.onChanged}
+              onStop={stop}
+              loadResults={(since) => props.loadBuildResults(props.draft.buildJobId ?? "", since)}
+            />
+          ) : null}
+        </div>
+      )
+    case "reading":
+      return line(
+        `Reading ${reading(status.reading)}.`,
+        "The rulebook updates once it’s read. You review what changed before it’s published."
+      )
+    case "draft-ready":
+      return line(
+        status.isFirst ? "Your rulebook is ready to review." : "A new draft of the rulebook is ready to review.",
+        status.isFirst
+          ? "Nothing is published yet. Review the draft and publish it to start checking applications against it."
+          : [
+              status.builtFrom.length > 0 ? `It was built after ${status.builtFrom.join(", ")} changed.` : null,
+              status.summary ? `It ${status.summary}.` : "It has the same rules as the rulebook in force."
+            ]
+              .filter((part) => part !== null)
+              .join(" "),
+        <Button className="w-fit" onClick={() => props.onReviewingChange(true)}>
+          {status.isFirst ? "Review the draft" : "Review changes"}
+        </Button>
+      )
+    case "build-stopped":
+      return line(
+        "The last build was stopped.",
+        status.hasDraft
+          ? "Work it finished is kept and reused next time. The earlier draft is still here to review."
+          : "Work it finished is kept and reused next time. Nothing was published.",
+        <div className="flex flex-wrap gap-2">
+          <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
+            Build a draft
+          </Button>
+          {status.hasDraft ? (
+            <Button variant="ghost" className="w-fit" onClick={() => props.onReviewingChange(true)}>
+              Review the earlier draft
+            </Button>
+          ) : null}
+        </div>
+      )
+    case "build-refused":
+      return line(
+        status.documents.length === 1
+          ? "The rulebook can’t be updated until one of your documents is fixed."
+          : "The rulebook can’t be updated until some of your documents are fixed.",
+        <ul className="flex flex-col gap-3">
+          {status.documents.map((document) => (
+            <li key={document.documentId} className="flex flex-col items-start gap-1.5">
+              <p>{refusalSentence(document)}</p>
+              <RemoveDocument document={document} onRemove={props.onRemoveDocument} onRemoved={props.onChanged} />
+            </li>
+          ))}
+        </ul>,
+        <Button className="w-fit" onClick={() => uploadDialog.open()}>
+          <UploadIcon />
+          Upload
+        </Button>
+      )
+    case "build-failed":
+      return line(
+        "The last update of the rulebook didn’t finish.",
+        <p className="line-clamp-3 break-words">{status.error}</p>,
+        status.isRetryable ? (
+          <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
+            Try again
+          </Button>
+        ) : null
+      )
+    case "documents-changed":
+      return line(
+        `Your documents changed since version ${status.version ?? ""} was published.`,
+        "Build a draft from them to review what changes.",
+        <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
+          Build a draft
+        </Button>
+      )
+    case "not-built":
+      return line(
+        "Build the rulebook from your documents.",
+        "Each provision is read and encoded as rules for you to review and publish.",
+        <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
+          Build the rulebook
+        </Button>
+      )
+    case "none":
+      return null
   }
 }
 
-/** The administrator's rulebook: build from documents, review and edit the draft, publish; or edit the published one. */
-export function RulebookPage({
-  draft,
-  published,
-  documents,
-  loadJob,
-  onBuild,
-  onApproveReady,
-  onPublish,
-  onEditPublished,
-  onDiscardDraft,
-  actions,
-  source,
-  onChanged
-}: RulebookPageProps) {
-  const ready = documents.filter((document) => document.status === "ready")
-  const [selected, setSelected] = useState<string[]>(() => ready.map((document) => document.id))
-  const [isBusy, setIsBusy] = useState(false)
-  const [tab, setTab] = useState(draft.rulebook || !published.rulebook ? "draft" : "published")
-  const counts = {
-    pending: draft.rules.filter((rule) => rule.review.status === "pending").length,
-    approved: draft.rules.filter((rule) => rule.review.status === "approved").length,
-    rejected: draft.rules.filter((rule) => rule.review.status === "rejected").length
-  }
-  const readyCount = readyToApprove(draft.rules).length
-  const publishedRules = published.rules.filter((rule) => rule.review.status === "approved")
-
-  const run = async (action: () => Promise<unknown>, fallback: string) => {
-    setIsBusy(true)
-    const succeeded = await attempt(action, fallback)
-    setIsBusy(false)
-    onChanged()
-    return succeeded
-  }
-
-  const editPublished = async () => {
-    if (await run(onEditPublished, "The draft wasn't created.")) {
-      setTab("draft")
+/** Removes a document the build refused, after a confirmation that names it. */
+function RemoveDocument({
+  document,
+  onRemove,
+  onRemoved
+}: {
+  document: RefusedDocument
+  onRemove: (documentId: string) => Promise<void>
+  onRemoved: () => void
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isRemoving, setIsRemoving] = useState(false)
+  const remove = async () => {
+    setIsRemoving(true)
+    const result = await attempt(async () => {
+      await onRemove(document.documentId)
+      return true
+    }, "The document wasn’t removed.")
+    setIsRemoving(false)
+    setIsOpen(false)
+    if (result) {
+      toast.success(`“${document.title}” was removed.`)
+      onRemoved()
     }
   }
-
   return (
-    <div className="flex flex-col gap-4 px-4 lg:px-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Build the rulebook</CardTitle>
-          <CardDescription>
-            Rules are extracted section by section from the documents you choose, checked against their pages, and saved
-            as a draft for you to review. Earlier approvals and edits carry over.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3">
-          {ready.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Upload and read at least one document first.</p>
-          ) : (
-            ready.map((document) => (
-              <Field key={document.id} orientation="horizontal">
-                <Checkbox
-                  id={`build-${document.id}`}
-                  checked={selected.includes(document.id)}
-                  onCheckedChange={(checked) =>
-                    setSelected((current) =>
-                      checked === true ? [...current, document.id] : current.filter((id) => id !== document.id)
-                    )
-                  }
-                />
-                <FieldLabel htmlFor={`build-${document.id}`}>{document.title}</FieldLabel>
-              </Field>
-            ))
-          )}
-          {draft.isBuilding && draft.buildJobId ? (
-            <JobProgress jobId={draft.buildJobId} loadJob={loadJob} onFinished={onChanged} />
-          ) : null}
-          {!draft.isBuilding && draft.lastBuildError ? (
-            <Alert variant="destructive">
-              <AlertTitle>The last build had problems</AlertTitle>
-              <AlertDescription className="line-clamp-3 break-all">{draft.lastBuildError}</AlertDescription>
-            </Alert>
-          ) : null}
-        </CardContent>
-        <CardFooter>
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialogTrigger
+        render={
           <Button
-            disabled={draft.isBuilding || isBusy || selected.length === 0}
-            onClick={() =>
-              void run(async () => {
-                await onBuild(selected)
-                setTab("draft")
-              }, "The build didn't start.")
-            }
-          >
-            {draft.isBuilding ? "Building" : "Build rulebook"}
+            variant="outline"
+            size="sm"
+            className="w-fit"
+            disabled={isRemoving}
+            aria-label={`Remove document “${document.title}”`}
+          />
+        }
+      >
+        Remove document
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Remove “{document.title}”?</AlertDialogTitle>
+          <AlertDialogDescription>
+            It&rsquo;s taken off your governing documents, with any earlier versions, so the rulebook is no longer built
+            from it. The rulebook in force doesn&rsquo;t change until you publish a new one.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep it</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" disabled={isRemoving} onClick={() => void remove()}>
+            Remove document
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+function RulesInForce({
+  published,
+  sources,
+  source,
+  loadRulesFile
+}: Pick<RulebookPageProps, "published" | "sources" | "source" | "loadRulesFile">) {
+  const [isDownloading, setIsDownloading] = useState(false)
+  const { rulebook, content } = published
+  if (!rulebook || !content) {
+    return null
+  }
+  const records = recordsOf(sources, content, "published")
+  const download = async () => {
+    setIsDownloading(true)
+    const json = await attempt(loadRulesFile, "The rules file couldn't be downloaded.")
+    setIsDownloading(false)
+    if (json) {
+      saveFile(`rules-version-${rulebook.version ?? "draft"}.json`, json)
+    }
+  }
+  return (
+    <section aria-labelledby="rules-in-force" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div className="flex flex-col gap-0.5">
+          <h2 id="rules-in-force" className="text-base font-semibold">
+            Rules in force
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Version {rulebook.version}
+            {rulebook.publishedAt ? `, published ${dateFormat.format(new Date(rulebook.publishedAt))}` : ""}.
+            Applications are checked against it.
+          </p>
+        </div>
+        {published.fileSha256 ? (
+          <Button size="sm" variant="ghost" disabled={isDownloading} onClick={() => void download()}>
+            <DownloadIcon />
+            {isDownloading ? "Downloading" : "Rules file"}
           </Button>
-        </CardFooter>
-      </Card>
-
-      <Tabs value={tab} onValueChange={(value) => setTab(value === "published" ? "published" : "draft")}>
-        <TabsList>
-          <TabsTrigger value="draft">Draft{draft.rulebook ? ` (${draft.rules.length})` : ""}</TabsTrigger>
-          <TabsTrigger value="published">
-            Published{published.rulebook?.version ? ` (version ${published.rulebook.version})` : ""}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="draft" className="flex flex-col gap-4">
-          {draft.rulebook ? (
-            <>
-              <Card size="sm">
-                <CardHeader>
-                  <CardTitle>Review the draft</CardTitle>
-                  <CardDescription className="flex flex-wrap gap-2">
-                    <Badge variant="outline">{counts.pending} pending</Badge>
-                    <Badge variant="outline">{counts.approved} approved</Badge>
-                    <Badge variant="outline">{counts.rejected} rejected</Badge>
-                  </CardDescription>
-                </CardHeader>
-                {draft.blockers.length > 0 ? (
-                  <CardContent>
-                    <ul className="list-disc pl-5 text-sm text-muted-foreground">
-                      {draft.blockers.map((blocker) => (
-                        <li key={blocker}>{blocker}</li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                ) : null}
-                <CardFooter className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    disabled={isBusy || readyCount === 0}
-                    onClick={() =>
-                      void run(async () => {
-                        const count = await onApproveReady()
-                        toast.success(`Approved ${count} ${count === 1 ? "rule" : "rules"}.`)
-                      }, "Approving failed.")
-                    }
-                  >
-                    Approve all ready ({readyCount})
-                  </Button>
-                  <Button
-                    disabled={isBusy || draft.blockers.length > 0}
-                    onClick={() => {
-                      const rulebookId = draft.rulebook?.id
-                      if (rulebookId) {
-                        void run(async () => {
-                          await onPublish(rulebookId)
-                          setTab("published")
-                        }, "Publishing failed.")
-                      }
-                    }}
-                  >
-                    Publish
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger render={<Button variant="ghost" disabled={isBusy} />}>
-                      Discard draft
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Discard the draft?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Every change in this draft is lost. The published rulebook stays as it is.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Keep editing</AlertDialogCancel>
-                        <AlertDialogAction
-                          variant="destructive"
-                          onClick={() => void run(onDiscardDraft, "The draft wasn't discarded.")}
-                        >
-                          Discard
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </CardFooter>
-              </Card>
-              {draft.removed.length > 0 ? (
-                <Alert>
-                  <AlertTitle>
-                    {draft.removed.length} published {draft.removed.length === 1 ? "rule isn’t" : "rules aren’t"} in
-                    this draft
-                  </AlertTitle>
-                  <AlertDescription>
-                    {draft.removed.length === 1 ? "It’s" : "They’re"} removed when you publish.
-                    <Accordion className="w-full">
-                      <AccordionItem value="removed">
-                        <AccordionTrigger>Show which</AccordionTrigger>
-                        <AccordionContent>
-                          <ul className="list-disc pl-5">
-                            {draft.removed.map((rule) => (
-                              <li key={rule.ruleKey}>{rule.title}</li>
-                            ))}
-                          </ul>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  </AlertDescription>
-                </Alert>
-              ) : null}
-              <RuleTable rules={draft.rules} actions={actions} source={source} />
-            </>
-          ) : (
-            <Empty>
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <ScrollTextIcon />
-                </EmptyMedia>
-                <EmptyTitle>No draft</EmptyTitle>
-                <EmptyDescription>
-                  {published.rulebook
-                    ? "To change the rules, edit the published rulebook, or build a new draft from the documents."
-                    : "Build the rulebook from the HOA’s documents to review its rules."}
-                </EmptyDescription>
-              </EmptyHeader>
-              {published.rulebook ? (
-                <EmptyContent>
-                  <Button disabled={isBusy || draft.isBuilding} onClick={() => void editPublished()}>
-                    <PencilIcon />
-                    Edit published rules
-                  </Button>
-                </EmptyContent>
-              ) : null}
-            </Empty>
-          )}
-        </TabsContent>
-
-        <TabsContent value="published" className="flex flex-col gap-4">
-          {published.rulebook ? (
-            <>
-              <Card size="sm">
-                <CardHeader>
-                  <CardTitle>Version {published.rulebook.version}</CardTitle>
-                  <CardDescription>
-                    {publishedRules.length} rules
-                    {published.rulebook.publishedAt
-                      ? `, published ${dateFormat.format(new Date(published.rulebook.publishedAt))}`
-                      : ""}
-                    . Applications are reviewed against this version.
-                  </CardDescription>
-                  <CardAction>
-                    {draft.rulebook ? (
-                      <Button variant="outline" onClick={() => setTab("draft")}>
-                        Open the draft
-                      </Button>
-                    ) : (
-                      <Button disabled={isBusy || draft.isBuilding} onClick={() => void editPublished()}>
-                        <PencilIcon />
-                        Edit rules
-                      </Button>
-                    )}
-                  </CardAction>
-                </CardHeader>
-              </Card>
-              <RuleTable rules={publishedRules} source={source} />
-            </>
-          ) : (
-            <Empty>
-              <EmptyHeader>
-                <EmptyTitle>Nothing published yet</EmptyTitle>
-                <EmptyDescription>
-                  Homeowners’ applications are checked against the published rulebook.
-                </EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
+        ) : null}
+      </div>
+      <RulebookWorkspace records={records} source={source} actions={null} audience="administrator" />
+    </section>
   )
 }

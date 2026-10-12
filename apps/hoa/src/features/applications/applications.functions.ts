@@ -22,18 +22,25 @@ import {
   type ReviewSummary
 } from "@/db/applicationRepository"
 import { getDb } from "@/db/client.server"
+import { listGoverningDocuments } from "@/db/documentRepository"
 import { getLatestJob, insertJob, newJob } from "@/db/jobRepository"
-import { getRulebookByStatus, listRules } from "@/db/rulebookRepository"
+import { getProjectType, listProjectTypes } from "@/db/projectTypeRepository"
+import { getPublishedRulesFile, type RulesFileRef } from "@/db/rulebookContentRepository"
 import type { Job } from "@/jobs/job"
-import { hasOpenRequests } from "@/pipeline/reviewInputs"
-import { reviewSchema, type Recommendation, type Review } from "@/review/reviewModel"
-import { projectTypeIds } from "@/rules/catalog"
-import type { Rule } from "@/rules/rule"
+import { answersSchema } from "@/projectTypes/answers"
+import { projectAnswers, type ProjectType } from "@/projectTypes/projectType"
+import { toEvidence } from "@/review/factSchema"
+import { hasOpenRequests, reviewSchema, type Recommendation, type Review } from "@/review/reviewModel"
+import { subjectsAnswerSchema } from "@/review/subjects"
+import { readRulesFile } from "@/rulebook/assemble"
+import type * as T from "@/schema/types"
 import { getRequestContext, requireAdministrator, type RequestContext } from "@/session/requestContext.server"
-import { applicationKeys } from "@/storage/keys"
-import { getJson } from "@/storage/objects"
+import { applicationKeys, jobStepKey, rulebookKeys } from "@/storage/keys"
+import { getJson, toBase64 } from "@/storage/objects"
 import { getBucket, getPresigner } from "@/storage/storage.server"
 import { validateUpload } from "@/storage/uploadRules"
+import type { SourceFile } from "../rulebook/rulebook.functions"
+import { reportRules, reviewTerms, type ReportRule } from "./applicationView"
 
 // Applications (docs/design/platform.md, "Server functions"): the homeowner creates one, uploads the packet, runs the
 // review as often as they like and submits; the committee decides.
@@ -74,7 +81,8 @@ export const createApplication = createServerFn({ method: "POST" })
   .validator((data: unknown) =>
     z
       .object({
-        projectType: z.enum(projectTypeIds),
+        projectTypeId: z.string().nullable(),
+        answers: projectAnswers.nullable(),
         description: z.string().trim().max(4000).nullable()
       })
       .parse(data)
@@ -82,9 +90,17 @@ export const createApplication = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<Application> => {
     const context = await getRequestContext()
     const now = new Date().toISOString()
+    const type = data.projectTypeId ? await getProjectType(getDb(), context.hoa.id, data.projectTypeId) : null
+    if (data.projectTypeId && type?.status !== "active") {
+      throw new Error("That project type isn't offered. Choose another, or Something else.")
+    }
+    // The answers are checked against the type's own form, the same schema the form validates with.
+    const answers =
+      type && data.answers ? projectAnswers.parse(answersSchema(type.definition).parse(data.answers)) : null
     return createApplicationRecord(getDb(), {
       hoaId: context.hoa.id,
-      projectType: data.projectType,
+      projectTypeId: type?.id ?? null,
+      answers,
       description: data.description || null,
       createdBy: context.user.id,
       now,
@@ -104,7 +120,8 @@ export const createApplicationUpload = createServerFn({ method: "POST" })
         applicationId: z.string(),
         fileName: z.string().min(1),
         mediaType: z.string(),
-        sizeBytes: z.number().int().positive()
+        sizeBytes: z.number().int().positive(),
+        contextText: z.string().trim().max(500).optional()
       })
       .parse(data)
   )
@@ -124,6 +141,7 @@ export const createApplicationUpload = createServerFn({ method: "POST" })
       fileName: data.fileName,
       mediaType: validation.upload.mediaType,
       sizeBytes: data.sizeBytes,
+      contextText: data.contextText ?? null,
       now: new Date().toISOString()
     })
     const key = applicationKeys(context.hoa.id, application.id).source(file.id, file.fileName)
@@ -207,7 +225,7 @@ export const runReview = createServerFn({ method: "POST" })
     if (!files.some((file) => file.parentFileId === null)) {
       throw new Error("Add at least one file first.")
     }
-    if (!(await getRulebookByStatus(db, context.hoa.id, "published"))) {
+    if (!(await getPublishedRulesFile(db, context.hoa.id))) {
       throw new Error("The HOA hasn't published its rulebook yet, so applications can't be reviewed.")
     }
     const now = new Date().toISOString()
@@ -291,7 +309,34 @@ export const recordDecision = createServerFn({ method: "POST" })
     }
   })
 
-export type ApplicationListItem = Application & { recommendation: Recommendation | null }
+export type ApplicationListItem = Application & {
+  recommendation: Recommendation | null
+  /** The project type's label; null for "Something else". */
+  projectTypeLabel: string | null
+}
+
+/**
+ * A rules file the pages read labels and rule text from. A file storage can't serve (or whose hash doesn't match)
+ * is logged and left out, so the application pages still show the applications and their reviews.
+ */
+async function readRulesFileForDisplay(ref: RulesFileRef) {
+  try {
+    return await readRulesFile(getBucket(), ref)
+  } catch (error) {
+    console.error(error)
+    return null
+  }
+}
+
+/** The published rules file, or null before the HOA publishes one. */
+async function loadPublishedRulesFile(hoaId: string) {
+  const published = await getPublishedRulesFile(getDb(), hoaId)
+  return published ? readRulesFileForDisplay(published) : null
+}
+
+/** The project type's label, from the organization's types; null for "Something else" or a removed type. */
+const typeLabel = (types: readonly ProjectType[], id: string | null) =>
+  id === null ? null : (types.find((type) => type.id === id)?.label ?? null)
 
 /** A homeowner's own applications, or every application for the committee, with their latest recommendation. */
 export const listApplications = createServerFn({ method: "GET" }).handler(async (): Promise<ApplicationListItem[]> => {
@@ -302,23 +347,72 @@ export const listApplications = createServerFn({ method: "GET" }).handler(async 
     context.hoa.id,
     context.role === "administrator" ? {} : { createdBy: context.user.id }
   )
+  const types = await listProjectTypes(db, context.hoa.id)
   return Promise.all(
     applications.map(async (application) => {
       const [latest] = await listReviewSummaries(db, context.hoa.id, application.id)
-      return { ...application, recommendation: latest?.recommendation ?? null }
+      return {
+        ...application,
+        recommendation: latest?.recommendation ?? null,
+        projectTypeLabel: typeLabel(types, application.projectTypeId)
+      }
     })
   )
 })
 
-export type ReviewRule = Pick<Rule, "id" | "title" | "statement" | "citations">
+/** The rules file a review read, checked against the hash it recorded. */
+const reviewRulesFile = (hoaId: string, review: Review) =>
+  readRulesFileForDisplay({
+    fileKey: rulebookKeys(hoaId, review.rulebookId).file,
+    fileSha256: review.rulesFileSha256
+  })
+
+/** What identification read to name each entity (the plat route, the photo), from the review's subjects step. */
+export type EntityEvidence = { entity: string; evidence: T.Evidence[] }
+
+const subjectsStep = z.object({ answer: subjectsAnswerSchema })
+
+/**
+ * The evidence that named each entity. The review record doesn't keep it, so it's read from the job's stored subjects
+ * step; a review whose steps are gone shows its entities without it.
+ */
+async function loadEntityEvidence(hoaId: string, review: Review): Promise<EntityEvidence[]> {
+  try {
+    const step = await getJson(getBucket(), jobStepKey(hoaId, review.jobId, "subjects"), subjectsStep)
+    return (step?.answer.entities ?? []).map((entity) => ({
+      entity: entity.id,
+      evidence: entity.evidence.map(toEvidence)
+    }))
+  } catch (error) {
+    console.error(error)
+    return []
+  }
+}
+
+/** The governing documents with pages, which the cited provisions' anchors point into. */
+async function loadSourceFiles(hoaId: string): Promise<SourceFile[]> {
+  const uploads = await listGoverningDocuments(getDb(), hoaId)
+  return uploads.flatMap((upload) =>
+    upload.status === "ready" && upload.pageCount
+      ? [{ id: upload.id, title: upload.title, pageCount: upload.pageCount }]
+      : []
+  )
+}
 
 export type ApplicationView = {
   application: Application
   files: ApplicationFile[]
   /** The latest review; for the committee, the review fixed at submission. */
   review: Review | null
-  /** The rules the review's findings refer to. */
-  rules: ReviewRule[]
+  /** The rules the review considered, with the provisions they cite. */
+  rules: ReportRule[]
+  /** The rulebook's terms the review names, for labels and term chips. */
+  terms: T.Term[]
+  entityEvidence: EntityEvidence[]
+  /** The governing documents a citation can be shown on. */
+  sourceFiles: SourceFile[]
+  /** The project type's label; null for "Something else". */
+  projectTypeLabel: string | null
   history: Pick<ReviewSummary, "id" | "recommendation" | "createdAt">[]
   /** The latest review job, so the page can follow one in progress or show why it failed. */
   job: Job | null
@@ -336,22 +430,57 @@ export const getApplicationView = createServerFn({ method: "GET" })
     const isOwner = application.createdBy === context.user.id
     const isCommittee = context.role === "administrator" && !isOwner
     const reviewId = isCommittee && application.submittedReviewId ? application.submittedReviewId : application.reviewId
-    const [files, review, history, job] = await Promise.all([
+    const [files, review, history, job, sourceFiles, types] = await Promise.all([
       listApplicationFiles(db, context.hoa.id, application.id),
       loadReview(context.hoa.id, application.id, reviewId),
       listReviewSummaries(db, context.hoa.id, application.id),
-      getLatestJob(db, context.hoa.id, application.id)
+      getLatestJob(db, context.hoa.id, application.id),
+      loadSourceFiles(context.hoa.id),
+      listProjectTypes(db, context.hoa.id)
     ])
-    const rules = review ? await listRules(db, context.hoa.id, review.rulebookId) : []
+    const [rulesFile, entityEvidence] = await Promise.all([
+      review ? reviewRulesFile(context.hoa.id, review) : loadPublishedRulesFile(context.hoa.id),
+      review ? loadEntityEvidence(context.hoa.id, review) : []
+    ])
+    const rules = review && rulesFile ? reportRules(rulesFile, review.selected) : []
     return {
       application,
       files,
       review,
-      rules: rules.map(({ id, title, statement, citations }) => ({ id, title, statement, citations })),
+      rules,
+      terms: review && rulesFile ? reviewTerms(rulesFile, review, rules) : [],
+      entityEvidence,
+      sourceFiles,
+      projectTypeLabel: typeLabel(types, application.projectTypeId),
       history: history.map(({ id, recommendation, createdAt }) => ({ id, recommendation, createdAt })),
       job,
       isOwner,
       canEdit: isOwner && editableStatuses.includes(application.status),
       canDecide: context.role === "administrator" && application.status === "submitted"
     }
+  })
+
+/**
+ * A photo from the packet, for the thumbnails beside the facts read from it: a short-lived download URL, or the image
+ * inline where the environment has no R2 token to sign one.
+ */
+export const getPacketImage = createServerFn({ method: "GET" })
+  .validator((data: unknown) => z.object({ applicationId: z.string(), fileId: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const context = await getRequestContext()
+    const application = await loadApplication(context, data.applicationId)
+    const file = await getApplicationFile(getDb(), context.hoa.id, data.fileId)
+    if (file?.applicationId !== application.id || !file.mediaType.startsWith("image/")) {
+      throw new Error("That file isn't a photo in this application.")
+    }
+    const key = applicationKeys(context.hoa.id, application.id).source(file.id, file.fileName)
+    const presigner = presignerOrNull()
+    if (presigner) {
+      return { url: await presigner.download(key) }
+    }
+    const object = await getBucket().get(key)
+    if (!object) {
+      throw new Error("The photo is missing from storage.")
+    }
+    return { url: `data:${file.mediaType};base64,${toBase64(new Uint8Array(await object.arrayBuffer()))}` }
   })

@@ -11,6 +11,7 @@ import { createLayoutClient } from "@/ocr/layoutClient"
 import { governingKeys, hoaCacheKey } from "@/storage/keys"
 import { getPresigner } from "@/storage/storage.server"
 import { runOcr, storageStep } from "./ocrSteps.server"
+import { requestRulebookBuildStep } from "./rulebookBuild.server"
 
 export type DocumentIngestParams = { hoaId: string; documentId: string; jobId: string }
 
@@ -29,7 +30,8 @@ function optionalPresigner() {
 
 /**
  * OCRs a governing document when it's uploaded (docs/design/ocr.md, "Where it runs"): resolve prompts, OCR in ranges,
- * labels, figure descriptions; the document becomes ready, or failed with its error.
+ * labels, figure descriptions; the document becomes ready, or failed with its error. A ready document requests a
+ * rulebook build (encoding.md, Save draft), which starts once no other upload is still being read.
  */
 export class DocumentIngest extends WorkflowEntrypoint<Env, DocumentIngestParams> {
   async run(event: WorkflowEvent<DocumentIngestParams>, step: WorkflowStep) {
@@ -39,6 +41,7 @@ export class DocumentIngest extends WorkflowEntrypoint<Env, DocumentIngestParams
       step.do(`progress:${stage}:${done}`, storageStep, () =>
         updateJob(db, hoaId, jobId, { stage, done, total, now: new Date().toISOString() })
       )
+    let isReady = false
     try {
       const document = await step.do("load", storageStep, async () => {
         const found = await getGoverningDocument(db, hoaId, documentId)
@@ -100,7 +103,7 @@ export class DocumentIngest extends WorkflowEntrypoint<Env, DocumentIngestParams
         }
       )
 
-      await step.do("finish", storageStep, async () => {
+      isReady = await step.do("finish", storageStep, async () => {
         const duplicate = await findDocumentByHash(db, hoaId, outcome.sha256, documentId)
         const now = new Date().toISOString()
         if (duplicate) {
@@ -115,7 +118,7 @@ export class DocumentIngest extends WorkflowEntrypoint<Env, DocumentIngestParams
             error: { stage: "ocr", message, isRetryable: false },
             now
           })
-          return
+          return false
         }
         await updateGoverningDocument(db, hoaId, documentId, {
           status: "ready",
@@ -131,6 +134,7 @@ export class DocumentIngest extends WorkflowEntrypoint<Env, DocumentIngestParams
           failures,
           now
         })
+        return true
       })
     } catch (error) {
       await step.do("fail", storageStep, async () => {
@@ -142,6 +146,9 @@ export class DocumentIngest extends WorkflowEntrypoint<Env, DocumentIngestParams
         await updateGoverningDocument(db, hoaId, documentId, { status: "failed", error: failed })
         await updateJob(db, hoaId, jobId, { status: "failed", error: failed, now: new Date().toISOString() })
       })
+    }
+    if (isReady) {
+      await requestRulebookBuildStep(step, "build-rulebook", { db, binding: this.env.RULEBOOK_BUILD, hoaId })
     }
   }
 }

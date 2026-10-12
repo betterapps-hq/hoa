@@ -1,12 +1,14 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers"
 import { NonRetryableError } from "cloudflare:workflows"
-import type { z } from "zod"
 import { createAiContext } from "@/ai/aiContext.server"
-import { pipelinePrompts } from "@/ai/pipelinePrompts"
+import { applicationReviewPrompts } from "@/ai/pipelinePrompts"
 import { resolvePromptVersions } from "@/ai/promptLoader"
-import type { PromptDefinition, PromptVariables } from "@/ai/prompts"
-import { runObjectPrompt, type PromptAttachment } from "@/ai/runPrompt"
-import { deleteAfterFor, type ApplicationFile, type ApplicationStatus } from "@/applications/application"
+import {
+  applicationRequestType,
+  deleteAfterFor,
+  type ApplicationFile,
+  type ApplicationStatus
+} from "@/applications/application"
 import {
   createApplicationFile,
   getApplication,
@@ -16,41 +18,25 @@ import {
   transitionApplication,
   updateApplicationFile
 } from "@/db/applicationRepository"
-import { createDatabase, type Database } from "@/db/database"
+import { createDatabase } from "@/db/database"
 import { getHoa } from "@/db/hoaRepository"
 import { getJob, updateJob } from "@/db/jobRepository"
-import { getRulebookByStatus, listRules } from "@/db/rulebookRepository"
+import { getProjectType } from "@/db/projectTypeRepository"
+import { getPublishedRulesFile } from "@/db/rulebookContentRepository"
 import { env } from "@/env.server"
+import type { StepRunner } from "@/jobs/steps"
 import { createLayoutClient } from "@/ocr/layoutClient"
 import { extractWordPictures } from "@/ocr/wordMedia"
-import { catalogForPrompt, truncate } from "@/pipeline/catalogPrompt"
-import { decide } from "@/pipeline/decide"
-import { evaluateRules, planQualitativeChecks, qualitativeKey, type QualitativeResult } from "@/pipeline/evaluate"
-import {
-  actionItemsForPrompt,
-  allowedValuesForPrompt,
-  checkboxesForPrompt,
-  classificationSchema,
-  documentsOutputSchema,
-  factsOutputSchema,
-  fileKindOf,
-  findingsForWriter,
-  informationalRulesForPrompt,
-  ownersOfRecord,
-  pagesForPrompt,
-  phraseItems,
-  qualitativeOutputSchema,
-  requirementsForPrompt,
-  textConditionsForPrompt,
-  writerOutputSchema,
-  type FilePages
-} from "@/pipeline/reviewInputs"
+import { localDate } from "@/review/load"
 import type { Review } from "@/review/reviewModel"
-import { applicationFileKinds, projectTypes } from "@/rules/catalog"
-import { applicationKeys } from "@/storage/keys"
+import { reviewApplication } from "@/review/run"
+import { loadPacket } from "@/review/storedPacket"
+import { readRulesFile } from "@/rulebook/assemble"
+import { applicationKeys, jobStepKey } from "@/storage/keys"
 import { createObjectPromptCache, getJson, putJson } from "@/storage/objects"
+import { loadPages } from "@/storage/pages"
 import { getPresigner } from "@/storage/storage.server"
-import { loadPages, modelStep, runOcr, storageStep, storedVisualSchema } from "./ocrSteps.server"
+import { modelStep, runOcr, storageStep } from "./ocrSteps.server"
 
 export type ApplicationReviewParams = {
   hoaId: string
@@ -61,8 +47,6 @@ export type ApplicationReviewParams = {
 }
 
 const wordMediaType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-const maxImages = 20
-const maxPagesCharacters = 200_000
 
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error)
@@ -90,83 +74,9 @@ function fileOcrKeys(hoaId: string, applicationId: string, file: Pick<Applicatio
   }
 }
 
-/** Every readable file's pages, figure descriptions and page kinds, in packet order. */
-async function loadPacket(
-  db: Database,
-  bucket: R2Bucket,
-  hoaId: string,
-  applicationId: string,
-  kinds: ReadonlyMap<string, readonly string[]> = new Map()
-): Promise<FilePages[]> {
-  const files = (await listApplicationFiles(db, hoaId, applicationId)).filter(
-    (file) => file.status === "ready" || file.status === "unreadable"
-  )
-  return Promise.all(
-    files.map(async (file) => {
-      const keys = fileOcrKeys(hoaId, applicationId, file)
-      const pages = file.status === "ready" ? await loadPages(bucket, keys, file.pageCount ?? 0) : []
-      const figureIds = file.mediaType.startsWith("image/")
-        ? ["image"]
-        : pages.flatMap((page) => page.figures.map((figure) => figure.id))
-      const visuals = (
-        await Promise.all(
-          figureIds.map((figureId) => getJson(bucket, keys.figureDescription(figureId), storedVisualSchema))
-        )
-      ).filter((visual) => visual !== null)
-      const fileKinds = kinds.get(file.id) ?? []
-      return {
-        file,
-        pages,
-        visuals,
-        kinds: new Map(
-          fileKinds.flatMap((kind, index) => {
-            const match = applicationFileKinds.find((item) => item === kind)
-            return match ? [[index + 1, match] as const] : []
-          })
-        )
-      }
-    })
-  )
-}
-
-/** The packet's images for the facts call, in order: uploaded pictures and figures cropped from pages. */
-async function loadImages(bucket: R2Bucket, hoaId: string, applicationId: string, packet: readonly FilePages[]) {
-  const sources = packet.flatMap(({ file, pages }) => {
-    const keys = fileOcrKeys(hoaId, applicationId, file)
-    if (file.status !== "ready") {
-      return []
-    }
-    if (file.mediaType.startsWith("image/")) {
-      return [{ key: keys.source, name: file.fileName, mediaType: file.mediaType }]
-    }
-    return pages.flatMap((page) =>
-      page.figures.map((figure) => ({
-        key: keys.figureImage(figure.id),
-        name: `${file.id}-${figure.id}.png`,
-        mediaType: "image/png"
-      }))
-    )
-  })
-  const images = await Promise.all(
-    sources.slice(0, maxImages).map(async (source): Promise<PromptAttachment | null> => {
-      const object = await bucket.get(source.key)
-      return object
-        ? {
-            type: "file",
-            filename: source.name,
-            mediaType: source.mediaType,
-            data: new Uint8Array(await object.arrayBuffer())
-          }
-        : null
-    })
-  )
-  return images.filter((image) => image !== null)
-}
-
 /**
- * Reviews an application packet against the published rulebook (docs/design/review.md, "Stages"): OCR and images,
- * classification, facts, documents, then code evaluates and decides, and the writer explains. Model results are cached
- * per application, so a re-run after adding one file only pays for what changed.
+ * Reviews an application packet against the published rulebook (application-review.md, Stages): resolve-prompts,
+ * load and OCR here, then the stages in `reviewApplication`, each a step whose output goes to R2, then save-review.
  */
 export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReviewParams> {
   async run(event: WorkflowEvent<ApplicationReviewParams>, step: WorkflowStep) {
@@ -175,12 +85,17 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
     const bucket = this.env.FILES
     const keys = applicationKeys(hoaId, applicationId)
     const now = () => new Date().toISOString()
-    const progress = (stage: string, done = 0, total = 0) =>
-      step.do(`progress:${stage}:${done}`, storageStep, () =>
+    // Step names must be unique: a stage can report the same count twice.
+    const reported = new Map<string, number>()
+    const progress = (stage: string, done = 0, total = 0) => {
+      const name = `progress:${stage}:${done}:${total}`
+      const count = (reported.get(name) ?? 0) + 1
+      reported.set(name, count)
+      return step.do(`${name}:${count}`, storageStep, () =>
         updateJob(db, hoaId, jobId, { stage, done, total, now: now() })
       )
+    }
     const failures: { stage: string; itemId: string; message: string }[] = []
-    let costUsd = 0
 
     try {
       const ai = createAiContext()
@@ -192,70 +107,41 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
           "Missing settings: AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and AZURE_DOCUMENT_INTELLIGENCE_KEY."
         )
       }
+
+      await progress("resolve-prompts")
+      const promptVersions = await step.do("resolve-prompts", storageStep, async () => {
+        const versions = await resolvePromptVersions(ai.loadPrompt, applicationReviewPrompts)
+        await updateJob(db, hoaId, jobId, { promptVersions: versions, now: now() })
+        return versions
+      })
+
+      // 2. Load: the application and its type, the published rules file and the settings.
+      await progress("load")
       const loaded = await step.do("load", storageStep, async () => {
         const application = await getApplication(db, hoaId, applicationId)
         if (!application) {
           throw new NonRetryableError("The application no longer exists.")
         }
-        const rulebook = await getRulebookByStatus(db, hoaId, "published")
-        if (!rulebook?.version) {
+        const rulesFile = await getPublishedRulesFile(db, hoaId)
+        if (!rulesFile) {
           throw new NonRetryableError("The HOA hasn't published a rulebook yet.")
         }
-        const rules = (await listRules(db, hoaId, rulebook.id)).filter(
-          (rule) => rule.review.status === "approved" && rule.projectTypes.includes(application.projectType)
-        )
         const hoa = await getHoa(db, hoaId)
         if (!hoa) {
           throw new NonRetryableError("The HOA no longer exists.")
         }
-        return { application, rulebook: { id: rulebook.id, version: rulebook.version }, rules, settings: hoa.settings }
+        const type = application.projectTypeId ? await getProjectType(db, hoaId, application.projectTypeId) : null
+        const projectType = type
+          ? { label: type.label, description: type.description, definition: type.definition }
+          : null
+        return { application, projectType, rulesFile, settings: hoa.settings, startedAt: now() }
       })
-      const { application, rules } = loaded
+      const { application, projectType } = loaded
+      // The file is read on every replay, never stored in a step: it's checked against its hash each time.
+      const rulesFile = await readRulesFile(bucket, loaded.rulesFile)
 
-      await progress("resolve-prompts")
-      const prompts = [
-        pipelinePrompts.visualDescription,
-        pipelinePrompts.fileClassification,
-        pipelinePrompts.factExtraction,
-        pipelinePrompts.documentCheck,
-        pipelinePrompts.qualitativeCheck,
-        pipelinePrompts.reviewWriter
-      ]
-      const promptVersions = await step.do("resolve-prompts", storageStep, async () => {
-        const versions = await resolvePromptVersions(ai.loadPrompt, prompts)
-        await updateJob(db, hoaId, jobId, { promptVersions: versions, now: now() })
-        return versions
-      })
-      const run = async <T, Prompt extends PromptDefinition>(
-        prompt: Prompt,
-        options: {
-          schema: z.ZodType<T>
-          variables: PromptVariables<Prompt>
-          attachments?: PromptAttachment[]
-          small?: boolean
-          traceName: string
-        }
-      ) => {
-        const result = await runObjectPrompt({
-          loadPrompt: ai.loadPrompt,
-          createModel: ai.createModel,
-          defaultModelId: options.small ? ai.smallModelId : ai.modelId,
-          prompt,
-          promptVersion: promptVersions[prompt.name],
-          schema: options.schema,
-          variables: options.variables,
-          attachments: options.attachments,
-          traceName: options.traceName,
-          environment: ai.environment,
-          sessionId: jobId,
-          cache: createObjectPromptCache(bucket, (hash) => keys.cache(options.traceName, hash))
-        })
-        await ai.flush()
-        return { object: result.object, costUsd: result.costUsd ?? 0 }
-      }
-
-      // OCR: pictures come out of Word files first, then every new file is read in parallel. Files read by an earlier
-      // review are already ready and aren't read again.
+      // 3. OCR: pictures come out of Word files first, then every new file is read in parallel. Files read by an
+      // earlier review are already ready and aren't read again.
       await progress("ocr")
       const topLevel = await step.do("ocr:list", storageStep, async () =>
         (await listApplicationFiles(db, hoaId, applicationId)).filter((file) => file.parentFileId === null)
@@ -272,7 +158,7 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
               ? `picture-${picture.ordinal}.${picture.mediaType === "image/png" ? "png" : "jpg"}`
               : picture.fileName
             if (picture.mediaType) {
-              await bucket.put(applicationKeys(hoaId, applicationId).source(childId, fileName), picture.data, {
+              await bucket.put(keys.source(childId, fileName), picture.data, {
                 httpMetadata: { contentType: picture.mediaType }
               })
             }
@@ -348,186 +234,107 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
           }
         })
       )
-
-      // Classify each page with the small model.
-      const readable = (await loadPacket(db, bucket, hoaId, applicationId)).filter(
-        ({ file }) => file.status === "ready"
+      const files = await step.do("ocr:files", storageStep, () => listApplicationFiles(db, hoaId, applicationId))
+      const packet = await loadPacket(
+        bucket,
+        files,
+        (file) => fileOcrKeys(hoaId, applicationId, file),
+        (file) => loadPages(bucket, fileOcrKeys(hoaId, applicationId, file), file.pageCount ?? 0)
       )
-      await progress("classify", 0, readable.length)
-      const kinds = new Map<string, string[]>()
-      for (const { file, pages, visuals } of readable) {
-        const fileKinds = await step.do(`classify:${file.id}`, modelStep, async () => {
-          const results = await Promise.all(
-            pages.map(async (page) => {
-              try {
-                const result = await run(pipelinePrompts.fileClassification, {
-                  schema: classificationSchema,
-                  small: true,
-                  traceName: "file-classification",
-                  variables: {
-                    fileKinds: applicationFileKinds.join(", "),
-                    contextText: file.contextText ?? "none",
-                    visualDescriptions:
-                      visuals
-                        .filter((visual) => visual.pageIndex === page.pageIndex)
-                        .map((visual) => visual.description)
-                        .join("\n") || "none",
-                    checkboxCount: String(page.checkboxes.length),
-                    pageText: truncate(page.text, 12_000) || "[no text]"
-                  }
-                })
-                return { kind: result.object.kind, costUsd: result.costUsd }
-              } catch {
-                return { kind: "other" as const, costUsd: 0 }
-              }
-            })
-          )
-          const pageKinds = results.map((result) => result.kind)
-          await setPageKinds(db, hoaId, file.id, pageKinds)
-          await updateApplicationFile(db, hoaId, file.id, { kind: fileKindOf(pageKinds) })
-          return { kinds: pageKinds, costUsd: results.reduce((sum, result) => sum + result.costUsd, 0) }
-        })
-        kinds.set(file.id, fileKinds.kinds)
-        costUsd += fileKinds.costUsd
-      }
-      const packet = await loadPacket(db, bucket, hoaId, applicationId, kinds)
-      const pages = truncate(pagesForPrompt(packet), maxPagesCharacters)
 
-      await progress("facts")
-      const facts = await step.do("facts", modelStep, async () => {
-        const result = await run(pipelinePrompts.factExtraction, {
-          schema: factsOutputSchema,
-          traceName: "fact-extraction",
-          variables: {
-            projectType: projectTypes[application.projectType].label,
-            catalog: catalogForPrompt(application.projectType),
-            allowedValues: allowedValuesForPrompt(rules),
-            textConditions: textConditionsForPrompt(rules),
-            description: application.description ?? "none",
-            pages
-          },
-          attachments: await loadImages(bucket, hoaId, applicationId, packet)
+      // 4 to 14. Each stage's steps keep their output in R2 (Workflows caps a step's output at 1 MiB) and read it back
+      // through its schema, on replay too.
+      const runStep: StepRunner = async (name, schema, run, kind = "code") => {
+        await step.do(name, kind === "model" ? modelStep : storageStep, async () => {
+          await putJson(bucket, jobStepKey(hoaId, jobId, name), await run())
+          await ai.flush()
         })
-        return { ...result.object, costUsd: result.costUsd }
-      })
-      costUsd += facts.costUsd
-
-      await progress("documents")
-      const documents = await step.do("documents", modelStep, async () => {
-        const result = await run(pipelinePrompts.documentCheck, {
-          schema: documentsOutputSchema,
-          traceName: "document-check",
-          variables: {
-            requirements: requirementsForPrompt(application.projectType, rules, facts.components),
-            ownersOfRecord: ownersOfRecord(facts.facts),
-            checkboxes: checkboxesForPrompt(packet),
-            pages
-          }
-        })
-        return { documents: result.object.documents, costUsd: result.costUsd }
-      })
-      costUsd += documents.costUsd
-
-      // Evaluate: one model call per applicable qualitative check, then code decides every finding.
-      const input = {
-        projectType: application.projectType,
-        rules,
-        components: facts.components,
-        facts: facts.facts,
-        conditionAnswers: facts.conditions,
-        documents: documents.documents
-      }
-      const planned = planQualitativeChecks(input)
-      await progress("evaluate", 0, planned.length)
-      const qualitative = new Map<string, QualitativeResult>()
-      for (const [index, { rule, componentId }] of planned.entries()) {
-        try {
-          const result = await step.do(`evaluate:${rule.id}:${componentId ?? "project"}`, modelStep, async () => {
-            const component = facts.components.find((item) => item.id === componentId)
-            const relevant = facts.facts.filter((fact) => fact.componentId === componentId || fact.componentId === null)
-            const answer = await run(pipelinePrompts.qualitativeCheck, {
-              schema: qualitativeOutputSchema,
-              traceName: "qualitative-check",
-              variables: {
-                ruleStatement: rule.statement,
-                criterion: rule.check.type === "qualitative" ? rule.check.criterion : rule.statement,
-                component: component ? `${component.id}: ${component.label}` : "the whole project",
-                facts: JSON.stringify(relevant),
-                evidencePages: pages
-              }
-            })
-            return answer
-          })
-          qualitative.set(qualitativeKey(rule.id, componentId), result.object)
-          costUsd += result.costUsd
-        } catch (error) {
-          // A failed qualitative call leaves the finding to the committee ("automatic check failed").
-          failures.push({
-            stage: "evaluate",
-            itemId: `${rule.id}:${componentId ?? "project"}`,
-            message: errorText(error)
-          })
+        const output = await getJson(bucket, jobStepKey(hoaId, jobId, name), schema)
+        if (output === null) {
+          throw new Error(`The output of step ${name} is missing from storage.`)
         }
-        await progress("evaluate", index + 1, planned.length)
+        return output
       }
-      const findings = await step.do("evaluate", storageStep, async () => evaluateRules({ ...input, qualitative }))
-
-      await progress("decide")
-      const decision = decide(findings, rules, loaded.settings)
-
-      await progress("write")
-      const written = await step.do("write", modelStep, async () => {
-        const result = await run(pipelinePrompts.reviewWriter, {
-          schema: writerOutputSchema,
-          traceName: "review-writer",
-          variables: {
-            recommendation: decision.recommendation,
-            findings: findingsForWriter(findings, rules),
-            facts: JSON.stringify(facts.facts),
-            actionItems: actionItemsForPrompt(decision),
-            informationalRules: informationalRulesForPrompt(rules)
-          }
-        })
-        return { ...result.object, costUsd: result.costUsd }
+      const result = await reviewApplication({
+        organizationId: hoaId,
+        rulesFile,
+        application: {
+          requestType: applicationRequestType,
+          projectType,
+          answers: application.answers,
+          description: application.description,
+          // A review before submission is provisional; one after the committee asked for more is judged as of
+          // the original submission.
+          submittedOn: application.submittedAt
+            ? localDate(application.submittedAt, rulesFile.settings.clauses.time.zone)
+            : null
+        },
+        packet,
+        step: runStep,
+        ai: {
+          loadPrompt: ai.loadPrompt,
+          createModel: ai.createModel,
+          modelId: ai.modelId,
+          smallModelId: ai.smallModelId,
+          environment: ai.environment,
+          sessionId: jobId,
+          promptVersions,
+          cache: (traceName) => createObjectPromptCache(bucket, (hash) => keys.cache(traceName, hash))
+        },
+        now: loaded.startedAt,
+        progress
       })
-      costUsd += written.costUsd
+      failures.push(...result.failures)
 
+      // 15. Save: the review in R2, its summary in D1, the page types on the files, and the application reviewed.
       await progress("save-review")
       await step.do("save-review", storageStep, async () => {
-        const job = await getJob(db, hoaId, jobId)
         const createdAt = now()
         const review: Review = {
           id: jobId,
           applicationId,
           jobId,
-          rulebookId: loaded.rulebook.id,
-          rulebookVersion: loaded.rulebook.version,
-          components: facts.components,
-          facts: facts.facts,
-          conditionAnswers: facts.conditions,
-          documents: documents.documents,
-          findings,
-          recommendation: decision.recommendation,
-          changes: phraseItems(decision.changes, written.items),
-          missingInformation: phraseItems(decision.missingInformation, written.items),
-          committeeDecisions: phraseItems(decision.committeeDecisions, written.items),
-          assessment: written.assessment,
-          feedback: written.feedback,
+          rulebookId: loaded.rulesFile.rulebookId,
+          rulesFileSha256: loaded.rulesFile.fileSha256,
+          request: result.request,
+          provisional: result.provisional,
+          selected: result.selected,
+          documents: result.documents,
+          normalizations: result.normalizations,
+          judgments: result.judgments,
+          conditionAnswers: result.conditionAnswers,
+          corrections: result.corrections,
+          findings: result.findings,
+          recommendation: result.recommendation,
+          changes: result.changes,
+          missingInformation: result.missingInformation,
+          committeeDecisions: result.committeeDecisions,
+          suggestions: result.suggestions,
+          assessment: result.assessment,
+          feedback: result.feedback,
           promptVersions,
-          costUsd,
-          durationMs: job ? Date.parse(createdAt) - Date.parse(job.createdAt) : 0,
+          costUsd: result.costUsd,
+          durationMs: Date.parse(createdAt) - Date.parse(loaded.startedAt),
           sessionId: jobId,
           createdAt
         }
         await putJson(bucket, keys.review(review.id), review)
+        for (const [fileId, types] of Object.entries(result.pageTypes)) {
+          await setPageKinds(db, hoaId, fileId, types)
+          const [first] = types
+          await updateApplicationFile(db, hoaId, fileId, {
+            kind: first && types.every((type) => type === first) ? first : null
+          })
+        }
         await saveReviewSummary(db, {
           id: review.id,
           hoaId,
           applicationId,
           jobId,
           rulebookId: review.rulebookId,
+          rulesFileSha256: review.rulesFileSha256,
           recommendation: review.recommendation,
-          costUsd,
+          costUsd: review.costUsd,
           sessionId: jobId,
           createdAt
         })

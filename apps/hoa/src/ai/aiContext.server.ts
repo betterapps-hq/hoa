@@ -32,15 +32,21 @@ export function createAiContext() {
     modelId: env.OPENROUTER_MODEL,
     /** The cheaper model for routing, structure and classification. */
     smallModelId: env.OPENROUTER_SMALL_MODEL ?? env.OPENROUTER_MODEL,
-    loadPrompt: createPromptLoader(langfuse.prompt, env.LANGFUSE_PROMPT_LABEL),
+    /** Model calls a rulebook build stage runs at once. */
+    encodingConcurrency: env.ENCODING_CONCURRENCY,
+    loadPrompt: createPromptLoader(
+      {
+        get: async (name, options) => langfuse.prompt.get(name, options),
+        getChat: async (name, options) => langfuse.prompt.get(name, { ...options, type: "chat" })
+      },
+      env.LANGFUSE_PROMPT_LABEL
+    ),
     environment: env.LANGFUSE_TRACING_ENVIRONMENT,
+    /** Scores observations, such as a build's root span. */
+    scores: langfuse.score,
     /** Sends buffered spans to Langfuse; call before a server function returns or a Workflow step ends. */
     flush: async () => {
       await telemetry.forceFlush()
     }
   }
-}
-
-export function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback
 }

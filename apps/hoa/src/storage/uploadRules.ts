@@ -25,10 +25,31 @@ const limits: Record<UploadTarget, Partial<Record<UploadFormat, number>>> = {
   application: { pdf: 25 * megabyte, docx: 25 * megabyte, image: 5 * megabyte }
 }
 
-/** The file input's `accept` attribute for each target. */
-export const acceptFor: Record<UploadTarget, string> = {
-  governing: ".pdf,.docx,application/pdf," + docxType,
-  application: ".pdf,.docx,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg," + docxType
+/** The media types and extensions a target accepts, as a file picker's filter: { "application/pdf": [".pdf"] }. */
+export function acceptedTypes(target: UploadTarget): Record<string, string[]> {
+  return Object.fromEntries(
+    uploadFormats
+      .filter((format) => limits[target][format] !== undefined)
+      .flatMap((format) =>
+        formats[format].types.map((type) => [type, formats[format].extensions.map((extension) => `.${extension}`)])
+      )
+  )
+}
+
+const formatNames: Record<UploadFormat, string> = { pdf: "PDF", docx: "Word", image: "JPEG or PNG" }
+
+/** What a target accepts, in words: "PDF or Word up to 25 MB, JPEG or PNG up to 5 MB." */
+export function uploadHint(target: UploadTarget) {
+  const bySize = Map.groupBy(
+    uploadFormats.filter((format) => limits[target][format] !== undefined),
+    (format) => limits[target][format] ?? 0
+  )
+  const parts = [...bySize].map(([limit, group]) => {
+    const names = group.map((format) => formatNames[format])
+    const listed = names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names.at(-1)}` : (names[0] ?? "")
+    return `${listed} up to ${limit / megabyte} MB`
+  })
+  return `${parts.join(", ")}.`
 }
 
 export type ValidatedUpload = { format: UploadFormat; mediaType: string }

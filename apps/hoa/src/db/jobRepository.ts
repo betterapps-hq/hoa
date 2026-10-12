@@ -1,5 +1,6 @@
 import { and, desc, eq } from "drizzle-orm"
 import { jobSchema, type Job } from "@/jobs/job"
+import { advanceProgress } from "@/jobs/progress"
 import type { Database } from "./database"
 import { jobs } from "./schema"
 
@@ -19,6 +20,7 @@ export function newJob(input: NewJob): Job {
     promptVersions: {},
     failures: [],
     error: null,
+    progress: null,
     createdAt: input.now,
     updatedAt: input.now
   }
@@ -61,21 +63,32 @@ export async function getLatestJobOfKind(db: Database, hoaId: string, kind: Job[
   return row ? jobSchema.parse(row) : null
 }
 
-/** Every job for a subject, newest first: the retention sweep deletes their outputs and traces. */
-export async function listJobs(db: Database, hoaId: string, subjectId: string): Promise<Job[]> {
-  const rows = await db
-    .select()
-    .from(jobs)
-    .where(and(eq(jobs.hoaId, hoaId), eq(jobs.subjectId, subjectId)))
-    .orderBy(desc(jobs.createdAt))
-  return rows.map((row) => jobSchema.parse(row))
+/**
+ * Moves a job's stage and count, and its steps when it records them (`src/jobs/progress.ts`), reading the steps it has
+ * so parallel reports each build on the latest.
+ */
+export async function reportJobProgress(
+  db: Database,
+  hoaId: string,
+  id: string,
+  report: { stage: string; done: number; total: number; now: string }
+) {
+  const job = await getJob(db, hoaId, id)
+  const { now, ...counts } = report
+  await updateJob(db, hoaId, id, {
+    ...counts,
+    ...(job?.progress ? { progress: advanceProgress(job.progress, counts, now) } : {}),
+    now
+  })
 }
 
 export async function updateJob(
   db: Database,
   hoaId: string,
   id: string,
-  patch: Partial<Pick<Job, "status" | "stage" | "done" | "total" | "promptVersions" | "failures" | "error">> & {
+  patch: Partial<
+    Pick<Job, "status" | "stage" | "done" | "total" | "promptVersions" | "failures" | "error" | "progress">
+  > & {
     now: string
   }
 ) {

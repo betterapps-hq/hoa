@@ -8,6 +8,55 @@
       "when": 1791452617233,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791556295580,
+      "tag": "0001_rules_schema_storage",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791561613415,
+      "tag": "0002_document_structure",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791564637107,
+      "tag": "0003_application_project_kind",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791588330869,
+      "tag": "0004_project_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791596082981,
+      "tag": "0005_archive_project_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791603147020,
+      "tag": "0006_job_progress",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791604714520,
+      "tag": "0007_governing_document_removed",
+      "breakpoints": true
     }
   ]
 }

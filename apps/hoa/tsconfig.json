@@ -6,6 +6,7 @@
     "declaration": false,
     "declarationMap": false,
     "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
     "types": ["node", "vite/client"],
     "paths": {
       "@/*": ["./src/*"]

@@ -2,336 +2,242 @@ import { createServerFn } from "@tanstack/react-start"
 import { env as bindings } from "cloudflare:workers"
 import { z } from "zod"
 import { getDb } from "@/db/client.server"
-import { getGoverningDocument, listGoverningDocuments } from "@/db/documentRepository"
-import { getLatestJobOfKind, insertJob, newJob } from "@/db/jobRepository"
+import type { Database } from "@/db/database"
+import { listDocumentRecords, listGoverningDocuments, listProvisions } from "@/db/documentRepository"
+import { getLatestJobOfKind } from "@/db/jobRepository"
 import {
-  copyRulebookAsDraft,
-  deleteRule,
-  discardDraft,
-  getRule,
-  getRulebookByStatus,
-  insertRulebook,
-  listRules,
-  publishRulebook as publishRulebookRecord,
-  updateRule,
-  updateRules
-} from "@/db/rulebookRepository"
-import { pageSchema } from "@/ocr/page"
-import type { RemovedRule } from "@/pipeline/carryForward"
-import { catalogVersion } from "@/rules/catalog"
-import { ruleSchema, rulebookSchema, type Rule } from "@/rules/rule"
+  discardDraftRulebook,
+  getPublishedRulesFile,
+  getRulebookContent,
+  type RulebookContent
+} from "@/db/rulebookContentRepository"
+import { getRulebookByStatus } from "@/db/rulebookRepository"
+import { readRulesFileJson } from "@/rulebook/assemble"
+import { loadBuildResults, type BuildResults } from "@/rulebook/buildResults.server"
+import { checkCurrentSources, isRefusedBuild, type RefusedDocument } from "@/rulebook/buildSources"
+import { rulebookChanges, type RulebookChanges } from "@/rulebook/changes"
+import { textOutsideProvisions, type SourceText } from "@/rulebook/coverage"
+import { currentDocumentIds } from "@/rulebook/currentDocuments"
+import { publishBlockers, publishDraft } from "@/rulebook/publish"
+import type { rulebookSchema } from "@/rules/rule"
+import type * as Rules from "@/schema/types"
 import { getRequestContext, requireAdministrator } from "@/session/requestContext.server"
-import { governingKeys, jobOutputKey } from "@/storage/keys"
-import { getJson } from "@/storage/objects"
+import { governingKeys } from "@/storage/keys"
+import { loadPages } from "@/storage/pages"
 import { getBucket } from "@/storage/storage.server"
 import {
-  addCitation,
-  applyRuleChanges,
-  approvalBlocker,
-  citationFromSelection,
-  describeBuildProblem,
-  publishBlockers,
-  readyToApprove,
-  removeCitation,
-  replaceCitation,
-  ruleChangesSchema
-} from "./rulebookEditing"
+  abandonRulebookBuild,
+  newBuildIds,
+  requestRulebookBuild,
+  stopRulebookBuild as stopBuild,
+  type StopResult
+} from "@/workflows/rulebookTrigger.server"
+import { describeBuildProblem } from "./rulebookView"
 
 type Rulebook = z.infer<typeof rulebookSchema>
 
 export type RulebookView = {
   rulebook: Rulebook | null
-  rules: Rule[]
-  /** For a draft: rules from the previous version that the new build no longer produced. */
-  removed: RemovedRule[]
+  /** The rulebook's records; null while it has none. */
+  content: RulebookContent | null
+  /** The published rules file's SHA-256. */
+  fileSha256: string | null
   /** The latest build, so the page can follow one in progress. */
   buildJobId: string | null
   isBuilding: boolean
-  /** Why the latest build failed or skipped sections, when it did. */
+  /** Why the latest build failed or skipped items, when it did; null when it was refused (see `refusedDocuments`). */
   lastBuildError: string | null
+  /** Whether building again can get past the latest build's failure, so the page offers to try again. */
+  isLastBuildRetryable: boolean
+  /** The documents the latest build refused before spending anything, while they still would be; empty otherwise. */
+  refusedDocuments: RefusedDocument[]
+  /** Whether an administrator stopped the latest build. */
+  isLastBuildStopped: boolean
+  /** Why the draft can't be published yet. */
   blockers: string[]
+  /** What the draft changes against the published rulebook; null for the published view and a draft with no records. */
+  changes: RulebookChanges | null
 }
 
-/** Starts a rulebook build from ready documents; refused while another build runs. */
-export const startRulebookBuild = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z.object({ documentIds: z.array(z.string()).min(1, "Choose at least one document.") }).parse(data)
+/** An upload with pages, which provisions' anchors point into. */
+export type SourceFile = { id: string; title: string; pageCount: number }
+
+/** The organization's governing documents and their provisions, which every rulebook's records cite. */
+export type RulebookSources = {
+  organization: { id: string; name: string }
+  documents: Rules.GoverningDocument[]
+  provisions: Rules.Provision[]
+  files: SourceFile[]
+}
+
+async function loadSources(db: Database, hoa: { id: string; name: string }): Promise<RulebookSources> {
+  const [records, uploads] = await Promise.all([listDocumentRecords(db, hoa.id), listGoverningDocuments(db, hoa.id)])
+  return {
+    organization: { id: hoa.id, name: hoa.name },
+    documents: records.map((record) => record.document),
+    provisions: await listProvisions(
+      db,
+      hoa.id,
+      records.map((record) => record.id)
+    ),
+    files: uploads.flatMap((upload) =>
+      upload.status === "ready" && upload.pageCount
+        ? [{ id: upload.id, title: upload.title, pageCount: upload.pageCount }]
+        : []
+    )
+  }
+}
+
+/** The documents and provisions the rules cite, for every rulebook view. */
+export const getRulebookSources = createServerFn({ method: "GET" }).handler(async () => {
+  const context = await getRequestContext()
+  return loadSources(getDb(), context.hoa)
+})
+
+/**
+ * The text on each upload's pages that no provision holds (encoding.md, UX, Coverage), cleaned as the structure stage
+ * cleans it: only uploads some provision's anchors point into are read.
+ */
+export const getSourceText = createServerFn({ method: "GET" }).handler(async (): Promise<SourceText[]> => {
+  const context = await getRequestContext()
+  const sources = await loadSources(getDb(), context.hoa)
+  const anchored = new Set(sources.provisions.flatMap((provision) => provision.anchors.map((anchor) => anchor.fileId)))
+  const bucket = getBucket()
+  return Promise.all(
+    sources.files
+      .filter((file) => anchored.has(file.id))
+      .map(async (file) =>
+        textOutsideProvisions(
+          file.id,
+          await loadPages(bucket, governingKeys(context.hoa.id, file.id), file.pageCount),
+          sources.provisions
+        )
+      )
   )
+})
+
+const skippedBuild = {
+  processing: "A document is still being read. The rulebook builds when it finishes.",
+  building: "A rulebook is already being built.",
+  "no-documents": "Upload a governing document first.",
+  unchanged: "The rulebook is already built from the current documents."
+} as const
+
+/**
+ * Builds the rulebook again from the current documents (uploads build it on their own; this is "try again"). Refused
+ * while a document is being read or another build runs.
+ */
+export const startRulebookBuild = createServerFn({ method: "POST" }).handler(async () => {
+  const context = await requireAdministrator()
+  const db = getDb()
+  const hoaId = context.hoa.id
+  const ids = newBuildIds()
+  const now = new Date().toISOString()
+  const request = await requestRulebookBuild(db, bindings.RULEBOOK_BUILD, hoaId, { now, ids }).catch(
+    async (error: unknown) => {
+      await abandonRulebookBuild(db, hoaId, ids, error instanceof Error ? error.message : String(error), now)
+      throw error
+    }
+  )
+  if (request.status === "skipped") {
+    throw new Error(skippedBuild[request.reason])
+  }
+  return { jobId: request.jobId, rulebookId: request.rulebookId }
+})
+
+/**
+ * Stops the running build (encoding.md, UX): its Workflow ends, nothing is saved or published, and the model answers
+ * it finished stay cached for the next build. Says so plainly when the build already ended.
+ */
+export const stopRulebookBuild = createServerFn({ method: "POST" }).handler(async (): Promise<StopResult> =>
+  stopBuild(getDb(), bindings.RULEBOOK_BUILD, await getRequestContext(), new Date().toISOString())
+)
+
+/**
+ * What the running build has produced so far, since a cursor (encoding.md, UX, Counts as they arrive). The page polls
+ * it every few seconds rather than holding a server-sent event stream open for the hour a build takes: each poll lists
+ * the build's step outputs and reads only the new ones, and a dropped connection loses nothing.
+ */
+export const getBuildResults = createServerFn({ method: "GET" })
+  .validator((data: unknown) => z.object({ jobId: z.string(), since: z.string().nullable() }).parse(data))
+  .handler(async ({ data }): Promise<BuildResults> => {
+    const context = await requireAdministrator()
+    return loadBuildResults(getDb(), getBucket(), context.hoa.id, data)
+  })
+
+/** Deletes the draft rulebook and its records; the published rulebook stays as it is. */
+export const discardRulebookDraft = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ rulebookId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const context = await requireAdministrator()
     const db = getDb()
-    const hoaId = context.hoa.id
-    if (await getRulebookByStatus(db, hoaId, "building")) {
-      throw new Error("A rulebook is already being built.")
+    const draft = await getRulebookByStatus(db, context.hoa.id, "draft")
+    if (draft?.id !== data.rulebookId) {
+      throw new Error("That draft is no longer current.")
     }
-    const documents = await Promise.all(data.documentIds.map((id) => getGoverningDocument(db, hoaId, id)))
-    if (documents.some((document) => document?.status !== "ready")) {
-      throw new Error("Every document must finish reading before the rulebook is built.")
-    }
-    const now = new Date().toISOString()
-    const job = newJob({ hoaId, kind: "rulebook-build", subjectId: crypto.randomUUID(), now })
-    const rulebook: Rulebook = {
-      id: job.subjectId,
-      hoaId,
-      version: null,
-      status: "building",
-      error: null,
-      catalogVersion,
-      sourceDocumentIds: data.documentIds,
-      jobId: job.id,
-      createdAt: now,
-      publishedBy: null,
-      publishedAt: null
-    }
-    // The partial unique index refuses a second building rulebook, so a double click can't start two builds.
-    await db.batch([insertRulebook(db, rulebook), insertJob(db, job)])
-    await bindings.RULEBOOK_BUILD.create({ id: job.id, params: { hoaId, rulebookId: rulebook.id, jobId: job.id } })
-    return { jobId: job.id, rulebookId: rulebook.id }
+    await discardDraftRulebook(db, context.hoa.id, draft.id)
   })
 
-const removedSchema = z.array(ruleSchema.pick({ ruleKey: true, title: true, citations: true }))
-
-/** The draft (administrators) or the published rulebook (everyone), with what the editor needs. */
+/** The draft (administrators) or the published rulebook (everyone), with its records. */
 export const getRulebookView = createServerFn({ method: "GET" })
   .validator((data: unknown) => z.object({ which: z.enum(["draft", "published"]) }).parse(data))
   .handler(async ({ data }): Promise<RulebookView> => {
     const context = data.which === "draft" ? await requireAdministrator() : await getRequestContext()
     const db = getDb()
     const hoaId = context.hoa.id
-    const building = await getRulebookByStatus(db, hoaId, "building")
-    const latestBuild = await getLatestJobOfKind(db, hoaId, "rulebook-build")
-    const rulebook = await getRulebookByStatus(db, hoaId, data.which)
-    const rules = rulebook ? await listRules(db, hoaId, rulebook.id) : []
-    // Removed rules are published rules the draft no longer has; the list the build saved is narrowed to the rules
-    // still published, so it's empty when nothing is.
-    const published = data.which === "draft" ? await getRulebookByStatus(db, hoaId, "published") : null
-    const publishedKeys = new Set(
-      published ? (await listRules(db, hoaId, published.id)).map((rule) => rule.ruleKey) : []
-    )
-    const saved =
-      rulebook && published
-        ? ((await getJson(getBucket(), jobOutputKey(hoaId, rulebook.jobId, "save-draft", "removed"), removedSchema)) ??
-          [])
+    const [building, latestBuild, rulebook] = await Promise.all([
+      getRulebookByStatus(db, hoaId, "building"),
+      getLatestJobOfKind(db, hoaId, "rulebook-build"),
+      getRulebookByStatus(db, hoaId, data.which)
+    ])
+    const content = rulebook ? await getRulebookContent(db, hoaId, rulebook.id) : null
+    const file = data.which === "published" ? await getPublishedRulesFile(db, hoaId) : null
+    const review =
+      rulebook && data.which === "draft" && content ? await draftReview(db, context.hoa, rulebook, content) : null
+    // A refused build is checked again against the documents as they are now, so removing or replacing the one at
+    // fault clears it at once.
+    const isRefused = isRefusedBuild(latestBuild)
+    const refusedDocuments =
+      isRefused && data.which === "draft"
+        ? await checkCurrentSources(db, hoaId, currentDocumentIds(await listGoverningDocuments(db, hoaId)))
         : []
-    const removed = saved.filter((rule) => publishedKeys.has(rule.ruleKey))
     return {
       rulebook,
-      rules: rules.toSorted((a, b) => a.topic.localeCompare(b.topic) || a.title.localeCompare(b.title)),
-      removed,
+      content,
+      fileSha256: file?.rulebookId === rulebook?.id ? (file?.fileSha256 ?? null) : null,
       buildJobId: latestBuild?.id ?? null,
       isBuilding: building !== null,
-      lastBuildError: describeBuildProblem(latestBuild),
-      blockers: data.which === "draft" ? publishBlockers(rules) : []
+      lastBuildError: isRefused ? null : describeBuildProblem(latestBuild),
+      isLastBuildRetryable: latestBuild?.status !== "failed" || (latestBuild.error?.isRetryable ?? true),
+      refusedDocuments,
+      isLastBuildStopped: latestBuild?.status === "cancelled",
+      blockers: review?.blockers ?? [],
+      changes: review?.changes ?? null
     }
   })
 
-async function loadDraftRule(hoaId: string, ruleId: string) {
-  const db = getDb()
-  const draft = await getRulebookByStatus(db, hoaId, "draft")
-  const rule = await getRule(db, hoaId, ruleId)
-  if (!draft || !rule || rule.rulebookId !== draft.id) {
-    throw new Error("Only rules in the draft rulebook can be changed.")
-  }
-  return { db, rule }
+/** Why the draft can't be published yet, and what it changes against the published rulebook. */
+async function draftReview(
+  db: Database,
+  hoa: { id: string; name: string },
+  draft: Rulebook,
+  content: RulebookContent
+): Promise<{ blockers: string[]; changes: RulebookChanges }> {
+  const [sources, uploads, published] = await Promise.all([
+    loadSources(db, hoa),
+    listGoverningDocuments(db, hoa.id),
+    getRulebookByStatus(db, hoa.id, "published")
+  ])
+  const publishedContent = published ? await getRulebookContent(db, hoa.id, published.id) : null
+  const changes = await rulebookChanges(
+    { ...content, sourceDocumentIds: draft.sourceDocumentIds },
+    published && publishedContent ? { ...publishedContent, sourceDocumentIds: published.sourceDocumentIds } : null,
+    uploads
+  )
+  return { blockers: publishBlockers({ ...sources, ...content }), changes }
 }
 
-/** Saves an administrator's edit; Verify runs again and the rule goes back to pending. */
-export const saveRule = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({ ruleId: z.string(), changes: ruleChangesSchema }).parse(data))
-  .handler(async ({ data }) => {
-    const context = await requireAdministrator()
-    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
-    if (rule.citations.length === 0) {
-      throw new Error("Add the passage this rule comes from before saving.")
-    }
-    const edited = applyRuleChanges(rule, data.changes)
-    await updateRule(db, context.hoa.id, edited)
-    return edited
-  })
-
-/**
- * Adds a citation picked in the document viewer. The client sends only the document, page and character range; the
- * quote is copied from the stored page, so it's always the document's own words.
- */
-export const addRuleCitation = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z
-      .object({
-        ruleId: z.string(),
-        documentId: z.string(),
-        pageIndex: z.number().int().positive(),
-        start: z.number().int().nonnegative(),
-        end: z.number().int().positive()
-      })
-      .parse(data)
-  )
-  .handler(async ({ data }) => {
-    const context = await requireAdministrator()
-    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
-    const document = await getGoverningDocument(db, context.hoa.id, data.documentId)
-    const page = document
-      ? await getJson(getBucket(), governingKeys(context.hoa.id, document.id).page(data.pageIndex), pageSchema)
-      : null
-    if (!document || !page) {
-      throw new Error("That page isn't available.")
-    }
-    const cited = addCitation(rule, citationFromSelection(page, data, document.title))
-    await updateRule(db, context.hoa.id, cited)
-    return cited
-  })
-
-/** Replaces one of a rule's citations with a passage picked in the document viewer, copied from the stored page. */
-export const replaceRuleCitation = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z
-      .object({
-        ruleId: z.string(),
-        index: z.number().int().nonnegative(),
-        documentId: z.string(),
-        pageIndex: z.number().int().positive(),
-        start: z.number().int().nonnegative(),
-        end: z.number().int().positive()
-      })
-      .parse(data)
-  )
-  .handler(async ({ data }) => {
-    const context = await requireAdministrator()
-    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
-    const document = await getGoverningDocument(db, context.hoa.id, data.documentId)
-    const page = document
-      ? await getJson(getBucket(), governingKeys(context.hoa.id, document.id).page(data.pageIndex), pageSchema)
-      : null
-    if (!document || !page) {
-      throw new Error("That page isn't available.")
-    }
-    const updated = replaceCitation(rule, data.index, citationFromSelection(page, data, document.title))
-    await updateRule(db, context.hoa.id, updated)
-    return updated
-  })
-
-/** Removes one of a rule's citations; a rule without any can't be saved or approved until one is added. */
-export const removeRuleCitation = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({ ruleId: z.string(), index: z.number().int().nonnegative() }).parse(data))
-  .handler(async ({ data }) => {
-    const context = await requireAdministrator()
-    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
-    const updated = removeCitation(rule, data.index)
-    await updateRule(db, context.hoa.id, updated)
-    return updated
-  })
-
-/** Approves or rejects a rule. A rule whose quote isn't found can't be approved. */
-export const reviewRule = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z
-      .object({ ruleId: z.string(), status: z.enum(["approved", "rejected", "pending"]), note: z.string().nullable() })
-      .parse(data)
-  )
-  .handler(async ({ data }) => {
-    const context = await requireAdministrator()
-    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
-    const blocker = data.status === "approved" ? approvalBlocker(rule) : null
-    if (blocker) {
-      throw new Error(blocker)
-    }
-    const reviewed: Rule = {
-      ...rule,
-      review: {
-        ...rule.review,
-        status: data.status,
-        reviewedBy: context.user.id,
-        reviewedAt: new Date().toISOString(),
-        note: data.note
-      }
-    }
-    await updateRule(db, context.hoa.id, reviewed)
-    return reviewed
-  })
-
-/** Approves every pending draft rule that has no open issues. Returns how many were approved. */
-export const approveReadyRules = createServerFn({ method: "POST" }).handler(async () => {
-  const context = await requireAdministrator()
-  const db = getDb()
-  const draft = await getRulebookByStatus(db, context.hoa.id, "draft")
-  if (!draft) {
-    throw new Error("There's no draft to approve.")
-  }
-  const reviewedAt = new Date().toISOString()
-  const approved = readyToApprove(await listRules(db, context.hoa.id, draft.id)).map((rule): Rule => ({
-    ...rule,
-    review: { ...rule.review, status: "approved", reviewedBy: context.user.id, reviewedAt }
-  }))
-  await updateRules(db, context.hoa.id, approved)
-  return { count: approved.length }
-})
-
-/**
- * Starts editing the published rulebook: a draft copy the administrator changes and publishes as the next version.
- * The copy has no build job; its id only keeps the record's shape.
- */
-export const editPublishedRulebook = createServerFn({ method: "POST" }).handler(async () => {
-  const context = await requireAdministrator()
-  const db = getDb()
-  const hoaId = context.hoa.id
-  if (await getRulebookByStatus(db, hoaId, "draft")) {
-    throw new Error("A draft is already open. Publish or discard it first.")
-  }
-  if (await getRulebookByStatus(db, hoaId, "building")) {
-    throw new Error("Wait for the rulebook build to finish.")
-  }
-  const published = await getRulebookByStatus(db, hoaId, "published")
-  if (!published) {
-    throw new Error("Nothing is published yet. Build the rulebook first.")
-  }
-  const draft = await copyRulebookAsDraft(db, hoaId, {
-    source: published,
-    sourceRules: await listRules(db, hoaId, published.id),
-    draftId: crypto.randomUUID(),
-    jobId: crypto.randomUUID(),
-    now: new Date().toISOString()
-  })
-  return { rulebookId: draft.id }
-})
-
-/** Removes a rule from the draft. */
-export const deleteDraftRule = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({ ruleId: z.string() }).parse(data))
-  .handler(async ({ data }) => {
-    const context = await requireAdministrator()
-    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
-    await deleteRule(db, context.hoa.id, rule.id)
-  })
-
-/** Throws the draft away; the published rulebook stays as it is. */
-export const discardRulebookDraft = createServerFn({ method: "POST" }).handler(async () => {
-  const context = await requireAdministrator()
-  const db = getDb()
-  const draft = await getRulebookByStatus(db, context.hoa.id, "draft")
-  if (draft) {
-    await discardDraft(db, context.hoa.id, draft.id)
-  }
-})
-
-/** Dismisses an issue with a note, such as a conflict the administrator has decided. */
-export const resolveIssue = createServerFn({ method: "POST" })
-  .validator((data: unknown) =>
-    z
-      .object({ ruleId: z.string(), issueIndex: z.number().int().nonnegative(), note: z.string().trim().min(1) })
-      .parse(data)
-  )
-  .handler(async ({ data }) => {
-    const context = await requireAdministrator()
-    const { db, rule } = await loadDraftRule(context.hoa.id, data.ruleId)
-    const resolution = { note: data.note, resolvedBy: context.user.id, resolvedAt: new Date().toISOString() }
-    const resolved: Rule = {
-      ...rule,
-      issues: rule.issues.map((issue, index) => (index === data.issueIndex ? { ...issue, resolution } : issue))
-    }
-    await updateRule(db, context.hoa.id, resolved)
-    return resolved
-  })
-
-/** Publishes the draft as the next version, once nothing is pending and every conflict is resolved. */
+/** Publishes the draft: assembles the rules file, writes it to storage with its hash and supersedes the previous one. */
 export const publishRulebook = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ rulebookId: z.string() }).parse(data))
   .handler(async ({ data }) => {
@@ -341,17 +247,23 @@ export const publishRulebook = createServerFn({ method: "POST" })
     if (draft?.id !== data.rulebookId) {
       throw new Error("That draft is no longer current.")
     }
-    const blockers = publishBlockers(await listRules(db, context.hoa.id, draft.id))
-    if (blockers.length > 0) {
-      throw new Error(blockers.join(" "))
-    }
-    const version = await publishRulebookRecord(db, context.hoa.id, {
+    const { version } = await publishDraft(db, getBucket(), context.hoa.id, {
       rulebookId: draft.id,
       userId: context.user.id,
       now: new Date().toISOString()
     })
     return { version }
   })
+
+/** The published rules file exactly as written, for download. */
+export const getPublishedRulesFileJson = createServerFn({ method: "GET" }).handler(async () => {
+  const context = await getRequestContext()
+  const file = await getPublishedRulesFile(getDb(), context.hoa.id)
+  if (!file) {
+    throw new Error("Nothing is published yet.")
+  }
+  return readRulesFileJson(getBucket(), file)
+})
 
 export type DashboardSummary = {
   hoaName: string
@@ -366,13 +278,13 @@ export const getDashboardSummary = createServerFn({ method: "GET" }).handler(asy
   const context = await getRequestContext()
   const db = getDb()
   const published = await getRulebookByStatus(db, context.hoa.id, "published")
-  const rules = published ? await listRules(db, context.hoa.id, published.id) : []
+  const content = published ? await getRulebookContent(db, context.hoa.id, published.id) : null
   const documents = await listGoverningDocuments(db, context.hoa.id)
   return {
     hoaName: context.hoa.name,
     publishedVersion: published?.version ?? null,
     publishedAt: published?.publishedAt ?? null,
-    ruleCount: rules.filter((rule) => rule.review.status === "approved").length,
+    ruleCount: content?.rules.filter((rule) => rule.review.status === "approved").length ?? 0,
     documentTitles: documents.filter((document) => document.status === "ready").map((document) => document.title)
   }
 })

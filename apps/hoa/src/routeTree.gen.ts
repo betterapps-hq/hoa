@@ -10,19 +10,18 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as ApplicationsIndexRouteImport } from './routes/applications.index'
 import { Route as ApplicationsApplicationIdRouteImport } from './routes/applications.$applicationId'
+import { Route as DocumentsIndexRouteImport } from './routes/documents.index'
+import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$documentId'
+import { Route as ProjectTypesIndexRouteImport } from './routes/project-types.index'
+import { Route as ProjectTypesProjectTypeIdRouteImport } from './routes/project-types.$projectTypeId'
+import { Route as FilesGoverningDocumentIdRouteImport } from './routes/files.governing.$documentId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DocumentsRoute = DocumentsRouteImport.update({
-  id: '/documents',
-  path: '/documents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RulesRoute = RulesRouteImport.update({
@@ -41,59 +40,114 @@ const ApplicationsApplicationIdRoute =
     path: '/applications/$applicationId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const DocumentsIndexRoute = DocumentsIndexRouteImport.update({
+  id: '/documents/',
+  path: '/documents/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentsDocumentIdRoute = DocumentsDocumentIdRouteImport.update({
+  id: '/documents/$documentId',
+  path: '/documents/$documentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectTypesIndexRoute = ProjectTypesIndexRouteImport.update({
+  id: '/project-types/',
+  path: '/project-types/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectTypesProjectTypeIdRoute =
+  ProjectTypesProjectTypeIdRouteImport.update({
+    id: '/project-types/$projectTypeId',
+    path: '/project-types/$projectTypeId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FilesGoverningDocumentIdRoute =
+  FilesGoverningDocumentIdRouteImport.update({
+    id: '/files/governing/$documentId',
+    path: '/files/governing/$documentId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/documents': typeof DocumentsRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/applications/': typeof ApplicationsIndexRoute
+  '/documents/': typeof DocumentsIndexRoute
+  '/project-types/': typeof ProjectTypesIndexRoute
+  '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/documents': typeof DocumentsRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/applications': typeof ApplicationsIndexRoute
+  '/documents': typeof DocumentsIndexRoute
+  '/project-types': typeof ProjectTypesIndexRoute
+  '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/documents': typeof DocumentsRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/applications/': typeof ApplicationsIndexRoute
+  '/documents/': typeof DocumentsIndexRoute
+  '/project-types/': typeof ProjectTypesIndexRoute
+  '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/documents'
     | '/rules'
     | '/applications/$applicationId'
+    | '/documents/$documentId'
+    | '/project-types/$projectTypeId'
     | '/applications/'
+    | '/documents/'
+    | '/project-types/'
+    | '/files/governing/$documentId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/documents'
     | '/rules'
     | '/applications/$applicationId'
+    | '/documents/$documentId'
+    | '/project-types/$projectTypeId'
     | '/applications'
+    | '/documents'
+    | '/project-types'
+    | '/files/governing/$documentId'
   id:
     | '__root__'
     | '/'
-    | '/documents'
     | '/rules'
     | '/applications/$applicationId'
+    | '/documents/$documentId'
+    | '/project-types/$projectTypeId'
     | '/applications/'
+    | '/documents/'
+    | '/project-types/'
+    | '/files/governing/$documentId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  DocumentsRoute: typeof DocumentsRoute
   RulesRoute: typeof RulesRoute
   ApplicationsApplicationIdRoute: typeof ApplicationsApplicationIdRoute
+  DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
+  ProjectTypesProjectTypeIdRoute: typeof ProjectTypesProjectTypeIdRoute
   ApplicationsIndexRoute: typeof ApplicationsIndexRoute
+  DocumentsIndexRoute: typeof DocumentsIndexRoute
+  ProjectTypesIndexRoute: typeof ProjectTypesIndexRoute
+  FilesGoverningDocumentIdRoute: typeof FilesGoverningDocumentIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -103,13 +157,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/documents': {
-      id: '/documents'
-      path: '/documents'
-      fullPath: '/documents'
-      preLoaderRoute: typeof DocumentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/rules': {
@@ -133,15 +180,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApplicationsApplicationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/documents/': {
+      id: '/documents/'
+      path: '/documents'
+      fullPath: '/documents/'
+      preLoaderRoute: typeof DocumentsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documents/$documentId': {
+      id: '/documents/$documentId'
+      path: '/documents/$documentId'
+      fullPath: '/documents/$documentId'
+      preLoaderRoute: typeof DocumentsDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/project-types/': {
+      id: '/project-types/'
+      path: '/project-types'
+      fullPath: '/project-types/'
+      preLoaderRoute: typeof ProjectTypesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/project-types/$projectTypeId': {
+      id: '/project-types/$projectTypeId'
+      path: '/project-types/$projectTypeId'
+      fullPath: '/project-types/$projectTypeId'
+      preLoaderRoute: typeof ProjectTypesProjectTypeIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/files/governing/$documentId': {
+      id: '/files/governing/$documentId'
+      path: '/files/governing/$documentId'
+      fullPath: '/files/governing/$documentId'
+      preLoaderRoute: typeof FilesGoverningDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  DocumentsRoute: DocumentsRoute,
   RulesRoute: RulesRoute,
   ApplicationsApplicationIdRoute: ApplicationsApplicationIdRoute,
+  DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
+  ProjectTypesProjectTypeIdRoute: ProjectTypesProjectTypeIdRoute,
   ApplicationsIndexRoute: ApplicationsIndexRoute,
+  DocumentsIndexRoute: DocumentsIndexRoute,
+  ProjectTypesIndexRoute: ProjectTypesIndexRoute,
+  FilesGoverningDocumentIdRoute: FilesGoverningDocumentIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

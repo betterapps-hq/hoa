@@ -1,0 +1,272 @@
+{
+  "id": "garage-attic",
+  "title": "Converting the attic instead of the garage",
+  "application": {
+    "projectType": null,
+    "description": "Finish the unfinished attic as a bedroom.",
+    "submittedOn": "2026-10-01"
+  },
+  "now": "2026-10-02T12:00:00Z",
+  "packet": {
+    "files": [
+      {
+        "id": "form",
+        "fileName": "application-form.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "ARCHITECTURAL REVIEW APPLICATION\n1. Unit: Unit 14 (sample address withheld)\n2. Owner of record: the owner named on the deed (one owner)\n3. Applicant: the owner\n4. Type of project: Attic conversion\n5. Description of the work: Finish the unfinished attic as a bedroom. Interior work only.\n6. Plans attached: attic floor plan and site plan\n7. Review fee: $50, paid by check on 09/30/2026\n8. Work to be done by: the owner\n9. Owner signature: [signed by the owner]   Date: 09/30/2026"
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "visuals": [],
+        "images": []
+      },
+      {
+        "id": "checklist",
+        "fileName": "application-checklist.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "APPLICATION CHECKLIST\nCompleted application form: Yes\nProject description: Yes\nSite plan showing the Unit's boundaries and the work: Yes\nFloor plan and exterior elevation: Yes\nPhotos of the existing condition: Yes\nProduct information for new materials: Yes\nOwner signature: [signed by the owner]   Date: 09/30/2026"
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "visuals": [],
+        "images": []
+      },
+      {
+        "id": "description",
+        "fileName": "project-description.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "PROJECT DESCRIPTION\nWe plan to finish our unfinished attic as a bedroom. The work is inside the house: insulation, drywall and flooring. Nothing on the outside of the house changes, and the garage stays a garage."
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "visuals": [],
+        "images": []
+      },
+      {
+        "id": "floor-plan",
+        "fileName": "attic-floor-plan.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "ATTIC FLOOR PLAN\nBedroom 14'-0\" x 18'-0\" in the existing attic space."
+          }
+        ],
+        "visuals": [
+          {
+            "figureId": "1.1",
+            "pageIndex": 1,
+            "description": "A floor plan of the attic finished as a bedroom, 14 feet by 18 feet, with a stair from the second floor.",
+            "measurements": []
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "images": []
+      },
+      {
+        "id": "site-plan",
+        "fileName": "site-plan.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "SITE PLAN - UNIT 14\nLot boundary, house footprint, attached garage, driveway."
+          }
+        ],
+        "visuals": [
+          {
+            "figureId": "1.1",
+            "pageIndex": 1,
+            "description": "A site plan of the lot showing its boundaries, the house footprint with the attached garage, and the driveway.",
+            "measurements": []
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "images": []
+      },
+      {
+        "id": "photo",
+        "fileName": "attic.jpg",
+        "mediaType": "image/jpeg",
+        "contextText": null,
+        "pages": [
+          {
+            "text": ""
+          }
+        ],
+        "visuals": [
+          {
+            "figureId": "image",
+            "pageIndex": 1,
+            "description": "A photo of an unfinished attic with exposed rafters and insulation between the joists.",
+            "measurements": []
+          }
+        ],
+        "isReadable": true,
+        "images": []
+      },
+      {
+        "id": "materials",
+        "fileName": "materials-product-sheet.pdf",
+        "mediaType": "application/pdf",
+        "pages": [
+          {
+            "text": "PRODUCT SHEET\nAttic insulation: R-38 fiberglass batts.\nDrywall: 1/2 inch gypsum board, painted.\nFlooring: carpet over a plywood subfloor."
+          }
+        ],
+        "contextText": null,
+        "isReadable": true,
+        "visuals": [],
+        "images": []
+      }
+    ]
+  },
+  "expected": {
+    "entities": [
+      {
+        "id": "work-1",
+        "type": "work",
+        "label": "Finish the attic as a bedroom"
+      },
+      {
+        "id": "space-1",
+        "type": "space-conversion",
+        "label": "The unfinished attic"
+      },
+      {
+        "id": "owner-1",
+        "type": "owner",
+        "label": "The owner of record"
+      }
+    ],
+    "facts": [
+      {
+        "entity": "space-1",
+        "property": "space-conversion.space",
+        "state": "known",
+        "value": {
+          "type": "value",
+          "term": "unfinished-space.attic",
+          "text": ""
+        }
+      },
+      {
+        "entity": "work-1",
+        "property": "work.kind",
+        "state": "known",
+        "value": {
+          "type": "value",
+          "term": "work-kind.interior",
+          "text": ""
+        }
+      },
+      {
+        "entity": "work-1",
+        "property": "work.performed-by",
+        "state": "known",
+        "value": {
+          "type": "value",
+          "term": "owner",
+          "text": ""
+        }
+      },
+      {
+        "entity": "request",
+        "property": "architectural-application.review-fee",
+        "state": "known",
+        "value": {
+          "type": "quantity",
+          "value": 50,
+          "unit": "usd"
+        }
+      },
+      {
+        "entity": "request",
+        "property": "architectural-application.review-fee-paid-on",
+        "state": "known",
+        "value": {
+          "type": "date",
+          "value": "2026-09-30"
+        }
+      }
+    ],
+    "documents": [
+      {
+        "ruleKey": "guidelines:3.1.5#application-form",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "guidelines:3.1.5#owner-signatures",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "guidelines:3.1.5#project-description",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "guidelines:3.1.5#plot-plan",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "guidelines:3.1.5#product-specification",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "guidelines:3.1.5#checklist",
+        "entity": "request",
+        "present": true
+      },
+      {
+        "ruleKey": "declaration:4.3(b)#plans",
+        "entity": "request",
+        "present": true
+      }
+    ],
+    "findings": {
+      "use-restrictions:a(vii)#replacement-garage-plans space-1": "not-applicable",
+      "use-restrictions:a(vii)#reviewer-garage-enclosure space-1": "not-applicable",
+      "use-restrictions:a(vii)#no-conversion space-1": "committee",
+      "declaration:4.1/p1#approval-required work-1": "exempt",
+      "declaration:4.3(b)#plans request": "met",
+      "declaration:4.3(b)/p2#harmony work-1": "committee",
+      "declaration:4.2(d)#fee-before-review request": "met",
+      "declaration:4.3(b)/p3#written-response request": "pending",
+      "guidelines:3.1.5#application-form request": "met",
+      "guidelines:3.1.5#owner-signatures request": "met",
+      "guidelines:3.1.5#project-description request": "met",
+      "guidelines:3.1.5#plot-plan request": "met",
+      "guidelines:3.1.5#product-specification request": "met",
+      "guidelines:3.1.5#checklist request": "met",
+      "guidelines:3.4.2#photos request": "met"
+    },
+    "recommendation": "refer-to-committee",
+    "actionItems": {
+      "changes": [],
+      "missingInformation": [],
+      "committeeDecisions": [
+        {
+          "ruleKey": "use-restrictions:a(vii)#no-conversion",
+          "entities": ["space-1"]
+        },
+        {
+          "ruleKey": "declaration:4.3(b)/p2#harmony",
+          "entities": ["work-1"]
+        }
+      ]
+    }
+  }
+}

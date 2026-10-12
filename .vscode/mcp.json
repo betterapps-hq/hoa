@@ -30,7 +30,7 @@
     // }
   },
   "inputs": [
-    // Run `pnpm --filter hoa auth:langfuse`, then paste the output without `Basic `. See docs/mcp-servers.md.
+    // Run `pnpm --filter hoa auth:langfuse`, then paste the output without `Basic `. See apps/hoa/docs/setup.md, section 7.
     {
       "id": "langfuse-basic-auth",
       "type": "promptString",

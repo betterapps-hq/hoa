@@ -35,31 +35,6 @@ and key are under **Keys and Endpoint** in the Azure portal. See [design/ocr.md]
 Copy [`.env.example`](../.env.example) to `apps/hoa/.env` and fill in the keys. `.env` is git-ignored. Keep local
 settings in `.env` only: don't create a `.dev.vars`, because Wrangler ignores `.env` when one exists.
 
-## Settings
-
-Every setting, where it's set, and its value per environment. Preview and demo values arrive with Cloudflare hosting:
-non-secret values in `wrangler.jsonc` `vars` (preview values in its `previews` block), secrets through
-`wrangler secret put` ([design/platform.md](design/platform.md#app-wiring)).
-
-| Variable | Purpose | Development (`.env`) | Preview | Demo |
-| --- | --- | --- | --- | --- |
-| `OPENROUTER_API_KEY` (secret) | Model calls. Without it, AI features report that it's missing. | hoa key | Same | Same |
-| `OPENROUTER_MODEL` | Main model; defaults to `anthropic/claude-haiku-5.5` | Default | Default | Default |
-| `OPENROUTER_SMALL_MODEL` (phase 1) | Routing, structure and classification; defaults to the main model | Default | Default | Default |
-| `LANGFUSE_PUBLIC_KEY` (secret) | Tracing and prompt management | `arc-review` key | `arc-review` key | `arc-review` key |
-| `LANGFUSE_SECRET_KEY` (secret) | Tracing and prompt management | `arc-review` key | `arc-review` key | `arc-review` key |
-| `LANGFUSE_BASE_URL` | Defaults to the US cloud region | Default | Default | Default |
-| `LANGFUSE_PROMPT_LABEL` | Prompt label to fetch; defaults to `production` | `production`, or a test label while tuning | `production` | `production` |
-| `LANGFUSE_TRACING_ENVIRONMENT` | Langfuse environment; defaults to `development` | `development` | `preview` | `production` |
-| `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` | OCR | The resource's endpoint | Same | Same |
-| `AZURE_DOCUMENT_INTELLIGENCE_KEY` (secret) | OCR | The resource's key | Same | Same |
-| `R2_ACCOUNT_ID` (phase 1) | Presigned R2 URLs | Cloudflare account id | Same | Same |
-| `R2_BUCKET` (phase 1) | The environment's bucket | `hoa-dev` | `hoa-preview` | `hoa-files` |
-| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (secrets, phase 1) | Presigned R2 URLs | Token scoped to `hoa-dev` | Token scoped to `hoa-preview` | Token scoped to `hoa-files` |
-
-The [MCP servers](../../../docs/mcp-servers.md) page covers connecting coding agents to the same Langfuse project and to
-OpenRouter.
-
 ## 5. Run
 
 Sign in to Cloudflare once (step 6), then prepare the local database:
@@ -75,12 +50,37 @@ pnpm --filter hoa dev
 
 The server runs inside workerd, Cloudflare's runtime, through its Vite plugin, using `wrangler.jsonc`'s `dev`
 environment: D1 is simulated on disk under `apps/hoa/.wrangler`, and R2 is the real `hoa-dev` bucket. Open
-<http://localhost:3000>, switch to the **Administrator** role and select **Run model check**. It reports the response,
-prompt version, latency, tokens, cost and Langfuse trace ID, which confirms each connection.
+<http://localhost:3000>.
 
-After changing `src/db/schema.ts`, run `pnpm --filter hoa db:generate` and commit the new migration. After changing
-`wrangler.jsonc`, regenerate the binding types with `pnpm --filter hoa cf-typegen` and commit
-`worker-configuration.d.ts`.
+To review applications before the rules UX exists, publish the committed sample rulebook into the local database:
+
+```sh
+pnpm --filter hoa db:seed:sample
+```
+
+It approves every record of `samples/declaration/rules.json`, publishes it as the HOA's rulebook and stores the rules
+file in Wrangler's local R2. The dev server reads R2 from the `hoa-dev` bucket, so add `--dev-bucket` to put the file
+there instead (`pnpm --filter hoa db:seed:sample --dev-bucket`).
+
+To start the rules over, empty the local rulebooks, rules, sections, provisions and reviews with their stored objects:
+
+```sh
+pnpm --filter hoa db:reset:rules
+```
+
+Uploaded documents and applications stay; applications go back to drafts. Add `--dev-bucket` to delete the objects
+from the `hoa-dev` bucket rather than Wrangler's local R2. Neither command touches the preview or demo environments.
+
+Before building the rulebook from the sample documents, tell the build how they're structured (the Declaration's
+Exhibit C is the use restrictions, a document of its own):
+
+```sh
+pnpm --filter hoa db:structure:sample
+```
+
+To run the rulebook build or one encoding step against the cached fixtures, see
+[design/evaluation.md](design/evaluation.md).
+
 ## 6. Cloudflare and deployment
 
 One-time setup for the demo and pull request previews ([design/platform.md](design/platform.md#cicd)):
@@ -100,3 +100,64 @@ One-time setup for the demo and pull request previews ([design/platform.md](desi
    preview jobs.
 
 The deploy and pull request pipelines apply migrations and the seed before deploying.
+
+## 7. MCP servers for coding agents
+
+The repository configures MCP servers so a coding agent can read prompts, traces and model data, and add UI
+components, while building features. Claude Code reads [`.mcp.json`](../../../.mcp.json); VS Code (Copilot) reads
+[`.vscode/mcp.json`](../../../.vscode/mcp.json). Neither file holds a secret.
+
+| Server       | Endpoint                                       | Auth                                               | Configured in    |
+| ------------ | ---------------------------------------------- | -------------------------------------------------- | ---------------- |
+| `langfuse`   | `https://us.cloud.langfuse.com/api/public/mcp` | Basic auth with the `arc-review` project's API keys | Both             |
+| `openrouter` | `https://mcp.openrouter.ai/mcp`                | Browser OAuth on first use                         | Both             |
+| `shadcn`     | `npx shadcn@latest mcp` (local)                | None                                               | Both             |
+| `github`     | `https://api.githubcopilot.com/mcp/`           | Your GitHub Copilot sign-in                        | VS Code only     |
+
+**Langfuse.** API keys are scoped to one project, so the server only sees `arc-review`. With the keys in
+`apps/hoa/.env`, produce the auth token with `pnpm --filter hoa auth:langfuse`. For Claude Code, set the output as the
+`LANGFUSE_MCP_BASIC_AUTH` environment variable before starting `claude`. For VS Code, start the server and paste the
+output when prompted for `langfuse-basic-auth`. Read and write tools are enabled, including prompt management. See the
+[Langfuse MCP docs](https://langfuse.com/docs/api-and-data-platform/features/mcp-server).
+
+**OpenRouter.** The first connection opens an OAuth consent screen that mints a dedicated key (7-day expiry and a $10
+spend cap by default, editable on that screen). Approve it only when you started the connection yourself. In Claude
+Code, run `/mcp`, select **openrouter** and choose **Authenticate**. Most tools are read-only lookups of models,
+pricing, credit balance and usage; a few, such as sending a message or generating an image, make billable calls. The
+app calls the OpenRouter API directly, not through this server. See the
+[OpenRouter MCP docs](https://openrouter.ai/docs/guides/overview/mcp-server).
+
+**shadcn.** Browses and installs components from the shadcn registry into `apps/hoa`, so agents add real shadcn
+components instead of hand-building them.
+
+## Schema and binding changes
+
+After changing `src/db/schema.ts`, run `pnpm --filter hoa db:generate` and commit the new migration. Migrations must
+stay backward compatible, since every pull request preview shares one preview database: add tables and nullable
+columns, and read the generated SQL (Drizzle Kit's table rebuilds can copy columns the old table doesn't have).
+
+After changing `wrangler.jsonc`, regenerate the binding types with `pnpm --filter hoa cf-typegen` and commit
+`worker-configuration.d.ts`.
+
+## Settings
+
+Every setting, where it's set, and its value per environment. Development reads `.env`. Preview and demo non-secret
+values are in `wrangler.jsonc` `vars` (preview values in its `previews` block), and their secrets are set with
+`wrangler secret put` ([design/platform.md](design/platform.md#app-wiring)).
+
+| Variable | Purpose | Development (`.env`) | Preview | Demo |
+| --- | --- | --- | --- | --- |
+| `OPENROUTER_API_KEY` (secret) | Model calls. Without it, AI features report that it's missing. | hoa key | Same | Same |
+| `OPENROUTER_MODEL` | Main model; defaults to `anthropic/claude-haiku-5.5` | Default | Default | Default |
+| `OPENROUTER_SMALL_MODEL` | Routing, structure and classification; defaults to the main model | Default | Default | Default |
+| `ENCODING_CONCURRENCY` | Model calls a rulebook build stage runs at once; defaults to 16 ([design/encoding.md](design/encoding.md#cost-and-scale)) | Default | Default | Default |
+| `LANGFUSE_PUBLIC_KEY` (secret) | Tracing and prompt management | `arc-review` key | `arc-review` key | `arc-review` key |
+| `LANGFUSE_SECRET_KEY` (secret) | Tracing and prompt management | `arc-review` key | `arc-review` key | `arc-review` key |
+| `LANGFUSE_BASE_URL` | Defaults to the US cloud region | Default | Default | Default |
+| `LANGFUSE_PROMPT_LABEL` | Prompt label to fetch; defaults to `production` | `development` | `preview` | `production` |
+| `LANGFUSE_TRACING_ENVIRONMENT` | Langfuse environment; defaults to `development` | `development` | `preview` | `production` |
+| `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT` | OCR | The resource's endpoint | Same | Same |
+| `AZURE_DOCUMENT_INTELLIGENCE_KEY` (secret) | OCR | The resource's key | Same | Same |
+| `R2_ACCOUNT_ID` | Presigned R2 URLs | Cloudflare account id | Same | Same |
+| `R2_BUCKET` | The environment's bucket | `hoa-dev` | `hoa-preview` | `hoa-files` |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (secrets) | Presigned R2 URLs | Token scoped to `hoa-dev` | Token scoped to `hoa-preview` | Token scoped to `hoa-files` |

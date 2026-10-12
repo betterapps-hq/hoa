@@ -1,8 +1,17 @@
 import { describe, expect, it, vi } from "vitest"
-import { applicationKeys, extensionOf, governingKeys, hoaCacheKey, jobOutputKey, jobOutputPrefix } from "./keys"
+import {
+  applicationKeys,
+  extensionOf,
+  governingKeys,
+  hoaCacheKey,
+  jobOutputKey,
+  jobOutputPrefix,
+  rulebookBuildKeys,
+  rulebookKeys
+} from "./keys"
 import { createObjectPromptCache, getJson, putJson, toHex, type ObjectBucket } from "./objects"
 import { createPresigner } from "./presign"
-import { validateUpload } from "./uploadRules"
+import { acceptedTypes, uploadHint, validateUpload } from "./uploadRules"
 
 const megabyte = 1024 * 1024
 
@@ -38,6 +47,18 @@ describe("validateUpload", () => {
   })
 })
 
+describe("acceptedTypes and uploadHint", () => {
+  it("say what each target takes, from the same rules validateUpload checks", () => {
+    expect(acceptedTypes("governing")).toEqual({
+      "application/pdf": [".pdf"],
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"]
+    })
+    expect(acceptedTypes("application")["image/png"]).toEqual([".png", ".jpg", ".jpeg"])
+    expect(uploadHint("governing")).toBe("PDF or Word up to 50 MB.")
+    expect(uploadHint("application")).toBe("PDF or Word up to 25 MB, JPEG or PNG up to 5 MB.")
+  })
+})
+
 describe("keys", () => {
   it("builds the object layout from record ids", () => {
     const governing = governingKeys("hoa", "doc")
@@ -67,6 +88,22 @@ describe("keys", () => {
     expect(jobOutputKey("hoa", "job", "extract", "s1")).toBe("hoas/hoa/jobs/job/extract/s1.json")
     expect(jobOutputPrefix("hoa", "job")).toBe("hoas/hoa/jobs/job/")
     expect(extensionOf("README")).toBe("bin")
+  })
+
+  it("keeps a rulebook's rules file and its build's stage outputs apart", () => {
+    expect(rulebookKeys("hoa", "rb")).toEqual({
+      root: "hoas/hoa/rulebooks/rb/",
+      file: "hoas/hoa/rulebooks/rb/rules.json"
+    })
+    const build = rulebookBuildKeys("hoa", "job")
+    expect(build.step("structure:doc")).toBe("hoas/hoa/jobs/job/structure/doc.json")
+    expect(build.step("find-rules:declaration:article-4")).toBe(
+      "hoas/hoa/jobs/job/find-rules/declaration:article-4.json"
+    )
+    expect(build.step("find-rules:declaration:article-4:rerun")).toBe(
+      "hoas/hoa/jobs/job/find-rules/declaration:article-4:rerun.json"
+    )
+    expect(build.step("merge")).toBe("hoas/hoa/jobs/job/merge/result.json")
   })
 })
 

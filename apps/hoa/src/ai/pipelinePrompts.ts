@@ -1,34 +1,63 @@
+import { stepPrompts } from "@/encoding/steps/prompts"
 import type { PromptDefinition } from "./prompts"
 
-// The pipeline's prompts (docs/design/extraction.md, review.md and ocr.md, "Prompts and models"). Their text lives in
-// Langfuse; each entry names the prompt and the `{{variables}}` the code fills in, which the Langfuse prompt must use exactly. Every prompt is generic: HOA rules and
-// applications arrive as data.
+// The pipeline's prompts (docs/design/encoding.md, application-review.md and ocr.md, "Prompts and models"). Their text
+// lives in Langfuse; each entry names the prompt and the `{{variables}}` the code fills in, which the Langfuse prompt
+// must use exactly. Every prompt is generic: HOA rules and applications arrive as data.
 
 export const pipelinePrompts = {
   /** Also receives the image as an attachment. */
   visualDescription: { name: "hoa-visual-description", variables: ["documentKind", "contextText", "ocrText"] },
-  sectionRouting: { name: "hoa-section-routing", variables: ["projectTypes", "topics", "heading", "sectionText"] },
-  sectionRuleExtraction: {
-    name: "hoa-section-rule-extraction",
-    variables: ["documentKind", "heading", "sectionText", "definitions", "references", "catalog"]
+  // The rulebook build (encoding.md): the structure repair here, the steps' prompts in src/encoding/steps/prompts.ts.
+  structureRepair: {
+    name: "hoa-structure-repair",
+    variables: ["documentTitle", "pageText", "parserOutline", "problems"]
   },
-  ruleConsolidation: { name: "hoa-rule-consolidation", variables: ["projectType", "candidates"] },
-  fileClassification: {
-    name: "hoa-file-classification",
-    variables: ["fileKinds", "contextText", "visualDescriptions", "checkboxCount", "pageText"]
+  // The application review (application-review.md). The subjects and facts calls also receive the packet's images.
+  pageClassification: {
+    name: "hoa-page-classification",
+    variables: ["documentTypes", "contextText", "visualDescriptions", "pageText"]
   },
-  /** Also receives the packet's images as attachments. */
-  factExtraction: {
-    name: "hoa-fact-extraction",
-    variables: ["projectType", "catalog", "allowedValues", "textConditions", "description", "pages"]
+  subjectIdentification: {
+    name: "hoa-subject-identification",
+    variables: ["requestType", "projectKind", "description", "candidateTypes", "pages"]
   },
-  documentCheck: { name: "hoa-document-check", variables: ["requirements", "ownersOfRecord", "checkboxes", "pages"] },
-  qualitativeCheck: {
-    name: "hoa-qualitative-check",
-    variables: ["ruleStatement", "criterion", "component", "facts", "evidencePages"]
+  entityFacts: {
+    name: "hoa-entity-facts",
+    variables: ["requestType", "description", "entities", "properties", "textConditions", "pages"]
   },
-  reviewWriter: {
-    name: "hoa-review-writer",
-    variables: ["recommendation", "findings", "facts", "actionItems", "informationalRules"]
-  }
+  documentReview: { name: "hoa-document-review", variables: ["requirements", "parties", "pages"] },
+  judgmentCheck: {
+    name: "hoa-judgment-check",
+    variables: ["statement", "question", "subject", "facts", "evidencePages"]
+  },
+  reviewSummary: {
+    name: "hoa-review-summary",
+    variables: ["recommendation", "findings", "actionItems", "suggestions"]
+  },
+  // Project types (application-review.md, Project types): the project types a rulebook suggests, with their fields
+  // and documents, which code checks against the rules before an administrator sees them.
+  projectTypeSuggestion: { name: "hoa-project-type-suggestion", variables: ["rulebook", "projectTypes"] }
 } as const satisfies Record<string, PromptDefinition>
+
+/** The prompts a rulebook build pins in resolve-prompts: the structure repair, then the steps'. */
+export const rulebookBuildPrompts = [
+  pipelinePrompts.structureRepair,
+  stepPrompts.definedTerms,
+  stepPrompts.ruleFinding,
+  stepPrompts.sharedVocabulary,
+  stepPrompts.vocabularyMerge,
+  stepPrompts.ruleStructuring,
+  stepPrompts.consolidation
+] as const
+
+/** The prompts an application review pins in resolve-prompts: OCR's visual descriptions, then the review's own. */
+export const applicationReviewPrompts = [
+  pipelinePrompts.visualDescription,
+  pipelinePrompts.pageClassification,
+  pipelinePrompts.subjectIdentification,
+  pipelinePrompts.entityFacts,
+  pipelinePrompts.documentReview,
+  pipelinePrompts.judgmentCheck,
+  pipelinePrompts.reviewSummary
+] as const

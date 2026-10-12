@@ -1,622 +1,229 @@
-import { useForm } from "@tanstack/react-form"
-import {
-  AlertTriangleIcon,
-  CheckIcon,
-  CircleCheckIcon,
-  CircleXIcon,
-  FileSearchIcon,
-  InfoIcon,
-  PencilIcon,
-  PlusIcon,
-  Trash2Icon,
-  XIcon
-} from "lucide-react"
-import { useState } from "react"
+import { useDidUpdate } from "@mantine/hooks"
+import { useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
-import { InfoTip } from "@/components/info-tip"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
-} from "@/components/ui/alert-dialog"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  DocumentViewer,
-  type CitationSource,
-  type PageSelectionInput
-} from "@/features/documents/DocumentViewer/DocumentViewer"
-import type { Rule } from "@/rules/rule"
-import {
-  approvalBlocker,
-  issueSeverity,
-  ruleEditSchema,
-  type IssueSeverity,
-  type RuleChanges
-} from "../rulebookEditing"
-import { CheckEditor, ConditionsEditor } from "../RuleSchema/CheckEditor"
-import { CheckSummary, ConditionsSummary } from "../RuleSchema/RuleSchema"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { approvalBlockers } from "@/rulebook/review"
+import { describeRule } from "@/schema/describe"
+import type * as T from "@/schema/types"
+import type { RuleDraft } from "@/schema/zod"
+import { attempt } from "../attempt"
+import { CitationText } from "../CitationText/CitationText"
+import { IssueList } from "../IssueList/IssueList"
+import { ProvisionReference } from "../ProvisionReference/ProvisionReference"
+import { ReviewControls } from "../ReviewControls/ReviewControls"
+import { citedProvision, countOf, relatedRules } from "../rulebookRecords"
+import { RuleForm } from "../RuleForm/RuleForm"
+import { domainLabels, remedyLabels } from "../ruleLabels"
+import { RuleLink } from "../RuleLink/RuleLink"
+import { RulePreview } from "../RulePreview/RulePreview"
+import { Statement } from "../Statement/Statement"
+import { TermChip } from "../TermChip/TermChip"
+import { useRulebookWorkspace } from "../useRulebookWorkspace"
+import { cureLabel, kindLabel } from "./RuleCard.utils"
 
-export type RuleCardActions = {
-  review: (ruleId: string, status: Rule["review"]["status"]) => Promise<void>
-  save: (ruleId: string, changes: RuleChanges) => Promise<void>
-  resolveIssue: (ruleId: string, issueIndex: number, note: string) => Promise<void>
-  remove: (ruleId: string) => Promise<void>
-  addCitation: (ruleId: string, selection: PageSelectionInput) => Promise<void>
-  replaceCitation: (ruleId: string, index: number, selection: PageSelectionInput) => Promise<void>
-  removeCitation: (ruleId: string, index: number) => Promise<void>
-}
+export type RuleCardProps = { rule: T.Rule }
 
-const obligationLabels: Record<Rule["obligation"], string> = {
-  required: "Required",
-  prohibited: "Prohibited",
-  permitted: "Permitted",
-  recommended: "Recommended"
-}
-
-const reviewLabels: Record<Rule["review"]["status"], string> = {
-  pending: "Pending",
-  approved: "Approved",
-  rejected: "Rejected"
-}
-
-const matchLabels: Record<Rule["citations"][number]["match"]["status"], string> = {
-  exact: "Quote found",
-  fuzzy: "Quote found, with scan differences",
-  "not-found": "Quote not found"
-}
-
-/** Runs an action, showing its error; resolves to whether it succeeded. */
-async function attempt(action: () => Promise<void>) {
-  try {
-    await action()
-    return true
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : "That didn't work.")
-    return false
-  }
-}
-
-const editFormId = (rule: Pick<Rule, "id">) => `rule-edit-${rule.id}`
-
-/** The rule's editable fields. Save and Cancel are in the panel's pinned footer, linked by the form's id. */
-function RuleEditor({ rule, onSave }: { rule: Rule; onSave: (changes: RuleChanges) => Promise<void> }) {
-  const projectType = rule.projectTypes[0] ?? "fence"
-  const form = useForm({
-    defaultValues: {
-      title: rule.title,
-      statement: rule.statement,
-      obligation: rule.obligation,
-      discretion: rule.discretion,
-      isCurable: rule.isCurable,
-      check: rule.check,
-      appliesWhen: rule.appliesWhen
-    },
-    validators: { onSubmit: ruleEditSchema },
-    onSubmit: async ({ value }) => {
-      await onSave(value)
-    }
-  })
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  const id = `rule-card-${title.toLowerCase().replaceAll(/\W+/g, "-")}`
   return (
-    <form
-      id={editFormId(rule)}
-      onSubmit={(event) => {
-        event.preventDefault()
-        void form.handleSubmit()
-      }}
-    >
-      <FieldGroup>
-        <form.Field name="title">
-          {(field) => (
-            <Field data-invalid={field.state.meta.errors.length > 0}>
-              <FieldLabel htmlFor={`${rule.id}-title`}>Title</FieldLabel>
-              <Input
-                id={`${rule.id}-title`}
-                value={field.state.value}
-                onChange={(event) => field.handleChange(event.target.value)}
-              />
-              <FieldError errors={field.state.meta.errors} />
-            </Field>
-          )}
-        </form.Field>
-        <form.Field name="statement">
-          {(field) => (
-            <Field data-invalid={field.state.meta.errors.length > 0}>
-              <FieldLabel htmlFor={`${rule.id}-statement`}>Rule</FieldLabel>
-              <Textarea
-                id={`${rule.id}-statement`}
-                value={field.state.value}
-                onChange={(event) => field.handleChange(event.target.value)}
-              />
-              <FieldError errors={field.state.meta.errors} />
-            </Field>
-          )}
-        </form.Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <form.Field name="obligation">
-            {(field) => (
-              <Field>
-                <div className="flex items-center gap-1.5">
-                  <FieldLabel htmlFor={`${rule.id}-obligation`}>Obligation</FieldLabel>
-                  <InfoTip label="About obligation">
-                    How strongly the documents state the rule. Required (“shall”, “must”) and prohibited (“shall not”)
-                    rules can fail an application. Recommended (“should”) rules never fail it; they go to the committee.
-                    Permitted (“may”) rules describe what’s allowed.
-                  </InfoTip>
-                </div>
-                <NativeSelect
-                  id={`${rule.id}-obligation`}
-                  value={field.state.value}
-                  onChange={(event) => {
-                    const value = (["required", "prohibited", "permitted", "recommended"] as const).find(
-                      (item) => item === event.target.value
-                    )
-                    if (value) {
-                      field.handleChange(value)
-                    }
-                  }}
-                >
-                  {Object.entries(obligationLabels).map(([value, label]) => (
-                    <NativeSelectOption key={value} value={value}>
-                      {label}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </Field>
-            )}
-          </form.Field>
-          <form.Field name="discretion">
-            {(field) => (
-              <Field>
-                <div className="flex items-center gap-1.5">
-                  <FieldLabel htmlFor={`${rule.id}-discretion`}>Who decides</FieldLabel>
-                  <InfoTip label="About who decides">
-                    Checked by the rules: the review decides from the application whether the rule is met. The
-                    committee: the documents leave it to the reviewer’s judgment (“case by case”, “at the discretion
-                    of”), so the review only flags it for the committee and it never changes the recommendation.
-                  </InfoTip>
-                </div>
-                <NativeSelect
-                  id={`${rule.id}-discretion`}
-                  value={field.state.value}
-                  onChange={(event) =>
-                    field.handleChange(event.target.value === "committee" ? "committee" : "objective")
-                  }
-                >
-                  <NativeSelectOption value="objective">Checked by the rules</NativeSelectOption>
-                  <NativeSelectOption value="committee">The committee</NativeSelectOption>
-                </NativeSelect>
-              </Field>
-            )}
-          </form.Field>
-        </div>
-        <form.Field name="isCurable">
-          {(field) => (
-            <Field orientation="horizontal">
-              <Checkbox
-                id={`${rule.id}-curable`}
-                checked={field.state.value}
-                onCheckedChange={(checked) => field.handleChange(checked === true)}
-              />
-              <div className="flex items-center gap-1.5">
-                <FieldLabel htmlFor={`${rule.id}-curable`}>Fixable by changing a detail</FieldLabel>
-                <InfoTip label="About fixable rules">
-                  Check this when a homeowner who fails the rule could meet it by changing a detail of the plan, such as
-                  a color, height or material. If every rule an application fails is fixable, the review recommends
-                  approval with conditions instead of rejection. Leave it unchecked when failing rules the project out,
-                  such as a prohibited location.
-                </InfoTip>
-              </div>
-            </Field>
-          )}
-        </form.Field>
-        <form.Field name="check">
-          {(field) => (
-            <CheckEditor
-              id={`${rule.id}-check`}
-              value={field.state.value}
-              projectType={projectType}
-              onChange={field.handleChange}
-            />
-          )}
-        </form.Field>
-        <form.Field name="appliesWhen">
-          {(field) => (
-            <ConditionsEditor
-              id={`${rule.id}-conditions`}
-              value={field.state.value}
-              projectType={projectType}
-              ruleId={rule.id}
-              onChange={field.handleChange}
-            />
-          )}
-        </form.Field>
-        <form.Subscribe
-          selector={(state) => state.fieldMeta.check?.errors.length || state.fieldMeta.appliesWhen?.errors.length}
-        >
-          {(hasErrors) =>
-            hasErrors ? (
-              <p className="text-sm text-destructive" role="alert">
-                The check or a condition is incomplete. Choose a detail and fill in every value.
-              </p>
-            ) : null
-          }
-        </form.Subscribe>
-      </FieldGroup>
-    </form>
-  )
-}
-
-/** What the viewer is open for: reading a citation, adding one, or replacing the citation at replaceIndex. */
-type ViewerState = { documentId: string; pageIndex: number; isCiting: boolean; replaceIndex?: number }
-
-function viewerTitle(viewer: ViewerState | null) {
-  if (!viewer?.isCiting) {
-    return "Citation in the document"
-  }
-  return viewer.replaceIndex === undefined ? "Add a citation" : "Edit the citation"
-}
-
-/**
- * A rule's citations. Each is fixed text from a document: it can be opened in the document, removed, or replaced by
- * adding the right passage, but never edited.
- */
-function Citations({ rule, actions, source }: Pick<RuleCardProps, "rule" | "actions" | "source">) {
-  const [viewer, setViewer] = useState<ViewerState | null>(null)
-  // The dialog keeps showing what it opened with while it animates closed.
-  const [isOpen, setIsOpen] = useState(false)
-  const open = (state: ViewerState) => {
-    setViewer(state)
-    setIsOpen(true)
-  }
-  const first = rule.citations[0]
-  const canRemove = actions !== undefined
-  return (
-    <section aria-label="Citations" className="flex flex-col gap-2">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">Citations</h3>
-        {actions && source ? (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              open({
-                documentId: first?.documentId ?? source.documents[0]?.id ?? "",
-                pageIndex: first?.pageIndex ?? 1,
-                isCiting: true
-              })
-            }
-            disabled={source.documents.length === 0}
-          >
-            <PlusIcon />
-            Add citation
-          </Button>
-        ) : null}
-      </div>
-      {rule.citations.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-3 text-muted-foreground" role="alert">
-          No citation. Add the passage this rule comes from; the rule can’t be saved or approved without one.
-        </p>
-      ) : null}
-      <ul className="flex flex-col gap-2">
-        {rule.citations.map((citation, index) => (
-          <li key={`${citation.documentId}:${citation.pageIndex}:${citation.quote}`} className="rounded-lg border p-2">
-            <div className="flex flex-wrap items-center justify-between gap-2 text-muted-foreground">
-              <span>
-                {citation.section}, page {citation.pageLabel ?? citation.pageIndex}
-              </span>
-              <Badge variant={citation.match.status === "not-found" ? "destructive" : "outline"}>
-                {matchLabels[citation.match.status]}
-              </Badge>
-            </div>
-            <blockquote className="mt-1 border-l-2 pl-2 italic">{citation.quote}</blockquote>
-            {source || canRemove ? (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {source ? (
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() =>
-                      open({ documentId: citation.documentId, pageIndex: citation.pageIndex, isCiting: false })
-                    }
-                  >
-                    <FileSearchIcon />
-                    View in document
-                  </Button>
-                ) : null}
-                {actions && source ? (
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() =>
-                      open({
-                        documentId: citation.documentId,
-                        pageIndex: citation.pageIndex,
-                        isCiting: true,
-                        replaceIndex: index
-                      })
-                    }
-                    aria-label="Edit citation"
-                  >
-                    <PencilIcon />
-                    Edit
-                  </Button>
-                ) : null}
-                {canRemove ? (
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => void attempt(() => actions.removeCitation(rule.id, index))}
-                  >
-                    <Trash2Icon />
-                    Remove
-                  </Button>
-                ) : null}
-              </div>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-      {source ? (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-          <DialogContent className="sm:max-w-3xl">
-            <DialogHeader>
-              <DialogTitle>{viewerTitle(viewer)}</DialogTitle>
-              <DialogDescription>{rule.title}</DialogDescription>
-            </DialogHeader>
-            {viewer ? (
-              <DocumentViewer
-                source={source}
-                initial={viewer}
-                highlights={rule.citations}
-                citeLabel={viewer.replaceIndex === undefined ? "Add as citation" : "Use this passage"}
-                onCite={
-                  viewer.isCiting && actions
-                    ? async (selection) => {
-                        const replaceIndex = viewer.replaceIndex
-                        const save =
-                          replaceIndex === undefined
-                            ? () => actions.addCitation(rule.id, selection)
-                            : () => actions.replaceCitation(rule.id, replaceIndex, selection)
-                        if (await attempt(save)) {
-                          setIsOpen(false)
-                        }
-                      }
-                    : undefined
-                }
-              />
-            ) : null}
-          </DialogContent>
-        </Dialog>
-      ) : null}
+    <section className="flex flex-col gap-2" aria-labelledby={id}>
+      <h3 id={id} className="text-sm font-medium text-muted-foreground">
+        {title}
+      </h3>
+      {children}
     </section>
   )
 }
 
-/** The actions stay at the bottom of the panel while the rule scrolls above them. */
-const pinnedFooter = "flex shrink-0 flex-wrap items-center gap-2 border-t bg-background px-4 py-3"
-
-const issueIconClass = "mt-0.5 size-4 shrink-0"
-
-function IssueIcon({ severity }: { severity: IssueSeverity | "resolved" }) {
-  switch (severity) {
-    case "resolved":
-      return <CheckIcon className={`${issueIconClass} text-muted-foreground`} aria-label="Resolved" />
-    case "note":
-      return <InfoIcon className={`${issueIconClass} text-muted-foreground`} aria-label="Note" />
-    case "blocking":
-      return <AlertTriangleIcon className={`${issueIconClass} text-destructive`} aria-label="Must be resolved" />
-    case "warning":
-      return (
-        <AlertTriangleIcon className={`${issueIconClass} text-amber-600 dark:text-amber-400`} aria-label="Warning" />
-      )
-  }
+function Detail({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  )
 }
 
-export type RuleCardProps = {
-  rule: Rule
-  actions?: RuleCardActions
-  /** The documents citations come from; without it citations can't be opened or added. */
-  source?: CitationSource
+function RuleList({ title, keys }: { title: string; keys: T.RuleKey[] }) {
+  return keys.length > 0 ? (
+    <Section title={title}>
+      <ul className="flex flex-col gap-1.5">
+        {keys.map((key) => (
+          <li key={key}>
+            <RuleLink ruleKey={key} />
+          </li>
+        ))}
+      </ul>
+    </Section>
+  ) : null
 }
 
 /**
- * One rule as a side panel's body: its details, citations and issues scroll, and its actions are pinned to the bottom.
- * Without actions it's read-only.
+ * A rule in full (encoding.md, UX): in a draft its review first (Approve, then Reject and Edit), then its statement,
+ * the provisions it cites, any problems, and behind disclosures what it says in the schema's words, who it binds, the
+ * rules it relates to, and a preview against typed facts.
  */
-export function RuleCard({ rule, actions, source }: RuleCardProps) {
+export function RuleCard({ rule }: RuleCardProps) {
+  const { records, vocabulary, citations, issues, approval, source, actions, audience } = useRulebookWorkspace()
   const [isEditing, setIsEditing] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [resolving, setResolving] = useState<{ index: number; note: string } | null>(null)
-  const blocker = approvalBlocker(rule)
+  const topRef = useRef<HTMLDivElement>(null)
+  // Switching between reading and editing starts at the top of the card; opening it leaves the sheet's header in view.
+  useDidUpdate(() => {
+    topRef.current?.scrollIntoView({ block: "start" })
+  }, [isEditing])
+  const chip = (key: T.TermKey | null) => (key ? <TermChip termKey={key} vocabulary={vocabulary} /> : "None")
+  const related = relatedRules(rule, records.rules)
+  const blockers = approval ? approvalBlockers(approval, { type: "rule", key: rule.key }) : []
+  const found = issues.get(rule.key) ?? []
+  const hasProblems = rule.issues.some((issue) => issue.resolution === null) || found.length > 0
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4 text-sm">
-        {isEditing ? null : (
-          <header className="flex items-start justify-between gap-3">
-            <div className="flex flex-col gap-1">
-              <h3 className="font-medium">{rule.title}</h3>
-              <p className="text-muted-foreground">{rule.statement}</p>
-            </div>
-            {actions ? (
-              <div className="shrink-0">
-                <Badge variant={rule.review.status === "rejected" ? "destructive" : "outline"}>
-                  {rule.review.status === "approved" ? (
-                    <CircleCheckIcon className="text-green-600 dark:text-green-400" />
-                  ) : null}
-                  {rule.review.status === "rejected" ? <CircleXIcon /> : null}
-                  {reviewLabels[rule.review.status]}
-                </Badge>
-              </div>
-            ) : null}
-          </header>
-        )}
-        <div className="flex flex-col gap-3">
-          {isEditing && actions ? (
-            <RuleEditor
-              rule={rule}
-              onSave={async (changes) => {
-                setIsSaving(true)
-                await attempt(async () => {
-                  await actions.save(rule.id, changes)
-                  setIsEditing(false)
-                })
-                setIsSaving(false)
-              }}
-            />
-          ) : (
-            <>
-              <dl className="grid gap-1 sm:grid-cols-[8rem_1fr]">
-                <dt className="text-muted-foreground">Obligation</dt>
-                <dd>{obligationLabels[rule.obligation]}</dd>
-                <dt className="text-muted-foreground">Who decides</dt>
-                <dd>{rule.discretion === "committee" ? "The committee" : "Checked by the rules"}</dd>
-                <dt className="text-muted-foreground">Check</dt>
-                <dd>
-                  <CheckSummary check={rule.check} />
-                </dd>
-                {rule.appliesWhen.length > 0 ? (
-                  <>
-                    <dt className="text-muted-foreground">Applies when</dt>
-                    <dd>
-                      <ConditionsSummary conditions={rule.appliesWhen} />
-                    </dd>
-                  </>
-                ) : null}
-                {rule.exceptions.length > 0 ? (
-                  <>
-                    <dt className="text-muted-foreground">Exceptions</dt>
-                    <dd>{rule.exceptions.join("; ")}</dd>
-                  </>
-                ) : null}
-              </dl>
-            </>
-          )}
-          <Citations rule={rule} actions={actions} source={source} />
-          {actions && rule.issues.length > 0 ? (
-            <ul className="flex flex-col gap-2">
-              {rule.issues.map((issue, index) => {
-                const severity = issueSeverity(issue)
-                return (
-                  <li
-                    key={`${issue.code}:${issue.message}`}
-                    className={
-                      issue.resolution ? "flex flex-col gap-2 p-1" : "flex flex-col gap-2 rounded-lg bg-muted p-2"
-                    }
-                  >
-                    <div className="flex items-start gap-2">
-                      <IssueIcon severity={issue.resolution ? "resolved" : severity} />
-                      <span
-                        className={issue.resolution || severity === "note" ? "flex-1 text-muted-foreground" : "flex-1"}
-                      >
-                        {issue.message}
-                        {issue.resolution ? <> Resolved: {issue.resolution.note}</> : null}
-                      </span>
-                      {!issue.resolution && resolving?.index !== index ? (
-                        <Button size="sm" variant="outline" onClick={() => setResolving({ index, note: "" })}>
-                          Resolve
-                        </Button>
-                      ) : null}
-                    </div>
-                    {resolving?.index === index ? (
-                      <div className="flex gap-2">
-                        <Input
-                          aria-label="Why this is resolved"
-                          placeholder="Why this is resolved"
-                          value={resolving.note}
-                          onChange={(event) => setResolving({ index, note: event.target.value })}
-                        />
-                        <Button
-                          size="sm"
-                          disabled={!resolving.note.trim()}
-                          onClick={() =>
-                            attempt(async () => {
-                              await actions.resolveIssue(rule.id, index, resolving.note.trim())
-                              setResolving(null)
-                            })
-                          }
-                        >
-                          Save
-                        </Button>
-                      </div>
-                    ) : null}
-                  </li>
-                )
-              })}
-            </ul>
-          ) : null}
-        </div>
+  const save = async (draft: RuleDraft) => {
+    if (!actions) {
+      return
+    }
+    const problems = await attempt(() => actions.saveRule(draft), "The rule wasn't saved.")
+    if (problems) {
+      setIsEditing(false)
+      toast.success(
+        problems.length > 0 ? `Saved, with ${countOf(problems.length, "problem", "problems")} to fix.` : "Saved."
+      )
+    }
+  }
+
+  if (isEditing) {
+    return (
+      <div ref={topRef}>
+        <RuleForm rule={rule} onSave={save} onCancel={() => setIsEditing(false)} />
       </div>
-      {actions && isEditing ? (
-        <footer className={pinnedFooter}>
-          <Button size="sm" type="submit" form={editFormId(rule)} disabled={isSaving || rule.citations.length === 0}>
-            {isSaving ? "Saving" : "Save"}
-          </Button>
-          <Button size="sm" variant="outline" disabled={isSaving} onClick={() => setIsEditing(false)}>
-            Cancel
-          </Button>
-        </footer>
+    )
+  }
+
+  const [main, ...more] = rule.citations.map((citation) => citedProvision(citations, citation))
+  return (
+    <div ref={topRef} className="flex flex-col gap-6">
+      <ReviewControls
+        record={{ type: "rule", key: rule.key }}
+        status={rule.review.status}
+        blockers={blockers}
+        onEdit={() => setIsEditing(true)}
+      />
+
+      <Section title="Statement">
+        <p className="text-base leading-relaxed">
+          <Statement text={rule.statement} vocabulary={vocabulary} />
+        </p>
+      </Section>
+
+      <Section title={rule.citations.length === 1 ? "Source" : "Sources"}>
+        {main ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <ProvisionReference citation={main} source={source}>
+                {main.heading ? `${main.label}: ${main.heading}` : main.label}
+              </ProvisionReference>
+              <div className="line-clamp-4 text-muted-foreground">
+                <CitationText citation={main} />
+              </div>
+            </div>
+            {more.length > 0 ? (
+              <ul className="flex flex-col gap-1" aria-label="Also cited">
+                {more.map((citation) => (
+                  <li key={citation.provisionKey}>
+                    <ProvisionReference citation={citation} source={source}>
+                      {citation.heading ? `${citation.label}: ${citation.heading}` : citation.label}
+                    </ProvisionReference>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : (
+          <p className="text-muted-foreground">It cites no provision.</p>
+        )}
+      </Section>
+
+      {hasProblems && audience === "administrator" ? (
+        <Section title="Problems">
+          <IssueList
+            issues={rule.issues}
+            found={found}
+            onResolve={
+              actions ? (index, note) => actions.resolveIssue({ type: "rule", key: rule.key }, index, note) : undefined
+            }
+          />
+        </Section>
       ) : null}
-      {actions && !isEditing ? (
-        <footer className={pinnedFooter}>
-          <Button
-            size="sm"
-            disabled={blocker !== null || rule.review.status === "approved"}
-            title={blocker ?? undefined}
-            onClick={() => attempt(() => actions.review(rule.id, "approved"))}
-          >
-            <CheckIcon />
-            Approve
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={rule.review.status === "rejected"}
-            onClick={() => attempt(() => actions.review(rule.id, "rejected"))}
-          >
-            <XIcon />
-            Reject
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setIsEditing(true)}>
-            <PencilIcon />
-            Edit
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger render={<Button size="sm" variant="ghost" />}>
-              <Trash2Icon />
-              Delete
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete this rule?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  “{rule.title}” is removed from the draft. Reviews keep using the published version until you publish.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Keep it</AlertDialogCancel>
-                <AlertDialogAction variant="destructive" onClick={() => void attempt(() => actions.remove(rule.id))}>
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          {blocker ? <span className="text-xs text-muted-foreground">{blocker}</span> : null}
-        </footer>
-      ) : null}
+
+      <Accordion multiple className="border-t">
+        <AccordionItem value="details">
+          <AccordionTrigger>What it says, in detail</AccordionTrigger>
+          <AccordionContent className="flex flex-col gap-5">
+            <p className="leading-relaxed">
+              <Statement text={describeRule(rule, vocabulary, { linkTerms: true })} vocabulary={vocabulary} />
+            </p>
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <Detail label="Kind">{kindLabel(rule)}</Detail>
+              <Detail label="Applies to">
+                {rule.appliesTo ? chip(rule.appliesTo) : "The subjects of the rules it overrides"}
+              </Detail>
+              <Detail label="Request types">
+                <span className="flex flex-wrap gap-x-2">
+                  {rule.requestTypes.map((key) => (
+                    <TermChip key={key} termKey={key} vocabulary={vocabulary} />
+                  ))}
+                </span>
+              </Detail>
+              {rule.kind === "norm" ? (
+                <>
+                  <Detail label="Bearer">{rule.bearer ? chip(rule.bearer) : "None: a requirement binds no one"}</Detail>
+                  {rule.beneficiary ? <Detail label="Owed to">{chip(rule.beneficiary)}</Detail> : null}
+                  {rule.decidedBy ? <Detail label="Decided by">{chip(rule.decidedBy)}</Detail> : null}
+                  <Detail label="Remedy">{rule.remedy ? remedyLabels[rule.remedy] : "None"}</Detail>
+                  <Detail label="Cure period">{cureLabel(rule.cure, vocabulary)}</Detail>
+                </>
+              ) : null}
+              {rule.kind === "discretion" ? <Detail label="Decided by">{chip(rule.decidedBy)}</Detail> : null}
+              {rule.kind === "sanction" ? (
+                <>
+                  <Detail label="Imposed by">{chip(rule.imposedBy)}</Detail>
+                  <Detail label="Against">
+                    <span className="flex flex-wrap gap-x-2">
+                      {rule.against.map((key) => (
+                        <TermChip key={key} termKey={key} vocabulary={vocabulary} />
+                      ))}
+                    </span>
+                  </Detail>
+                </>
+              ) : null}
+              <Detail label="In effect from">{rule.effectiveFrom}</Detail>
+              <Detail label="Domain">{domainLabels[rule.domain]}</Detail>
+              {audience === "administrator" ? (
+                <Detail label="Key">
+                  <code className="text-xs break-all">{rule.key}</code>
+                </Detail>
+              ) : null}
+            </dl>
+            <RuleList title="Overrides" keys={related.overrides} />
+            <RuleList title="Overridden by" keys={related.overriddenBy} />
+            <RuleList title="Enforces" keys={related.enforces} />
+            <RuleList title="Enforced by" keys={related.enforcedBy} />
+            <RuleList title="Limits" keys={related.limits} />
+            {hasProblems ? null : (
+              <p className="text-muted-foreground">
+                {rule.issues.length > 0 ? "Its problems are resolved." : "No problems found."}
+              </p>
+            )}
+          </AccordionContent>
+        </AccordionItem>
+        {audience === "administrator" ? (
+          <AccordionItem value="try">
+            <AccordionTrigger>Try it against facts</AccordionTrigger>
+            <AccordionContent>
+              <RulePreview rule={rule} />
+            </AccordionContent>
+          </AccordionItem>
+        ) : null}
+      </Accordion>
     </div>
   )
 }

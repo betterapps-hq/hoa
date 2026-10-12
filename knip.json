@@ -1,7 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignoreExportsUsedInFile": true,
-  "ignore": ["beachball.config.js"],
   "tags": ["-vendored"],
   "workspaces": {
     ".": {},

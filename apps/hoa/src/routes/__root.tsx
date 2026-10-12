@@ -1,8 +1,10 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createRootRoute, HeadContent, Outlet, Scripts, useRouter } from "@tanstack/react-router"
+import { ThemeProvider } from "next-themes"
 import { useState, type ReactNode } from "react"
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary"
 import { AppSidebar } from "@/components/app-sidebar"
+import { UnitSystemProvider } from "@/components/QuantityInput/QuantityInput"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
@@ -32,7 +34,8 @@ type RootDocumentProps = {
 
 function RootDocument({ children }: RootDocumentProps) {
   return (
-    <html lang="en">
+    // next-themes sets the theme class on <html> before React hydrates, so React must not compare it.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
@@ -56,34 +59,40 @@ function RootLayout() {
   const router = useRouter()
   const [queryClient] = useState(() => new QueryClient())
   return (
-    <QueryClientProvider client={queryClient}>
-      <RoleProvider
-        roleId={session.roleId}
-        onRoleChange={async (roleId) => {
-          await setDemoRole({ data: { roleId } })
-          await router.invalidate()
-        }}
-      >
-        <TooltipProvider>
-          <SidebarProvider style={layoutStyle}>
-            <AppSidebar variant="inset" />
-            <SidebarInset>
-              <SiteHeader />
-              <div className="flex flex-1 flex-col">
-                <div className="@container/main flex flex-1 flex-col gap-2">
-                  <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-                    <ErrorBoundary FallbackComponent={AppError}>
-                      <Outlet />
-                    </ErrorBoundary>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <QueryClientProvider client={queryClient}>
+        <RoleProvider
+          roleId={session.roleId}
+          onRoleChange={async (roleId) => {
+            await setDemoRole({ data: { roleId } })
+            // The current page may be one the new role can't open; the dashboard is open to every role.
+            await router.navigate({ to: "/" })
+            await router.invalidate()
+          }}
+        >
+          <TooltipProvider>
+            <SidebarProvider style={layoutStyle}>
+              <AppSidebar variant="inset" />
+              <SidebarInset>
+                <SiteHeader />
+                <div className="flex flex-1 flex-col">
+                  <div className="@container/main flex flex-1 flex-col gap-2">
+                    <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+                      <ErrorBoundary FallbackComponent={AppError}>
+                        <UnitSystemProvider value={session.unitSystem}>
+                          <Outlet />
+                        </UnitSystemProvider>
+                      </ErrorBoundary>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </SidebarInset>
-          </SidebarProvider>
-          <Toaster />
-        </TooltipProvider>
-      </RoleProvider>
-    </QueryClientProvider>
+              </SidebarInset>
+            </SidebarProvider>
+            <Toaster />
+          </TooltipProvider>
+        </RoleProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   )
 }
 

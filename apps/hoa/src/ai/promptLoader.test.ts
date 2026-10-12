@@ -31,6 +31,12 @@ describe("createPromptLoader", () => {
     expect(template.compile({ name: "Sam" })).toBe("Hi Sam")
   })
 
+  it("reads a version's reasoning effort", async () => {
+    const manager = langfuse({ config: { model: "anthropic/claude-haiku-5.5", effort: "high" } })
+    const template = await createPromptLoader(manager, "production")(prompt)
+    expect(template.config).toEqual({ model: "anthropic/claude-haiku-5.5", effort: "high" })
+  })
+
   it("loads a pinned version, and ignores an unusable config", async () => {
     const manager = langfuse({ config: { model: 7 } })
     const template = await createPromptLoader(manager, "production")(prompt, { version: 7 })
@@ -55,6 +61,53 @@ describe("createPromptLoader", () => {
     const load = createPromptLoader(langfuse({ prompt: "Hi {{fullName}}" }), "production")
     await expect(load(prompt)).rejects.toThrow(
       "Langfuse prompt hoa-greeting version 4 doesn't match the code: it uses {{fullName}}, which the code doesn't fill in; it doesn't use {{name}}."
+    )
+  })
+})
+
+describe("chat prompts", () => {
+  const chat = { name: "hoa-chat", variables: ["name"], chat: true } as const
+
+  function chatManager(prompt: unknown[]) {
+    return {
+      get: vi.fn<LangfusePromptManager["get"]>(),
+      getChat: vi.fn<NonNullable<LangfusePromptManager["getChat"]>>(async (name) => ({
+        name,
+        version: 2,
+        prompt,
+        config: {},
+        compile: (variables) => [
+          { role: "system", content: "Greet people." },
+          { role: "user", content: `<name>${variables?.name ?? ""}</name>` }
+        ]
+      }))
+    }
+  }
+
+  it("loads a chat prompt's messages and checks the variables across them", async () => {
+    const manager = chatManager([
+      { role: "system", content: "Greet people." },
+      { role: "user", content: "<name>{{name}}</name>" }
+    ])
+    const template = await createPromptLoader(manager, "development")(chat, { version: 2 })
+    expect(manager.getChat).toHaveBeenCalledWith("hoa-chat", { version: 2 })
+    expect(manager.get).not.toHaveBeenCalled()
+    expect(template.messages?.({ name: "Sam" })).toEqual([
+      { role: "system", content: "Greet people." },
+      { role: "user", content: "<name>Sam</name>" }
+    ])
+    expect(template.compile({ name: "Sam" })).toBe("Greet people.\n<name>Sam</name>")
+  })
+
+  it("refuses a chat whose variables don't match, one that isn't system and user messages, and a text-only loader", async () => {
+    await expect(
+      createPromptLoader(chatManager([{ role: "user", content: "Hi" }]), "production")(chat)
+    ).rejects.toThrow("doesn't use {{name}}")
+    await expect(
+      createPromptLoader(chatManager([{ type: "placeholder", name: "history" }]), "production")(chat)
+    ).rejects.toThrow("isn't a chat of system and user messages")
+    await expect(createPromptLoader(langfuse(), "production")(chat)).rejects.toThrow(
+      "couldn't serve the prompt hoa-chat"
     )
   })
 })

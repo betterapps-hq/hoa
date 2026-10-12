@@ -1,0 +1,1 @@
+ALTER TABLE `applications` ADD `project_kind` text;

@@ -15,6 +15,7 @@
     "**/.output/**",
     "**/coverage/**",
     "**/docs/**",
+    "apps/hoa/scripts/schema-doc/**",
     "**/routeTree.gen.ts",
     "**/worker-configuration.d.ts",
     "**/.wrangler/**",

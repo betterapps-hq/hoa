@@ -1,7 +1,11 @@
+import { match } from "ts-pattern"
 import type { ApplicationFile, ApplicationStatus, decisionOutcomes } from "@/applications/application"
-import type { Finding, FindingStatus, Recommendation, Review } from "@/review/reviewModel"
+import type { Recommendation } from "@/review/reviewModel"
+import type { Fact, FactValue, Outcome } from "@/schema/types"
+import type { Vocabulary } from "@/schema/vocabulary"
+import { amountText } from "../rulebook/rulebookRecords"
 
-// Labels and groupings for the application pages.
+// Labels, groupings and value formats for the application pages.
 
 export const statusLabels: Record<ApplicationStatus, string> = {
   draft: "Draft",
@@ -16,7 +20,8 @@ export const recommendationLabels: Record<Recommendation, string> = {
   approve: "Approve",
   "approve-with-conditions": "Approve with conditions",
   "request-information": "More information needed",
-  reject: "Changes required"
+  "refer-to-committee": "Refer to the committee",
+  deny: "Deny"
 }
 
 export type DecisionOutcome = (typeof decisionOutcomes)[number]
@@ -29,12 +34,32 @@ export const outcomeLabels: Record<DecisionOutcome, string> = {
   "information-requested": "Information requested"
 }
 
-export const findingLabels: Record<FindingStatus, string> = {
+/** A group of findings by outcome, as the findings list heads it. */
+export const findingLabels: Record<Outcome, string> = {
   "not-met": "Not met",
-  unclear: "Needs information",
-  "needs-committee": "For the committee",
+  "missing-information": "Missing information",
+  committee: "For the committee",
+  advisory: "Suggestions",
+  pending: "Pending",
   met: "Met",
-  "not-applicable": "Doesn't apply"
+  exempt: "Exempt",
+  "not-applicable": "Doesn't apply",
+  available: "Available",
+  blocked: "Blocked"
+}
+
+/** One finding's outcome, as a matrix cell names it. */
+export const cellLabels: Record<Outcome, string> = {
+  "not-met": "Not met",
+  "missing-information": "Missing",
+  committee: "Committee",
+  advisory: "Suggestion",
+  pending: "Pending",
+  met: "Met",
+  exempt: "Exempt",
+  "not-applicable": "n/a",
+  available: "Available",
+  blocked: "Blocked"
 }
 
 export const fileStatusLabels: Record<ApplicationFile["status"], string> = {
@@ -44,15 +69,27 @@ export const fileStatusLabels: Record<ApplicationFile["status"], string> = {
   unreadable: "Couldn't be read"
 }
 
-/** Findings grouped in the order people act on them; the groups that have findings. */
-export function groupFindings(findings: readonly Finding[]) {
-  const order: FindingStatus[] = ["not-met", "unclear", "needs-committee", "met", "not-applicable"]
-  const byStatus = Map.groupBy(findings, (finding) => finding.status)
-  return order.flatMap((status) => {
-    const group = byStatus.get(status)
-    return group ? [{ status, findings: group }] : []
-  })
-}
+/** Outcomes in the order people act on them. */
+export const outcomeOrder: Outcome[] = [
+  "not-met",
+  "missing-information",
+  "committee",
+  "advisory",
+  "pending",
+  "met",
+  "exempt",
+  "not-applicable",
+  "available",
+  "blocked"
+]
+
+/** The outcomes that ask something of someone: a change, information, or the committee's decision. */
+export const attentionOutcomes: ReadonlySet<Outcome> = new Set([
+  "not-met",
+  "missing-information",
+  "committee",
+  "advisory"
+])
 
 /** Files the homeowner uploaded, each with the pictures taken from it. */
 export function packetFiles(files: readonly ApplicationFile[]) {
@@ -61,10 +98,46 @@ export function packetFiles(files: readonly ApplicationFile[]) {
     .map((file) => ({ file, pictures: files.filter((child) => child.parentFileId === file.id) }))
 }
 
-/** The component a finding is about, as the review named it. */
-export function componentLabel(review: Pick<Review, "components">, componentId: string | null) {
-  if (componentId === null) {
-    return "Whole project"
-  }
-  return review.components.find((component) => component.id === componentId)?.label ?? componentId
+/** "Fence run" for `fence-run`: a term's label as a heading starts. */
+export const sentenceCase = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" })
+const dateTimeFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" })
+
+/** A fact's value in words: labels for terms and units, an entity by its label. */
+export function factValueText(value: FactValue, vocabulary: Vocabulary, entityLabel: (id: string) => string) {
+  return match(value)
+    .with({ type: "quantity" }, (quantity) => amountText(quantity.value, quantity.unit, vocabulary))
+    .with({ type: "number" }, (number) => String(number.value))
+    .with({ type: "boolean" }, (boolean) => (boolean.value ? "Yes" : "No"))
+    .with({ type: "value" }, (chosen) => (chosen.term ? vocabulary.label(chosen.term) : chosen.text))
+    .with({ type: "date" }, (date) => dateFormat.format(new Date(`${date.value}T00:00:00Z`)))
+    .with({ type: "date-time" }, (dateTime) => dateTimeFormat.format(new Date(dateTime.value)))
+    .with({ type: "time" }, (time) => time.value)
+    .with({ type: "schedule" }, (schedule) => [...schedule.weekly, ...schedule.annual].join(", ") || "A schedule")
+    .with({ type: "text" }, (text) => text.value)
+    .with({ type: "entity" }, (reference) => entityLabel(reference.entity))
+    .exhaustive()
 }
+
+/** What a fact says: its value, "None" when the packet says there's none, or the readings it couldn't choose between. */
+export function factText(fact: Fact, vocabulary: Vocabulary, entityLabel: (id: string) => string) {
+  const text = (value: FactValue) => factValueText(value, vocabulary, entityLabel)
+  if (fact.state === "absent") {
+    return "None"
+  }
+  if (fact.value) {
+    return text(fact.value)
+  }
+  return fact.candidates.length > 0 ? fact.candidates.map(text).join(" or ") : (fact.stated ?? "Not read")
+}
+
+export const factStateLabels: Record<Fact["state"], string | null> = {
+  known: null,
+  absent: null,
+  conflicting: "Conflicting",
+  uncertain: "Unsure"
+}
+
+/** "92%": a confidence or a match score. */
+export const percent = (value: number) => `${Math.round(value * 100)}%`

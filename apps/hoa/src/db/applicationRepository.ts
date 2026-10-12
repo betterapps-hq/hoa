@@ -8,18 +8,27 @@ import {
   type ApplicationStatus
 } from "@/applications/application"
 import { recommendations, type Recommendation } from "@/review/reviewModel"
-import type { ApplicationFileKind } from "@/rules/catalog"
 import type { Database } from "./database"
 import { applicationFiles, applicationPages, applications, reviews } from "./schema"
 
+/**
+ * The first build's project type column stays until cutover (implementation-plan.md, 9.6) and other branches' previews
+ * still read it, so it holds the one value they know.
+ */
+const legacyProjectType = "fence"
+
 export async function createApplication(
   db: Database,
-  input: Pick<Application, "hoaId" | "projectType" | "description" | "createdBy"> & { now: string; deleteAfter: string }
+  input: Pick<Application, "hoaId" | "projectTypeId" | "answers" | "description" | "createdBy"> & {
+    now: string
+    deleteAfter: string
+  }
 ): Promise<Application> {
   const application: Application = {
     id: crypto.randomUUID(),
     hoaId: input.hoaId,
-    projectType: input.projectType,
+    projectTypeId: input.projectTypeId,
+    answers: input.answers,
     description: input.description,
     createdBy: input.createdBy,
     createdAt: input.now,
@@ -31,7 +40,7 @@ export async function createApplication(
     decision: null,
     deleteAfter: input.deleteAfter
   }
-  await db.insert(applications).values(application)
+  await db.insert(applications).values({ ...application, firstBuildProjectType: legacyProjectType })
   return application
 }
 
@@ -205,21 +214,11 @@ export async function deleteApplicationFile(db: Database, hoaId: string, id: str
 }
 
 /** Page kinds from classification, written as a whole per file. */
-export async function setPageKinds(db: Database, hoaId: string, fileId: string, kinds: readonly ApplicationFileKind[]) {
+export async function setPageKinds(db: Database, hoaId: string, fileId: string, kinds: readonly string[]) {
   await db.batch([
     db.delete(applicationPages).where(and(eq(applicationPages.hoaId, hoaId), eq(applicationPages.fileId, fileId))),
     ...kinds.map((kind, index) => db.insert(applicationPages).values({ hoaId, fileId, pageIndex: index + 1, kind }))
   ])
-}
-
-export async function listPageKinds(db: Database, hoaId: string, fileIds: readonly string[]) {
-  if (fileIds.length === 0) {
-    return []
-  }
-  return db
-    .select({ fileId: applicationPages.fileId, pageIndex: applicationPages.pageIndex, kind: applicationPages.kind })
-    .from(applicationPages)
-    .where(and(eq(applicationPages.hoaId, hoaId), inArray(applicationPages.fileId, [...fileIds])))
 }
 
 export type ReviewSummary = {
@@ -228,6 +227,8 @@ export type ReviewSummary = {
   applicationId: string
   jobId: string
   rulebookId: string
+  /** The rules file the review read, so it can be reproduced against the exact file. */
+  rulesFileSha256: string | null
   recommendation: Recommendation
   costUsd: number
   sessionId: string

@@ -1,6 +1,5 @@
 import { z } from "zod"
-import { projectTypeIds } from "@/rules/catalog"
-import { errorInfoSchema, ruleTopics } from "@/rules/rule"
+import { errorInfoSchema } from "@/shared/schemas"
 
 // Governing documents and their sections (docs/design/documents.md).
 
@@ -13,16 +12,6 @@ export const governingDocumentKinds = [
   "form"
 ] as const
 export type GoverningDocumentKind = (typeof governingDocumentKinds)[number]
-
-/** Authority for resolving conflicts: lower ranks win (docs/design/rules.md, "Authority and conflicts"). */
-export const authorityRank: Record<GoverningDocumentKind, number> = {
-  declaration: 1,
-  bylaws: 2,
-  "rules-and-regulations": 3,
-  "design-guidelines": 3,
-  amendment: 3,
-  form: 4
-}
 
 export const governingDocumentSchema = z.object({
   /** One id per uploaded version; pages, sections and citations use it. */
@@ -47,8 +36,8 @@ export const governingDocumentSchema = z.object({
 export type GoverningDocument = z.infer<typeof governingDocumentSchema>
 
 export const sectionRoutingSchema = z.object({
-  projectTypes: z.array(z.enum(projectTypeIds)),
-  topics: z.array(z.enum(ruleTopics)),
+  projectTypes: z.array(z.string()),
+  topics: z.array(z.string()),
   isRelevant: z.boolean()
 })
 

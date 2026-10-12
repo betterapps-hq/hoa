@@ -1,0 +1,479 @@
+import { createServerFn } from "@tanstack/react-start"
+import { z } from "zod"
+import { createAiContext } from "@/ai/aiContext.server"
+import { pipelinePrompts } from "@/ai/pipelinePrompts"
+import { runObjectPrompt } from "@/ai/runPrompt"
+import { applicationRequestType } from "@/applications/application"
+import { getDb } from "@/db/client.server"
+import {
+  countApplicationsOfType,
+  deleteProjectType as deleteProjectTypeRecord,
+  getProjectType,
+  insertProjectType,
+  listProjectTypes as listProjectTypeRecords,
+  updateProjectType as updateProjectTypeRecord
+} from "@/db/projectTypeRepository"
+import { getPublishedRulesFile, getRulesFileOf } from "@/db/rulebookContentRepository"
+import { bindDefinition } from "@/projectTypes/bind"
+import {
+  buildDefinition,
+  projectSubjects,
+  propertyRules,
+  vocabularyUnits,
+  type ProjectSubject
+} from "@/projectTypes/build"
+import { allQuestions } from "@/projectTypes/definition"
+import {
+  projectTypeDefinition,
+  projectTypeDetails,
+  projectTypeStatuses,
+  type ProjectType,
+  type ProjectTypeDefinition
+} from "@/projectTypes/projectType"
+import {
+  checkSuggestions,
+  projectTypesForPrompt,
+  rulebookForPrompt,
+  suggestionAnswerSchema,
+  type ProjectTypeSuggestion
+} from "@/projectTypes/suggest"
+import { rulebookChanges, type RulebookChange } from "@/projectTypes/updates"
+import { definitionOf, rulebookVocabulary, scopeNoteOf } from "@/review/documentTypes"
+import { readRulesFile } from "@/rulebook/assemble"
+import type * as T from "@/schema/types"
+import { getRequestContext, requireAdministrator } from "@/session/requestContext.server"
+import { getBucket } from "@/storage/storage.server"
+import type { CitedProvision } from "../rulebook/citedProvision"
+import { citationIndex, citedProvision } from "../rulebook/rulebookRecords"
+import { projectRequirements, type RequirementGroup } from "./requirements"
+
+// Project types (application-review.md, Project types): the organization's own list, which homeowners pick from and
+// administrators keep. Definitions, suggestions and requirements are built against the published rulebook.
+
+const today = () => new Date().toISOString().slice(0, 10)
+
+/** The published rulebook's id, rules file and publish date; null before the organization publishes one. */
+async function publishedRulebook(hoaId: string) {
+  const published = await getPublishedRulesFile(getDb(), hoaId)
+  return published
+    ? {
+        id: published.rulebookId,
+        publishedAt: published.publishedAt,
+        rulesFile: await readRulesFile(getBucket(), published)
+      }
+    : null
+}
+
+type Published = Awaited<ReturnType<typeof publishedRulebook>>
+
+/** Whether a type was built against an earlier rulebook than the published one. */
+const isOutdatedType = (type: ProjectType, published: Published) =>
+  published !== null && type.rulebookId !== published.id
+
+/**
+ * The rules file a type's form is kept against: the rulebook it was built with while it's out of date (so editing it
+ * doesn't take the published rulebook's changes unreviewed), else the published one; null when there's neither.
+ */
+async function ownRulesFile(hoaId: string, type: ProjectType, published: Published) {
+  if (!isOutdatedType(type, published) || type.rulebookId === null) {
+    return published ? { id: published.id, rulesFile: published.rulesFile } : null
+  }
+  const file = await getRulesFileOf(getDb(), hoaId, type.rulebookId)
+  if (!file) {
+    return published ? { id: published.id, rulesFile: published.rulesFile } : null
+  }
+  return { id: type.rulebookId, rulesFile: await readRulesFile(getBucket(), file) }
+}
+
+async function requirePublished(hoaId: string) {
+  const published = await publishedRulebook(hoaId)
+  if (!published) {
+    throw new Error("Publish the rulebook first: project types are built from its rules.")
+  }
+  return published
+}
+
+async function loadOwnType(hoaId: string, id: string) {
+  const type = await getProjectType(getDb(), hoaId, id)
+  if (!type) {
+    throw new Error("The project type doesn't exist.")
+  }
+  return type
+}
+
+/** Why a form asks its questions: the passages they cite, and the titles of the rules that read each property. */
+export type QuestionReasons = {
+  citations: Record<string, CitedProvision>
+  /** Rule titles by property. */
+  rules: Record<string, string[]>
+}
+
+/** A project type as homeowners choose it, with why its questions are asked. */
+export type OfferedProjectType = ProjectType & { reasons: QuestionReasons }
+
+/** The project types homeowners can choose: the active ones. */
+export const listActiveProjectTypes = createServerFn({ method: "GET" }).handler(
+  async (): Promise<OfferedProjectType[]> => {
+    const context = await getRequestContext()
+    const [types, published] = await Promise.all([
+      listProjectTypeRecords(getDb(), context.hoa.id),
+      publishedRulebook(context.hoa.id)
+    ])
+    return types
+      .filter((type) => type.status === "active")
+      .map((type) => {
+        const current = currentType(type, published)
+        return {
+          ...current,
+          reasons: published ? reasonsOf(published.rulesFile, current) : { citations: {}, rules: {} }
+        }
+      })
+  }
+)
+
+function reasonsOf(rulesFile: T.RulesFile, type: ProjectType): QuestionReasons {
+  const titles = new Map(rulesFile.rules.map((rule) => [rule.key, rule.title]))
+  const byProperty = propertyRules(rulesFile, applicationRequestType, type.definition.subjects, today())
+  return {
+    citations: citationsOf(rulesFile, citedKeys(type.definition)),
+    rules: Object.fromEntries(
+      Object.entries(byProperty).map(([property, keys]) => [property, keys.flatMap((key) => titles.get(key) ?? [])])
+    )
+  }
+}
+
+/**
+ * A type as its form reads now: bound again to the rules it was built against, so the questions carry what code
+ * derives from the vocabulary (units, code's wording for a bare label). A type built against an earlier rulebook stays
+ * as stored until the administrator updates it.
+ */
+function currentType(type: ProjectType, published: Awaited<ReturnType<typeof publishedRulebook>>): ProjectType {
+  if (!published || type.rulebookId !== published.id) {
+    return type
+  }
+  const built = buildDefinition(published.rulesFile, applicationRequestType, type.definition.subjects, today())
+  return { ...type, definition: bindDefinition(type.definition, built) }
+}
+
+export type ProjectTypeListItem = ProjectType & {
+  applicationCount: number
+  /** When the rulebook it's out of date with was published; null while it's current. */
+  outdatedSince: string | null
+}
+
+export type ProjectTypesOverview = {
+  projectTypes: ProjectTypeListItem[]
+  /** The things a project type can cover, for adding one by hand; empty before a rulebook is published. */
+  subjects: ProjectSubject[]
+  hasPublishedRulebook: boolean
+}
+
+/** Every project type with how many applications use it, and what a new one can cover. */
+export const getProjectTypesOverview = createServerFn({ method: "GET" }).handler(
+  async (): Promise<ProjectTypesOverview> => {
+    const context = await requireAdministrator()
+    const db = getDb()
+    const [types, published] = await Promise.all([
+      listProjectTypeRecords(db, context.hoa.id),
+      publishedRulebook(context.hoa.id)
+    ])
+    return {
+      projectTypes: await Promise.all(
+        types.map(async (type) => ({
+          ...type,
+          applicationCount: await countApplicationsOfType(db, context.hoa.id, type.id),
+          outdatedSince: isOutdatedType(type, published) ? (published?.publishedAt ?? null) : null
+        }))
+      ),
+      subjects: published ? projectSubjects(published.rulesFile, applicationRequestType) : [],
+      hasPublishedRulebook: published !== null
+    }
+  }
+)
+
+/** How many active project types are out of date with the published rulebook, for the committee's dashboard. */
+export const countOutdatedProjectTypes = createServerFn({ method: "GET" }).handler(async (): Promise<number> => {
+  const context = await getRequestContext()
+  if (context.role !== "administrator") {
+    return 0
+  }
+  const [types, published] = await Promise.all([
+    listProjectTypeRecords(getDb(), context.hoa.id),
+    getPublishedRulesFile(getDb(), context.hoa.id)
+  ])
+  return published
+    ? types.filter((type) => type.status === "active" && type.rulebookId !== published.rulebookId).length
+    : 0
+})
+
+export type ProjectTypeView = {
+  projectType: ProjectType
+  applicationCount: number
+  /** Every requirement the published rulebook places on this kind of project. */
+  requirements: RequirementGroup[]
+  /** The labels of the things it covers. */
+  subjectLabels: string[]
+  /** Whether it was built against an earlier rulebook than the published one. */
+  isOutdated: boolean
+  /**
+   * While it's out of date: when the published rulebook was published, what changed for this form, and the form the
+   * published rulebook gives, which accepted changes come from.
+   */
+  updates: { publishedAt: string | null; changes: RulebookChange[]; latest: ProjectTypeDefinition } | null
+  /** Every question the rules about its subjects can ask, for adding back one the administrator removed. */
+  available: ProjectTypeDefinition
+  /** What each question checks, by property key: the vocabulary's meaning and the rules that read it. */
+  questionInfo: Record<string, QuestionInfo>
+  /** The passages the questions cite, by provision key; a key missing here is a link the rulebook no longer has. */
+  citations: Record<string, CitedProvision>
+  /** The units the vocabulary has, for the administrator's own amount questions. */
+  units: VocabularyUnit[]
+}
+
+export type VocabularyUnit = ReturnType<typeof vocabularyUnits>[number]
+
+export type QuestionInfo = { meaning: string | null; ruleKeys: string[] }
+
+function questionInfoOf(rulesFile: T.RulesFile, subjects: readonly string[]): Record<string, QuestionInfo> {
+  const vocabulary = rulebookVocabulary(rulesFile)
+  return Object.fromEntries(
+    Object.entries(propertyRules(rulesFile, applicationRequestType, subjects, today())).map(([property, ruleKeys]) => [
+      property,
+      { meaning: definitionOf(vocabulary, property) ?? scopeNoteOf(vocabulary, property), ruleKeys }
+    ])
+  )
+}
+
+/** Every provision key a definition's questions cite, asked or kept aside. */
+const citedKeys = (definition: ProjectTypeDefinition) =>
+  new Set([
+    ...allQuestions(definition).flatMap((item) => item.field.citations ?? []),
+    ...definition.documents.flatMap((document) => document.citations)
+  ])
+
+/** The cited passages that exist in the rulebook's documents, as screens show them. */
+function citationsOf(rulesFile: T.RulesFile, keys: Iterable<string>): Record<string, CitedProvision> {
+  const index = citationIndex(rulesFile)
+  return Object.fromEntries(
+    [...keys]
+      .filter((key) => index.provisions.has(key))
+      .map((key) => [key, citedProvision(index, { provisionKey: key, highlight: null, region: null })])
+  )
+}
+
+export const getProjectTypeView = createServerFn({ method: "GET" })
+  .validator((data: unknown) => z.object({ projectTypeId: z.string() }).parse(data))
+  .handler(async ({ data }): Promise<ProjectTypeView> => {
+    const context = await requireAdministrator()
+    const db = getDb()
+    const [type, published, applicationCount] = await Promise.all([
+      loadOwnType(context.hoa.id, data.projectTypeId),
+      publishedRulebook(context.hoa.id),
+      countApplicationsOfType(db, context.hoa.id, data.projectTypeId)
+    ])
+    const subjects = published ? projectSubjects(published.rulesFile, applicationRequestType) : []
+    const current = currentType(type, published)
+    const own = await ownRulesFile(context.hoa.id, type, published)
+    const buildFrom = (rulesFile: T.RulesFile) =>
+      buildDefinition(rulesFile, applicationRequestType, type.definition.subjects, today())
+    const available = own ? buildFrom(own.rulesFile) : type.definition
+    const isOutdated = isOutdatedType(type, published)
+    const latest = published && isOutdated ? buildFrom(published.rulesFile) : null
+    const updates =
+      published && latest
+        ? {
+            publishedAt: published.publishedAt,
+            latest,
+            changes: rulebookChanges(
+              type.definition,
+              own && own.id !== published.id ? available : null,
+              latest,
+              new Set(published.rulesFile.provisions.map((provision) => provision.key))
+            )
+          }
+        : null
+    return {
+      projectType: current,
+      applicationCount,
+      requirements: published
+        ? projectRequirements(published.rulesFile, applicationRequestType, type.definition.subjects, today())
+        : [],
+      subjectLabels: type.definition.subjects.map(
+        (key) => subjects.find((subject) => subject.key === key)?.label ?? key
+      ),
+      isOutdated,
+      updates,
+      available,
+      questionInfo: published ? questionInfoOf(published.rulesFile, type.definition.subjects) : {},
+      citations: published
+        ? citationsOf(published.rulesFile, [
+            ...citedKeys(current.definition),
+            ...citedKeys(available),
+            ...(latest ? citedKeys(latest) : [])
+          ])
+        : {},
+      units: vocabularyUnits(published?.rulesFile ?? null)
+    }
+  })
+
+/** Every passage of the published rulebook's documents, for linking one to a question. */
+export const listCitableProvisions = createServerFn({ method: "GET" }).handler(async (): Promise<CitedProvision[]> => {
+  const context = await requireAdministrator()
+  const published = await publishedRulebook(context.hoa.id)
+  if (!published) {
+    return []
+  }
+  const index = citationIndex(published.rulesFile)
+  return published.rulesFile.provisions.map((provision) =>
+    citedProvision(index, { provisionKey: provision.key, highlight: null, region: null })
+  )
+})
+
+/**
+ * Project types the governing documents suggest: the model reads the published rulebook and proposes types; code keeps
+ * only fields the rules test and documents the rules require.
+ */
+export const suggestProjectTypes = createServerFn({ method: "POST" }).handler(
+  async (): Promise<ProjectTypeSuggestion[]> => {
+    const context = await requireAdministrator()
+    const ai = createAiContext()
+    if (!ai.isConfigured) {
+      throw new Error(`Suggestions need ${ai.missing.join(", ")}.`)
+    }
+    const [published, existing] = await Promise.all([
+      requirePublished(context.hoa.id),
+      listProjectTypeRecords(getDb(), context.hoa.id)
+    ])
+    const on = today()
+    try {
+      const result = await runObjectPrompt({
+        loadPrompt: ai.loadPrompt,
+        createModel: ai.createModel,
+        defaultModelId: ai.modelId,
+        prompt: pipelinePrompts.projectTypeSuggestion,
+        schema: suggestionAnswerSchema,
+        variables: {
+          rulebook: rulebookForPrompt(published.rulesFile, applicationRequestType, on),
+          projectTypes: projectTypesForPrompt(existing)
+        },
+        traceName: "project-type-suggestion",
+        environment: ai.environment,
+        sessionId: `project-types-${context.hoa.id}`
+      })
+      return checkSuggestions(result.object, {
+        rulesFile: published.rulesFile,
+        requestType: applicationRequestType,
+        on,
+        existing
+      })
+    } finally {
+      await ai.flush()
+    }
+  }
+)
+
+const newProjectType = projectTypeDetails.extend({
+  subjects: z.array(z.string()),
+  /** A suggestion's definition, checked against the rules; without one, the rules' full definition. */
+  definition: projectTypeDefinition.nullable()
+})
+
+export const createProjectType = createServerFn({ method: "POST" })
+  .validator((data: unknown) => newProjectType.parse(data))
+  .handler(async ({ data }): Promise<ProjectType> => {
+    const context = await requireAdministrator()
+    const published = await requirePublished(context.hoa.id)
+    const known = new Set(projectSubjects(published.rulesFile, applicationRequestType).map((subject) => subject.key))
+    const subjects = data.subjects.filter((key) => known.has(key))
+    const built = buildDefinition(published.rulesFile, applicationRequestType, subjects, today())
+    return insertProjectType(getDb(), {
+      hoaId: context.hoa.id,
+      label: data.label,
+      description: data.description || null,
+      rulebookId: published.id,
+      definition: data.definition ? bindDefinition(data.definition, built) : built,
+      now: new Date().toISOString()
+    })
+  })
+
+/** A newly linked passage must be in the published rulebook's documents; one a rebuild removed stays until fixed. */
+function checkCitations(definition: ProjectTypeDefinition, before: ProjectTypeDefinition, rulesFile: T.RulesFile) {
+  const known = citedKeys(before)
+  const index = citationIndex(rulesFile)
+  const unknown = [...citedKeys(definition)].filter((key) => !known.has(key) && !index.provisions.has(key))
+  if (unknown.length > 0) {
+    throw new Error("A linked passage isn't in the rulebook's documents. Choose it again.")
+  }
+}
+
+/**
+ * Saves the label, description and form; the form is checked against the rules again: the rulebook it was built with
+ * while it's out of date, so an edit never takes the published rulebook's changes unreviewed.
+ */
+export const updateProjectType = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    projectTypeDetails.extend({ id: z.string(), definition: projectTypeDefinition }).parse(data)
+  )
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    const [type, published] = await Promise.all([
+      loadOwnType(context.hoa.id, data.id),
+      requirePublished(context.hoa.id)
+    ])
+    const own = (await ownRulesFile(context.hoa.id, type, published)) ?? published
+    const built = buildDefinition(own.rulesFile, applicationRequestType, type.definition.subjects, today())
+    checkCitations(data.definition, type.definition, published.rulesFile)
+    await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
+      label: data.label,
+      description: data.description || null,
+      definition: bindDefinition(data.definition, built),
+      rulebookId: own.id,
+      updatedAt: new Date().toISOString()
+    })
+  })
+
+/**
+ * Brings a type up to date with the published rulebook: the form the administrator reviewed (each change accepted or
+ * their version kept, `applyChanges`), bound against the published rules.
+ */
+export const applyProjectTypeUpdates = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ id: z.string(), definition: projectTypeDefinition }).parse(data))
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    const [type, published] = await Promise.all([
+      loadOwnType(context.hoa.id, data.id),
+      requirePublished(context.hoa.id)
+    ])
+    const built = buildDefinition(published.rulesFile, applicationRequestType, type.definition.subjects, today())
+    checkCitations(data.definition, type.definition, published.rulesFile)
+    await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
+      definition: bindDefinition(data.definition, built),
+      rulebookId: published.id,
+      updatedAt: new Date().toISOString()
+    })
+  })
+
+/** Archives a project type (hidden from new applications, kept for existing ones) or unarchives it. */
+export const setProjectTypeStatus = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ id: z.string(), status: z.enum(projectTypeStatuses) }).parse(data))
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    await loadOwnType(context.hoa.id, data.id)
+    await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
+      status: data.status,
+      updatedAt: new Date().toISOString()
+    })
+  })
+
+/** Deletes a project type no application uses; one in use can only be archived. */
+export const deleteProjectType = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ id: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    const db = getDb()
+    await loadOwnType(context.hoa.id, data.id)
+    if ((await countApplicationsOfType(db, context.hoa.id, data.id)) > 0) {
+      throw new Error("Applications use this project type, so it can be archived but not deleted.")
+    }
+    await deleteProjectTypeRecord(db, context.hoa.id, data.id)
+  })
