@@ -1,38 +1,257 @@
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldLabel } from "@/components/ui/field"
+import {
+  Questionnaire,
+  QuestionnaireActions,
+  QuestionnaireChoice,
+  QuestionnaireChoiceDescription,
+  QuestionnaireChoices,
+  QuestionnaireDescription,
+  QuestionnaireError,
+  QuestionnaireItem,
+  QuestionnaireNext,
+  QuestionnairePrevious,
+  QuestionnaireProgress,
+  QuestionnaireSkip,
+  QuestionnaireSubmit,
+  QuestionnaireTitle
+} from "@/components/ui/questionnaire"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
+import { sentenceCase } from "@/lib/text"
 import type * as T from "@/schema/types"
 import { attempt } from "../attempt"
 import { ProvisionReference } from "../ProvisionReference/ProvisionReference"
-import { citedProvision } from "../rulebookRecords"
+import { citedProvision, countOf } from "../rulebookRecords"
 import { RuleLink } from "../RuleLink/RuleLink"
 import { TermChip } from "../TermChip/TermChip"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 
 /**
- * Interpretation and conflict questions (encoding.md, UX, Questions): each with its citations and its options, each
- * option listing the candidate rules it keeps. Answering approves the kept rules and rejects the others.
+ * Interpretation and conflict questions (encoding.md, UX, Questions): the open ones are answered one at a time, each
+ * reading saying which candidate rules it keeps, and each answer saved on the way to the next. Answering approves the
+ * kept rules and rejects the others. Answered questions follow, each with the reading chosen, to change it.
  */
 export function QuestionsTab() {
   const { records, actions } = useRulebookWorkspace()
+  const open = records.questions.filter((question) => question.answer === null)
+  // The questions one pass steps through, fixed when it starts, so answering one doesn't renumber the rest.
+  const [pass, setPass] = useState<readonly string[]>(() => (actions ? open.map((question) => question.id) : []))
   if (records.questions.length === 0) {
     return <p className="text-sm text-muted-foreground">Processing left no questions.</p>
   }
-  const open = records.questions.filter((question) => question.answer === null)
+  const stepping = pass.flatMap((id) => records.questions.filter((question) => question.id === id))
+  const waiting = open.filter((question) => !pass.includes(question.id))
+  const answered = records.questions.filter((question) => question.answer !== null && !pass.includes(question.id))
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-muted-foreground">
         Each question decides which reading of a provision the rules follow.
         {actions && open.length > 0 ? ` ${open.length} of ${records.questions.length} to answer.` : ""}
       </p>
-      {[...open, ...records.questions.filter((question) => question.answer !== null)].map((question) => (
+      {actions && stepping.length > 0 ? (
+        <QuestionSteps key={pass.join(" ")} questions={stepping} onFinish={() => setPass([])} />
+      ) : null}
+      {actions && stepping.length === 0 && waiting.length > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+          <p className="text-sm">{countOf(waiting.length, "question", "questions")} still to answer.</p>
+          <Button size="sm" onClick={() => setPass(waiting.map((question) => question.id))}>
+            Answer {waiting.length === 1 ? "it" : "them"}
+          </Button>
+        </div>
+      ) : null}
+      {actions && answered.length > 0 && stepping.length + waiting.length > 0 ? (
+        <h3 className="pt-2 text-sm font-medium">Answered</h3>
+      ) : null}
+      {(actions ? answered : [...open, ...answered]).map((question) => (
         <QuestionCard key={question.id} question={question} />
       ))}
     </div>
+  )
+}
+
+/** A reading chosen for a question, and why, before it's saved. */
+type Draft = { option: string; text: string }
+
+const draftOf = (question: T.Question): Draft => ({
+  option: question.answer ? String(question.answer.option) : "",
+  text: question.answer?.text ?? ""
+})
+
+/** Whether a draft chooses a reading, or gives a reason, that isn't saved yet. */
+function isUnsaved(question: T.Question, draft: Draft) {
+  if (draft.option === "") {
+    return false
+  }
+  const text = draft.text.trim() || null
+  return question.answer?.option !== Number(draft.option) || question.answer.text !== text
+}
+
+/**
+ * The open questions, one at a time: choosing a reading and moving on saves it, skipping leaves the question open,
+ * and finishing saves the last one.
+ */
+function QuestionSteps({ questions, onFinish }: { questions: readonly T.Question[]; onFinish: () => void }) {
+  const { actions } = useRulebookWorkspace()
+  const [current, setCurrent] = useState(questions[0]?.id ?? "")
+  const [drafts, setDrafts] = useState<ReadonlyMap<string, Draft>>(new Map())
+  const [saving, setSaving] = useState(0)
+  const [hasSaved, setHasSaved] = useState(false)
+  // The question just skipped: leaving it saves nothing.
+  const skipped = useRef<string | null>(null)
+  const draftFor = (question: T.Question) => drafts.get(question.id) ?? draftOf(question)
+  const edit = (question: T.Question, change: Partial<Draft>) =>
+    setDrafts((all) => new Map(all).set(question.id, { ...(all.get(question.id) ?? draftOf(question)), ...change }))
+
+  const leave = async (id: string) => {
+    const question = questions.find((item) => item.id === id)
+    if (skipped.current === id) {
+      skipped.current = null
+      return
+    }
+    if (!actions || !question || !isUnsaved(question, draftFor(question))) {
+      return
+    }
+    const draft = draftFor(question)
+    setSaving((count) => count + 1)
+    const result = await attempt(
+      () => actions.answerQuestion(question.id, Number(draft.option), draft.text.trim() || null),
+      "The answer wasn't saved."
+    )
+    setSaving((count) => count - 1)
+    if (result) {
+      setHasSaved(true)
+      const [kept] = result.skipped
+      if (kept) {
+        toast.message(`Answered. A kept rule still needs review: ${kept.reasons.join(" ")}`)
+      }
+    }
+  }
+  const savedText = hasSaved ? "Answers saved" : ""
+  const items = questions.map((question) => ({
+    name: question.id,
+    choices: question.options.map((_, index) => ({ value: String(index) }))
+  }))
+
+  return (
+    <Card>
+      <CardContent>
+        <Questionnaire
+          items={items}
+          item={current}
+          shortcuts="letters"
+          onItemChange={(next) => {
+            void leave(current)
+            setCurrent(next)
+          }}
+          onSubmit={(event) => {
+            event.preventDefault()
+            void leave(current).then(onFinish)
+          }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <QuestionnaireProgress />
+            <p className="text-xs text-muted-foreground" aria-live="polite">
+              {saving > 0 ? "Saving" : savedText}
+            </p>
+          </div>
+          {questions.map((question) => (
+            <QuestionStep
+              key={question.id}
+              question={question}
+              draft={draftFor(question)}
+              onEdit={(change) => edit(question, change)}
+            />
+          ))}
+          <QuestionnaireActions>
+            <QuestionnairePrevious />
+            <QuestionnaireSkip
+              onClick={() => {
+                skipped.current = current
+                const question = questions.find((item) => item.id === current)
+                if (question) {
+                  edit(question, { option: "" })
+                }
+              }}
+            />
+            <QuestionnaireNext />
+            <QuestionnaireSubmit>Finish</QuestionnaireSubmit>
+          </QuestionnaireActions>
+        </Questionnaire>
+      </CardContent>
+    </Card>
+  )
+}
+
+function QuestionStep({
+  question,
+  draft,
+  onEdit
+}: {
+  question: T.Question
+  draft: Draft
+  onEdit: (change: Partial<Draft>) => void
+}) {
+  const { records, citations, vocabulary, source } = useRulebookWorkspace()
+  const titleOf = (key: T.RuleKey) => {
+    const rule = records.rules.find((item) => item.key === key)
+    return rule ? [sentenceCase(rule.title)] : []
+  }
+  return (
+    <QuestionnaireItem name={question.id}>
+      <QuestionnaireTitle className="leading-snug">{question.question}</QuestionnaireTitle>
+      <QuestionnaireDescription>
+        {question.kind === "conflict" ? "Provisions that conflict: " : "A provision to interpret: "}
+        {question.citations.map((citation, index) => (
+          <span key={citation.provisionKey}>
+            {index > 0 ? ", " : ""}
+            <ProvisionReference citation={citedProvision(citations, citation)} source={source} />
+          </span>
+        ))}
+      </QuestionnaireDescription>
+      {question.about.terms.length > 0 ? (
+        <p className="flex flex-wrap gap-x-2 text-sm">
+          <span className="text-muted-foreground">About</span>
+          {question.about.terms.map((key) => (
+            <TermChip key={key} termKey={key} vocabulary={vocabulary} />
+          ))}
+        </p>
+      ) : null}
+      <QuestionnaireChoices>
+        {question.options.map((option, index) => {
+          const kept = option.keeps.flatMap(titleOf)
+          return (
+            <QuestionnaireChoice
+              key={option.label}
+              value={String(index)}
+              checked={draft.option === String(index)}
+              onChange={(event) => {
+                if (event.target.checked) {
+                  onEdit({ option: String(index) })
+                }
+              }}
+            >
+              <span className="font-medium">{option.label}</span>
+              <QuestionnaireChoiceDescription>
+                {kept.length > 0 ? `Keeps: ${kept.join("; ")}` : "Keeps no rule"}
+              </QuestionnaireChoiceDescription>
+            </QuestionnaireChoice>
+          )
+        })}
+      </QuestionnaireChoices>
+      <QuestionnaireError />
+      <Field>
+        <FieldLabel htmlFor={`${question.id}-why`}>Why (optional)</FieldLabel>
+        <Textarea
+          id={`${question.id}-why`}
+          value={draft.text}
+          onChange={(event) => onEdit({ text: event.target.value })}
+        />
+      </Field>
+    </QuestionnaireItem>
   )
 }
 

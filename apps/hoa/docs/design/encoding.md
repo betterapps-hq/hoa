@@ -371,8 +371,10 @@ list is ordered by relevance; without, in its usual order. The other filters sti
   those kinds and details ("3 of 37 details"); "Approve all N terms" approves what an open subject keeps, its details
   and their choices included. A search lists the subjects it finds best first, opened: a found subject shows all of
   itself, otherwise only the details holding a match, and a found choice is marked.
-- **Questions:** each question with its citations and readings; Answer becomes the primary action once a reading is
-  chosen.
+- **Questions:** the open questions one at a time (shadcn's Questionnaire, "Question 1 of 4"), each with its citations
+  and readings, each reading naming the rules it keeps. Choosing a reading and moving on saves the answer; Skip leaves
+  the question open, and finishing brings back the skipped ones as one line to answer later. Answered questions
+  follow, each with its chosen reading and a way to change it.
 - **Settings:** the review, then each clause in words with its citations (edited as JSON), and the policy.
 - **Coverage:** one share for the documents the build read from their pages ("97.7% of the text of 2 documents is
   covered by a rule, a term, a setting or a reason for having no rule"), one bar and a small legend. A document whose

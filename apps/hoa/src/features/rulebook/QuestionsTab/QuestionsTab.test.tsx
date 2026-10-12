@@ -11,29 +11,46 @@ const toast = vi.hoisted(() => ({
 vi.mock("sonner", () => ({ toast }))
 
 const records = sampleRecords()
-const [first] = records.questions
+const [first, second] = records.questions
 
 describe("QuestionsTab", () => {
-  it("shows each question with its citations and the rules each reading keeps", () => {
+  it("asks the open questions one at a time, each reading saying the rules it keeps", () => {
     renderInWorkspace(<QuestionsTab />)
     expect(screen.getByText(/15 of 15 to answer/)).toBeInTheDocument()
-    const readings = screen.getAllByRole("radiogroup", { name: "Readings" })[0]!
-    expect(within(readings).getByText("Only the six-month minimum term")).toBeInTheDocument()
-    const kept = screen.getByRole("list", { name: "Rules kept by: Only the six-month minimum term" })
-    expect(
-      within(kept).getByRole("button", { name: "Declarant's Units exempt from the minimum lease term" })
-    ).toBeInTheDocument()
-    expect(screen.getAllByRole("link", { name: "Declaration 3.1(c), paragraph 2" }).length).toBeGreaterThan(0)
+    expect(screen.getByRole("progressbar", { name: "Questionnaire progress" })).toHaveTextContent("Question 1 of 15")
+    const step = screen.getByRole("group", { name: first?.question })
+    expect(within(step).getByRole("radio", { name: /Only the six-month minimum term/ })).toBeInTheDocument()
+    expect(within(step).getByText("Keeps: Declarant's Units exempt from the minimum lease term")).toBeInTheDocument()
+    expect(within(step).getAllByRole("link", { name: "Declaration 3.1(c), paragraph 2" }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole("group", { name: second?.question })).not.toBeInTheDocument()
   })
 
-  it("answers a question with a reading and a note", async () => {
+  it("saves a reading and a note on the way to the next question", async () => {
     const { user, actions } = renderInWorkspace(<QuestionsTab />)
-    const [card] = screen.getAllByRole("radiogroup", { name: "Readings" })
-    await user.click(within(card!).getAllByRole("radio")[1]!)
-    await user.type(screen.getAllByRole("textbox", { name: "Why (optional)" })[0]!, "The paragraph's own words.")
-    await user.click(screen.getAllByRole("button", { name: "Answer" })[0]!)
+    const step = screen.getByRole("group", { name: first?.question })
+    await user.click(within(step).getAllByRole("radio")[1]!)
+    await user.type(within(step).getByRole("textbox", { name: "Why (optional)" }), "The paragraph's own words.")
+    await user.click(screen.getByRole("button", { name: "Next" }))
     expect(actions?.answerQuestion).toHaveBeenCalledWith(first?.id, 1, "The paragraph's own words.")
-    expect(toast.success).toHaveBeenCalledWith("Answered.")
+    expect(screen.getByRole("group", { name: second?.question })).toBeInTheDocument()
+    expect(screen.getByText("Question 2 of 15")).toBeInTheDocument()
+  })
+
+  it("asks for a reading before moving on, and skipping leaves the question open", async () => {
+    const { user, actions } = renderInWorkspace(<QuestionsTab />)
+    await user.click(screen.getByRole("button", { name: "Next" }))
+    expect(screen.getByRole("alert")).toHaveTextContent("Choose an answer or skip this question.")
+    await user.click(screen.getByRole("button", { name: "Skip" }))
+    expect(screen.getByRole("group", { name: second?.question })).toBeInTheDocument()
+    expect(actions?.answerQuestion).not.toHaveBeenCalled()
+  })
+
+  it("saves the last question when finishing", async () => {
+    const one = { ...records, questions: records.questions.slice(0, 1) }
+    const { user, actions } = renderInWorkspace(<QuestionsTab />, { records: one })
+    await user.click(screen.getAllByRole("radio")[0]!)
+    await user.click(screen.getByRole("button", { name: "Finish" }))
+    expect(actions?.answerQuestion).toHaveBeenCalledWith(first?.id, 0, null)
   })
 
   it("shows an answer's chosen reading, and lets it change", async () => {
@@ -47,9 +64,10 @@ describe("QuestionsTab", () => {
     }
     const { user } = renderInWorkspace(<QuestionsTab />, { records: answered })
     expect(screen.getByText(/14 of 15 to answer/)).toBeInTheDocument()
+    expect(screen.getByText("Question 1 of 14")).toBeInTheDocument()
     expect(screen.getByText("(chosen)")).toBeInTheDocument()
     expect(screen.getByText("Note: As written.")).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Change the answer" }))
-    expect(screen.getAllByRole("radiogroup", { name: "Readings" })).toHaveLength(15)
+    expect(screen.getByRole("radiogroup", { name: "Readings" })).toBeInTheDocument()
   })
 })
