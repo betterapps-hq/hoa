@@ -18,14 +18,9 @@ import type { ReadingBlock } from "@/documents/reading"
 import { cn } from "@/lib/utils"
 import type { BuildResult } from "@/rulebook/buildResults"
 import type * as T from "@/schema/types"
-import { dotClass, draftedClass } from "../DocumentEncodingFindings/DocumentEncodingFindings.motion"
-import {
-  slotCenter,
-  type Box,
-  type FindKind,
-  type Point
-} from "../DocumentEncodingFindings/DocumentEncodingFindings.utils"
 import { ReaderMotion } from "./DocumentEncodingReader.motion"
+import { dotClass, draftedClass } from "./DocumentEncodingReader.piles"
+import { slotCenter, type Box, type FindKind, type Point } from "./DocumentEncodingReader.piles"
 import {
   countsOf,
   nextSpot,
@@ -52,8 +47,7 @@ export type DocumentEncodingReaderProps = {
 }
 
 /**
- * A build reading its documents (encoding.md, UX, The build's progress), the variation of DocumentEncodingFindings that shows the
- * document: one passage at a time in a window between the piles, as the build's results name it. Each term is marked
+ * A build reading its documents (encoding.md, UX, The build's progress): the document, one passage at a time in a window between the piles, as the build's results name it. Each term is marked
  * where it's defined or first used and flies to the terms; each passage is scanned and gets its verdict, its rules
  * flying to the rules; each drafted rule shows its statement with its blanks filling in, and fills its dot. Without
  * motion it shows the counts, the piles and the last thing named, at rest.

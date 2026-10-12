@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest"
 import type { BuildResult } from "@/rulebook/buildResults"
 import { simulatedBuildSeconds } from "@/tests/simulatedBuild"
 import { readingDocument, readingResults } from "@/tests/simulatedReading"
-import { slotCenter } from "../DocumentEncodingFindings/DocumentEncodingFindings.utils"
 import { findingCounts } from "../DocumentEncodingSteps/DocumentEncodingSteps.utils"
+import { slotCenter } from "./DocumentEncodingReader.piles"
 import {
   beatMs,
   beatPlan,

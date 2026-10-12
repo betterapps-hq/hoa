@@ -1,6 +1,6 @@
 import { onTestFinished, vi } from "vitest"
 
-// Motion on a clock the test moves, for tests of what's animated (DocumentEncodingFindings): `performance.now()` reads it,
+// Motion on a clock the test moves, for tests of what's animated (DocumentEncodingReader): `performance.now()` reads it,
 // animation frames run as it moves, and an `Element.animate` animation finishes once its time is up, not before. Each
 // animation keeps its element, keyframes and options for the test to look at.
 

@@ -1,4 +1,4 @@
-import { dotClass, type Shown } from "../DocumentEncodingFindings/DocumentEncodingFindings.motion"
+import { dotClass, type Shown } from "./DocumentEncodingReader.piles"
 import {
   flightKeyframes,
   flightPeak,
@@ -6,7 +6,7 @@ import {
   trailKeyframes,
   type FindKind,
   type Point
-} from "../DocumentEncodingFindings/DocumentEncodingFindings.utils"
+} from "./DocumentEncodingReader.piles"
 import {
   beatMs,
   beatPlan,
@@ -22,9 +22,9 @@ import {
   type Spot
 } from "./DocumentEncodingReader.utils"
 
-// The reader in motion (DocumentEncodingReader.tsx): one beat at a time from a queue of what the build's results name, each
-// moment a scene React draws, and each find flying into its pile in an SVG group outside React, as DocumentEncodingFindings'
-// finds do. Beats keep their own pace until the queue would take longer than the build takes between results, then
+// The reader in motion (DocumentEncodingReader.tsx): one beat at a time from a queue of what the build's results name,
+// each moment a scene React draws, and each find flying into its pile in an SVG group outside React, so a burst of a
+// hundred finds is a hundred animations, not a hundred renders. Beats keep their own pace until the queue would take longer than the build takes between results, then
 // play faster; while nothing new has come, the window drifts on through the document.
 
 export type ReaderHost = {

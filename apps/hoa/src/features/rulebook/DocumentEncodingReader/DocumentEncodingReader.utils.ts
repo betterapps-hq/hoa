@@ -4,17 +4,11 @@ import type { BuildResult } from "@/rulebook/buildResults"
 import { parseStatement } from "@/schema/statement"
 import type * as T from "@/schema/types"
 import { pluralOf } from "@/text/normalize"
-import type { Shown } from "../DocumentEncodingFindings/DocumentEncodingFindings.motion"
-import {
-  gridFit,
-  type Box,
-  type FindKind,
-  type PilesLayout
-} from "../DocumentEncodingFindings/DocumentEncodingFindings.utils"
+import type { Shown } from "./DocumentEncodingReader.piles"
+import { gridFit, type Box, type FindKind, type PilesLayout } from "./DocumentEncodingReader.piles"
 
-// The picture of a build that reads along with it (encoding.md, UX, The build's progress), a variation of
-// DocumentEncodingFindings: the document itself in a window between the two piles, showing one thing at a time as the build's
-// results name it. A term is marked where the document defines or first uses it; a passage is scanned and gets its
+// The picture of a build that reads along with it (encoding.md, UX, The build's progress): the document itself in a
+// window between two piles of finds, showing one thing at a time as the build's results name it. A term is marked where the document defines or first uses it; a passage is scanned and gets its
 // verdict, the rules found in it, the settings it sets or why it holds none; a drafted rule shows its statement with
 // blanks for its terms and values filling in. Each find flies into its pile. Nothing is listed: only what's being read
 // shows. Coordinates are CSS pixels from the picture's top left.
