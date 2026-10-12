@@ -40,6 +40,8 @@ feedback; follow them everywhere, and fix a violation when you touch the code ar
 - **Search uses the shared MiniSearch helper**, so every search box tolerates typos and ranks by relevance.
 - **An uploaded file is an attachment** (shadcn's `Attachment`, its media `FileTypeMedia`: the extension on a tile
   tinted by kind), with its name, what became of it, and its actions (open, download, remove).
+- **A photo opens in the image viewer** (`ImageViewer`, a dialog with the file's name), from its thumbnail or its
+  attachment, never in place of the page.
 
 ## Citations
 
@@ -48,7 +50,9 @@ feedback; follow them everywhere, and fix a violation when you touch the code ar
 - Several citations open a designed picker (grouped by document, with label, heading and a snippet), never a plain text
   dropdown.
 - A rule named in running text is its title as the link to its citation; a term is its label. Never show a rule or term
-  key: one the page has no record of reads as its key in words.
+  key: one the page has no record of reads as its key in words, and isn't linked, since a guessed link can lead nowhere.
+- On a page someone works through (a form, an editor, an application under review), a citation opens the reader in a
+  sheet over the page (`CitationsOpenInSheet`), so nothing is lost; a middle-click still opens it in a new tab.
 
 ## Checking
 

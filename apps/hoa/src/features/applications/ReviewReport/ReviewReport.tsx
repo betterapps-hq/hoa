@@ -1,4 +1,3 @@
-import { useUncontrolled } from "@mantine/hooks"
 import { ListChecksIcon, type LucideIcon } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import type { Application } from "@/applications/application"
@@ -17,7 +16,6 @@ import { stepCountTitle, stepGroupId, stepGroups, stepOutcomes, type StepKey } f
 import { outcomeIcons } from "../OutcomeChip/OutcomeChip"
 import { PacketFacts, packetFacts } from "../PacketFacts/PacketFacts"
 import { actionItemId, type ReviewContext } from "../reviewContext"
-import { ReviewMatrix } from "../ReviewMatrix/ReviewMatrix"
 import { ReviewVerdict } from "../ReviewVerdict/ReviewVerdict"
 import {
   decisionTones,
@@ -26,6 +24,7 @@ import {
   verdictHeadline,
   verdictReason
 } from "../ReviewVerdict/ReviewVerdict.utils"
+import { RuleResults } from "../RuleResults/RuleResults"
 
 /** A tab of the report: the review's own, or one the page adds, such as the packet's files. */
 export type ReportTab = { value: string; label: string; count?: number; content: ReactNode }
@@ -36,9 +35,6 @@ export type ReviewReportProps = {
   decision: Application["decision"]
   /** More tabs from the page, after the review's own. */
   tabs?: readonly ReportTab[]
-  /** The open tab, for a page that lays itself out around it; "overview" first otherwise. */
-  tab?: string
-  onTabChange?: (tab: string) => void
 }
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
@@ -111,18 +107,21 @@ function Counts({ counts }: { counts: readonly Count[] }) {
 }
 
 /**
- * A review as the application page shows it: the recommendation with one sentence of why and the counts it rests on,
- * then tabs: the next steps first, in the order that changes the outcome, then how each rule was checked, what the
- * review read, its written summary, and whatever the page adds.
+ * A review as the application page shows it: the recommendation with the review's summary of why and the counts it
+ * rests on, then tabs: the next steps first, in the order that changes the outcome, then how each rule was checked,
+ * what the review read, and whatever the page adds.
  */
-export function ReviewReport({ context, decision, tabs = [], tab: openTab, onTabChange }: ReviewReportProps) {
+export function ReviewReport({ context, decision, tabs = [] }: ReviewReportProps) {
   const { review, audience } = context
-  const [tab, setTab] = useUncontrolled({ value: openTab, defaultValue: "overview", onChange: onTabChange })
+  const [tab, setTab] = useState("overview")
   const [selected, setSelected] = useState<Finding | null>(null)
   const [isSheetOpen, setIsSheetOpen] = useState(false)
   const [expanded, setExpanded] = useState<ReadonlySet<StepKey>>(new Set())
   const facts = packetFacts(review)
   const rules = ruleCounts(review)
+  const written = (audience === "committee" ? review.assessment : review.feedback).trim()
+  // The review's own words for why, each rule it names linked; without them, why comes from the counts.
+  const summary = written ? <MarkedText text={written} context={context} /> : null
 
   const openFinding = (finding: Finding) => {
     setSelected(finding)
@@ -213,20 +212,11 @@ export function ReviewReport({ context, decision, tabs = [], tab: openTab, onTab
       value: "rules",
       label: "Rules",
       count: review.selected.length,
-      content: <ReviewMatrix context={context} onOpen={openFinding} />
+      content: <RuleResults context={context} onOpen={openFinding} />
     },
     ...(facts.length > 0
       ? [{ value: "facts", label: "Facts", count: facts.length, content: <PacketFacts context={context} /> }]
       : []),
-    {
-      value: "summary",
-      label: "Summary",
-      content: (
-        <p className="max-w-prose leading-relaxed whitespace-pre-line">
-          <MarkedText text={audience === "committee" ? review.assessment : review.feedback} context={context} />
-        </p>
-      )
-    },
     ...tabs
   ]
 
@@ -239,10 +229,15 @@ export function ReviewReport({ context, decision, tabs = [], tab: openTab, onTab
           reason={decision.note}
           tone={decisionTones[decision.outcome]}
           meta={
-            <p className="text-sm text-muted-foreground">
-              Decided {dateFormat.format(new Date(decision.decidedAt))}. The review recommended:{" "}
-              {verdictHeadline(review.recommendation, "committee").toLowerCase()}.
-            </p>
+            <>
+              <p className="text-sm text-muted-foreground">
+                Decided {dateFormat.format(new Date(decision.decidedAt))}. The review recommended:{" "}
+                {verdictHeadline(review.recommendation, "committee").toLowerCase()}.
+              </p>
+              {summary ? (
+                <p className="max-w-prose text-sm text-pretty whitespace-pre-line text-muted-foreground">{summary}</p>
+              ) : null}
+            </>
           }
         >
           <Counts counts={counts} />
@@ -251,7 +246,7 @@ export function ReviewReport({ context, decision, tabs = [], tab: openTab, onTab
         <ReviewVerdict
           eyebrow={audience === "homeowner" ? "Review result" : "The review recommends"}
           headline={verdictHeadline(review.recommendation, audience)}
-          reason={verdictReason(review, audience)}
+          reason={summary ?? verdictReason(review, audience)}
           tone={recommendationTones[review.recommendation]}
           meta={<ReviewDate context={context} />}
         >

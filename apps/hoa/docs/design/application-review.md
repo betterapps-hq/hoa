@@ -400,14 +400,16 @@ high effort no better on any stage, and not a match for Sonnet on the document r
 
 The application routes keep their shape.
 
-**Every rule reference links to its citation.** Wherever a rule appears (a matrix row, a finding, an action item, the
-written summary, the committee's view), it's a `RuleReference`: the rule's title with its main citation's label
-("Guidelines 5.4.2(i)"). Activating it opens `DocumentViewer` at the cited provision with the operative words
+**Every rule reference links to its citation.** Wherever a rule appears (a result row, a finding, an action item, the
+written summary, the committee's view), it links to its citation: in a finding or an opened action item it's a
+`RuleReference`, the rule's title with its main citation's label ("Guidelines 5.4.2(i)"). Activating it opens `DocumentViewer` at the cited provision with the operative words
 highlighted (or the region on a plat); hovering or focusing it shows the provision's text. A rule with several
 citations lists the main one and "2 more". The text shown is always the stored provision, so it can't drift from the
-document. In running text (an action item, the written summary), a rule marker is the rule's title itself as the link
-to its main citation. A reader never sees a key: a rule or term the page has no record of reads as its key in words
-("Photos (Guidelines 3.4.2)" for `guidelines:3.4.2#photos`, "review fee" for `architectural-application.review-fee`).
+document. In running text (an action item, the written summary) and in a result's row, the rule's title itself is
+the link to its main citation, which opens the reader in a side sheet over the page. A reader never sees a key: a rule
+the page has no record of reads as its key in words, unlinked, since nothing says where it's written ("Photos" for
+`guidelines:3.4.2#photos`), and a term as its key in words ("review fee" for `architectural-application.review-fee`).
+A value shown on its own starts with a capital.
 
 - **Start an application:** the project type picker lists the organization's active project types
   ([Project types](#project-types)) and "Something else". Choosing one renders its form (its questions, repeatable
@@ -421,17 +423,19 @@ to its main citation. A reader never sees a key: a rule or term the page has no 
   - **Back to the applications**, then the **header:** the application type, its status as a badge with a colored dot
     (a decision takes its outcome's color), and the homeowner's description.
   - **Verdict card:** the recommendation in plain words beside a tinted icon ("More information needed" for the
-    homeowner, "Request more information" for the committee) with one sentence of why, written by code from the action
-    items ("Your packet doesn't yet show 11 things the rules ask for."), so it never mixes in rule titles or citations.
-    Under it, one muted line says when the review ran; a provisional review says so, with "What this means" on demand.
+    homeowner, "Request more information" for the committee), then why: the review's written summary (the feedback for
+    the homeowner, the assessment for the committee), each rule it names linked. It's at most three sentences, so it
+    has no tab of its own. A review without one says why in a sentence code writes from the action items ("Your packet
+    doesn't yet show 11 things the rules ask for."). Under it, one muted line says when the review ran; a provisional
+    review says so, with "What this means" on demand.
     Then the counts it rests on, each a tile: what's missing, what doesn't meet the rules, what's left to the
     committee (each jumps to its group), and the rules met out of those that apply to the project (it opens the
-    matrix). Once the committee decides, its decision and note take the recommendation's place, with the
-    recommendation in the muted line.
-  - **Tabs:** Overview, Rules (the rule matrix, given the page's whole width: the side column steps aside, keeping a
-    decision being written), Facts (what the review read from the packet: a card per entity, each fact with its value,
-    confidence, and the words it was read from, so a misread can be corrected before submitting), Summary (the review's
-    written summary), Files and History (every review, the latest marked), each with its count.
+    rule results). Once the committee decides, its decision and note take the recommendation's place, with the
+    recommendation and the review's summary in muted lines.
+  - **Tabs:** Overview, Rules (the rule results), Facts (what the review read from the packet: a card per entity, each fact with its value,
+    confidence, and the words it was read from, so a misread can be corrected before submitting), Files and History
+    (every review, the latest marked), each with its count. Each piece of evidence is the quote and, under it, its file
+    and page, spaced apart from the next; a photo's thumbnail opens it at full size in a viewer over the page.
   - **Overview:** the action items as a card per group, ordered by what changes the outcome: what to provide, what to
     change (as "possible conditions" when the review recommends conditions), what the committee decides itself; a
     denial puts the changes first. A group's header has its outcome's icon and its count. Each item is one line in the
@@ -443,34 +447,32 @@ to its main citation. A reader never sees a key: a rule or term the page has no 
     decision, each outcome a choice card, the one that follows the recommendation marked "Recommended by the review"
     and preselected (none for a referral), with "Start from the review's next steps" to draft the note. Under it, the
     details: project type, started, submitted, reviewed (provisional or not), decided, and the number of files.
-  - **Files:** each packet file as an attachment with what the review made of it. It opens in a new tab (a PDF or photo
-    shows in the browser; anything else is saved) and saves from its download action, both served by
+  - **Files:** each packet file as an attachment with what the review made of it. A photo opens in the viewer; any
+    other file opens in a new tab (a PDF shows in the browser; anything else is saved). Each saves from its download
+    action, both served by
     `/files/applications/$applicationId/$fileId` to the homeowner who made the application and to administrators. The
     homeowner can remove a file and run the review again.
-- **Rule matrix** (`ReviewMatrix`), under the Rules tab. It's the whole review at a glance: every
-  selected rule against every part of the project.
-  - **Rows** are rules, grouped by their main citation's provision (5.3, 5.4, 5.5…), each a `RuleReference` linked to
-    its citation.
-    **Columns** are the entities from subject identification (left side run, right side run, rear run, return run,
-    gate) plus a column for the application itself (signatures, checklist, form).
-  - **Cells** are outcome chips: met, not met, missing, committee, suggestion, exempt, or a muted "n/a" when the rule
-    doesn't apply to that entity (its subject is another type, or `appliesWhen` is false).
-  - **Opening a cell** (or a part under a next step) shows the finding in a side sheet: the rule's statement and the
+- **Rule results** (`RuleResults`), under the Rules tab: how each rule was checked. A rule applies to few parts of a
+  project, usually one, so a grid of rules against parts is mostly "doesn't apply"; the results are a list instead.
+  - **Rows** are the checks that apply: the rule (its title as the link to its citation), the part of the project it
+    read (activating it shows what was identified: its type, label and the evidence that named it, such as the plat
+    route or the photo), and the result as an outcome chip (not met, missing, committee, suggestion, met, exempt). The
+    worst results come first; the columns sort.
+  - **Filters** by result, each with its count.
+  - **The rules that apply to nothing** in the project (their subject is another type, or `appliesWhen` is false) are
+    one line under the list, "4 rules don't apply to this project", that opens their names.
+  - **Opening a result** (or a part under a next step) shows the finding in a side sheet: the rule's statement and the
     provision's text; the reason; then every fact the rule read, each marked by where it came from: **read from your
     packet** (with the page, the quote, a thumbnail for photos and the model's confidence), **matched** (a stated value
     matched to a listed one, with the match score when it was fuzzy), **computed** (unit conversion, derived
     properties), or **not provided**. A judgment shows the model's answer and rationale; a document check shows each
     statement confirmed or contradicted, with its quote.
-  - **Filters:** "Only what needs attention" (hides met and n/a rows), and by outcome. The column header of an entity
-    opens what was identified: its type, label and the evidence that named it (the plat route, the photo).
-  - **Narrow screens:** the rule column stays fixed and the entity columns scroll inside the matrix; below 480 pixels the
-    matrix becomes one card per entity listing its rules with chips.
   - The sheet links back to the finding's next step ("Change in your plans: ..."), showing it if its group was
     collapsed. **Committee view:** the same, plus the rules that changed each finding and the judgment rationale.
 - **`getApplicationView`** loads the review and, from the review's rules file, only the selected rules and the
   provisions they cite, as `ReviewRule { key, title, statement, citations: { provisionKey, label, documentTitle, text,
   anchors }[] }`.
-- **Committee view:** the assessment replaces the homeowner feedback in the written summary.
+- **Committee view:** the assessment replaces the homeowner feedback as the verdict's why.
 
 ## Expected result for the sample application
 

@@ -24,7 +24,7 @@ export type ReviewVerdictProps = {
   /** Whose verdict it is: "The review recommends", "Committee decision". */
   eyebrow: string
   headline: string
-  /** One sentence of why, or the committee's note. */
+  /** Why: the review's summary, or the committee's note. */
   reason: ReactNode
   tone: VerdictTone
   /** A quiet line under the reason, such as when the review ran. */

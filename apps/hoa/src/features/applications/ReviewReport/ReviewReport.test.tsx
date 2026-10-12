@@ -67,7 +67,8 @@ describe("ReviewReport", () => {
     setup()
     const verdict = screen.getByRole("region", { name: "More information needed" })
     expect(within(verdict).getByText("Review result")).toBeInTheDocument()
-    expect(within(verdict).getByText("Your packet doesn't yet show 11 things the rules ask for.")).toBeInTheDocument()
+    const summary = within(verdict).getByText(/^Choose a listed color under/)
+    expect(within(summary).getByRole("link", { name: colors })).toBeInTheDocument()
     expect(within(verdict).getByText(/^Provisional review from/)).toBeInTheDocument()
     expect(within(verdict).getByRole("button", { name: "What this means" })).toBeInTheDocument()
     const counts = within(within(verdict).getByRole("list", { name: "The review in numbers" }))
@@ -80,9 +81,14 @@ describe("ReviewReport", () => {
     setup({ audience: "committee" })
     expect(screen.getByText("The review recommends")).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "Request more information" })).toBeInTheDocument()
-    expect(screen.getByText("The packet doesn't show 11 things the rules ask for.")).toBeInTheDocument()
+    expect(screen.getByText(/^Request information\. The colors fail/)).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Missing 11" })).toBeInTheDocument()
     expect(screen.getByRole("region", { name: "For your judgment" })).toBeInTheDocument()
+  })
+
+  it("says why from the counts when the review has no written summary", () => {
+    setup({ change: (review) => ({ ...review, feedback: "" }) })
+    expect(screen.getByText("Your packet doesn't yet show 11 things the rules ask for.")).toBeInTheDocument()
   })
 
   it("lists the next steps first, in the order that changes the outcome, the first few of a long group", async () => {
@@ -144,7 +150,7 @@ describe("ReviewReport", () => {
   })
 
   it("says plainly when there's nothing to do", () => {
-    setup({ change: clean })
+    setup({ change: (review) => ({ ...clean(review), feedback: "" }) })
     expect(screen.getByRole("heading", { name: "Ready for approval" })).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "To add 0" })).not.toBeInTheDocument()
     expect(screen.getByText("Your packet meets every rule the review checked.")).toBeInTheDocument()
@@ -187,10 +193,11 @@ describe("ReviewReport", () => {
     expect(screen.getByRole("heading", { name: "Approved with conditions" })).toBeInTheDocument()
     expect(screen.getByText("Use a listed color.")).toBeInTheDocument()
     expect(screen.getByText(/The review recommended: request more information\./)).toBeInTheDocument()
+    expect(screen.getByText(/^Choose a listed color under/)).toBeInTheDocument()
     expect(screen.getByRole("region", { name: "Add to your packet" })).toBeInTheDocument()
   })
 
-  it("keeps the rule matrix, what it read, the written summary and the page's own tabs a tab away", async () => {
+  it("keeps how each rule was checked, what it read and the page's own tabs a tab away", async () => {
     const { user } = setup()
     expect(screen.queryByRole("table")).not.toBeInTheDocument()
     await user.click(screen.getByRole("tab", { name: /^Rules \d+$/ }))
@@ -200,12 +207,10 @@ describe("ReviewReport", () => {
     expect(run.getAllByText(/River Birtch/).length).toBeGreaterThan(0)
     await user.click(screen.getByRole("tab", { name: "Files 2" }))
     expect(screen.getByText("The packet")).toBeInTheDocument()
-    await user.click(screen.getByRole("tab", { name: "Summary" }))
-    const feedback = screen.getByText(/Choose a listed color under/)
-    expect(within(feedback).getByRole("link", { name: colors })).toBeInTheDocument()
+    expect(screen.queryByRole("tab", { name: "Summary" })).not.toBeInTheDocument()
   })
 
-  it("links from a finding in the matrix back to its next step, showing it if it was hidden", async () => {
+  it("links from a rule's result back to its next step, showing it if it was hidden", async () => {
     const { user } = setup()
     vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(() => undefined)
     await user.click(screen.getByRole("tab", { name: /^Rules \d+$/ }))

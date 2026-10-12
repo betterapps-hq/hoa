@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import type { RuleKey } from "@/schema/types"
 import { ProvisionReference } from "../../rulebook/ProvisionReference/ProvisionReference"
 import { RuleReference } from "../../rulebook/RuleReference/RuleReference"
+import { sentenceCase } from "../applicationDisplay"
 import { ruleName, type ReviewContext } from "../reviewContext"
 
 export type ReviewRuleReferenceProps = {
@@ -21,23 +22,30 @@ export function ReviewRuleReference({ ruleKey, context, title }: ReviewRuleRefer
   )
 }
 
+export type InlineRuleReferenceProps = Omit<ReviewRuleReferenceProps, "title"> & {
+  /** Shown on its own, as in a table's row, rather than inside a sentence: its first letter capitalized. */
+  isStandalone?: boolean
+}
+
 /**
- * A rule named in running text: its name as the link to its main citation, which shows the provision's text on hover
- * and opens the document at it. A rule without a citation, or that the page has no record of, is its name alone.
+ * A rule by its name alone, linked to its main citation, which shows the provision's text on hover and opens the
+ * document at it. A rule the page has no record of is its key in words, unlinked: nothing says where it's written.
  */
-export function InlineRuleReference({ ruleKey, context }: Omit<ReviewRuleReferenceProps, "title">) {
+export function InlineRuleReference({ ruleKey, context, isStandalone = false }: InlineRuleReferenceProps) {
   const rule = context.rules.get(ruleKey)
   const [main] = rule?.citations ?? []
-  if (!rule || !main) {
-    return <span className="font-medium">{ruleName(context.rules, ruleKey)}</span>
+  const written = ruleName(context.rules, ruleKey)
+  const name = isStandalone ? sentenceCase(written) : written
+  if (rule && main) {
+    return (
+      <ProvisionReference
+        citation={main}
+        source={context.source}
+        cites={rule.citations.map((citation) => citation.provisionKey)}
+      >
+        {name}
+      </ProvisionReference>
+    )
   }
-  return (
-    <ProvisionReference
-      citation={main}
-      source={context.source}
-      cites={rule.citations.map((citation) => citation.provisionKey)}
-    >
-      {rule.title}
-    </ProvisionReference>
-  )
+  return <span className="font-medium">{name}</span>
 }

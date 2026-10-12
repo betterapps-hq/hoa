@@ -27,7 +27,7 @@ function FactRow({ fact, context }: { fact: Fact; context: ReviewContext }) {
       <dt className="text-muted-foreground">{sentenceCase(vocabulary.label(fact.property))}</dt>
       <dd className="flex min-w-0 flex-col gap-2">
         <span className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{value}</span>
+          <span className="font-medium">{sentenceCase(value)}</span>
           {state ? <Badge variant="outline">{state}</Badge> : null}
           {fact.confidence === null ? null : (
             <Badge variant="secondary" className="tabular-nums">

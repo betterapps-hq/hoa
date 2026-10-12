@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { FileTextIcon, ImageIcon } from "lucide-react"
+import { ImageViewer } from "@/components/ImageViewer/ImageViewer"
 import type { Evidence } from "@/schema/types"
 import { evidenceFile, type ReviewContext } from "../reviewContext"
 
@@ -19,19 +20,26 @@ function Thumbnail({
 }) {
   const { data: url } = useQuery({ queryKey: ["packet-image", fileId], queryFn: () => loadImage(fileId) })
   return url ? (
-    <img src={url} alt={name} className="h-20 w-28 shrink-0 rounded-md border object-cover" />
+    <ImageViewer
+      src={url}
+      name={name}
+      trigger={<img src={url} alt={name} className="h-20 w-28 rounded-md border object-cover" />}
+    />
   ) : (
     <div className="h-20 w-28 shrink-0 animate-pulse rounded-md border bg-muted" aria-hidden />
   )
 }
 
-/** Where the review read something: the words quoted, then the file and its page, and the photo when it's one. */
+/**
+ * Where the review read something: the words quoted, then the file and its page, and the photo when it's one, which
+ * opens at full size.
+ */
 export function EvidenceList({ evidence, context }: EvidenceListProps) {
   if (evidence.length === 0) {
     return null
   }
   return (
-    <ul className="flex flex-col gap-2">
+    <ul className="flex flex-col gap-4">
       {evidence.map((item, index) => {
         const file = evidenceFile(context, item.fileId)
         const name = file?.fileName ?? item.fileId

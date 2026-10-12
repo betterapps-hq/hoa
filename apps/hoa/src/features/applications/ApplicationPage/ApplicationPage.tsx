@@ -6,6 +6,7 @@ import { z } from "zod"
 import { decisionOutcomes, type Application, type ApplicationStatus } from "@/applications/application"
 import { FileDropzone } from "@/components/FileDropzone/FileDropzone"
 import { FileTypeMedia } from "@/components/FileTypeMedia/FileTypeMedia"
+import { ImageViewer } from "@/components/ImageViewer/ImageViewer"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -43,6 +44,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
+import { CitationsOpenInSheet } from "@/features/documents/ReaderSheet/ReaderSheet"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { cn } from "@/lib/utils"
@@ -56,7 +58,7 @@ import {
   statusLabels,
   type DecisionOutcome
 } from "../applicationDisplay"
-import { applicationFileUrl } from "../applicationFile"
+import { applicationFileUrl, opensInBrowser } from "../applicationFile"
 import type { ApplicationView } from "../applications.functions"
 import { createReviewContext, ruleName, type ReviewAudience } from "../reviewContext"
 import { ReviewReport, type ReportTab } from "../ReviewReport/ReviewReport"
@@ -281,67 +283,92 @@ function fileState(status: ApplicationView["files"][number]["status"], isReading
 function PacketFileList({ view, isBusy, onRemove }: PacketFileListProps) {
   const files = packetFiles(view.files)
   const isReviewing = view.application.status === "reviewing"
+  // A photo opens in the viewer over the page; the last one shown stays named while the viewer closes.
+  const [viewed, setViewed] = useState<{ id: string; fileName: string } | null>(null)
+  const [isViewerOpen, setIsViewerOpen] = useState(false)
   if (files.length === 0) {
     return <p className="text-sm text-muted-foreground">No files yet.</p>
   }
   return (
-    <ul className="flex flex-col gap-2">
-      {files.map(({ file, pictures }) => {
-        const isReading = isReviewing && file.status === "processing"
-        return (
-          <li key={file.id}>
-            <Attachment className="w-full" state={fileState(file.status, isReading)}>
-              <FileTypeMedia fileName={file.fileName} mediaType={file.mediaType} />
-              <AttachmentContent>
-                <AttachmentTitle title={file.fileName}>{file.fileName}</AttachmentTitle>
-                {/* What the review made of it, whole: a reason it couldn't be read is worth reading. */}
-                <AttachmentDescription className="whitespace-normal">
-                  {isReading ? "Reading" : fileStatusLabels[file.status]}
-                  {file.pageCount ? `, ${file.pageCount} ${file.pageCount === 1 ? "page" : "pages"}` : ""}
-                  {pictures.length > 0 ? `, ${pictures.length} ${pictures.length === 1 ? "picture" : "pictures"}` : ""}
-                  {file.error ? `: ${file.error.message}` : ""}
-                </AttachmentDescription>
-              </AttachmentContent>
-              {file.status === "uploading" ? null : (
-                <AttachmentTrigger
-                  render={
-                    <a
-                      href={applicationFileUrl(view.application.id, file.id)}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Open ${file.fileName}`}
-                    />
-                  }
-                />
-              )}
-              <AttachmentActions>
-                {file.status === "uploading" ? null : (
+    <>
+      <ul className="flex flex-col gap-2">
+        {files.map(({ file, pictures }) => {
+          const isReading = isReviewing && file.status === "processing"
+          // A photo opens in the viewer; any other file in a new tab, or the browser saves it.
+          const trigger =
+            file.mediaType.startsWith("image/") && opensInBrowser(file.mediaType) ? (
+              <AttachmentTrigger
+                aria-label={`View ${file.fileName}`}
+                className="cursor-zoom-in"
+                onClick={() => {
+                  setViewed(file)
+                  setIsViewerOpen(true)
+                }}
+              />
+            ) : (
+              <AttachmentTrigger
+                render={
                   <a
-                    className={buttonVariants({ variant: "ghost", size: "icon-xs" })}
-                    href={applicationFileUrl(view.application.id, file.id, { download: true })}
-                    download
-                    aria-label={`Download ${file.fileName}`}
-                    title="Download"
-                  >
-                    <DownloadIcon aria-hidden />
-                  </a>
-                )}
-                {view.canEdit ? (
-                  <AttachmentAction
-                    aria-label={`Remove ${file.fileName}`}
-                    title="Remove"
-                    disabled={isBusy}
-                    onClick={() => onRemove(file.id)}
-                  >
-                    <Trash2Icon />
-                  </AttachmentAction>
-                ) : null}
-              </AttachmentActions>
-            </Attachment>
-          </li>
-        )
-      })}
-    </ul>
+                    href={applicationFileUrl(view.application.id, file.id)}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open ${file.fileName}`}
+                  />
+                }
+              />
+            )
+          return (
+            <li key={file.id}>
+              <Attachment className="w-full" state={fileState(file.status, isReading)}>
+                <FileTypeMedia fileName={file.fileName} mediaType={file.mediaType} />
+                <AttachmentContent>
+                  <AttachmentTitle title={file.fileName}>{file.fileName}</AttachmentTitle>
+                  {/* What the review made of it, whole: a reason it couldn't be read is worth reading. */}
+                  <AttachmentDescription className="whitespace-normal">
+                    {isReading ? "Reading" : fileStatusLabels[file.status]}
+                    {file.pageCount ? `, ${file.pageCount} ${file.pageCount === 1 ? "page" : "pages"}` : ""}
+                    {pictures.length > 0
+                      ? `, ${pictures.length} ${pictures.length === 1 ? "picture" : "pictures"}`
+                      : ""}
+                    {file.error ? `: ${file.error.message}` : ""}
+                  </AttachmentDescription>
+                </AttachmentContent>
+                {file.status === "uploading" ? null : trigger}
+                <AttachmentActions>
+                  {file.status === "uploading" ? null : (
+                    <a
+                      className={buttonVariants({ variant: "ghost", size: "icon-xs" })}
+                      href={applicationFileUrl(view.application.id, file.id, { download: true })}
+                      download
+                      aria-label={`Download ${file.fileName}`}
+                      title="Download"
+                    >
+                      <DownloadIcon aria-hidden />
+                    </a>
+                  )}
+                  {view.canEdit ? (
+                    <AttachmentAction
+                      aria-label={`Remove ${file.fileName}`}
+                      title="Remove"
+                      disabled={isBusy}
+                      onClick={() => onRemove(file.id)}
+                    >
+                      <Trash2Icon />
+                    </AttachmentAction>
+                  ) : null}
+                </AttachmentActions>
+              </Attachment>
+            </li>
+          )
+        })}
+      </ul>
+      <ImageViewer
+        src={viewed ? applicationFileUrl(view.application.id, viewed.id) : undefined}
+        name={viewed?.fileName ?? ""}
+        open={isViewerOpen}
+        onOpenChange={setIsViewerOpen}
+      />
+    </>
   )
 }
 
@@ -464,11 +491,8 @@ export function ApplicationPage({
   const { application, review, job } = view
   const [isBusy, setIsBusy] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
-  const [tab, setTab] = useState("overview")
   const fileCount = packetFiles(view.files).length
   const isReviewing = application.status === "reviewing"
-  // The rule matrix wants the page's whole width, so the side column steps aside while it's open.
-  const isWide = tab === "rules" && review !== null && !isReviewing
   const canSubmit =
     view.isOwner &&
     review !== null &&
@@ -624,8 +648,6 @@ export function ApplicationPage({
           })}
           decision={application.decision}
           tabs={tabs}
-          tab={tab}
-          onTabChange={setTab}
         />
       )
     }
@@ -650,51 +672,48 @@ export function ApplicationPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 lg:px-6">
-      <div className="flex flex-col gap-3">
-        <Button variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" onClick={onBack}>
-          <ArrowLeftIcon />
-          Applications
-        </Button>
-        <ApplicationHeader view={view} />
-      </div>
-      <div
-        className={cn(
-          "grid items-start gap-6",
-          !isWide && "@4xl/main:grid-cols-[minmax(0,1fr)_19rem] @6xl/main:grid-cols-[minmax(0,1fr)_21rem]"
-        )}
-      >
-        <div className="flex min-w-0 flex-col gap-6">
-          {failed}
-          {body()}
+    // Reading a citation is a step in reading the application: it opens over the page, not in place of it.
+    <CitationsOpenInSheet>
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 lg:px-6">
+        <div className="flex flex-col gap-3">
+          <Button variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" onClick={onBack}>
+            <ArrowLeftIcon />
+            Applications
+          </Button>
+          <ApplicationHeader view={view} />
         </div>
-        {/* Hidden, not removed, beside a wide tab, so a decision being written keeps its words. */}
-        <aside aria-label="About this application" hidden={isWide} className="flex min-w-0 flex-col gap-4">
-          {action}
-          <ApplicationDetails view={view} />
-        </aside>
+        <div className="grid items-start gap-6 @4xl/main:grid-cols-[minmax(0,1fr)_19rem] @6xl/main:grid-cols-[minmax(0,1fr)_21rem]">
+          <div className="flex min-w-0 flex-col gap-6">
+            {failed}
+            {body()}
+          </div>
+          <aside aria-label="About this application" className="flex min-w-0 flex-col gap-4">
+            {action}
+            <ApplicationDetails view={view} />
+          </aside>
+        </div>
+        <AlertDialog open={isConfirming} onOpenChange={setIsConfirming}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Submit with open requests?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The review asks for information you haven’t provided. The committee may deny an incomplete application.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep editing</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setIsConfirming(false)
+                  void submit(true)
+                }}
+              >
+                Submit anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
-      <AlertDialog open={isConfirming} onOpenChange={setIsConfirming}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Submit with open requests?</AlertDialogTitle>
-            <AlertDialogDescription>
-              The review asks for information you haven’t provided. The committee may deny an incomplete application.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep editing</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                setIsConfirming(false)
-                void submit(true)
-              }}
-            >
-              Submit anyway
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+    </CitationsOpenInSheet>
   )
 }
