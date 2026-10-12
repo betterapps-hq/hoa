@@ -1,5 +1,14 @@
 import { ChevronDownIcon, FileTextIcon, UploadIcon } from "lucide-react"
 import { useState } from "react"
+import {
+  Attachment,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentMedia,
+  AttachmentTitle,
+  AttachmentTrigger
+} from "@/components/ui/attachment"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import type { GoverningDocument } from "@/documents/governingDocument"
@@ -102,9 +111,9 @@ export function GoverningDocuments({
           ) : null}
         </Empty>
       ) : (
-        <ul className="@container flex flex-col divide-y rounded-lg border">
+        <ul className="@container flex flex-col gap-2">
           {shown.map(({ latest, earlier }) => (
-            <li key={latest.lineageId} className="flex flex-col gap-1 px-4 py-3">
+            <li key={latest.lineageId} className="flex flex-col gap-1">
               <DocumentRow
                 document={latest}
                 jobId={jobs[latest.id]}
@@ -159,38 +168,53 @@ function DocumentRow({
     dateText(document.uploadedAt) ? `added ${dateText(document.uploadedAt)}` : null
   ].filter((item) => item !== null)
   return (
-    <div className="flex items-start justify-between gap-2">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        {/* The title opens the document in the reader once its pages were read. */}
-        {isReadable ? (
-          <ReaderLink
-            href={citationHref(document.id)}
-            className="w-fit font-medium underline-offset-4 hover:underline focus-visible:underline"
-          >
-            {document.title}
-          </ReaderLink>
-        ) : (
-          <span className="font-medium">{document.title}</span>
-        )}
-        <span className="text-sm text-muted-foreground">{details.join(", ")}</span>
+    <Attachment className="w-full" state={documentState(document.status)}>
+      <AttachmentMedia>
+        <FileTextIcon aria-hidden />
+      </AttachmentMedia>
+      <AttachmentContent className="flex flex-col gap-0.5">
+        <AttachmentTitle title={document.title}>{document.title}</AttachmentTitle>
+        <AttachmentDescription>{details.join(", ")}</AttachmentDescription>
         {document.status === "processing" && jobId ? (
           <JobProgress jobId={jobId} loadJob={loadJob} onFinished={onChanged} />
         ) : null}
         {document.status === "processing" && !jobId ? (
-          <span className="text-sm text-muted-foreground">Being read</span>
+          <span className="text-xs text-muted-foreground">Being read</span>
         ) : null}
         {document.status === "uploading" ? (
-          <span className="text-sm text-muted-foreground">The upload didn&rsquo;t finish.</span>
+          <span className="text-xs text-muted-foreground">The upload didn&rsquo;t finish.</span>
         ) : null}
         {document.status === "failed" ? (
-          <span className="text-sm text-destructive">
+          <span className="text-xs text-destructive">
             It couldn&rsquo;t be read{document.error ? `: ${document.error.message}` : "."}
           </span>
         ) : null}
-      </div>
-      {isDownloadable ? <DocumentDownload documentId={document.id} title={document.title} /> : null}
-    </div>
+      </AttachmentContent>
+      {/* The whole card opens the document in the reader once its pages were read. */}
+      {isReadable ? (
+        <AttachmentTrigger
+          render={<ReaderLink href={citationHref(document.id)} />}
+          aria-label={`Read ${document.title}`}
+        />
+      ) : null}
+      {isDownloadable ? (
+        <AttachmentActions>
+          <DocumentDownload documentId={document.id} title={document.title} />
+        </AttachmentActions>
+      ) : null}
+    </Attachment>
   )
+}
+
+/** A document's state as an attachment shows it: read, being read, an upload that didn't finish, or not readable. */
+function documentState(status: GoverningDocument["status"]) {
+  if (status === "failed") {
+    return "error"
+  }
+  if (status === "uploading") {
+    return "idle"
+  }
+  return status === "processing" ? "processing" : "done"
 }
 
 function EarlierVersions({ versions }: { versions: GoverningDocument[] }) {

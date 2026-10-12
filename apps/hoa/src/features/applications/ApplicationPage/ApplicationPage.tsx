@@ -16,6 +16,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from "@/components/ui/alert-dialog"
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentMedia,
+  AttachmentTitle
+} from "@/components/ui/attachment"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -237,6 +246,17 @@ type PacketFileListProps = {
   onRemove: (fileId: string) => void
 }
 
+/** A packet file's state as an attachment shows it: read, being read, still uploading, or not readable. */
+function fileState(status: ApplicationView["files"][number]["status"], isReading: boolean) {
+  if (status === "unreadable") {
+    return "error"
+  }
+  if (status === "uploading") {
+    return "uploading"
+  }
+  return isReading ? "processing" : "done"
+}
+
 /** The files the homeowner uploaded, each with what the review made of it. */
 function PacketFileList({ view, isBusy, onRemove }: PacketFileListProps) {
   const files = packetFiles(view.files)
@@ -245,32 +265,40 @@ function PacketFileList({ view, isBusy, onRemove }: PacketFileListProps) {
     return <p className="text-sm text-muted-foreground">No files yet.</p>
   }
   return (
-    <ul className="flex flex-col divide-y">
-      {files.map(({ file, pictures }) => (
-        <li key={file.id} className="flex items-center gap-3 py-2 text-sm">
-          <FileIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate">{file.fileName}</span>
-            <span className="text-muted-foreground">
-              {isReviewing && file.status === "processing" ? "Reading" : fileStatusLabels[file.status]}
-              {file.pageCount ? `, ${file.pageCount} ${file.pageCount === 1 ? "page" : "pages"}` : ""}
-              {pictures.length > 0 ? `, ${pictures.length} ${pictures.length === 1 ? "picture" : "pictures"}` : ""}
-              {file.error ? `: ${file.error.message}` : ""}
-            </span>
-          </div>
-          {view.canEdit ? (
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label={`Remove ${file.fileName}`}
-              disabled={isBusy}
-              onClick={() => onRemove(file.id)}
-            >
-              <Trash2Icon />
-            </Button>
-          ) : null}
-        </li>
-      ))}
+    <ul className="flex flex-col gap-2">
+      {files.map(({ file, pictures }) => {
+        const isReading = isReviewing && file.status === "processing"
+        return (
+          <li key={file.id}>
+            <Attachment className="w-full" state={fileState(file.status, isReading)}>
+              <AttachmentMedia>
+                <FileIcon aria-hidden />
+              </AttachmentMedia>
+              <AttachmentContent>
+                <AttachmentTitle title={file.fileName}>{file.fileName}</AttachmentTitle>
+                {/* What the review made of it, whole: a reason it couldn't be read is worth reading. */}
+                <AttachmentDescription className="whitespace-normal">
+                  {isReading ? "Reading" : fileStatusLabels[file.status]}
+                  {file.pageCount ? `, ${file.pageCount} ${file.pageCount === 1 ? "page" : "pages"}` : ""}
+                  {pictures.length > 0 ? `, ${pictures.length} ${pictures.length === 1 ? "picture" : "pictures"}` : ""}
+                  {file.error ? `: ${file.error.message}` : ""}
+                </AttachmentDescription>
+              </AttachmentContent>
+              {view.canEdit ? (
+                <AttachmentActions>
+                  <AttachmentAction
+                    aria-label={`Remove ${file.fileName}`}
+                    disabled={isBusy}
+                    onClick={() => onRemove(file.id)}
+                  >
+                    <Trash2Icon />
+                  </AttachmentAction>
+                </AttachmentActions>
+              ) : null}
+            </Attachment>
+          </li>
+        )
+      })}
     </ul>
   )
 }
