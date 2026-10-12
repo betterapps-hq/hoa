@@ -587,6 +587,11 @@ wording so adding one back keeps it).
   kept as written. Every
   newly linked citation must be a provision of the published rulebook; one a rebuild removes stays, flagged in the
   editor.
+- **The list** (`ProjectTypesPage`): until a rulebook is published there's nothing to build a type from, so the page
+  is one empty state, "Publish your rulebook first", leading to the rulebook; nothing else shows. Once one is, a
+  header with "Suggest project types" and "Add project type", then each type as a card: its name (the card opens it),
+  description, how many questions, documents and applications, an archived badge or the out-of-date line, and its
+  menu. Suggestions, once asked for, appear above the cards, each to add or dismiss.
 - **The editor** (`ProjectTypePage`): each question rendered exactly as homeowners see it (`QuestionField`, shared
   with the homeowner form), one info button for long help, its citations on a quiet line, a drag
   handle (dnd-kit, keyboard sensor and announcements) and a menu (edit, required or optional, remove with undo).
