@@ -721,7 +721,8 @@ export async function buildRulebook(input: BuildInput) {
   batches.forEach((batch, index) => {
     const result = firstPasses[index]
     if (result?.status !== "fulfilled") {
-      failures.push({ stage: "structure-rules", itemId: batch.id, message: messageOf(result?.reason) })
+      // A batch's id is its first rule's key: the suffix tells the whole batch from that one rule, as a retry's does.
+      failures.push({ stage: "structure-rules", itemId: `${batch.id}:first-pass`, message: messageOf(result?.reason) })
       return
     }
     calls.push(...result.value.calls)

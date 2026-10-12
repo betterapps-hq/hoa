@@ -9,7 +9,7 @@ import type { RulebookView } from "../rulebook.functions"
 export type RulebookStatus =
   | { kind: "building"; reading: string[] }
   | { kind: "reading"; reading: string[] }
-  | { kind: "draft-ready"; isFirst: boolean; summary: string; builtFrom: string[] }
+  | { kind: "draft-ready"; isFirst: boolean; summary: string; builtFrom: string[]; skipped: number }
   | { kind: "build-failed"; error: string; isRetryable: boolean }
   | { kind: "build-refused"; documents: RefusedDocument[] }
   | { kind: "build-stopped"; hasDraft: boolean }
@@ -75,7 +75,8 @@ export function rulebookStatus({
       kind: "draft-ready",
       isFirst: changes?.isFirst ?? published.rulebook === null,
       summary: changes ? (changeSummary(changes) ?? "") : "",
-      builtFrom: changes?.documents.added.map((document) => document.title) ?? []
+      builtFrom: changes?.documents.added.map((document) => document.title) ?? [],
+      skipped: draft.buildFailures.length
     }
   }
   if (draft.refusedDocuments.length > 0) {

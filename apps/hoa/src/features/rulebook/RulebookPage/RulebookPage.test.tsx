@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { render, screen, within } from "@testing-library/react"
+import { cleanup, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import { describe, expect, it, vi } from "vitest"
@@ -55,6 +55,7 @@ const draft: RulebookView = {
   buildJobId: null,
   isBuilding: false,
   lastBuildError: null,
+  buildFailures: [],
   isLastBuildRetryable: true,
   refusedDocuments: [],
   isLastBuildStopped: false,
@@ -163,6 +164,28 @@ describe("RulebookPage", () => {
     expect(screen.getByRole("tab", { name: "Terms", selected: true })).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Answer 15 questions" }))
     expect(screen.getByRole("tab", { name: "Questions", selected: true })).toBeInTheDocument()
+  })
+
+  it("says what the build skipped, on the status line and in the review, with the errors folded away", async () => {
+    const failures = [
+      { stage: "structure-rules", itemId: "declaration:21#fine", message: "zod: imposedBy" },
+      { stage: "structure-rules", itemId: "declaration:21#notice", message: "zod: against" }
+    ]
+    const skipped = { ...draft, buildFailures: failures }
+    setup({ draft: skipped })
+    expect(
+      within(screen.getByRole("region", { name: "Status" })).getByText(
+        /The build skipped 2 items, listed in the review\./
+      )
+    ).toBeInTheDocument()
+    cleanup()
+    const { user } = setup({ draft: skipped, isReviewing: true })
+    const notice = screen.getByRole("alert")
+    expect(within(notice).getByText("The build skipped 2 items")).toBeInTheDocument()
+    expect(within(notice).getByText("Declaration 21: 2 rules weren't drafted")).toBeInTheDocument()
+    expect(within(notice).queryByText("zod: imposedBy")).not.toBeInTheDocument()
+    await user.click(within(notice).getByRole("button", { name: "What went wrong" }))
+    expect(within(notice).getByText("zod: imposedBy")).toBeInTheDocument()
   })
 
   it("discards the draft after saying what's lost", async () => {

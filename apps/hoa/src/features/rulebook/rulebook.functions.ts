@@ -12,6 +12,7 @@ import {
   type RulebookContent
 } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus } from "@/db/rulebookRepository"
+import type { JobFailure } from "@/jobs/job"
 import { readRulesFileJson } from "@/rulebook/assemble"
 import { loadBuildResults, type BuildResults } from "@/rulebook/buildResults.server"
 import { checkCurrentSources, isRefusedBuild, type RefusedDocument } from "@/rulebook/buildSources"
@@ -32,7 +33,7 @@ import {
   stopRulebookBuild as stopBuild,
   type StopResult
 } from "@/workflows/rulebookTrigger.server"
-import { describeBuildProblem } from "./rulebookView"
+import { buildFailuresOf, describeBuildProblem } from "./rulebookView"
 
 type Rulebook = z.infer<typeof rulebookSchema>
 
@@ -45,8 +46,10 @@ export type RulebookView = {
   /** The latest build, so the page can follow one in progress. */
   buildJobId: string | null
   isBuilding: boolean
-  /** Why the latest build failed or skipped items, when it did; null when it was refused (see `refusedDocuments`). */
+  /** Why the latest build failed, when it did; null when it was refused (see `refusedDocuments`). */
   lastBuildError: string | null
+  /** What the build that made this rulebook skipped (a rule it couldn't draft, a section it couldn't read). */
+  buildFailures: JobFailure[]
   /** Whether building again can get past the latest build's failure, so the page offers to try again. */
   isLastBuildRetryable: boolean
   /** The documents the latest build refused before spending anything, while they still would be; empty otherwise. */
@@ -208,6 +211,7 @@ export const getRulebookView = createServerFn({ method: "GET" })
       buildJobId: latestBuild?.id ?? null,
       isBuilding: building !== null,
       lastBuildError: isRefused ? null : describeBuildProblem(latestBuild),
+      buildFailures: buildFailuresOf(latestBuild, rulebook?.id ?? null),
       isLastBuildRetryable: latestBuild?.status !== "failed" || (latestBuild.error?.isRetryable ?? true),
       refusedDocuments,
       isLastBuildStopped: latestBuild?.status === "cancelled",

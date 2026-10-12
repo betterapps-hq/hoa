@@ -5,6 +5,7 @@ import { jobProgress } from "./progress"
 export const jobKinds = ["document-ingest", "rulebook-build", "application-review"] as const
 
 export const jobFailureSchema = z.object({ stage: z.string(), itemId: z.string(), message: z.string() })
+export type JobFailure = z.infer<typeof jobFailureSchema>
 
 export const jobSchema = z.object({
   /** The Workflow instance id, also the Langfuse session id. */

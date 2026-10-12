@@ -1,19 +1,20 @@
-import type { Job } from "@/jobs/job"
+import type { Job, JobFailure } from "@/jobs/job"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import { coverageOf } from "@/rulebook/coverage"
 
 // What the rules page says about a rulebook as a whole: its counts, and why the last build had problems.
 
-/** Why the latest build failed or skipped items; null for a clean one. */
+/** Why the latest build failed; null when it finished. What a finished build skipped shows with its draft instead. */
 export function describeBuildProblem(job: Job | null) {
-  if (job?.status === "failed") {
-    return job.error?.message ?? "The build failed."
-  }
-  const [first] = job?.failures ?? []
-  if (job?.status === "completed-with-errors" && first) {
-    return `${job.failures.length === 1 ? "1 item" : `${job.failures.length} items`} failed (${first.stage}): ${first.message}`
-  }
-  return null
+  return job?.status === "failed" ? (job.error?.message ?? "The build failed.") : null
+}
+
+/**
+ * What the build that made this draft skipped; empty for a clean build, and for a build whose draft is gone (discarded
+ * or replaced), since its skipped items went with it.
+ */
+export function buildFailuresOf(job: Job | null, rulebookId: string | null): JobFailure[] {
+  return job?.status === "completed-with-errors" && job.subjectId === rulebookId ? job.failures : []
 }
 
 export type RulebookCounts = {

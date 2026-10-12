@@ -1,7 +1,9 @@
+import type { JobFailure } from "@/jobs/job"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import type { Coverage } from "@/rulebook/coverage"
 import { isBlocking } from "@/rulebook/review"
 import type * as T from "@/schema/types"
+import { citationLabel, countOf } from "../rulebookRecords"
 import type { WorkspaceView } from "../RulebookWorkspace/RulebookWorkspace.utils"
 
 // What's left before a draft can be published (encoding.md, UX, Draft review): a short to-do list, in the order the
@@ -103,4 +105,74 @@ export function draftTodos(records: RulebookRecords, coverage: Pick<Coverage, "u
       : null
   ]
   return todos.filter((todo) => todo !== null)
+}
+
+/** Something the build skipped, in words: "Declaration Article 21: 2 rules weren't drafted", and the errors behind it. */
+export type SkippedPart = { id: string; text: string; details: string[] }
+
+// What a stage didn't do, said of the section it started at, or of the whole draft.
+const sectionWords: Partial<Record<string, string>> = {
+  "find-rules": "it wasn't read for rules",
+  vocabulary: "the terms its rules use weren't named",
+  "structure-rules": "not every rule from here on was drafted"
+}
+const draftWords: Partial<Record<string, string>> = {
+  "vocabulary-merge": "The terms weren't combined into one vocabulary",
+  consolidate: "The rules weren't checked against each other for conflicts"
+}
+
+/**
+ * Where a skipped item is, from its id: one rule ("declaration:21#fine"), a batch of rules from one on (its key with
+ * ":first-pass" or ":retry-1"), a section, a document, or nothing for the build as a whole.
+ */
+function placeOf(itemId: string, records: Pick<RulebookRecords, "provisions" | "documents">) {
+  const base = itemId.replace(/:(first-pass|retry-\d+)$/, "")
+  const [provisionKey = base, aspect] = base.split("#")
+  if (aspect !== undefined && base === itemId) {
+    return { kind: "rule" as const, label: citationLabel(provisionKey) }
+  }
+  if (records.provisions.some((provision) => provision.key === provisionKey)) {
+    return { kind: "section" as const, label: citationLabel(provisionKey) }
+  }
+  const document = records.documents.find((found) => found.key === base)
+  return document ? { kind: "document" as const, label: document.title } : null
+}
+
+/**
+ * What the build that made the draft skipped (encoding.md, UX, Draft review), one line per place and kind: what's in
+ * those sections may be missing from the draft, so the reviewer reads them in the documents.
+ */
+export function skippedParts(
+  failures: readonly JobFailure[],
+  records: Pick<RulebookRecords, "provisions" | "documents">
+): SkippedPart[] {
+  const parts = new Map<string, { place: ReturnType<typeof placeOf>; stage: string; details: string[] }>()
+  for (const failure of failures) {
+    const place = placeOf(failure.itemId, records)
+    const id = `${failure.stage} ${place?.kind ?? ""} ${place?.label ?? ""}`
+    const part = parts.get(id) ?? { place, stage: failure.stage, details: [] }
+    part.details.push(failure.message)
+    parts.set(id, part)
+  }
+  return [...parts].map(([id, { place, stage, details }]) => {
+    const what = (() => {
+      switch (place?.kind) {
+        case "rule":
+          return details.length === 1
+            ? "a rule wasn't drafted"
+            : `${countOf(details.length, "rule", "rules")} weren't drafted`
+        case "section":
+          return sectionWords[stage] ?? "it wasn't finished"
+        case "document":
+          return stage === "defined-terms" ? "its defined terms weren't read" : "it wasn't finished"
+        case undefined:
+          return null
+      }
+    })()
+    return {
+      id,
+      text: place && what ? `${place.label}: ${what}` : (draftWords[stage] ?? "Part of the build wasn't finished"),
+      details
+    }
+  })
 }

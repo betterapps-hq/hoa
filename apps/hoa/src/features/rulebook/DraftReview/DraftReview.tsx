@@ -1,5 +1,6 @@
-import { ArrowLeftIcon } from "lucide-react"
+import { ArrowLeftIcon, ChevronDownIcon, TriangleAlertIcon } from "lucide-react"
 import { useState } from "react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,6 +13,8 @@ import {
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import type { JobFailure } from "@/jobs/job"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import { coverageOf } from "@/rulebook/coverage"
 import { attempt } from "../attempt"
@@ -21,7 +24,7 @@ import { countOf } from "../rulebookRecords"
 import { RulebookWorkspace } from "../RulebookWorkspace/RulebookWorkspace"
 import type { WorkspaceView } from "../RulebookWorkspace/RulebookWorkspace.utils"
 import type { RulebookActions, RulebookSource } from "../useRulebookWorkspace"
-import { draftTodos, type DraftTodo } from "./DraftReview.utils"
+import { draftTodos, skippedParts, type DraftTodo, type SkippedPart } from "./DraftReview.utils"
 
 export type DraftReviewProps = {
   records: RulebookRecords
@@ -29,6 +32,8 @@ export type DraftReviewProps = {
   changes: DraftChanges | null
   /** Why it can't be published yet, as the server checks it. */
   blockers: string[]
+  /** What the build that made the draft skipped. */
+  buildFailures: JobFailure[]
   /** The version in force, for the way back; null when nothing is published. */
   publishedVersion: number | null
   /** A newer build is running: the draft will be replaced, keeping the decisions on unchanged records. */
@@ -49,6 +54,7 @@ export function DraftReview({
   records,
   changes,
   blockers,
+  buildFailures,
   publishedVersion,
   isRebuilding,
   source,
@@ -58,6 +64,7 @@ export function DraftReview({
   onDiscard
 }: DraftReviewProps) {
   const todos = draftTodos(records, coverageOf(records))
+  const skipped = skippedParts(buildFailures, records)
   const [view, setView] = useState<WorkspaceView>({
     tab: changes ? "changes" : (todos[0]?.view.tab ?? "rules"),
     filter: changes ? null : (todos[0]?.view.filter ?? null),
@@ -136,6 +143,7 @@ export function DraftReview({
             everything that didn&rsquo;t change.
           </p>
         ) : null}
+        {skipped.length > 0 ? <SkippedNotice failures={buildFailures} parts={skipped} /> : null}
       </header>
 
       <section aria-labelledby="draft-next" className="flex flex-col gap-4 rounded-lg border p-5">
@@ -215,5 +223,38 @@ export function DraftReview({
         />
       </section>
     </div>
+  )
+}
+
+/** What the build skipped: where, in words, with the errors behind it folded away. */
+function SkippedNotice({ failures, parts }: { failures: JobFailure[]; parts: SkippedPart[] }) {
+  return (
+    <Alert>
+      <TriangleAlertIcon aria-hidden />
+      <AlertTitle>The build skipped {countOf(failures.length, "item", "items")}</AlertTitle>
+      <AlertDescription className="flex flex-col items-start gap-2">
+        <p>What they cover may be missing from the draft. Check those parts of the documents before you publish.</p>
+        <ul className="flex flex-col gap-0.5 text-foreground">
+          {parts.map((part) => (
+            <li key={part.id}>{part.text}</li>
+          ))}
+        </ul>
+        <Collapsible>
+          <CollapsibleTrigger
+            render={<Button variant="link" size="sm" className="group/details h-auto p-0 text-muted-foreground" />}
+          >
+            What went wrong
+            <ChevronDownIcon aria-hidden className="transition-transform group-aria-expanded/details:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <ul className="mt-1 flex flex-col gap-1 text-xs break-words">
+              {parts.flatMap((part) =>
+                part.details.map((detail, index) => <li key={`${part.id} ${index}`}>{detail}</li>)
+              )}
+            </ul>
+          </CollapsibleContent>
+        </Collapsible>
+      </AlertDescription>
+    </Alert>
   )
 }

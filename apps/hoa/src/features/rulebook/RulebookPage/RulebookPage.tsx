@@ -29,7 +29,7 @@ import { BuildProgress } from "../BuildProgress/BuildProgress"
 import { DraftReview } from "../DraftReview/DraftReview"
 import { saveFile } from "../PublishedRulebook/PublishedRulebook.utils"
 import type { RulebookSources, RulebookView } from "../rulebook.functions"
-import { recordsOf } from "../rulebookRecords"
+import { countOf, recordsOf } from "../rulebookRecords"
 import { RulebookWorkspace } from "../RulebookWorkspace/RulebookWorkspace"
 import type { RulebookActions, RulebookSource } from "../useRulebookWorkspace"
 import { refusalSentence, rulebookStatus, type RulebookStatus } from "./RulebookPage.utils"
@@ -88,6 +88,7 @@ export function RulebookPage(props: RulebookPageProps) {
             : null
         }
         blockers={draft.blockers}
+        buildFailures={draft.buildFailures}
         publishedVersion={published.rulebook?.version ?? null}
         isRebuilding={draft.isBuilding}
         source={source}
@@ -184,14 +185,19 @@ function StatusLine({
     case "draft-ready":
       return line(
         status.isFirst ? "Your rulebook is ready to review." : "A new draft of the rulebook is ready to review.",
-        status.isFirst
-          ? "Nothing is published yet. Review the draft and publish it to start checking applications against it."
-          : [
-              status.builtFrom.length > 0 ? `It was built after ${status.builtFrom.join(", ")} changed.` : null,
-              status.summary ? `It ${status.summary}.` : "It has the same rules as the rulebook in force."
-            ]
-              .filter((part) => part !== null)
-              .join(" "),
+        [
+          ...(status.isFirst
+            ? ["Nothing is published yet. Review the draft and publish it to start checking applications against it."]
+            : [
+                status.builtFrom.length > 0 ? `It was built after ${status.builtFrom.join(", ")} changed.` : null,
+                status.summary ? `It ${status.summary}.` : "It has the same rules as the rulebook in force."
+              ]),
+          status.skipped > 0
+            ? `The build skipped ${countOf(status.skipped, "item", "items")}, listed in the review.`
+            : null
+        ]
+          .filter((part) => part !== null)
+          .join(" "),
         <Button className="w-fit" onClick={() => props.onReviewingChange(true)}>
           {status.isFirst ? "Review the draft" : "Review changes"}
         </Button>
