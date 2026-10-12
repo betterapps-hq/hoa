@@ -14,6 +14,8 @@ import {
 import { getRulebookByStatus } from "@/db/rulebookRepository"
 import type { JobFailure } from "@/jobs/job"
 import { readRulesFile, readRulesFileJson } from "@/rulebook/assemble"
+import type { BuildResultsPage } from "@/rulebook/buildResults"
+import { loadBuildDocuments, loadBuildResults, type BuildDocument } from "@/rulebook/buildResults.server"
 import { checkCurrentSources, isRefusedBuild, type RefusedDocument } from "@/rulebook/buildSources"
 import { rulebookChanges, type RulebookChanges } from "@/rulebook/changes"
 import { textOutsideProvisions, type SourceText } from "@/rulebook/coverage"
@@ -164,6 +166,26 @@ export const startRulebookBuild = createServerFn({ method: "POST" }).handler(asy
 export const stopRulebookBuild = createServerFn({ method: "POST" }).handler(async (): Promise<StopResult> =>
   stopBuild(getDb(), bindings.RULEBOOK_BUILD, await getRequestContext(), new Date().toISOString())
 )
+
+/**
+ * What the running build has produced so far, since a cursor (encoding.md, UX, Counts as they arrive). The page polls
+ * it every few seconds rather than holding a server-sent event stream open for the hour a build takes: each poll lists
+ * the build's step outputs and reads only the new ones, and a dropped connection loses nothing.
+ */
+export const getBuildResults = createServerFn({ method: "GET" })
+  .validator((data: unknown) => z.object({ jobId: z.string(), since: z.string().nullable() }).parse(data))
+  .handler(async ({ data }): Promise<BuildResultsPage> => {
+    const context = await requireAdministrator()
+    return loadBuildResults(getDb(), getBucket(), context.hoa.id, data)
+  })
+
+/** The documents the running build reads, with their provisions, once it has structured them; none before. */
+export const getBuildDocuments = createServerFn({ method: "GET" })
+  .validator((data: unknown) => z.object({ jobId: z.string() }).parse(data))
+  .handler(async ({ data }): Promise<BuildDocument[]> => {
+    const context = await requireAdministrator()
+    return loadBuildDocuments(getDb(), getBucket(), context.hoa.id, data.jobId)
+  })
 
 /** Deletes the draft rulebook and its records; the published rulebook stays as it is. */
 export const discardRulebookDraft = createServerFn({ method: "POST" })

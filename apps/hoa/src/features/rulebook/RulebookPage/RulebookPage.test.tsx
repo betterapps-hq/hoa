@@ -121,6 +121,8 @@ function setup(overrides: Partial<RulebookPageProps> = {}) {
     onRemoveDocument: vi.fn<RulebookPageProps["onRemoveDocument"]>(async () => undefined),
     onBuild: vi.fn<() => Promise<void>>(async () => undefined),
     onStop: vi.fn<RulebookPageProps["onStop"]>(async () => ({ status: "stopped" })),
+    loadBuildResults: vi.fn<RulebookPageProps["loadBuildResults"]>(async () => ({ results: [], cursor: null })),
+    loadBuildDocuments: vi.fn<RulebookPageProps["loadBuildDocuments"]>(async () => []),
     onPublish: vi.fn<(rulebookId: string) => Promise<void>>(async () => undefined),
     onDiscard: vi.fn<(rulebookId: string) => Promise<void>>(async () => undefined),
     onChanged: vi.fn<() => void>(),

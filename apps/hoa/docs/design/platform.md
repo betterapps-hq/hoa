@@ -152,6 +152,8 @@ Each checks the role and access rules.
 | `getActiveJob` | Any | Subject id | The latest job for a document, rulebook or application, so a reloaded page finds work in progress |
 | `startRulebookBuild` | Administrator | | Job id, rulebook id; refused while a document is being read or another build runs |
 | `stopRulebookBuild` | Administrator | | Whether the build was stopped or had already ended |
+| `getBuildResults` | Administrator | Job id, cursor | What the running build has produced since the cursor |
+| `getBuildDocuments` | Administrator | Job id | The documents the running build reads, with their provisions, once structured |
 | `getRulebookView` | Administrator for the draft, any for the published | `draft` or `published` | The rulebook and its records |
 | `getRulebookSources`, `getSourceText` | Any | | The documents and provisions the rules cite; page text no provision holds |
 | `reviewRulebookRecords` | Administrator | Rulebook id, record refs, `proposed`, `approved` or `rejected` | Records updated, and those skipped with why |

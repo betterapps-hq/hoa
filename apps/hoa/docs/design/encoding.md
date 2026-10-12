@@ -303,10 +303,12 @@ rules, 35–50 min left").
 
 **Counts as they arrive.** The steps say only where the build is: the current one has a spinner, and none counts what
 it found or the parts the build divides its work into (documents, sections, groups of sections, batches of rules).
-What the build finds belongs to the reader (DocumentEncodingReader), which shows each term, rule and draft as it arrives and
-counts them; it isn't on the page yet. Its results are to come from a server function (administrators, the
-organization's own builds) over `loadBuildResults`, which lists the build's step outputs in R2 and reads only those
-written since the page's cursor, polled every four seconds. Polling, not server-sent events: a stream would hold a Worker request
+What the build finds belongs to the reader above the steps (`DocumentEncodingReader`, in `ProcessingStatus`), which
+shows each term, rule and draft in the document as it arrives and counts them. Its results come from
+`getBuildResults` (administrators, the organization's own builds), which lists the build's step outputs in R2 and reads
+only those written since the page's cursor, polled every four seconds; its documents from `getBuildDocuments`, the
+structure step's output with each document's title, asked for every four seconds until the step has written it and
+then kept, as it doesn't change. Polling, not server-sent events: a stream would hold a Worker request
 open for the hour a build runs and still have to poll R2 inside it, while a poll is short, survives a dropped
 connection and reads nothing twice.
 

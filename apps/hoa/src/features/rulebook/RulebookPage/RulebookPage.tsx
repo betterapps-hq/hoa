@@ -21,11 +21,13 @@ import {
 } from "@/features/documents/GoverningDocuments/GoverningDocuments"
 import type { DocumentDetails } from "@/features/documents/uploadDocument"
 import type { Job } from "@/jobs/job"
+import type { BuildResultsPage } from "@/rulebook/buildResults"
+import type { BuildDocument } from "@/rulebook/buildResults.server"
 import type { RefusedDocument } from "@/rulebook/buildSources"
 import type { StopResult } from "@/workflows/rulebookTrigger.server"
 import { attempt } from "../attempt"
-import { DocumentEncodingSteps } from "../DocumentEncodingSteps/DocumentEncodingSteps"
 import { DraftReview } from "../DraftReview/DraftReview"
+import { ProcessingStatus } from "../ProcessingStatus/ProcessingStatus"
 import { saveFile } from "../PublishedRulebook/PublishedRulebook.utils"
 import type { RulebookSources, RulebookView } from "../rulebook.functions"
 import { recordsOf } from "../rulebookRecords"
@@ -57,6 +59,10 @@ export type RulebookPageProps = {
   onBuild: () => Promise<void>
   /** Stops the running build. */
   onStop: () => Promise<StopResult>
+  /** What a running build has produced since a cursor, for the reader. */
+  loadBuildResults: (jobId: string, since: string | null) => Promise<BuildResultsPage>
+  /** The documents a running build reads, with their provisions, once it has structured them. */
+  loadBuildDocuments: (jobId: string) => Promise<BuildDocument[]>
   onPublish: (rulebookId: string) => Promise<void>
   onDiscard: (rulebookId: string) => Promise<void>
   onChanged: () => void
@@ -164,26 +170,21 @@ function StatusLine({
   )
   const reading = (titles: string[]) => (titles.length === 1 ? titles[0] : `${titles.length} documents`)
   switch (status.kind) {
-    case "building":
-      // A short title over the progress, which says the rest.
-      return (
-        <section aria-label="Status" className="flex flex-col gap-4 rounded-lg border p-5">
-          <div className="flex flex-col gap-0.5 pb-3">
-            <p className="font-medium">Processing your documents</p>
-            <p className="text-sm text-muted-foreground">You can leave this page and come back.</p>
-          </div>
-          {props.draft.buildJobId ? (
-            <div className="text-sm text-muted-foreground">
-              <DocumentEncodingSteps
-                jobId={props.draft.buildJobId}
-                loadJob={props.loadJob}
-                onFinished={props.onChanged}
-                onStop={stop}
-              />
-            </div>
-          ) : null}
-        </section>
+    case "building": {
+      const jobId = props.draft.buildJobId
+      return jobId ? (
+        <ProcessingStatus
+          jobId={jobId}
+          loadJob={props.loadJob}
+          loadResults={(since) => props.loadBuildResults(jobId, since)}
+          loadDocuments={() => props.loadBuildDocuments(jobId)}
+          onFinished={props.onChanged}
+          onStop={stop}
+        />
+      ) : (
+        line("Processing your documents", "You can leave this page and come back.")
       )
+    }
     case "reading":
       return line(
         `Reading ${reading(status.reading)}.`,
