@@ -125,6 +125,8 @@ export function lineAt(lines: readonly Box[], y: number): Box | undefined {
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2)
 const transform = ({ x, y }: Point, scale: number) => `translate(${x}px, ${y}px) scale(${scale})`
+/** Past where it's going, then back: for a find popping out of its line and settling on its dot. */
+const overshoot = "cubic-bezier(0.34, 1.56, 0.64, 1)"
 
 /** When a flight's travel ends and its landing bounce starts, as a share of its time. */
 const travelEnd = 0.8
@@ -139,8 +141,8 @@ export function flightPeak(from: Point, to: Point, lift: number, ceiling: number
 
 /**
  * A find's flight from its line on the page to its dot: it pops out of the line, arcs with its highest point at `peak`
- * (or at its higher end, when that's higher), and lands with a bounce. Keyframes for `Element.animate`, linear between
- * them.
+ * (or at its higher end, when that's higher), and lands with a bounce. Keyframes for `Element.animate`: the arc is
+ * eased in its points, linear between them; the pop and the landing ease each on their own.
  */
 export function flightKeyframes(from: Point, to: Point, peak: number): Keyframe[] {
   // A quadratic curve's highest point is `apex` when its control point is above it by the geometric mean of how far
@@ -154,17 +156,18 @@ export function flightKeyframes(from: Point, to: Point, peak: number): Keyframe[
   const steps = 20
   const start = 0.1
   return [
-    { offset: 0, transform: transform(from, 0.2), opacity: 0 },
+    { offset: 0, transform: transform(from, 0.2), opacity: 0, easing: overshoot },
     { offset: start, transform: transform(from, 1.25), opacity: 1 },
     ...Array.from({ length: steps }, (_, index) => {
       const t = (index + 1) / steps
       return {
         offset: start + (travelEnd - start) * t,
         transform: transform(along(easeInOut(t)), 1.25 - 0.25 * t),
-        opacity: 1
+        opacity: 1,
+        ...(index === steps - 1 ? { easing: "ease-out" } : {})
       }
     }),
-    { offset: 0.9, transform: transform(to, 1.4), opacity: 1 },
+    { offset: 0.9, transform: transform(to, 1.4), opacity: 1, easing: overshoot },
     { offset: 1, transform: transform(to, 1), opacity: 1 }
   ]
 }

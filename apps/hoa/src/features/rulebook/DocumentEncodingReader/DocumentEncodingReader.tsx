@@ -269,11 +269,18 @@ type WindowProps = {
   captionRef: RefObject<HTMLDivElement | null>
 }
 
+/** How the window moves and the scan line sweeps: slow out, quick through the middle, slow in. */
+const easeInOut = "cubic-bezier(0.65, 0, 0.35, 1)"
+/** The scan line's soft band above it, in pixels. */
+const scanBand = 12
+
 /** The document in a window, moved to the passage showing, and under it what the build made of it. */
 function ReaderWindow({ box, document, scene, isAnimated, textRef, captionRef }: WindowProps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const scanRef = useRef<HTMLDivElement>(null)
   const sweep = useRef<Animation | null>(null)
+  // Where the window has scrolled to, so the scan line stays in view.
+  const scrolled = useRef(0)
   const shownDocument = useRef(document?.key)
   const isHere = scene.spot !== null && scene.spot.documentKey === document?.key
   const activeKey = isHere && (scene.event?.spot || scene.phase === "drift") ? scene.spot?.blockKey : undefined
@@ -296,16 +303,19 @@ function ReaderWindow({ box, document, scene, isAnimated, textRef, captionRef }:
     const scroll = block ? Math.min(most, Math.max(0, block.offsetTop - Math.round(view.clientHeight * 0.22))) : 0
     const isSameDocument = shownDocument.current === document?.key
     shownDocument.current = document?.key
-    content.style.transition =
-      isAnimated && isSameDocument ? `transform ${scene.moveMs}ms cubic-bezier(0.65, 0, 0.35, 1)` : "none"
+    content.style.transition = isAnimated && isSameDocument ? `transform ${scene.moveMs}ms ${easeInOut}` : "none"
     content.style.transform = `translateY(${-scroll}px)`
+    scrolled.current = scroll
   }, [scene.spot?.blockKey, scene.moveMs, document?.key, isAnimated, box.width, textRef])
 
-  // The scan line sweeps the passage being read or drifted over, and fades where it is when that's done.
+  // The scan line waits at the top of the passage being read or drifted over while the window gets there, sweeps down
+  // what of it shows, and fades where it is when that's done. It spans the passage, its ends fading out at the
+  // passage's edges, so nothing shows past its rounded corners.
   useLayoutEffect(() => {
     const line = scanRef.current
     const content = contentRef.current
-    if (!line || !content) {
+    const view = textRef.current
+    if (!line || !content || !view) {
       return
     }
     const block =
@@ -317,14 +327,20 @@ function ReaderWindow({ box, document, scene, isAnimated, textRef, captionRef }:
     }
     sweep.current?.cancel()
     line.style.opacity = "1"
-    sweep.current = line.animate(
-      [
-        { transform: `translateY(${block.offsetTop + 2}px)` },
-        { transform: `translateY(${block.offsetTop + block.offsetHeight - 2}px)` }
-      ],
-      { duration: scene.ms, easing: "ease-in-out", fill: "forwards" }
+    line.style.left = `${block.offsetLeft}px`
+    line.style.width = `${block.offsetWidth}px`
+    const top = block.offsetTop + 2
+    // No further than the window's faded bottom edge.
+    const bottom = Math.max(
+      top,
+      Math.min(block.offsetTop + block.offsetHeight - 2, scrolled.current + view.clientHeight - 20)
     )
-  }, [scene, activeKey, isAnimated])
+    const wait = Math.min(scene.moveMs, scene.ms * 0.4)
+    sweep.current = line.animate(
+      [{ transform: `translateY(${top - scanBand}px)` }, { transform: `translateY(${bottom - scanBand}px)` }],
+      { duration: Math.max(1, scene.ms - wait), delay: wait, easing: easeInOut, fill: "both" }
+    )
+  }, [scene, activeKey, isAnimated, textRef])
   useEffect(() => () => sweep.current?.cancel(), [])
 
   return (
@@ -353,8 +369,11 @@ function ReaderWindow({ box, document, scene, isAnimated, textRef, captionRef }:
           ))}
           <div
             ref={scanRef}
-            className="pointer-events-none absolute inset-x-1 top-0 h-px bg-link opacity-0 shadow-[0_0_6px_1px_var(--color-link)] transition-opacity duration-300"
-          />
+            className="pointer-events-none absolute top-0 h-3 [mask-image:linear-gradient(to_right,transparent,black_15%,black_85%,transparent)] opacity-0 transition-opacity duration-300 ease-out"
+          >
+            <div className="h-full bg-linear-to-b from-transparent to-link/15" />
+            <div className="absolute inset-x-0 bottom-0 h-px bg-link" />
+          </div>
         </div>
       </div>
       <div ref={captionRef} className="h-[84px] shrink-0 border-t bg-muted/30 px-3 py-2">
