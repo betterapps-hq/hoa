@@ -22,6 +22,7 @@ export default defineConfig({
       // Routes, server functions and *.server.ts wiring hold no logic of their own; they're covered by browser acceptance.
       exclude: [
         "src/**/*.test.{ts,tsx}",
+        "src/**/*.stories.tsx",
         "src/**/*.server.ts",
         "src/features/**/run*.ts",
         "src/**/*.functions.ts",

@@ -5,6 +5,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite dev",
+    "storybook": "storybook dev --port 6006 --no-open",
     "deploy:demo": "wrangler deploy",
     "deploy:preview": "wrangler preview",
     "cf-typegen": "wrangler types",
@@ -87,6 +88,7 @@
     "@repo/oxlint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@rolldown/plugin-babel": "^0.2.4",
+    "@storybook/react-vite": "10.6.0",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^7.0.1",
@@ -102,6 +104,7 @@
     "drizzle-kit": "0.31.11",
     "happy-dom": "^20.10.6",
     "oxlint": "^1.72.0",
+    "storybook": "10.6.0",
     "tailwindcss": "^4.3.3",
     "tsx": "4.23.15",
     "typescript": "catalog:",

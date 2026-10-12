@@ -67,6 +67,16 @@ pnpm --filter hoa db:reset:rules
 Uploaded documents and applications stay; applications go back to drafts. It never touches the preview or demo
 environments.
 
+Components can be worked on alone in Storybook, at <http://localhost:6006>:
+
+```sh
+pnpm --filter hoa storybook
+```
+
+A component's stories sit next to it (`BuildProgress.stories.tsx`) and give it the data it would get on the page, so
+every state can be seen without running a build. Storybook builds with `.storybook/vite.config.ts`, the app's styles
+and React without the Worker.
+
 To run the rulebook build or one encoding step against the cached fixtures, see
 [design/evaluation.md](design/evaluation.md).
 

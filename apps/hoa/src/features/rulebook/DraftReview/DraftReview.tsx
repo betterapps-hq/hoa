@@ -1,6 +1,5 @@
-import { ArrowLeftIcon, ChevronDownIcon, TriangleAlertIcon } from "lucide-react"
+import { ArrowLeftIcon } from "lucide-react"
 import { useState } from "react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,7 +12,6 @@ import {
   AlertDialogTrigger
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import type { JobFailure } from "@/jobs/job"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import { coverageOf } from "@/rulebook/coverage"
@@ -23,8 +21,9 @@ import { changeSummary } from "../RulebookPage/RulebookPage.utils"
 import { countOf } from "../rulebookRecords"
 import { RulebookWorkspace } from "../RulebookWorkspace/RulebookWorkspace"
 import type { WorkspaceView } from "../RulebookWorkspace/RulebookWorkspace.utils"
+import { SkippedNotice } from "../SkippedNotice/SkippedNotice"
 import type { RulebookActions, RulebookSource } from "../useRulebookWorkspace"
-import { draftTodos, skippedParts, type DraftTodo, type SkippedPart } from "./DraftReview.utils"
+import { draftTodos, skippedParts, type DraftTodo } from "./DraftReview.utils"
 
 export type DraftReviewProps = {
   records: RulebookRecords
@@ -223,38 +222,5 @@ export function DraftReview({
         />
       </section>
     </div>
-  )
-}
-
-/** What the build skipped: where, in words, with the errors behind it folded away. */
-function SkippedNotice({ failures, parts }: { failures: JobFailure[]; parts: SkippedPart[] }) {
-  return (
-    <Alert>
-      <TriangleAlertIcon aria-hidden />
-      <AlertTitle>The build skipped {countOf(failures.length, "item", "items")}</AlertTitle>
-      <AlertDescription className="flex flex-col items-start gap-2">
-        <p>What they cover may be missing from the draft. Check those parts of the documents before you publish.</p>
-        <ul className="flex flex-col gap-0.5 text-foreground">
-          {parts.map((part) => (
-            <li key={part.id}>{part.text}</li>
-          ))}
-        </ul>
-        <Collapsible>
-          <CollapsibleTrigger
-            render={<Button variant="link" size="sm" className="group/details h-auto p-0 text-muted-foreground" />}
-          >
-            What went wrong
-            <ChevronDownIcon aria-hidden className="transition-transform group-aria-expanded/details:rotate-180" />
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <ul className="mt-1 flex flex-col gap-1 text-xs break-words">
-              {parts.flatMap((part) =>
-                part.details.map((detail, index) => <li key={`${part.id} ${index}`}>{detail}</li>)
-              )}
-            </ul>
-          </CollapsibleContent>
-        </Collapsible>
-      </AlertDescription>
-    </Alert>
   )
 }
