@@ -25,6 +25,8 @@ export type ReviewContext = {
   source?: CitationSource
   /** A packet photo's URL, for thumbnails. */
   loadImage?: (fileId: string) => Promise<string>
+  /** Where a packet file opens in the browser, to show evidence where it was read. */
+  fileUrl?: (fileId: string) => string
 }
 
 export type ReviewContextInput = Omit<ReviewContext, "rules" | "vocabulary" | "entityEvidence"> & {

@@ -435,7 +435,8 @@ A value shown on its own starts with a capital.
   - **Tabs:** Overview, Rules (the rule results), Facts (what the review read from the packet: a card per entity, each fact with its value,
     confidence, and the words it was read from, so a misread can be corrected before submitting), Files and History
     (every review, the latest marked), each with its count. Each piece of evidence is the quote and, under it, its file
-    and page, spaced apart from the next; a photo's thumbnail opens it at full size in a viewer over the page.
+    and page, spaced apart from the next. The file and page open a PDF at that page in a new tab (a Word file, which the
+    browser can't show, isn't linked); a photo's thumbnail opens it at full size in a viewer over the page.
   - **Overview:** the action items as a card per group, ordered by what changes the outcome: what to provide, what to
     change (as "possible conditions" when the review recommends conditions), what the committee decides itself; a
     denial puts the changes first. A group's header has its outcome's icon and its count. Each item is one line in the

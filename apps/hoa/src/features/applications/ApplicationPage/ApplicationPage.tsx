@@ -644,7 +644,8 @@ export function ApplicationPage({
             entityEvidence: view.entityEvidence,
             audience,
             source,
-            loadImage
+            loadImage,
+            fileUrl: (fileId) => applicationFileUrl(application.id, fileId)
           })}
           decision={application.decision}
           tabs={tabs}
