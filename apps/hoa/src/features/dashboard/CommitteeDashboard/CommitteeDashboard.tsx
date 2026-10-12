@@ -76,7 +76,7 @@ export function CommitteeDashboard({
           footer={
             summary.publishedAt
               ? `${summary.ruleCount} rules, published ${dateText(summary.publishedAt)}.`
-              : "Build one from the governing documents."
+              : "Process the governing documents to make one."
           }
         >
           <NextRulebookNote nextRulebook={nextRulebook} />
@@ -196,7 +196,7 @@ function NextRulebookNote({ nextRulebook }: { nextRulebook: NextRulebook | null 
     return null
   }
   if (nextRulebook.status === "building") {
-    return <div className="text-muted-foreground">A new draft is being built.</div>
+    return <div className="text-muted-foreground">Your documents are being processed into a new draft.</div>
   }
   const work = [
     nextRulebook.rulesToReview > 0 ? `${nextRulebook.rulesToReview} rules` : null,

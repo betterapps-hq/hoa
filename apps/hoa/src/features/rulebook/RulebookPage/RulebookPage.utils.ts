@@ -37,11 +37,11 @@ export function changeSummary(changes: NonNullable<RulebookView["changes"]>) {
 export function refusalSentence({ title, kind, otherTitle }: RefusedDocument) {
   switch (kind) {
     case "file-missing":
-      return `“${title}” has no file, so the rulebook can’t be built from it. Upload it again, or remove it.`
+      return `“${title}” has no file, so the rulebook can’t be made from it. Upload it again, or remove it.`
     case "file-invalid":
-      return `“${title}” has no file we can read, so the rulebook can’t be built from it. Upload it again, or remove it.`
+      return `“${title}” has no file we can read, so the rulebook can’t be made from it. Upload it again, or remove it.`
     case "structure-invalid":
-      return `“${title}” is split into parts in a way the rulebook can’t be built from. Upload it again, or remove it.`
+      return `“${title}” is split into parts in a way the rulebook can’t be made from. Upload it again, or remove it.`
     case "duplicate-key":
       return otherTitle === undefined
         ? `“${title}” uses the same name as another document. Remove one of them.`

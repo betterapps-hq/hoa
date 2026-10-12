@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest"
 import type { BuildResult } from "@/rulebook/buildResults"
 import { simulatedBuildSeconds } from "@/tests/simulatedBuild"
 import { readingDocument, readingResults } from "@/tests/simulatedReading"
-import { slotCenter } from "../BuildFindings/BuildFindings.utils"
-import { findingCounts } from "../BuildProgress/BuildProgress.utils"
+import { slotCenter } from "../DocumentEncodingFindings/DocumentEncodingFindings.utils"
+import { findingCounts } from "../DocumentEncodingSteps/DocumentEncodingSteps.utils"
 import {
   beatMs,
   beatPlan,
@@ -18,7 +18,7 @@ import {
   termSpot,
   type ReaderEvent,
   type WordSpot
-} from "./BuildReader.utils"
+} from "./DocumentEncodingReader.utils"
 
 // Maple Hollow's made-up declaration and its build (src/tests/simulatedReading.ts).
 

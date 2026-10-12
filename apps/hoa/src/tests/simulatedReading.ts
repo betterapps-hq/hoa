@@ -1,7 +1,7 @@
 import type { BuildResult } from "@/rulebook/buildResults"
 import type * as T from "@/schema/types"
 
-// Maple Hollow's declaration, made up for the stories of a build reading its document (BuildReader), and a build of it
+// Maple Hollow's declaration, made up for the stories of a build reading its document (DocumentEncodingReader), and a build of it
 // timed like Sudden Valley's (simulatedBuild.ts): the provisions as the structure step makes them, and each step's
 // results as it writes them: every provision of a section with its rules, settings or reason for none, and two rules
 // whose first drafts fail their check and are drafted again. Every word is written for this file.

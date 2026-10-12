@@ -9,9 +9,9 @@ import {
   type FindKind,
   type FindingsLayout,
   type Point
-} from "./BuildFindings.utils"
+} from "./DocumentEncodingFindings.utils"
 
-// The finds in motion (BuildFindings.tsx): each new term or rule flies from the line the scan is on into its dot, and
+// The finds in motion (DocumentEncodingFindings.tsx): each new term or rule flies from the line the scan is on into its dot, and
 // each newly drafted rule fills its dot with a ring. Drawn straight into an SVG group outside React, so a burst of a
 // hundred finds is a hundred animations, not a hundred renders; what has landed goes back to React as counts, once a
 // frame.

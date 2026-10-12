@@ -136,7 +136,7 @@ describe("CommitteeDashboard", () => {
     )
   })
 
-  it("says a new draft is being built", () => {
+  it("says the documents are being processed into a new draft", () => {
     render(
       <CommitteeDashboard
         summary={published}
@@ -145,7 +145,7 @@ describe("CommitteeDashboard", () => {
         asOf={asOf}
       />
     )
-    expect(screen.getByText("A new draft is being built.")).toBeInTheDocument()
+    expect(screen.getByText("Your documents are being processed into a new draft.")).toBeInTheDocument()
   })
 
   it("says so when nothing is waiting and no rulebook is published", () => {

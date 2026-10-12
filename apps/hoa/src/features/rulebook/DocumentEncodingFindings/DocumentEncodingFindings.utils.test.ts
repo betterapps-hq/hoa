@@ -10,7 +10,7 @@ import {
   slotCenter,
   trailKeyframes,
   type Point
-} from "./BuildFindings.utils"
+} from "./DocumentEncodingFindings.utils"
 
 describe("findingsLayout", () => {
   it("puts the page in the middle, a grid on each side of it, and the grids under the counts", () => {

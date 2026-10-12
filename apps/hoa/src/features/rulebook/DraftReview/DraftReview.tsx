@@ -123,8 +123,8 @@ export function DraftReview({
                     : "Nothing has been reviewed on it yet."}{" "}
                   {publishedVersion
                     ? `Version ${publishedVersion} stays in force.`
-                    : "Nothing is published, so there will be no rulebook until you build one."}{" "}
-                  Uploading a document builds a new draft.
+                    : "Nothing is published, so there will be no rulebook until you process your documents again."}{" "}
+                  Uploading a document starts a new draft.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -141,8 +141,8 @@ export function DraftReview({
         </div>
         {isRebuilding ? (
           <p className="text-sm text-muted-foreground">
-            A newer draft is being built from your latest documents. It replaces this one and keeps your decisions on
-            everything that didn&rsquo;t change.
+            Your latest documents are being processed into a newer draft. It replaces this one and keeps your decisions
+            on everything that didn&rsquo;t change.
           </p>
         ) : null}
         {skipped.length > 0 ? (

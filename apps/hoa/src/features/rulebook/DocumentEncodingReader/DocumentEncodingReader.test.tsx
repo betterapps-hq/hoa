@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { fakeMotion } from "@/tests/fakeMotion"
 import { simulatedBuildSeconds } from "@/tests/simulatedBuild"
 import { readingDocuments, readingResults } from "@/tests/simulatedReading"
-import { BuildReader } from "./BuildReader"
-import { beatMs } from "./BuildReader.utils"
+import { DocumentEncodingReader } from "./DocumentEncodingReader"
+import { beatMs } from "./DocumentEncodingReader.utils"
 
 // The picture's width and the person's motion setting, as each test needs them.
 const viewer = vi.hoisted(() => ({ width: 576, isReduced: false }))
@@ -27,11 +27,11 @@ const countOf = (label: string) => screen.getByText(label).nextElementSibling?.t
 /** What the window's caption says. */
 const captionOf = (container: HTMLElement) => container.querySelector("[aria-hidden] .border-t")?.textContent
 
-describe("BuildReader", () => {
+describe("DocumentEncodingReader", () => {
   it("shows the counts, every find's dot and the last thing named, at rest, when the person asked for less motion", () => {
     viewer.isReduced = true
     const { container } = render(
-      <BuildReader results={readingResults(simulatedBuildSeconds)} documents={documents} isRunning={false} />
+      <DocumentEncodingReader results={readingResults(simulatedBuildSeconds)} documents={documents} isRunning={false} />
     )
     expect(countOf("Terms found")).toBe("63")
     expect(countOf("Rules found")).toBe("37")
@@ -49,7 +49,7 @@ describe("BuildReader", () => {
   it("shows the document's whole title on hover only when the window cuts it short", async () => {
     viewer.isReduced = true
     const user = userEvent.setup()
-    render(<BuildReader results={readingResults(600)} documents={documents} isRunning />)
+    render(<DocumentEncodingReader results={readingResults(600)} documents={documents} isRunning />)
     const title = screen.getByText("Declaration of Covenants for Maple Hollow")
     await user.hover(title)
     await new Promise((resolve) => setTimeout(resolve, 800))
@@ -68,7 +68,9 @@ describe("BuildReader", () => {
 
   it("shows just the counts until it knows how wide it is", () => {
     viewer.width = 0
-    const { container } = render(<BuildReader results={readingResults(600)} documents={documents} isRunning />)
+    const { container } = render(
+      <DocumentEncodingReader results={readingResults(600)} documents={documents} isRunning />
+    )
     expect(container.querySelector("svg")).toBeNull()
     expect(container.querySelector("[data-block]")).toBeNull()
     expect(countOf("Terms found")).toBe("34")
@@ -76,8 +78,10 @@ describe("BuildReader", () => {
 
   it("gets to a term's passage, marks the term green there, then counts it once it lands", async () => {
     const motion = fakeMotion()
-    const { container, rerender } = render(<BuildReader results={readingResults(15)} documents={documents} isRunning />)
-    rerender(<BuildReader results={readingResults(16)} documents={documents} isRunning />)
+    const { container, rerender } = render(
+      <DocumentEncodingReader results={readingResults(15)} documents={documents} isRunning />
+    )
+    rerender(<DocumentEncodingReader results={readingResults(16)} documents={documents} isRunning />)
     await act(() => motion.advance(16))
     expect(captionOf(container)).toBe("Term foundAssociation")
     // The window gets there first.
@@ -96,9 +100,9 @@ describe("BuildReader", () => {
   it("fills a drafted rule's blanks one at a time, then calls it drafted", async () => {
     const motion = fakeMotion()
     const { container, rerender } = render(
-      <BuildReader results={readingResults(838)} documents={documents} isRunning />
+      <DocumentEncodingReader results={readingResults(838)} documents={documents} isRunning />
     )
-    rerender(<BuildReader results={readingResults(839)} documents={documents} isRunning />)
+    rerender(<DocumentEncodingReader results={readingResults(839)} documents={documents} isRunning />)
     const blanks = () => container.querySelectorAll("[aria-hidden] .border-t .text-transparent").length
     await act(() => motion.advance(16))
     // "Each {{lot}} may hold only one single-family {{dwelling}}.": a term, a value and a term.

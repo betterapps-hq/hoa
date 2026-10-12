@@ -16,7 +16,7 @@ export async function removeDocument(
 ) {
   assertAdministrator(context.role)
   if (await getRulebookByStatus(db, context.hoa.id, "building")) {
-    throw new Error("The rulebook is being built. Remove the document once the build finishes.")
+    throw new Error("Your documents are being processed. Remove the document once that finishes.")
   }
   if (!(await removeGoverningDocument(db, context.hoa.id, documentId, now))) {
     throw new Error("That document was already removed.")

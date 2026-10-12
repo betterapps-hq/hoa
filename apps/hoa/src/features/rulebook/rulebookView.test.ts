@@ -31,7 +31,7 @@ describe("describeBuildProblem", () => {
   it("explains a failed build, and nothing for one that finished", () => {
     expect(describeBuildProblem(null)).toBeNull()
     expect(describeBuildProblem({ ...job, status: "completed" })).toBeNull()
-    expect(describeBuildProblem({ ...job, status: "failed" })).toBe("The build failed.")
+    expect(describeBuildProblem({ ...job, status: "failed" })).toBe("Processing failed.")
     expect(describeBuildProblem({ ...job, status: "completed-with-errors", failures: [failure] })).toBeNull()
   })
 

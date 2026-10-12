@@ -88,7 +88,7 @@ export function GoverningDocuments({
             <EmptyTitle>No documents yet</EmptyTitle>
             <EmptyDescription>
               {onUpload
-                ? "Upload the CC&Rs, design guidelines and other governing documents. The rulebook is built from them."
+                ? "Upload the CC&Rs, design guidelines and other governing documents. The rulebook is made from them."
                 : "The association hasn’t added its governing documents yet."}
             </EmptyDescription>
           </EmptyHeader>

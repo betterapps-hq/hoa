@@ -129,10 +129,10 @@ export const getSourceText = createServerFn({ method: "GET" }).handler(async ():
 })
 
 const skippedBuild = {
-  processing: "A document is still being read. The rulebook builds when it finishes.",
-  building: "A rulebook is already being built.",
+  processing: "A document is still being read. Processing starts when it finishes.",
+  building: "Your documents are already being processed.",
   "no-documents": "Upload a governing document first.",
-  unchanged: "The rulebook is already built from the current documents."
+  unchanged: "The current documents are already processed."
 } as const
 
 /**

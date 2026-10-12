@@ -24,7 +24,7 @@ import type { Job } from "@/jobs/job"
 import type { RefusedDocument } from "@/rulebook/buildSources"
 import type { StopResult } from "@/workflows/rulebookTrigger.server"
 import { attempt } from "../attempt"
-import { BuildProgress } from "../BuildProgress/BuildProgress"
+import { DocumentEncodingSteps } from "../DocumentEncodingSteps/DocumentEncodingSteps"
 import { DraftReview } from "../DraftReview/DraftReview"
 import { saveFile } from "../PublishedRulebook/PublishedRulebook.utils"
 import type { RulebookSources, RulebookView } from "../rulebook.functions"
@@ -144,14 +144,14 @@ function StatusLine({
   const [isBusy, setIsBusy] = useState(false)
   const build = async () => {
     setIsBusy(true)
-    await attempt(props.onBuild, "The build didn't start.")
+    await attempt(props.onBuild, "Processing didn't start.")
     setIsBusy(false)
     props.onChanged()
   }
   const stop = async () => {
-    const result = await attempt(props.onStop, "The build couldn’t be stopped.")
+    const result = await attempt(props.onStop, "Processing couldn’t be stopped.")
     if (result && result.status !== "stopped") {
-      toast("The build had already finished, so there was nothing to stop.")
+      toast("Processing had already finished, so there was nothing to stop.")
     }
     props.onChanged()
   }
@@ -172,7 +172,7 @@ function StatusLine({
             You can leave this page. When it&rsquo;s done, you review what changed here before it&rsquo;s published.
           </p>
           {props.draft.buildJobId ? (
-            <BuildProgress
+            <DocumentEncodingSteps
               jobId={props.draft.buildJobId}
               loadJob={props.loadJob}
               onFinished={props.onChanged}
@@ -193,7 +193,7 @@ function StatusLine({
           ...(status.isFirst
             ? ["Nothing is published yet. Review the draft and publish it to start checking applications against it."]
             : [
-                status.builtFrom.length > 0 ? `It was built after ${status.builtFrom.join(", ")} changed.` : null,
+                status.builtFrom.length > 0 ? `It was made after ${status.builtFrom.join(", ")} changed.` : null,
                 status.summary ? `It ${status.summary}.` : "It has the same rules as the rulebook in force."
               ]),
           status.skipped > 0 ? "Some parts weren’t finished. They’re listed in the review." : null
@@ -206,13 +206,13 @@ function StatusLine({
       )
     case "build-stopped":
       return line(
-        "The last build was stopped.",
+        "Processing was stopped.",
         status.hasDraft
           ? "Work it finished is kept and reused next time. The earlier draft is still here to review."
           : "Work it finished is kept and reused next time. Nothing was published.",
         <div className="flex flex-wrap gap-2">
           <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-            Build a draft
+            Process documents
           </Button>
           {status.hasDraft ? (
             <Button variant="ghost" className="w-fit" onClick={() => props.onReviewingChange(true)}>
@@ -252,17 +252,17 @@ function StatusLine({
     case "documents-changed":
       return line(
         `Your documents changed since version ${status.version ?? ""} was published.`,
-        "Build a draft from them to review what changes.",
+        "Process them to see what changes.",
         <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-          Build a draft
+          Process documents
         </Button>
       )
     case "not-built":
       return line(
-        "Build the rulebook from your documents.",
+        "Turn your documents into a rulebook.",
         "Each provision is read and encoded as rules for you to review and publish.",
         <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-          Build the rulebook
+          Process documents
         </Button>
       )
     case "none":

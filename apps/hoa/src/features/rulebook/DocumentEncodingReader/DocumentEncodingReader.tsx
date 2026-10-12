@@ -18,9 +18,14 @@ import type { ReadingBlock } from "@/documents/reading"
 import { cn } from "@/lib/utils"
 import type { BuildResult } from "@/rulebook/buildResults"
 import type * as T from "@/schema/types"
-import { dotClass, draftedClass } from "../BuildFindings/BuildFindings.motion"
-import { slotCenter, type Box, type FindKind, type Point } from "../BuildFindings/BuildFindings.utils"
-import { ReaderMotion } from "./BuildReader.motion"
+import { dotClass, draftedClass } from "../DocumentEncodingFindings/DocumentEncodingFindings.motion"
+import {
+  slotCenter,
+  type Box,
+  type FindKind,
+  type Point
+} from "../DocumentEncodingFindings/DocumentEncodingFindings.utils"
+import { ReaderMotion } from "./DocumentEncodingReader.motion"
 import {
   countsOf,
   nextSpot,
@@ -35,9 +40,9 @@ import {
   type Scene,
   type Verdict,
   type WordSpot
-} from "./BuildReader.utils"
+} from "./DocumentEncodingReader.utils"
 
-export type BuildReaderProps = {
+export type DocumentEncodingReaderProps = {
   /** What the build's steps have written so far. */
   results: readonly BuildResult[]
   /** The documents the build has structured, with their provisions as its structure step made them. */
@@ -47,13 +52,13 @@ export type BuildReaderProps = {
 }
 
 /**
- * A build reading its documents (encoding.md, UX, The build's progress), the variation of BuildFindings that shows the
+ * A build reading its documents (encoding.md, UX, The build's progress), the variation of DocumentEncodingFindings that shows the
  * document: one passage at a time in a window between the piles, as the build's results name it. Each term is marked
  * where it's defined or first used and flies to the terms; each passage is scanned and gets its verdict, its rules
  * flying to the rules; each drafted rule shows its statement with its blanks filling in, and fills its dot. Without
  * motion it shows the counts, the piles and the last thing named, at rest.
  */
-export function BuildReader({ results, documents, isRunning }: BuildReaderProps) {
+export function DocumentEncodingReader({ results, documents, isRunning }: DocumentEncodingReaderProps) {
   const { ref: sizeRef, width } = useElementSize<HTMLDivElement>()
   const isReduced = useReducedMotion()
   const read = useMemo(() => readerDocuments(documents), [documents])

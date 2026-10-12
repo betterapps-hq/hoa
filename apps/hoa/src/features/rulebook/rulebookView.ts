@@ -6,7 +6,7 @@ import { coverageOf } from "@/rulebook/coverage"
 
 /** Why the latest build failed; null when it finished. What a finished build skipped shows with its draft instead. */
 export function describeBuildProblem(job: Job | null) {
-  return job?.status === "failed" ? (job.error?.message ?? "The build failed.") : null
+  return job?.status === "failed" ? (job.error?.message ?? "Processing failed.") : null
 }
 
 /**

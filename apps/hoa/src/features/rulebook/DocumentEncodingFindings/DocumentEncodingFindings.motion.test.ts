@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { fakeMotion } from "@/tests/fakeMotion"
-import { FindingsMotion, type Shown } from "./BuildFindings.motion"
-import { findingsLayout, pageLines, scanRange, slotCenter } from "./BuildFindings.utils"
+import { FindingsMotion, type Shown } from "./DocumentEncodingFindings.motion"
+import { findingsLayout, pageLines, scanRange, slotCenter } from "./DocumentEncodingFindings.utils"
 
 const layout = findingsLayout(576, { terms: 40, rules: 40 })
 const lines = pageLines(layout.page)

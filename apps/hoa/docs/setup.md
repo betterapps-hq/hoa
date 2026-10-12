@@ -73,7 +73,7 @@ Components can be worked on alone in Storybook, at <http://localhost:6006>:
 pnpm --filter hoa storybook
 ```
 
-A component's stories sit next to it (`BuildProgress.stories.tsx`) and give it the data it would get on the page, so
+A component's stories sit next to it (`DocumentEncodingSteps.stories.tsx`) and give it the data it would get on the page, so
 every state can be seen without running a build. Storybook builds with `.storybook/vite.config.ts`, the app's styles
 and React without the Worker.
 

@@ -4,15 +4,15 @@ import { fn } from "storybook/test"
 import { Button } from "@/components/ui/button"
 import { simulatedBuildSeconds, simulatedJob } from "@/tests/simulatedBuild"
 import { readingDocuments, readingResults } from "@/tests/simulatedReading"
-import { BuildProgress } from "../BuildProgress/BuildProgress"
-import { BuildReader } from "./BuildReader"
+import { DocumentEncodingSteps } from "../DocumentEncodingSteps/DocumentEncodingSteps"
+import { DocumentEncodingReader } from "./DocumentEncodingReader"
 
 // A build of Maple Hollow's made-up declaration (src/tests/simulatedReading.ts), timed like Sudden Valley's, as the
 // reader shows it, replayed faster than it ran. The results are polled every 4 seconds, as the app polls them, so what
 // the build names arrives in the bursts it does on the page.
 
 const meta = {
-  component: BuildReader,
+  component: DocumentEncodingReader,
   // A story sets `width` to show it at another width.
   decorators: [
     (Story, { parameters }) => (
@@ -22,7 +22,7 @@ const meta = {
     )
   ],
   args: { results: readingResults(600), documents: readingDocuments(600), isRunning: true }
-} satisfies Meta<typeof BuildReader>
+} satisfies Meta<typeof DocumentEncodingReader>
 
 export default meta
 type Story = StoryObj<typeof meta>
@@ -68,7 +68,7 @@ function Replaying({ speed, from = 0, withProgress = false, onReplay }: ReplayPr
   const hasDocuments = readingDocuments(replay.seconds).length > 0
   const documents = useMemo(() => (hasDocuments ? readingDocuments(simulatedBuildSeconds) : []), [hasDocuments])
   const minutes = Math.floor(replay.seconds / 60)
-  const reader = <BuildReader results={replay.results} documents={documents} isRunning={replay.isRunning} />
+  const reader = <DocumentEncodingReader results={replay.results} documents={documents} isRunning={replay.isRunning} />
   return (
     <div className="flex flex-col gap-6">
       {withProgress ? (
@@ -80,7 +80,7 @@ function Replaying({ speed, from = 0, withProgress = false, onReplay }: ReplayPr
           </p>
           <div className="pt-2 pb-4">{reader}</div>
           <div className="text-sm text-muted-foreground">
-            <BuildProgress
+            <DocumentEncodingSteps
               jobId={`replay-${speed}`}
               loadJob={async () => simulatedJob(replay.now())}
               onFinished={fn()}

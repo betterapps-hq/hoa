@@ -263,16 +263,18 @@ organization with 2 documents or 20, 50 rules or 2,000, sees the same page.
 **In force (an administrator's default view).** Three parts, top to bottom:
 
 - **Status:** shown only when there's something to say, most pressing first (`rulebookStatus`): a build is running
-  (with its progress, below); a document is being read; the last build was stopped ("The last build was stopped.",
-  with **Build a draft**, and **Review the earlier draft** when there is one); a draft is ready ("A new draft of the rulebook is ready to review.
-  It was built after the Design Guidelines changed. It adds 5 rules, changes 12 rules and removes 2 rules." and
+  (with its progress, below); a document is being read; the last build was stopped ("Processing was stopped.",
+  with **Process documents**, and **Review the earlier draft** when there is one); a draft is ready ("A new draft of the rulebook is ready to review.
+  It was made after the Design Guidelines changed. It adds 5 rules, changes 12 rules and removes 2 rules." and
   **Review changes**); the last build was refused by its check, checked again against the documents as they are now
   (one plain sentence per document naming it and saying what to do, such as "“Declaration” has no file we can read, so
-  the rulebook can’t be built from it. Upload it again, or remove it.", with **Upload** and, per document, **Remove
+  the rulebook can’t be made from it. Upload it again, or remove it.", with **Upload** and, per document, **Remove
   document**, which confirms by name and takes every version of it out of the documents builds and the page read,
   while what cites its pages still opens them); the last build failed (**Try again** only when the failure is
   retryable); the documents differ from the published rulebook's and
-  there's no draft (**Build a draft**); nothing is built yet (**Build the rulebook**).
+  there's no draft (**Process documents**); nothing is built yet (**Process documents**, under "Turn your
+  documents into a rulebook."). On screen the build is "processing": people process their documents; the code and
+  these docs keep "build".
 - **Governing documents:** each document's current version (kind, version, pages, date) with its earlier versions
   behind a disclosure. **Read** (the document viewer, page by page) shows on the row; **Download** (the original file)
   and **New version** are in its ellipsis menu (a homeowner, with nothing else to do, sees Download beside Read). One
@@ -285,7 +287,7 @@ organization with 2 documents or 20, 50 rules or 2,000, sees the same page.
 - **Rules in force:** the published version and date, the rules file to download, and the rulebook's records
   read-only in quiet tabs (Rules, Terms, Coverage, Questions when there are any, Settings).
 
-**The build's progress** (`BuildProgress`). A build takes up to an hour, so the status shows all of it up front, not
+**The build's progress** (`DocumentEncodingSteps`). A build takes up to an hour, so the status shows all of it up front, not
 one stage's bar at a time. The job records every stage it will report when it starts (`jobs.progress_json`,
 `src/jobs/progress.ts`), and each report marks the stages before it done and its own current, with its count and
 times. Until that record arrives, the page lists the same stages (`src/encoding/stages.ts`), none started. The page groups the stages into steps in plain words: Reading documents, Finding defined terms, Finding rules,
@@ -301,17 +303,17 @@ rules, 35–50 min left").
 
 **Counts as they arrive.** The steps say only where the build is: the current one has a spinner, and none counts what
 it found or the parts the build divides its work into (documents, sections, groups of sections, batches of rules).
-What the build finds belongs to the reader (BuildReader), which shows each term, rule and draft as it arrives and
+What the build finds belongs to the reader (DocumentEncodingReader), which shows each term, rule and draft as it arrives and
 counts them; it isn't on the page yet. Its results are to come from a server function (administrators, the
 organization's own builds) over `loadBuildResults`, which lists the build's step outputs in R2 and reads only those
 written since the page's cursor, polled every four seconds. Polling, not server-sent events: a stream would hold a Worker request
 open for the hour a build runs and still have to poll R2 inside it, while a poll is short, survives a dropped
 connection and reads nothing twice.
 
-**Stopping a build.** While a build runs, **Stop building** (quiet, beside the progress) asks "Stop this build? Work
+**Stopping a build.** While a build runs, **Stop processing** (quiet, beside the progress) asks "Stop processing? Work
 finished so far is kept and reused next time. Nothing is published." Stopping (`stopRulebookBuild`, administrators
 only) terminates the build's Workflow instance and marks its rulebook and job `cancelled`. No draft is saved, the job
-isn't marked failed, and no follow-up build starts; the next upload, or **Build a draft**, starts one, and the model
+isn't marked failed, and no follow-up build starts; the next upload, or **Process documents**, starts one, and the model
 answers the stopped build finished come from the content cache. A build that already finished, failed or was stopped
 is reported as such, not as an error.
 

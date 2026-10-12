@@ -20,7 +20,7 @@ import { useRulebookWorkspace } from "../useRulebookWorkspace"
 export function QuestionsTab() {
   const { records, actions } = useRulebookWorkspace()
   if (records.questions.length === 0) {
-    return <p className="text-sm text-muted-foreground">The build left no questions.</p>
+    return <p className="text-sm text-muted-foreground">Processing left no questions.</p>
   }
   const open = records.questions.filter((question) => question.answer === null)
   return (

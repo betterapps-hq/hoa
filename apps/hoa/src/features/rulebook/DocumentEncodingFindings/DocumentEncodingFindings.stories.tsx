@@ -3,15 +3,15 @@ import { useEffect, useState } from "react"
 import { fn } from "storybook/test"
 import { Button } from "@/components/ui/button"
 import { simulatedBuildSeconds, simulatedJob, simulatedResults } from "@/tests/simulatedBuild"
-import { BuildProgress } from "../BuildProgress/BuildProgress"
-import { findingCounts, type FindingCounts } from "../BuildProgress/BuildProgress.utils"
-import { BuildFindings } from "./BuildFindings"
+import { DocumentEncodingSteps } from "../DocumentEncodingSteps/DocumentEncodingSteps"
+import { findingCounts, type FindingCounts } from "../DocumentEncodingSteps/DocumentEncodingSteps.utils"
+import { DocumentEncodingFindings } from "./DocumentEncodingFindings"
 
 // Sudden Valley's build (src/tests/simulatedBuild.ts) as the picture shows it, replayed faster than it ran. The results
 // are polled every 4 seconds, as the app polls them, so finds arrive in the bursts they do on the page.
 
 const meta = {
-  component: BuildFindings,
+  component: DocumentEncodingFindings,
   decorators: [
     (Story) => (
       <div className="max-w-xl">
@@ -20,7 +20,7 @@ const meta = {
     )
   ],
   args: { counts: findingCounts(simulatedResults(600)), documents: 1, isRunning: true }
-} satisfies Meta<typeof BuildFindings>
+} satisfies Meta<typeof DocumentEncodingFindings>
 
 export default meta
 type Story = StoryObj<typeof meta>
@@ -76,9 +76,9 @@ function Replaying({
   const minutes = Math.floor(replay.seconds / 60)
   return (
     <div className="flex flex-col gap-6">
-      <BuildFindings counts={counts} documents={documents} isRunning={replay.isRunning} />
+      <DocumentEncodingFindings counts={counts} documents={documents} isRunning={replay.isRunning} />
       {withProgress ? (
-        <BuildProgress
+        <DocumentEncodingSteps
           jobId={`replay-${speed}`}
           loadJob={async () => simulatedJob(replay.now())}
           onFinished={fn()}
@@ -119,7 +119,7 @@ export const ReplayedFromDrafting: Story = {
 }
 
 /** Where it would sit: above the build's progress, both following the same build. */
-export const WithTheBuildProgress: Story = {
+export const WithTheDocumentEncodingSteps: Story = {
   render: () => <Replay speed={24} withProgress />
 }
 

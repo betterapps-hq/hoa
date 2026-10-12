@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest"
 import { fakeMotion } from "@/tests/fakeMotion"
 import { simulatedBuildSeconds } from "@/tests/simulatedBuild"
 import { readingDocument, readingResults } from "@/tests/simulatedReading"
-import type { Shown } from "../BuildFindings/BuildFindings.motion"
-import { slotCenter, type Point } from "../BuildFindings/BuildFindings.utils"
-import { ReaderMotion } from "./BuildReader.motion"
+import type { Shown } from "../DocumentEncodingFindings/DocumentEncodingFindings.motion"
+import { slotCenter, type Point } from "../DocumentEncodingFindings/DocumentEncodingFindings.utils"
+import { ReaderMotion } from "./DocumentEncodingReader.motion"
 import {
   beatMs,
   countsOf,
@@ -14,7 +14,7 @@ import {
   readerLayout,
   type ReaderEvent,
   type Scene
-} from "./BuildReader.utils"
+} from "./DocumentEncodingReader.utils"
 
 const documents = readerDocuments([readingDocument])
 const layout = readerLayout(576, { terms: 63, rules: 37 })

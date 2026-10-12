@@ -63,7 +63,7 @@ describe("removeDocument", () => {
       publishedBy: null,
       publishedAt: null
     })
-    await expect(removeDocument(db, administrator, newer.id, now)).rejects.toThrow("being built")
+    await expect(removeDocument(db, administrator, newer.id, now)).rejects.toThrow("being processed")
     await failRulebook(db, hoaId, "building", { stage: "check", message: "x", isRetryable: false })
 
     await removeDocument(db, administrator, newer.id, now)

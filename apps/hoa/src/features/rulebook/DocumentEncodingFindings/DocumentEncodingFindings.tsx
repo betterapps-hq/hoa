@@ -2,8 +2,8 @@ import { useElementSize, useReducedMotion } from "@mantine/hooks"
 import { useEffect, useId, useRef, useState } from "react"
 import { flushSync } from "react-dom"
 import { cn } from "@/lib/utils"
-import type { FindingCounts } from "../BuildProgress/BuildProgress.utils"
-import { dotClass, draftedClass, FindingsMotion, type Shown } from "./BuildFindings.motion"
+import type { FindingCounts } from "../DocumentEncodingSteps/DocumentEncodingSteps.utils"
+import { dotClass, draftedClass, FindingsMotion, type Shown } from "./DocumentEncodingFindings.motion"
 import {
   findingsLayout,
   pageLines,
@@ -12,9 +12,9 @@ import {
   type Box,
   type FindKind,
   type FindingsLayout
-} from "./BuildFindings.utils"
+} from "./DocumentEncodingFindings.utils"
 
-export type BuildFindingsProps = {
+export type DocumentEncodingFindingsProps = {
   /** What the build has found so far (`findingCounts`). */
   counts: FindingCounts
   /** How many documents the build reads: more than one shows as a stack of pages. */
@@ -29,7 +29,7 @@ export type BuildFindingsProps = {
  * as it arrives. Rules fill in as they're drafted. Only counts are shown, never the finds themselves. Without motion
  * (the person asked for less, or the picture hasn't been measured yet) the dots and counts just show.
  */
-export function BuildFindings({ counts, documents, isRunning }: BuildFindingsProps) {
+export function DocumentEncodingFindings({ counts, documents, isRunning }: DocumentEncodingFindingsProps) {
   const { ref, width } = useElementSize<HTMLDivElement>()
   const isReduced = useReducedMotion()
   const target: Shown = {

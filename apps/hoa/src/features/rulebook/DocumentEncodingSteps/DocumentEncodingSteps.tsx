@@ -28,9 +28,9 @@ import {
   summaryText,
   timeLeftText,
   type BuildStep
-} from "./BuildProgress.utils"
+} from "./DocumentEncodingSteps.utils"
 
-export type BuildProgressProps = {
+export type DocumentEncodingStepsProps = {
   jobId: string
   loadJob: (jobId: string) => Promise<Job | null>
   /** Called once when the build ends, so the page can reload. */
@@ -47,7 +47,13 @@ export type BuildProgressProps = {
  * before it ends, every step in plain words behind the toggle (where the build is, not what it has found), and a
  * quiet way to stop it. Polls the job every 2 seconds.
  */
-export function BuildProgress({ jobId, loadJob, onFinished, onStop, now = Date.now }: BuildProgressProps) {
+export function DocumentEncodingSteps({
+  jobId,
+  loadJob,
+  onFinished,
+  onStop,
+  now = Date.now
+}: DocumentEncodingStepsProps) {
   const [isOpen, setIsOpen] = useState(true)
   const { data: job } = useQuery({
     queryKey: ["job", jobId],
@@ -106,9 +112,9 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, now = Date.n
             <TooltipContent>{stepsLabel}</TooltipContent>
           </Tooltip>
         </div>
-        <Progress value={Math.round((estimate?.fraction ?? 0) * 100)} aria-label="Build progress" />
+        <Progress value={Math.round((estimate?.fraction ?? 0) * 100)} aria-label="Processing progress" />
         <CollapsibleContent>
-          <ol aria-label="Build steps" className="flex flex-col gap-2">
+          <ol aria-label="Processing steps" className="flex flex-col gap-2">
             {steps.map((step) => (
               <StepRow key={step.label} step={step} />
             ))}
@@ -177,19 +183,19 @@ function StopBuild({ onStop }: { onStop: () => Promise<void> }) {
   return (
     <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
       <AlertDialogTrigger render={<Button variant="outline" size="sm" className="w-fit" disabled={isStopping} />}>
-        {isStopping ? "Stopping" : "Stop building"}
+        {isStopping ? "Stopping" : "Stop processing"}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Stop this build?</AlertDialogTitle>
+          <AlertDialogTitle>Stop processing?</AlertDialogTitle>
           <AlertDialogDescription>
             Work finished so far is kept and reused next time. Nothing is published.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Keep building</AlertDialogCancel>
+          <AlertDialogCancel>Keep processing</AlertDialogCancel>
           <AlertDialogAction variant="destructive" disabled={isStopping} onClick={() => void stop()}>
-            Stop building
+            Stop processing
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

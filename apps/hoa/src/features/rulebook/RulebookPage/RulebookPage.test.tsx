@@ -141,7 +141,7 @@ describe("RulebookPage", () => {
     const status = screen.getByRole("region", { name: "Status" })
     expect(within(status).getByText("A new draft of the rulebook is ready to review.")).toBeInTheDocument()
     expect(
-      within(status).getByText(/built after Declaration changed\. It adds 1 rule and changes 1 rule\./)
+      within(status).getByText(/made after Declaration changed\. It adds 1 rule and changes 1 rule\./)
     ).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "Rules in force" })).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "Governing documents" })).toBeInTheDocument()
@@ -263,7 +263,7 @@ describe("RulebookPage", () => {
     ).toBeInTheDocument()
     expect(
       within(status).getByText(
-        "“Declaration (sample pages)” has no file we can read, so the rulebook can’t be built from it. Upload it again, or remove it."
+        "“Declaration (sample pages)” has no file we can read, so the rulebook can’t be made from it. Upload it again, or remove it."
       )
     ).toBeInTheDocument()
     expect(
@@ -337,22 +337,22 @@ describe("RulebookPage", () => {
     expect(screen.queryByText(/^Drafting rules, /)).not.toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Hide steps" }))
     expect(screen.getByText(/^Drafting rules, .* left$/)).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Stop building" }))
+    await user.click(screen.getByRole("button", { name: "Stop processing" }))
     const dialog = await screen.findByRole("alertdialog")
     expect(
       within(dialog).getByText("Work finished so far is kept and reused next time. Nothing is published.")
     ).toBeInTheDocument()
-    await user.click(within(dialog).getByRole("button", { name: "Stop building" }))
+    await user.click(within(dialog).getByRole("button", { name: "Stop processing" }))
     expect(props.onStop).toHaveBeenCalled()
     const { toast } = await import("sonner")
-    expect(toast).toHaveBeenCalledWith("The build had already finished, so there was nothing to stop.")
+    expect(toast).toHaveBeenCalledWith("Processing had already finished, so there was nothing to stop.")
     expect(props.onChanged).toHaveBeenCalled()
   })
 
-  it("says the last build was stopped, with Build a draft as the action", async () => {
+  it("says processing was stopped, with Process documents as the action", async () => {
     const { props, user } = setup({ draft: { ...noDraft, isLastBuildStopped: true } })
-    expect(screen.getByText("The last build was stopped.")).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Build a draft" }))
+    expect(screen.getByText("Processing was stopped.")).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Process documents" }))
     expect(props.onBuild).toHaveBeenCalled()
   })
 })

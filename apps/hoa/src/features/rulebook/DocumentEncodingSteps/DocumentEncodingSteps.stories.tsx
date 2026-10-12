@@ -3,12 +3,12 @@ import { useState } from "react"
 import { fn } from "storybook/test"
 import type { Job } from "@/jobs/job"
 import { simulatedBuildSeconds, simulatedJob } from "@/tests/simulatedBuild"
-import { BuildProgress, type BuildProgressProps } from "./BuildProgress"
+import { DocumentEncodingSteps, type DocumentEncodingStepsProps } from "./DocumentEncodingSteps"
 
 // Sudden Valley's build (src/tests/simulatedBuild.ts), held at a moment or replayed. The page polls the job as it does
 // in the app.
 
-type Source = Pick<BuildProgressProps, "loadJob">
+type Source = Pick<DocumentEncodingStepsProps, "loadJob">
 
 /** The build held `seconds` in: its clock keeps moving, as a long step's does. */
 function heldAt(seconds: number): Source {
@@ -29,7 +29,7 @@ function replayed(speed: number): Source {
 }
 
 const meta = {
-  component: BuildProgress,
+  component: DocumentEncodingSteps,
   decorators: [
     (Story) => (
       <div className="max-w-xl">
@@ -43,7 +43,7 @@ const meta = {
     onFinished: fn(),
     onStop: fn(async () => undefined)
   }
-} satisfies Meta<typeof BuildProgress>
+} satisfies Meta<typeof DocumentEncodingSteps>
 
 export default meta
 type Story = StoryObj<typeof meta>
@@ -76,7 +76,7 @@ export const Replay: Story = {
   render: (args) => <Replaying {...args} />
 }
 
-function Replaying(props: BuildProgressProps) {
+function Replaying(props: DocumentEncodingStepsProps) {
   const [source] = useState(() => replayed(24))
-  return <BuildProgress {...props} {...source} />
+  return <DocumentEncodingSteps {...props} {...source} />
 }
