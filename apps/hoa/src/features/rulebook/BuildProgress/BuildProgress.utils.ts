@@ -53,6 +53,26 @@ function latestOutlines(results: readonly BuildResult[]) {
   return [...bySection.values()]
 }
 
+export type FindingCounts = { terms: number; rulesFound: number; rulesDrafted: number }
+
+/**
+ * What the build has found so far, as three counts: terms (defined or named by the vocabulary, each once), rules found
+ * (each section's newest answer) and rules drafted.
+ */
+export function findingCounts(results: readonly BuildResult[]): FindingCounts {
+  const terms = new Set(
+    results.flatMap((result) => (result.kind === "terms" || result.kind === "vocabulary" ? result.labels : []))
+  )
+  const drafted = new Set(
+    results.flatMap((result) => (result.kind === "rules" ? result.rules.map((rule) => rule.key) : []))
+  )
+  return {
+    terms: terms.size,
+    rulesFound: latestOutlines(results).reduce((sum, result) => sum + result.rules.length, 0),
+    rulesDrafted: drafted.size
+  }
+}
+
 /** What each step has produced so far, by the step's label, as counts from the build's results. */
 export function stepFindings(results: readonly BuildResult[]): Record<string, string> {
   const findings: Record<string, string> = {}

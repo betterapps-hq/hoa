@@ -2,7 +2,16 @@ import { describe, expect, it } from "vitest"
 import { buildStages } from "@/encoding/build"
 import { advanceProgress, finishProgress, startProgress, type JobProgress } from "@/jobs/progress"
 import type { BuildResult } from "@/rulebook/buildResults"
-import { buildSteps, elapsedText, estimateBuild, stepFindings, summaryText, timeLeftText } from "./BuildProgress.utils"
+import { simulatedBuildSeconds, simulatedResults } from "@/tests/simulatedBuild"
+import {
+  buildSteps,
+  elapsedText,
+  estimateBuild,
+  findingCounts,
+  stepFindings,
+  summaryText,
+  timeLeftText
+} from "./BuildProgress.utils"
 
 const stages = ["resolve-prompts", ...buildStages, "save-draft"].map((stage) => ({
   stage,
@@ -86,6 +95,17 @@ describe("stepFindings", () => {
       stepFindings([...results, { id: "c", at: at(9), kind: "consolidated", problems: 0, conflicts: 1 }])
     ).toMatchObject({
       "Combining and checking for conflicts": "1 conflict to decide"
+    })
+  })
+
+  it("counts every find once for the picture of what's been found, whichever steps named it", () => {
+    expect(findingCounts(results)).toEqual({ terms: 5, rulesFound: 4, rulesDrafted: 2 })
+    expect(findingCounts([])).toEqual({ terms: 0, rulesFound: 0, rulesDrafted: 0 })
+    // Sudden Valley's build: 18 defined terms, overlapping vocabulary groups, 95 rules all drafted.
+    expect(findingCounts(simulatedResults(simulatedBuildSeconds))).toEqual({
+      terms: 182,
+      rulesFound: 95,
+      rulesDrafted: 95
     })
   })
 
