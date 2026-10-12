@@ -52,12 +52,27 @@ export type RankTarget =
   | { type: "gap"; index: number }
   | { type: "beside"; kind: T.DocumentKind; side: "before" | "after" }
 
+/** Law (schema.md, Rank and conflicts): it outranks every document an organization writes, so it can't be moved. */
+export const isLaw = (kind: T.DocumentKind) => kind === "statute" || kind === "ordinance"
+
+/** How many ranks at the top hold only law, and stay fixed there. */
+export function lawRanks(order: readonly (readonly T.DocumentKind[])[]) {
+  const index = order.findIndex((rank) => !rank.every(isLaw))
+  return index === -1 ? order.length : index
+}
+
+/** Whether a document may go to a target: law stays where it is, and nothing goes into or above it. */
+export function canPlace(order: readonly T.DocumentKind[][], kind: T.DocumentKind, target: RankTarget) {
+  return !isLaw(kind) && (target.type === "beside" ? !isLaw(target.kind) : target.index >= lawRanks(order))
+}
+
 /**
  * Moves one document: into a rank (`index` of the rank) or into a rank of its own at a gap (`index` of the rank it
- * goes before; the number of ranks for the end). A rank left empty goes away.
+ * goes before; the number of ranks for the end). A rank left empty goes away; a move
+ * `canPlace` refuses changes nothing.
  */
 export function placeDocument(order: readonly T.DocumentKind[][], kind: T.DocumentKind, target: RankTarget) {
-  if (target.type === "beside" && target.kind === kind) {
+  if (!canPlace(order, kind, target) || (target.type === "beside" && target.kind === kind)) {
     return order.map((rank) => [...rank])
   }
   const next = order.map((rank) => rank.filter((item) => item !== kind))

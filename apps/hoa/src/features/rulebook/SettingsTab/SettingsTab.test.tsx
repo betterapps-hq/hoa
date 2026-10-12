@@ -45,23 +45,27 @@ describe("SettingsTab", () => {
     await user.click(screen.getByRole("button", { name: "Approve" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "settings" }], "approved", null)
     const precedence = card("Which document wins")
-    expect(precedence.getAllByRole("button", { name: /^Drag / }).length).toBe(
-      records.settings.clauses.precedence.order.flat().length
-    )
-    await user.click(precedence.getByRole("button", { name: "Move City and county ordinances" }))
+    expect(precedence.queryByRole("button", { name: "Drag State and federal laws" })).not.toBeInTheDocument()
+    expect(precedence.getByLabelText("Law always comes first")).toBeInTheDocument()
+    await user.click(precedence.getByRole("button", { name: "Move Declaration (CC&Rs)" }))
     await user.click(await screen.findByRole("menuitem", { name: "Just below its rank now" }))
     expect(actions?.saveSettings).not.toHaveBeenCalled()
     await user.click(precedence.getByRole("button", { name: "Reset" }))
     expect(precedence.getByRole("listitem", { name: /^1st: / })).toHaveAccessibleName(
       "1st: State and federal laws, City and county ordinances"
     )
-    await user.click(precedence.getByRole("button", { name: "Move City and county ordinances" }))
+    await user.click(precedence.getByRole("button", { name: "Move Declaration (CC&Rs)" }))
     await user.click(await screen.findByRole("menuitem", { name: "Just below its rank now" }))
     await user.click(precedence.getByRole("button", { name: "Save the order" }))
     expect(actions?.saveSettings).toHaveBeenLastCalledWith({
       clauses: {
         precedence: expect.objectContaining({
-          order: [["statute"], ["ordinance"], ...records.settings.clauses.precedence.order.slice(1)]
+          order: [
+            ["statute", "ordinance"],
+            ["supplemental-declaration", "plat"],
+            ["declaration"],
+            ...records.settings.clauses.precedence.order.slice(2)
+          ]
         })
       },
       policy: null
@@ -113,9 +117,9 @@ describe("placeDocument", () => {
   const order: T.DocumentKind[][] = [["statute", "ordinance"], ["declaration"], ["rules", "policy", "resolution"]]
 
   it("ranks a document equal to another rank's, dropping a rank it leaves empty", () => {
-    expect(placeDocument(order, "declaration", { type: "rank", index: 0 })).toEqual([
-      ["statute", "ordinance", "declaration"],
-      ["rules", "policy", "resolution"]
+    expect(placeDocument(order, "declaration", { type: "rank", index: 2 })).toEqual([
+      ["statute", "ordinance"],
+      ["rules", "policy", "resolution", "declaration"]
     ])
   })
 
@@ -131,6 +135,14 @@ describe("placeDocument", () => {
     ])
   })
 
+  it("keeps law at the top: it doesn't move, and nothing goes into or above it", () => {
+    expect(placeDocument(order, "statute", { type: "gap", index: 2 })).toEqual(order)
+    expect(placeDocument(order, "declaration", { type: "rank", index: 0 })).toEqual(order)
+    expect(placeDocument(order, "declaration", { type: "beside", kind: "ordinance", side: "after" })).toEqual(order)
+    expect(placeDocument(order, "policy", { type: "gap", index: 0 })).toEqual(order)
+    expect(placeDocument(order, "policy", { type: "gap", index: 1 })[1]).toEqual(["policy"])
+  })
+
   it("ranks a document on its own at a gap", () => {
     expect(placeDocument(order, "policy", { type: "gap", index: 3 })).toEqual([
       ["statute", "ordinance"],
@@ -138,7 +150,7 @@ describe("placeDocument", () => {
       ["rules", "resolution"],
       ["policy"]
     ])
-    expect(placeDocument(order, "resolution", { type: "gap", index: 0 })[0]).toEqual(["resolution"])
+    expect(placeDocument([["declaration"], ["bylaws"]], "bylaws", { type: "gap", index: 0 })[0]).toEqual(["bylaws"])
   })
 })
 

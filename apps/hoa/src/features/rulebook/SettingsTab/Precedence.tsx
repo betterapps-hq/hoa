@@ -14,7 +14,7 @@ import {
   type DragEndEvent,
   type Over
 } from "@dnd-kit/core"
-import { ChevronDownIcon, GripVerticalIcon } from "lucide-react"
+import { ChevronDownIcon, GripVerticalIcon, LockIcon } from "lucide-react"
 import { useState } from "react"
 import {
   DropdownMenu,
@@ -25,14 +25,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import type * as T from "@/schema/types"
-import { documentKindLabel, ordinal, placeDocument, type RankTarget } from "./SettingsTab.utils"
+import {
+  canPlace,
+  documentKindLabel,
+  isLaw,
+  lawRanks,
+  ordinal,
+  placeDocument,
+  type RankTarget
+} from "./SettingsTab.utils"
 
 // The order of authority as ranks (encoding.md, UX, Settings): each rank a row of the documents equal in it. A
 // document is dragged by its handle onto another rank, to rank equal with what's there, or into a gap between ranks,
 // to rank alone there; held over another document, it goes before or after it, by which half of it the dragged
-// document's center is over. Its menu does the same from the keyboard. A rank left empty goes away.
+// document's center is over. Its menu does the same from the keyboard. A rank left empty goes away. Law stays at the
+// top: it can't be moved, and nothing is dropped into or above it.
 
 export type PrecedenceProps = {
   order: readonly T.DocumentKind[][]
@@ -76,8 +86,8 @@ const collisions: CollisionDetection = (args) => {
  * The gap before a rank, or after the last: a fixed strip, so nothing moves when a drag starts, that shows an insert
  * line when a document is held over it, to rank it on its own there.
  */
-function Gap({ index, isDragging }: { index: number; isDragging: boolean }) {
-  const { setNodeRef, isOver } = useDroppable({ id: targetId({ type: "gap", index }) })
+function Gap({ index, isDragging, isLocked }: { index: number; isDragging: boolean; isLocked: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id: targetId({ type: "gap", index }), disabled: isLocked })
   return (
     <li ref={setNodeRef} aria-hidden className="flex h-3 items-center">
       <span
@@ -102,9 +112,10 @@ type ChipProps = {
 /** A document in its rank: a handle to drag it, and a menu to move it from the keyboard. */
 function Chip({ kind, rankIndex, order, onPlace, insert }: ChipProps) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } = useDraggable({ id: kind })
-  const { setNodeRef: setDropRef } = useDroppable({ id: chipId(kind), disabled: !onPlace })
+  const { setNodeRef: setDropRef } = useDroppable({ id: chipId(kind), disabled: !onPlace || isLaw(kind) })
   const label = documentKindLabel(kind)
   const isAlone = order[rankIndex]?.length === 1
+  const first = lawRanks(order)
   return (
     <span
       ref={(node) => {
@@ -150,7 +161,7 @@ function Chip({ kind, rankIndex, order, onPlace, insert }: ChipProps) {
               <DropdownMenuGroup>
                 <DropdownMenuLabel>Rank {label} equal to</DropdownMenuLabel>
                 {order.map((rank, index) =>
-                  index === rankIndex ? null : (
+                  index === rankIndex || index < first ? null : (
                     <DropdownMenuItem key={rank.join("+")} onClick={() => onPlace({ type: "rank", index })}>
                       <span className="w-8 shrink-0 text-muted-foreground tabular-nums">{ordinal(index + 1)}</span>
                       <span className="truncate">{rank.map(documentKindLabel).join(", ")}</span>
@@ -161,8 +172,10 @@ function Chip({ kind, rankIndex, order, onPlace, insert }: ChipProps) {
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
                 <DropdownMenuLabel>Rank it on its own</DropdownMenuLabel>
-                {rankIndex > 0 || !isAlone ? (
-                  <DropdownMenuItem onClick={() => onPlace({ type: "gap", index: 0 })}>First</DropdownMenuItem>
+                {rankIndex > first || !isAlone ? (
+                  <DropdownMenuItem onClick={() => onPlace({ type: "gap", index: first })}>
+                    {first > 0 ? "First after the law" : "First"}
+                  </DropdownMenuItem>
                 ) : null}
                 {isAlone ? null : (
                   <DropdownMenuItem onClick={() => onPlace({ type: "gap", index: rankIndex + 1 })}>
@@ -191,7 +204,8 @@ type Place = (kind: T.DocumentKind) => (target: RankTarget) => void
 type RankProps = { index: number; order: readonly T.DocumentKind[][]; place: Place | null; beside: Beside | null }
 
 function Rank({ index, order, place, beside }: RankProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: targetId({ type: "rank", index }) })
+  const isLocked = index < lawRanks(order)
+  const { setNodeRef, isOver } = useDroppable({ id: targetId({ type: "rank", index }), disabled: isLocked })
   const rank = order[index] ?? []
   return (
     <li
@@ -210,11 +224,27 @@ function Rank({ index, order, place, beside }: RankProps) {
             kind={kind}
             rankIndex={index}
             order={order}
-            onPlace={place ? place(kind) : null}
+            onPlace={place && !isLocked ? place(kind) : null}
             insert={beside?.kind === kind ? beside.side : null}
           />
         ))}
       </span>
+      {place && isLocked ? (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <button
+                type="button"
+                aria-label="Law always comes first"
+                className="ml-auto flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            }
+          >
+            <LockIcon className="size-3.5" aria-hidden />
+          </TooltipTrigger>
+          <TooltipContent>Law always comes first</TooltipContent>
+        </Tooltip>
+      ) : null}
     </li>
   )
 }
@@ -226,10 +256,14 @@ export function Precedence({ order, onChange }: PrecedenceProps) {
   const kinds = order.flat()
   const track = ({ active, over }: { active: Active; over: Over | null }) => {
     const target = over ? targetOf(active, over, kinds) : null
-    setBeside(target?.type === "beside" && target.kind !== active.id ? target : null)
+    const kind = kinds.find((item) => item === active.id)
+    setBeside(
+      target?.type === "beside" && kind && target.kind !== kind && canPlace(order, kind, target) ? target : null
+    )
   }
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   const place: Place = (kind) => (target) => onChange?.(placeDocument(order, kind, target))
+  const locked = lawRanks(order)
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     setDragged(null)
     setBeside(null)
@@ -242,10 +276,12 @@ export function Precedence({ order, onChange }: PrecedenceProps) {
   const list = (
     <ol className={cn("flex flex-col", onChange ? null : "gap-1.5")} aria-label="Documents in order of authority">
       {order.map((rank, index) => [
-        onChange ? <Gap key={`gap-${index}`} index={index} isDragging={dragged !== null} /> : null,
+        onChange ? (
+          <Gap key={`gap-${index}`} index={index} isDragging={dragged !== null} isLocked={index < locked} />
+        ) : null,
         <Rank key={rank.join("+")} index={index} order={order} place={onChange ? place : null} beside={beside} />
       ])}
-      {onChange ? <Gap index={order.length} isDragging={dragged !== null} /> : null}
+      {onChange ? <Gap index={order.length} isDragging={dragged !== null} isLocked={order.length < locked} /> : null}
     </ol>
   )
   if (!onChange) {
