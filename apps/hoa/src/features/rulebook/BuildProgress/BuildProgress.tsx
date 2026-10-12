@@ -116,7 +116,7 @@ const statusWords: Record<BuildStep["status"], string> = {
 
 function StepRow({ step }: { step: BuildStep }) {
   const optionalWords: Partial<Record<BuildStep["status"], string>> = { skipped: "Not needed", upcoming: "If needed" }
-  const detail = (step.isOptional ? optionalWords[step.status] : undefined) ?? step.count
+  const detail = step.isOptional ? optionalWords[step.status] : undefined
   const found = step.status === "upcoming" ? null : step.found
   return (
     <li

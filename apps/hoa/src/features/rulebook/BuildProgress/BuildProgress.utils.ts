@@ -6,18 +6,22 @@ import type { BuildResult } from "@/rulebook/buildResults"
 // The build's progress for people (encoding.md, UX, The build's progress): the job's stages grouped into a few steps
 // in plain words, each done, current, upcoming or skipped, and one estimate of the time left for the whole build.
 
-/** How the build's stages read: consecutive stages with the same words are one step. */
-const stepWords: Record<string, { label: string; counted?: [string, string] }> = {
+/**
+ * How the build's stages read: consecutive stages with the same words are one step. A stage whose work is counted
+ * (documents, sections, groups of sections, batches of rules) gives its step a bar while it runs; the step never says
+ * those counts, which are how the build divides its work, only what the work has found.
+ */
+const stepWords: Record<string, { label: string; isCounted?: boolean }> = {
   "resolve-prompts": { label: "Reading documents" },
   check: { label: "Reading documents" },
   structure: { label: "Reading documents" },
   analyze: { label: "Reading documents" },
-  "defined-terms": { label: "Finding defined terms", counted: ["document", "documents"] },
+  "defined-terms": { label: "Finding defined terms", isCounted: true },
   plan: { label: "Finding rules" },
-  "find-rules": { label: "Finding rules", counted: ["section", "sections"] },
-  vocabulary: { label: "Building the vocabulary", counted: ["group of sections", "groups of sections"] },
+  "find-rules": { label: "Finding rules", isCounted: true },
+  vocabulary: { label: "Building the vocabulary", isCounted: true },
   "vocabulary-merge": { label: "Building the vocabulary" },
-  "structure-rules": { label: "Drafting rules", counted: ["batch of rules", "batches of rules"] },
+  "structure-rules": { label: "Drafting rules", isCounted: true },
   merge: { label: "Combining and checking for conflicts" },
   consolidate: { label: "Combining and checking for conflicts" },
   "save-draft": { label: "Saving the draft" }
@@ -28,9 +32,7 @@ export type BuildStep = {
   status: JobStep["status"]
   /** A step that runs only when there's something for it to do. */
   isOptional: boolean
-  /** "47 of 64 sections, 4 under way", for a step with countable work under way or done. */
-  count: string | null
-  /** How much of the step's countable work is done, from 0 to 1, while it runs; null otherwise. */
+  /** How much of the step's work is done, from 0 to 1, while it runs; null otherwise. */
   fraction: number | null
   /** What the step has produced so far, as a count: "112 rules found", "40 of 112 rules drafted". */
   found: string | null
@@ -139,22 +141,12 @@ export function buildSteps(progress: JobProgress, results: readonly BuildResult[
     }
   }
   return groups.map(({ label, steps }) => {
-    const status = groupStatus(steps)
-    const work = steps.find((step) => stepWords[step.stage]?.counted && step.total > 0 && step.status !== "upcoming")
-    const words = work ? stepWords[work.stage]?.counted : undefined
-    const isRunning = work?.status === "current"
-    // The calls in flight: the job runs at most `concurrency` at once, so a step reads as working before its first
-    // call finishes.
-    const underWay = work && isRunning ? Math.min(work.total - work.done, progress.workload.concurrency) : 0
+    const work = steps.find((step) => stepWords[step.stage]?.isCounted && step.total > 0 && step.status === "current")
     return {
       label,
-      status,
+      status: groupStatus(steps),
       isOptional: steps.every((step) => step.isOptional),
-      count:
-        work && words
-          ? `${status === "done" ? work.total : work.done} of ${work.total} ${work.total === 1 ? words[0] : words[1]}${underWay > 0 ? `, ${underWay} under way` : ""}`
-          : null,
-      fraction: work && isRunning ? work.done / work.total : null,
+      fraction: work ? work.done / work.total : null,
       found: findings[label] ?? null
     }
   })
