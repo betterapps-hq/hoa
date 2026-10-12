@@ -1,64 +1,33 @@
 import type { Meta, StoryObj } from "@storybook/react-vite"
+import { useState } from "react"
 import { fn } from "storybook/test"
 import type { Job } from "@/jobs/job"
-import { advanceProgress, startProgress } from "@/jobs/progress"
+import { simulatedBuildSeconds, simulatedJob, simulatedResults } from "@/tests/simulatedBuild"
 import { BuildProgress, type BuildProgressProps } from "./BuildProgress"
 
-// A rulebook build of one six-page declaration, on the timeline Sudden Valley's build took (17 minutes): when each
-// stage started, in seconds from the start, and how many items it works through.
-const timeline = [
-  { stage: "resolve-prompts", at: 0, total: 0 },
-  { stage: "check", at: 0.5, total: 1 },
-  { stage: "structure", at: 1.2, total: 1 },
-  { stage: "analyze", at: 2.2, total: 1 },
-  { stage: "defined-terms", at: 2.8, total: 1 },
-  { stage: "plan", at: 16, total: 1 },
-  { stage: "find-rules", at: 17, total: 2 },
-  { stage: "vocabulary", at: 280, total: 4 },
-  { stage: "vocabulary-merge", at: 804, total: 1, isOptional: true },
-  { stage: "structure-rules", at: 818, total: 9 },
-  { stage: "merge", at: 1009, total: 1 },
-  { stage: "consolidate", at: 1010, total: 1 },
-  { stage: "save-draft", at: 1024, total: 1 }
-]
+// Sudden Valley's build (src/tests/simulatedBuild.ts), held at a moment or replayed. The page polls the job and the
+// results as it does in the app, so every step shows its work and what it found.
 
-/** The build `seconds` in, with `done` of the current stage's items finished. */
-function runningJob(seconds: number, done: number): Job {
-  const start = Date.now() - seconds * 1000
-  const at = (offset: number) => new Date(start + offset * 1000).toISOString()
-  const reached = timeline.filter((step) => step.at <= seconds)
-  const progress = reached.reduce(
-    (current, step, index) =>
-      advanceProgress(
-        current,
-        { stage: step.stage, done: index === reached.length - 1 ? done : step.total, total: step.total },
-        at(step.at)
-      ),
-    startProgress(timeline, { concurrency: 4, documents: 1 })
-  )
-  const current = reached.at(-1) ?? timeline[0]
+type Source = Pick<BuildProgressProps, "loadJob" | "loadResults">
+
+/** The build held `seconds` in: its clock keeps moving, as a long step's does. */
+function heldAt(seconds: number): Source {
+  let now: number | null = null
+  const startedAt = () => (now ??= Date.now())
   return {
-    id: "build",
-    hoaId: "hoa",
-    kind: "rulebook-build",
-    subjectId: "draft",
-    status: "running",
-    stage: current?.stage ?? null,
-    done,
-    total: current?.total ?? 0,
-    promptVersions: {},
-    failures: [],
-    error: null,
-    progress,
-    createdAt: at(0),
-    updatedAt: at(seconds)
+    loadJob: async () => simulatedJob(seconds, startedAt()),
+    loadResults: async () => ({ results: simulatedResults(seconds, startedAt()), cursor: null, documents: [] })
   }
 }
 
-/** Polls give the same build each time; its clock keeps moving, as a long step's does. */
-function loadingJob(seconds: number, done: number): BuildProgressProps["loadJob"] {
-  let job: Job | null = null
-  return async () => (job ??= runningJob(seconds, done))
+/** The build replayed `speed` times faster than it ran, from when the story opens. */
+function replayed(speed: number): Source {
+  const start = Date.now()
+  const seconds = () => Math.min(simulatedBuildSeconds, ((Date.now() - start) / 1000) * speed)
+  return {
+    loadJob: async () => simulatedJob(seconds()),
+    loadResults: async () => ({ results: simulatedResults(seconds()), cursor: null, documents: [] })
+  }
 }
 
 const meta = {
@@ -71,11 +40,10 @@ const meta = {
     )
   ],
   args: {
-    jobId: "build",
-    loadJob: loadingJob(200, 1),
+    jobId: "simulated-build",
+    ...heldAt(200),
     onFinished: fn(),
-    onStop: fn(async () => undefined),
-    loadResults: async () => ({ results: [], cursor: null, documents: [] })
+    onStop: fn(async () => undefined)
   }
 } satisfies Meta<typeof BuildProgress>
 
@@ -87,24 +55,31 @@ export const Starting: Story = {
   args: { loadJob: () => new Promise<Job | null>(() => undefined) }
 }
 
-export const FindingDefinedTerms: Story = {
-  args: { loadJob: loadingJob(10, 0) }
-}
+export const FindingDefinedTerms: Story = { args: heldAt(10) }
 
+/** One of two sections read: its rules are counted. */
 export const FindingRules: Story = {}
 
-export const BuildingTheVocabulary: Story = {
-  args: { loadJob: loadingJob(600, 2) }
-}
+export const BuildingTheVocabulary: Story = { args: heldAt(600) }
 
-export const DraftingRules: Story = {
-  args: { loadJob: loadingJob(900, 3) }
-}
+export const DraftingRules: Story = { args: heldAt(900) }
+
+export const CheckingForConflicts: Story = { args: heldAt(1015) }
 
 /** Folded, the line names the step as well as the time left. */
 export const StepsHidden: Story = {
-  args: { loadJob: loadingJob(900, 3) },
+  args: heldAt(900),
   play: async ({ canvas, userEvent }) => {
     await userEvent.click(await canvas.findByRole("button", { name: "Hide steps" }))
   }
+}
+
+/** The whole build at 24 times its speed, about 45 seconds. Remount the story to replay it. */
+export const Replay: Story = {
+  render: (args) => <Replaying {...args} />
+}
+
+function Replaying(props: BuildProgressProps) {
+  const [source] = useState(() => replayed(24))
+  return <BuildProgress {...props} {...source} />
 }
