@@ -1,6 +1,7 @@
+import { rulebookBuildStages } from "@/encoding/stages"
 import { stageLabel } from "@/features/jobs/JobProgress/JobProgress.utils"
 import type { Job } from "@/jobs/job"
-import type { JobProgress, JobStep } from "@/jobs/progress"
+import { startProgress, type JobProgress, type JobStep } from "@/jobs/progress"
 import type { BuildResult } from "@/rulebook/buildResults"
 
 // The build's progress for people (encoding.md, UX, The build's progress): the job's stages grouped into a few steps
@@ -100,6 +101,10 @@ export function buildSteps(progress: JobProgress): BuildStep[] {
     isOptional: steps.every((step) => step.isOptional)
   }))
 }
+
+/** The build's steps before it reports any, every one upcoming: the page shows the whole build from the start. */
+export const startingSteps = (): BuildStep[] =>
+  buildSteps(startProgress(rulebookBuildStages, { concurrency: 1, documents: 0 }))
 
 export type Range = { low: number; high: number }
 

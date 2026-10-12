@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest"
-import { buildStages } from "@/encoding/build"
+import { rulebookBuildStages } from "@/encoding/stages"
 import { advanceProgress, finishProgress, startProgress, type JobProgress } from "@/jobs/progress"
 import type { BuildResult } from "@/rulebook/buildResults"
 import { simulatedBuildSeconds, simulatedResults } from "@/tests/simulatedBuild"
-import { buildSteps, elapsedText, estimateBuild, findingCounts, summaryText, timeLeftText } from "./BuildProgress.utils"
-
-const stages = ["resolve-prompts", ...buildStages, "save-draft"].map((stage) => ({
-  stage,
-  isOptional: stage === "vocabulary-merge"
-}))
+import {
+  buildSteps,
+  elapsedText,
+  estimateBuild,
+  findingCounts,
+  startingSteps,
+  summaryText,
+  timeLeftText
+} from "./BuildProgress.utils"
 
 const start = Date.parse("2026-10-09T12:00:00.000Z")
 const at = (minutes: number) => new Date(start + minutes * 60_000).toISOString()
@@ -17,7 +20,7 @@ const at = (minutes: number) => new Date(start + minutes * 60_000).toISOString()
 function progressOf(reports: [stage: string, done: number, total: number, minute: number][]) {
   return reports.reduce<JobProgress>(
     (progress, [stage, done, total, minute]) => advanceProgress(progress, { stage, done, total }, at(minute)),
-    startProgress(stages, { concurrency: 16, documents: 2 })
+    startProgress(rulebookBuildStages, { concurrency: 16, documents: 2 })
   )
 }
 
@@ -42,6 +45,18 @@ describe("buildSteps", () => {
       ["Saving the draft", "upcoming"]
     ])
     expect(steps[3]).toMatchObject({ isOptional: false })
+  })
+
+  it("lists every step, none started, before the build reports any", () => {
+    expect(startingSteps().map((step) => [step.label, step.status])).toEqual([
+      ["Reading documents", "upcoming"],
+      ["Finding defined terms", "upcoming"],
+      ["Finding rules", "upcoming"],
+      ["Building the vocabulary", "upcoming"],
+      ["Drafting rules", "upcoming"],
+      ["Combining and checking for conflicts", "upcoming"],
+      ["Saving the draft", "upcoming"]
+    ])
   })
 
   it("skips merging the vocabulary when it has nothing to decide", () => {

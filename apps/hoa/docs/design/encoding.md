@@ -288,7 +288,7 @@ organization with 2 documents or 20, 50 rules or 2,000, sees the same page.
 **The build's progress** (`BuildProgress`). A build takes up to an hour, so the status shows all of it up front, not
 one stage's bar at a time. The job records every stage it will report when it starts (`jobs.progress_json`,
 `src/jobs/progress.ts`), and each report marks the stages before it done and its own current, with its count and
-times. The page groups the stages into steps in plain words: Reading documents, Finding defined terms, Finding rules,
+times. Until that record arrives, the page lists the same stages (`src/encoding/stages.ts`), none started. The page groups the stages into steps in plain words: Reading documents, Finding defined terms, Finding rules,
 Building the vocabulary (merging it only if needed), Drafting rules, Combining and checking for conflicts, Saving the
 draft. A stage the page has no words for is a step of its own, so the list stays true to the build's stages. Above the list, one
 row: the time left ("35–50 min left"; the list already names the current step), the time so far ("21 min in") and an

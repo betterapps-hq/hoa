@@ -1,4 +1,5 @@
-import type { BuildResult, BuildStage } from "./build"
+import type { BuildResult } from "./build"
+import type { BuildStage } from "./stages"
 
 // The build's scores (encoding.md, Quality): sent to Langfuse on the build's root span, so every build and evaluation
 // run can be compared on the rules it outlined and structured validly, the reruns and retries it needed, coverage,

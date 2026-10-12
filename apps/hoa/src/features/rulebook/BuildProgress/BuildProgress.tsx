@@ -18,13 +18,13 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Progress } from "@/components/ui/progress"
 import { Spinner } from "@/components/ui/spinner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import type { Job } from "@/jobs/job"
 import { cn } from "@/lib/utils"
 import {
   buildSteps,
   elapsedText,
   estimateBuild,
+  startingSteps,
   summaryText,
   timeLeftText,
   type BuildStep
@@ -67,10 +67,8 @@ export function BuildProgress({ jobId, loadJob, onFinished, onStop, now = Date.n
   const [, setTick] = useState(0)
   useInterval(() => setTick((tick) => tick + 1), 10_000, { autoInvoke: true })
 
-  if (job && !job.progress) {
-    return <JobProgress jobId={jobId} loadJob={loadJob} onFinished={onFinished} />
-  }
-  const steps = job?.progress ? buildSteps(job.progress) : []
+  // Until the build reports its steps, it lists them all as not started.
+  const steps = job?.progress ? buildSteps(job.progress) : startingSteps()
   const estimate = job ? estimateBuild(job, now()) : null
   // With the steps showing, the line above them gives only the time left: the list already names the current step.
   const remaining = estimate?.remaining ?? null
