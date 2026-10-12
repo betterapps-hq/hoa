@@ -117,7 +117,7 @@ describe("CommitteeDashboard", () => {
     )
 
     expect(screen.getByText("A draft has 12 rules and 2 questions to review.")).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: "Review the draft" })).toHaveAttribute("href", "/rules")
+    expect(screen.getByRole("link", { name: "Review the draft" })).toHaveAttribute("href", "/rules/review")
   })
 
   it("links to the project types that need updating for the published rulebook", () => {

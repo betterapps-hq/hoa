@@ -40,7 +40,8 @@ export type DraftReviewProps = {
   isRebuilding: boolean
   source: RulebookSource
   actions: RulebookActions
-  onBack: (() => void) | null
+  /** Back to the rulebook page. */
+  onBack: () => void
   onPublish: () => Promise<void>
   onDiscard: () => Promise<void>
   /** Processes the documents again, redoing only what was skipped. */
@@ -102,12 +103,10 @@ export function DraftReview({
     <CitationsOpenInSheet>
       <div className="flex flex-col gap-8">
         <header className="flex flex-col gap-3">
-          {onBack ? (
-            <Button variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" onClick={onBack}>
-              <ArrowLeftIcon />
-              Rules in force{publishedVersion ? ` (version ${publishedVersion})` : ""}
-            </Button>
-          ) : null}
+          <Button variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" onClick={onBack}>
+            <ArrowLeftIcon />
+            {publishedVersion ? `Rules in force (version ${publishedVersion})` : "Rulebook"}
+          </Button>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex flex-col gap-1">
               <h2 className="text-xl font-semibold">{changes ? "Review the new draft" : "Review the rulebook"}</h2>

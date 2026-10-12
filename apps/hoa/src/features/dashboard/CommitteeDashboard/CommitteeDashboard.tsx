@@ -207,7 +207,7 @@ function NextRulebookNote({ nextRulebook }: { nextRulebook: NextRulebook | null 
       <div className="text-muted-foreground">
         {work.length > 0 ? `A draft has ${work.join(" and ")} to review.` : "A draft is ready to publish."}
       </div>
-      <Link to="/rules" className={linkClass}>
+      <Link to="/rules/review" className={linkClass}>
         Review the draft
       </Link>
     </>

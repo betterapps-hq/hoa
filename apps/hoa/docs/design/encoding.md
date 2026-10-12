@@ -319,7 +319,7 @@ isn't marked failed, and no follow-up build starts; the next upload, or **Proces
 answers the stopped build finished come from the content cache. A build that already finished, failed or was stopped
 is reported as such, not as an error.
 
-**Reviewing a draft** is a focused mode (`/rules?review=draft`; with nothing published, it's what the page shows). It
+**Reviewing a draft** is a focused page of its own (`/rules/review`; `/rules` stays the rulebook page, and offers it). It
 leads with the way back to the rules in force, what the draft changes against them, and **Discard draft**, whose
 confirmation says how many review decisions are lost and that the published version stays in force. When the build
 that made the draft skipped items (a rule that still failed its checks, a section a call never answered), a notice

@@ -73,7 +73,7 @@ const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
 /**
  * The administrator's rulebook and governing documents in one place (encoding.md, UX): the rulebook in force, the
  * documents it's built from, and one quiet line about what's happening or next. Uploading a document rebuilds the
- * draft; reviewing the draft is a focused mode that ends in publishing or discarding it.
+ * draft; reviewing the draft is a focused mode of its own (`/rules/review`) that ends in publishing or discarding it.
  */
 export function RulebookPage(props: RulebookPageProps) {
   const { draft, published, sources, source, actions, isReviewing, onReviewingChange } = props
@@ -100,7 +100,7 @@ export function RulebookPage(props: RulebookPageProps) {
         isRebuilding={draft.isBuilding}
         source={source}
         actions={actions}
-        onBack={published.rulebook ? () => onReviewingChange(false) : null}
+        onBack={() => onReviewingChange(false)}
         onPublish={async () => {
           await props.onPublish(draftId)
           onReviewingChange(false)
