@@ -31,8 +31,10 @@ paper.
   quieter), covering the provision and everything under it, named "Cited passage" for screen readers, focused when the
   reader opens or steps to it, and placed near the top third of the screen.
 - **Where you are:** a line at the top names the current article and section once you scroll past them.
-- **Outline and search** share a column on wide containers and a sheet on narrow ones. Search uses the shared MiniSearch
-  helper over the document's passages; choosing a result goes to it and marks the words that matched.
+- **Outline and search** share a column on wide containers and a sheet on narrow ones. The outline lists articles and
+  sections by their headings; a document of numbered paragraphs with no headings (`outlineOf`) lists each paragraph by
+  its number and first words instead. Search uses the shared MiniSearch helper over the document's passages; choosing
+  a result goes to it and marks the words that matched.
 - Long documents stay fast: each article is a section the browser skips laying out while it's off screen
   (`content-visibility`), and jumps settle once the text above them has been laid out.
 

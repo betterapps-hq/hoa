@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type { Page } from "@/ocr/page"
 import type * as T from "@/schema/types"
-import { documentReading, printedNumber, provisionBlocks, type ReadingInput } from "./reading"
+import { documentReading, outlineOf, printedNumber, provisionBlocks, type ReadingInput } from "./reading"
 
 // A synthetic two-page document: an article with a section, two points and a counted paragraph, and a line of page
 // text no provision holds.
@@ -115,6 +115,26 @@ const input = (overrides: Partial<ReadingInput> = {}): ReadingInput => ({
   newerVersionId: null,
   original: { hasWordBoxes: true },
   ...overrides
+})
+
+describe("outlineOf", () => {
+  it("lists a document of numbered paragraphs with no headings by their numbers and first words", () => {
+    const paragraph = (label: string, text: string) =>
+      provision({
+        key: `covenants:${label}`,
+        label,
+        num: { printed: label, normalized: label, source: "printed" },
+        text
+      })
+    const blocks = provisionBlocks([
+      paragraph("1", "These covenants bind every lot shown on the recorded plat."),
+      paragraph("2", "No lot may be divided.")
+    ])
+    expect(outlineOf(blocks)).toEqual([
+      { key: "covenants:1", number: "1", title: "These covenants bind every lot shown…", level: 2 },
+      { key: "covenants:2", number: "2", title: "No lot may be divided.", level: 2 }
+    ])
+  })
 })
 
 describe("documentReading", () => {

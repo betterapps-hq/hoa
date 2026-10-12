@@ -270,10 +270,33 @@ export function documentReading({
     ...base,
     isStructured: true,
     blocks,
-    outline: blocks.flatMap((block): OutlineEntry[] =>
-      block.type === "provision" && block.part === "main" && block.heading && block.depth <= 1
-        ? [{ key: block.key, number: block.number, title: block.heading, level: block.depth === 0 ? 1 : 2 }]
-        : []
-    )
+    outline: outlineOf(blocks)
   }
+}
+
+/** A passage's first words, for an outline entry it has no heading for: "These Restrictions shall apply to…". */
+function openingWords(text: string, count = 6) {
+  const words = text.trim().split(/\s+/)
+  const opening = words.slice(0, count).join(" ")
+  return words.length > count ? `${opening.replace(/[,;:.]+$/, "")}…` : opening
+}
+
+/**
+ * The table of contents: articles and their sections by their headings. A document of numbered paragraphs with no
+ * headings at all lists each top-level paragraph by its number and first words instead, so it can still be found.
+ */
+export function outlineOf(blocks: readonly ReadingBlock[]): OutlineEntry[] {
+  const headed = blocks.flatMap((block): OutlineEntry[] =>
+    block.type === "provision" && block.part === "main" && block.heading && block.depth <= 1
+      ? [{ key: block.key, number: block.number, title: block.heading, level: block.depth === 0 ? 1 : 2 }]
+      : []
+  )
+  if (headed.length > 0) {
+    return headed
+  }
+  return blocks.flatMap((block): OutlineEntry[] =>
+    block.type === "provision" && block.part === "main" && block.depth === 0 && block.number && block.text
+      ? [{ key: block.key, number: block.number, title: openingWords(block.text), level: 2 }]
+      : []
+  )
 }
