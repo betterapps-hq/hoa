@@ -377,7 +377,13 @@ list is ordered by relevance; without, in its usual order. The other filters sti
   and readings, each reading naming the rules it keeps. Choosing a reading and moving on saves the answer; Skip leaves
   the question open, and finishing brings back the skipped ones as one line to answer later. Answered questions
   follow, each with its chosen reading and a way to change it.
-- **Settings:** the review, then each clause in words with its citations (edited as JSON), and the policy.
+- **Settings:** the review, then each clause as a card that says what it's for, a small form in plain words and the
+  passages it comes from (or that it's the usual default). Which document wins is a list of ranks dragged by their
+  handles; deadlines are a choice of calendar or business days and whether a deadline on a day off moves; the cure
+  period's length and unit; who decides each request and who answers for whom are rows of pickers, added and removed;
+  what a sanction needs first is read as sentences, removable. Conditions and exceptions the documents attach show as
+  sentences, not edited here. Changes save as they're made. Then "Your recommendations": what to recommend when a rule
+  isn't met, by what would fix it, and how sure the review must be, in percent. Nothing is edited as JSON.
 - **Coverage:** one share for the documents the build read from their pages ("97.7% of the text of 2 documents is
   covered by a rule, a term, a setting or a reason for having no rule"), one bar and a small legend. A document whose
   provisions aren't linked to any upload's pages says it's not built yet instead of showing a share. Two views:
