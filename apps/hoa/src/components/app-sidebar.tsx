@@ -13,7 +13,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
         <RoleSwitcher />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={role.navigation} />
+        <NavMain sections={role.navigation} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

@@ -8,7 +8,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem
 } from "@/components/ui/sidebar"
-import type { NavItem } from "@/features/role/roles"
+import type { NavItem, NavSection } from "@/features/role/roles"
 
 const icons: Record<NavItem["to"], typeof LayoutDashboardIcon> = {
   "/": LayoutDashboardIcon,
@@ -17,14 +17,15 @@ const icons: Record<NavItem["to"], typeof LayoutDashboardIcon> = {
   "/applications": ClipboardCheckIcon
 }
 
-export function NavMain({ items }: { items: NavItem[] }) {
+/** The sidebar's links: the dashboard on its own, then each section under its heading. */
+export function NavMain({ sections }: { sections: NavSection[] }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
-  return (
-    <SidebarGroup>
-      <SidebarGroupLabel>Design review</SidebarGroupLabel>
+  return sections.map((section) => (
+    <SidebarGroup key={section.label ?? "home"}>
+      {section.label ? <SidebarGroupLabel>{section.label}</SidebarGroupLabel> : null}
       <SidebarGroupContent>
         <SidebarMenu>
-          {items.map((item) => {
+          {section.items.map((item) => {
             const Icon = icons[item.to]
             return (
               <SidebarMenuItem key={item.to}>
@@ -42,5 +43,5 @@ export function NavMain({ items }: { items: NavItem[] }) {
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
-  )
+  ))
 }
