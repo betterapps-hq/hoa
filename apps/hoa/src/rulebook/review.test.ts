@@ -153,6 +153,14 @@ describe("reviewRecords", () => {
     })
     expect(rejections.rules[0]?.review).toEqual({ status: "rejected", by, at, note: "Not ours." })
   })
+
+  it("never rejects the settings: every rulebook has them, so they're changed instead", () => {
+    const result = reviewRecords(sampleRecords(), [{ type: "settings" }], { status: "rejected", by, at, note: null })
+    expect(result.settings).toBeNull()
+    expect(result.skipped).toEqual([
+      { ref: { type: "settings" }, reasons: ["The settings can't be rejected; change them instead."] }
+    ])
+  })
 })
 
 describe("answerQuestion", () => {

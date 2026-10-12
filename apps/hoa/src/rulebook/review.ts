@@ -202,7 +202,8 @@ export type ReviewChanges = {
 
 /**
  * Sets the review of records. Approving checks each one's blockers; a record with blockers is skipped, not approved.
- * Rejecting and returning to proposed always apply.
+ * Rejecting and returning to proposed always apply, except that the settings can't be rejected: every rulebook has
+ * them, so they're edited instead.
  */
 export function reviewRecords(
   records: RulebookRecords,
@@ -213,7 +214,11 @@ export function reviewRecords(
   const changes: ReviewChanges = { rules: [], terms: [], provisions: [], settings: null, skipped: [] }
   const next = reviewed(review.status, review.by, review.at, review.note)
   for (const ref of refs) {
-    const reasons = review.status === "approved" ? approvalBlockers(context, ref) : []
+    const reasons = match(review.status)
+      .with("approved", () => approvalBlockers(context, ref))
+      .with("rejected", () => (ref.type === "settings" ? ["The settings can't be rejected; change them instead."] : []))
+      .with("proposed", () => [])
+      .exhaustive()
     if (reasons.length > 0) {
       changes.skipped.push({ ref, reasons })
       continue

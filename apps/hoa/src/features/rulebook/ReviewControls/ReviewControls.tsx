@@ -26,7 +26,7 @@ export type ReviewControlsProps = {
 /**
  * The review of one record (encoding.md, UX): Approve, then Reject and Edit as quieter actions. A decided record says
  * so in words, with Undo to send it back to review. Rejecting is how a record is dropped: it stays in the draft with
- * its status, and a rebuild carries the decision forward.
+ * its status, and a rebuild carries the decision forward. The settings can't be dropped, so they have no Reject.
  */
 export function ReviewControls({
   record,
@@ -113,15 +113,17 @@ export function ReviewControls({
             Approve
           </Button>
         )}
-        <Button
-          size={size}
-          variant="ghost"
-          disabled={isBusy}
-          aria-label={named("Reject")}
-          onClick={() => void review("rejected")}
-        >
-          Reject
-        </Button>
+        {record.type === "settings" ? null : (
+          <Button
+            size={size}
+            variant="ghost"
+            disabled={isBusy}
+            aria-label={named("Reject")}
+            onClick={() => void review("rejected")}
+          >
+            Reject
+          </Button>
+        )}
         {edit}
       </div>
     </div>
