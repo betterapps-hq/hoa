@@ -165,7 +165,8 @@ const entries: Entry[] = [
   section(
     "4.6",
     "Solar Panels",
-    "Solar panels are allowed on any roof. On a roof that faces the street, they must sit flush with it."
+    // Longer than the reader's window, so the window scrolls along as it's read.
+    "Solar panels are allowed on any roof. On a roof that faces the street, they must sit flush with it, and their frames, conduit and mounting hardware must be black or match the roof. Panels may not rise above the ridge line or hang past the roof's edge. Panels on the ground belong in a rear yard, screened from the street and from neighboring Lots by a fence or plantings at least as tall as the panels. An Owner who takes panels down must repair the roof within 30 days, so that no mounts, holes or stains are left showing."
   ),
   section(
     "4.7",
@@ -357,7 +358,8 @@ const ruleEntries: [label: string, slug: string, title: string, statement: strin
     "4.6",
     "flush-panels",
     "Street-facing solar panels sit flush",
-    "A {{solar-panel}} on a {{roof}} that faces the {{street}} must sit flush with it."
+    // Longer than the reader's caption, so it moves up as its blanks fill.
+    "A {{solar-panel}} on a {{roof}} that faces the {{street}} must sit flush with it, with its frame, conduit and mounting hardware in black or the roof's color; it may not rise above the ridge line, hang past the roof's edge, or stand more than 6 inches off the {{roof}}."
   ],
   [
     "4.7",

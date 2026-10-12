@@ -280,7 +280,7 @@ const gap = 20
 /** The counts above each pile beside the window, and below each under it: a label, the count and what's drafted. */
 const header = 66
 const footer = 66
-export const windowHeight = 252
+export const windowHeight = 288
 /** The piles' height under the window: dots shrink to keep every find in it. */
 const stackedGrid = 56
 

@@ -189,25 +189,25 @@ describe("readerLayout", () => {
     const layout = readerLayout(576, { terms: 63, rules: 37 })
     expect(layout).toMatchObject({
       isStacked: false,
-      window: { x: 155.5, y: 0, width: 265, height: 252 },
+      window: { x: 155.5, y: 0, width: 265, height: 288 },
       pitch: 10,
-      gridBottom: 252,
-      height: 252,
+      gridBottom: 288,
+      height: 288,
       ceiling: 62
     })
     expect(layout.terms).toEqual({ inner: 135.5, side: -1, columns: 13 })
     expect(layout.rules).toEqual({ inner: 440.5, side: 1, columns: 13 })
     expect(layout.counts.rules.x).toBe(440.5)
-    expect(slotCenter(layout, "terms", 0)).toEqual({ x: 130.5, y: 247 })
+    expect(slotCenter(layout, "terms", 0)).toEqual({ x: 130.5, y: 283 })
   })
 
   it("on a phone, puts the window over the piles, and their counts under them", () => {
     const layout = readerLayout(343, { terms: 63, rules: 37 })
     expect(layout).toMatchObject({
       isStacked: true,
-      window: { x: 0, y: 0, width: 343, height: 252 },
-      gridBottom: 324,
-      height: 390,
+      window: { x: 0, y: 0, width: 343, height: 288 },
+      gridBottom: 360,
+      height: 426,
       ceiling: 0
     })
     expect(layout.counts.terms.y).toBeGreaterThan(layout.gridBottom)
@@ -215,7 +215,7 @@ describe("readerLayout", () => {
   })
 
   it("keeps its usual height before it's measured", () => {
-    expect(readerLayout(0, { terms: 892, rules: 617 }).height).toBe(252)
+    expect(readerLayout(0, { terms: 892, rules: 617 }).height).toBe(288)
   })
 })
 

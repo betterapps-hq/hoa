@@ -271,27 +271,71 @@ type WindowProps = {
 
 /** How the window moves and the scan line sweeps: slow out, quick through the middle, slow in. */
 const easeInOut = "cubic-bezier(0.65, 0, 0.35, 1)"
-/** The scan line's soft band above it, in pixels. */
+/** The scan line's soft band above it, in pixels, and how far above the window's bottom edge it stops. */
 const scanBand = 12
+const scanEdge = 20
+
+/**
+ * Where the window rests at a passage: its top a little below the window's, or, for a term further down than that
+ * shows, the term a little above the window's middle.
+ */
+function restingScroll(
+  view: HTMLElement,
+  content: HTMLElement,
+  block: HTMLElement | undefined,
+  focus: HTMLElement | null
+) {
+  if (!block) {
+    return 0
+  }
+  const most = Math.max(0, content.scrollHeight - view.clientHeight)
+  let scroll = block.offsetTop - Math.round(view.clientHeight * 0.22)
+  if (focus) {
+    const top = focus.getBoundingClientRect().top - content.getBoundingClientRect().top
+    if (top + focus.offsetHeight > scroll + view.clientHeight - scanEdge) {
+      scroll = top - Math.round(view.clientHeight * 0.4)
+    }
+  }
+  return Math.min(most, Math.max(0, scroll))
+}
+
+/** Scrolls the window's text to `scroll` over `ms`, from wherever a sweep through a long passage left it. */
+function scrollText(
+  content: HTMLElement,
+  refs: { scrolled: { current: number }; follow: { current: Animation | null } },
+  scroll: number,
+  ms: number
+) {
+  const { follow } = refs
+  if (follow.current) {
+    follow.current.commitStyles()
+    follow.current.cancel()
+    follow.current = null
+  }
+  content.style.transition = ms > 0 ? `transform ${ms}ms ${easeInOut}` : "none"
+  content.style.transform = `translateY(${-scroll}px)`
+  refs.scrolled.current = scroll
+}
 
 /** The document in a window, moved to the passage showing, and under it what the build made of it. */
 function ReaderWindow({ box, document, scene, isAnimated, textRef, captionRef }: WindowProps) {
   const contentRef = useRef<HTMLDivElement>(null)
   const scanRef = useRef<HTMLDivElement>(null)
   const sweep = useRef<Animation | null>(null)
-  // Where the window has scrolled to, so the scan line stays in view.
+  // Where the window has scrolled to, and its scroll along a sweep through a passage longer than it.
   const scrolled = useRef(0)
+  const follow = useRef<Animation | null>(null)
   const shownDocument = useRef(document?.key)
   const isHere = scene.spot !== null && scene.spot.documentKey === document?.key
   const activeKey = isHere && (scene.event?.spot || scene.phase === "drift") ? scene.spot?.blockKey : undefined
   const tone = toneOf(scene)
-  // A term is marked once the window has got to its passage.
-  const mark =
-    scene.event?.kind === "term" && scene.step > 0 && scene.event.spot?.documentKey === document?.key
-      ? scene.event.spot
-      : null
+  // A term's words, which the window gets to first and marks once it's there.
+  const termSpot =
+    scene.event?.kind === "term" && scene.event.spot?.documentKey === document?.key ? scene.event.spot : null
+  const isMarked = termSpot !== null && scene.step > 0
 
-  // The window moves to the passage, a little below its top; to another document, at once.
+  // The window moves to the passage, a little below its top, or on to a term further down it; to another document, at
+  // once.
   useLayoutEffect(() => {
     const view = textRef.current
     const content = contentRef.current
@@ -299,18 +343,20 @@ function ReaderWindow({ box, document, scene, isAnimated, textRef, captionRef }:
       return
     }
     const block = blockElement(content, scene.spot?.blockKey)
-    const most = Math.max(0, content.scrollHeight - view.clientHeight)
-    const scroll = block ? Math.min(most, Math.max(0, block.offsetTop - Math.round(view.clientHeight * 0.22))) : 0
     const isSameDocument = shownDocument.current === document?.key
     shownDocument.current = document?.key
-    content.style.transition = isAnimated && isSameDocument ? `transform ${scene.moveMs}ms ${easeInOut}` : "none"
-    content.style.transform = `translateY(${-scroll}px)`
-    scrolled.current = scroll
-  }, [scene.spot?.blockKey, scene.moveMs, document?.key, isAnimated, box.width, textRef])
+    scrollText(
+      content,
+      { scrolled, follow },
+      restingScroll(view, content, block, content.querySelector<HTMLElement>("[data-term-spot]")),
+      isAnimated && isSameDocument ? scene.moveMs : 0
+    )
+  }, [scene.spot?.blockKey, termSpot?.start, scene.moveMs, document?.key, isAnimated, box.width, textRef])
 
-  // The scan line waits at the top of the passage being read or drifted over while the window gets there, sweeps down
-  // what of it shows, and fades where it is when that's done. It spans the passage, its ends fading out at the
-  // passage's edges, so nothing shows past its rounded corners.
+  // The scan line waits at the top of the passage being read or drifted over while the window gets there, then sweeps
+  // down it; through a passage longer than the window, the window scrolls along with it. It fades where it is when
+  // that's done. It spans the passage, its ends fading out at the passage's edges, so nothing shows past its rounded
+  // corners.
   useLayoutEffect(() => {
     const line = scanRef.current
     const content = contentRef.current
@@ -326,22 +372,43 @@ function ReaderWindow({ box, document, scene, isAnimated, textRef, captionRef }:
       return
     }
     sweep.current?.cancel()
+    // A passage read again after a sweep scrolled through it starts from its top again.
+    const resting = restingScroll(view, content, block, null)
+    const isAway = follow.current !== null || scrolled.current !== resting
+    if (isAway) {
+      scrollText(content, { scrolled, follow }, resting, scene.moveMs)
+    }
     line.style.opacity = "1"
     line.style.left = `${block.offsetLeft}px`
     line.style.width = `${block.offsetWidth}px`
     const top = block.offsetTop + 2
-    // No further than the window's faded bottom edge.
-    const bottom = Math.max(
-      top,
-      Math.min(block.offsetTop + block.offsetHeight - 2, scrolled.current + view.clientHeight - 20)
-    )
+    const end = block.offsetTop + block.offsetHeight - 2
+    // The window scrolls as far as the passage's end needs, and the line goes no further than its faded bottom edge.
+    const most = Math.max(0, content.scrollHeight - view.clientHeight)
+    const from = scrolled.current
+    const to = Math.min(most, Math.max(from, end - (view.clientHeight - scanEdge)))
+    const bottom = Math.max(top, Math.min(end, to + view.clientHeight - scanEdge))
     const wait = Math.min(scene.moveMs, scene.ms * 0.4)
+    const timing = { duration: Math.max(1, scene.ms - wait), delay: wait, easing: easeInOut }
     sweep.current = line.animate(
       [{ transform: `translateY(${top - scanBand}px)` }, { transform: `translateY(${bottom - scanBand}px)` }],
-      { duration: Math.max(1, scene.ms - wait), delay: wait, easing: easeInOut, fill: "both" }
+      { ...timing, fill: "both" }
     )
+    if (to > from) {
+      follow.current = content.animate(
+        [{ transform: `translateY(${-from}px)` }, { transform: `translateY(${-to}px)` }],
+        { ...timing, fill: "forwards" }
+      )
+      scrolled.current = to
+    }
   }, [scene, activeKey, isAnimated, textRef])
-  useEffect(() => () => sweep.current?.cancel(), [])
+  useEffect(
+    () => () => {
+      sweep.current?.cancel()
+      follow.current?.cancel()
+    },
+    []
+  )
 
   return (
     <div
@@ -363,7 +430,8 @@ function ReaderWindow({ box, document, scene, isAnimated, textRef, captionRef }:
               key={block.key}
               block={block}
               tone={block.key === activeKey ? tone : null}
-              mark={mark?.blockKey === block.key ? mark : null}
+              mark={termSpot?.blockKey === block.key ? termSpot : null}
+              isMarked={isMarked}
               isAnimated={isAnimated}
             />
           ))}
@@ -376,7 +444,7 @@ function ReaderWindow({ box, document, scene, isAnimated, textRef, captionRef }:
           </div>
         </div>
       </div>
-      <div ref={captionRef} className="h-[84px] shrink-0 border-t bg-muted/30 px-3 py-2">
+      <div ref={captionRef} className="h-[104px] shrink-0 border-t bg-muted/30 px-3 py-2">
         <Caption scene={scene} document={document} />
       </div>
     </div>
@@ -399,9 +467,19 @@ function DocumentTitle({ title }: { title: string }) {
 }
 
 /** Text with a term's words marked green, swept on from the left as with a highlighter. */
-function Marked({ text, range, isAnimated }: { text: string; range: MarkRange | null; isAnimated: boolean }) {
+function Marked({
+  text,
+  range,
+  isMarked,
+  isAnimated
+}: {
+  text: string
+  range: MarkRange | null
+  isMarked: boolean
+  isAnimated: boolean
+}) {
   const ref = useRef<HTMLElement>(null)
-  const start = range?.start
+  const start = isMarked ? range?.start : undefined
   useLayoutEffect(() => {
     if (isAnimated && start !== undefined) {
       ref.current?.animate([{ backgroundSize: "0% 100%" }, { backgroundSize: "100% 100%" }], {
@@ -413,11 +491,22 @@ function Marked({ text, range, isAnimated }: { text: string; range: MarkRange | 
   if (!range) {
     return text
   }
+  // Before it's marked, the words are only where the window is going.
+  if (!isMarked) {
+    return (
+      <>
+        {text.slice(0, range.start)}
+        <span data-term-spot>{text.slice(range.start, range.end)}</span>
+        {text.slice(range.end)}
+      </>
+    )
+  }
   return (
     <>
       {text.slice(0, range.start)}
       <mark
         ref={ref}
+        data-term-spot
         data-term-mark
         className="-mx-0.5 rounded-[3px] bg-transparent bg-linear-to-r from-coverage-term/30 to-coverage-term/30 bg-no-repeat px-0.5 font-medium text-foreground dark:from-coverage-term/40 dark:to-coverage-term/40"
       >
@@ -436,11 +525,13 @@ function Passage({
   block,
   tone,
   mark,
+  isMarked,
   isAnimated
 }: {
   block: ReadingBlock
   tone: Tone | null
   mark: WordSpot | null
+  isMarked: boolean
   isAnimated: boolean
 }) {
   const className = cn(
@@ -455,10 +546,15 @@ function Passage({
     )
   }
   const text = block.text ? (
-    <Marked text={block.text} range={mark?.part === "text" ? mark : null} isAnimated={isAnimated} />
+    <Marked text={block.text} range={mark?.part === "text" ? mark : null} isMarked={isMarked} isAnimated={isAnimated} />
   ) : null
   const intro = block.intro ? (
-    <Marked text={block.intro} range={mark?.part === "intro" ? mark : null} isAnimated={isAnimated} />
+    <Marked
+      text={block.intro}
+      range={mark?.part === "intro" ? mark : null}
+      isMarked={isMarked}
+      isAnimated={isAnimated}
+    />
   ) : null
   const active = tone ? { "data-active": "" } : {}
   if (block.level === 2) {
@@ -629,15 +725,45 @@ function CaptionBody({
             label={event.isRetry ? `${label} again` : label}
           />
           <p className="truncate text-xs font-medium">{event.title}</p>
-          {event.statement ? (
-            <p className="line-clamp-2 text-xs text-muted-foreground">
-              <Blanks statement={event.statement} filled={step} />
-            </p>
-          ) : null}
+          {event.statement ? <Statement statement={event.statement} filled={step} isDone={isDrafted} /> : null}
         </>
       )
     }
   }
+}
+
+/**
+ * A statement three lines high. One longer than that moves up a line at a time to keep the blank being filled in view,
+ * and once it's drafted, to show its end.
+ */
+function Statement({ statement, filled, isDone }: { statement: string; filled: number; isDone: boolean }) {
+  const boxRef = useRef<HTMLDivElement>(null)
+  const textRef = useRef<HTMLParagraphElement>(null)
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const text = textRef.current
+    if (!box || !text) {
+      return
+    }
+    const line = Number.parseFloat(getComputedStyle(text).lineHeight) || 16
+    const blanks = text.querySelectorAll<HTMLElement>("[data-blank]")
+    const last = blanks[Math.min(filled, blanks.length) - 1]
+    // How far down it has to show: its end once drafted, else the last blank filled.
+    let shown = last ? last.offsetTop + last.offsetHeight : 0
+    if (isDone) {
+      shown = text.scrollHeight
+    }
+    const lines = Math.max(0, Math.ceil((shown - box.clientHeight - 1) / line))
+    const most = Math.max(0, text.scrollHeight - box.clientHeight)
+    text.style.transform = `translateY(${-Math.min(lines * line, most)}px)`
+  }, [statement, filled, isDone])
+  return (
+    <div ref={boxRef} className="h-12 overflow-hidden text-xs text-muted-foreground">
+      <p ref={textRef} className="relative transition-transform duration-300 ease-out">
+        <Blanks statement={statement} filled={filled} />
+      </p>
+    </div>
+  )
 }
 
 /** A statement with its first `filled` blanks filled: a term in a term link's style, a value in bold. */
@@ -654,6 +780,7 @@ function Blanks({ statement, filled }: { statement: string; filled: number }) {
     return (
       <span
         key={index}
+        data-blank
         className={cn(
           "inline-block rounded-[3px] font-medium",
           isFilled
