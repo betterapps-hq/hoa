@@ -1,5 +1,6 @@
+import { useWindowEvent } from "@mantine/hooks"
 import { PlusIcon, Trash2Icon } from "lucide-react"
-import { useId, useState, type ReactNode } from "react"
+import { createContext, use, useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,7 +16,7 @@ import { ChoiceSelect } from "../ChoiceSelect/ChoiceSelect"
 import { IssueList } from "../IssueList/IssueList"
 import { ProvisionReference } from "../ProvisionReference/ProvisionReference"
 import { ReviewControls } from "../ReviewControls/ReviewControls"
-import { amountText, citedProvision, countOf } from "../rulebookRecords"
+import { amountText, citedProvision } from "../rulebookRecords"
 import { Statement } from "../Statement/Statement"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 import { Precedence } from "./Precedence"
@@ -41,7 +42,8 @@ import { TimeZonePicker } from "./TimeZonePicker"
 
 // The rulebook's settings (encoding.md, UX, Settings): what the documents say about deadlines, authority and
 // enforcement, each as a small form in plain words with the passages it comes from, then the organization's own policy
-// for what a review recommends and how sure it must be. The settings are reviewed and published like a rule.
+// for what a review recommends and how sure it must be. The settings are reviewed and published like a rule. Every
+// card edits one draft, laid over the saved settings, which saves or is discarded as a whole from the bar at the end.
 
 type Clauses = T.Settings["clauses"]
 
@@ -69,79 +71,166 @@ const dayLabels: Record<(typeof dayUnits)[number], string> = {
 const dayChoices = dayUnits.map((value) => ({ value, label: dayLabels[value] }))
 const cureUnits = [...dayChoices, { value: "month", label: "Months" }, { value: "year", label: "Years" }]
 
-/** Saves a change to some clauses, saying when it leaves problems to fix. */
-function useSaveClauses() {
-  const { actions } = useRulebookWorkspace()
-  return async (clauses: Partial<Clauses>) => {
-    if (!actions) {
-      return
-    }
-    const found = await attempt(() => actions.saveSettings({ clauses, policy: null }), "The change wasn't saved.")
-    if (found && found.length > 0) {
-      toast.warning(`Saved, with ${countOf(found.length, "problem", "problems")} to fix.`)
-    }
-  }
+type Policy = T.Settings["policy"]
+
+/** The settings being edited: the saved ones with the changes made since, and ways to change them. */
+type SettingsDraft = {
+  clauses: Clauses
+  policy: Policy
+  /** Changes some clauses in the draft. */
+  change: (clauses: Partial<Clauses>) => void
+  /** Puts a clause back as it's saved. */
+  restore: (name: keyof Clauses) => void
+  changePolicy: (change: (policy: Policy) => Policy) => void
+  isEditable: boolean
 }
+
+const SettingsDraftContext = createContext<SettingsDraft | null>(null)
+
+function useSettingsDraft() {
+  const draft = use(SettingsDraftContext)
+  if (!draft) {
+    throw new Error("A setting is shown outside the settings tab.")
+  }
+  return draft
+}
+
+type Changes = { clauses: Partial<Clauses>; policy: Policy | null }
+const noChanges: Changes = { clauses: {}, policy: null }
 
 /** The settings, each in its own card, after the review of them as a whole. */
 export function SettingsTab() {
   const { records, issues, approval, actions } = useRulebookWorkspace()
   const { settings } = records
   const blockers = approval ? approvalBlockers(approval, { type: "settings" }) : []
+  const [changes, setChanges] = useState<Changes>(noChanges)
+  // Bumped when the draft is saved or discarded, so each card's own fields start again from the settings.
+  const [round, setRound] = useState(0)
+  const [isSaving, setIsSaving] = useState(false)
+  const isChanged = Object.keys(changes.clauses).length > 0 || changes.policy !== null
+  const draft: SettingsDraft = {
+    clauses: { ...settings.clauses, ...changes.clauses },
+    policy: changes.policy ?? settings.policy,
+    change: (clauses) => setChanges((current) => ({ ...current, clauses: { ...current.clauses, ...clauses } })),
+    restore: (name) =>
+      setChanges((current) => ({
+        ...current,
+        clauses: Object.fromEntries(Object.entries(current.clauses).filter(([key]) => key !== name))
+      })),
+    changePolicy: (change) =>
+      setChanges((current) => ({ ...current, policy: change(current.policy ?? settings.policy) })),
+    isEditable: actions !== null
+  }
+  const reset = () => {
+    setChanges(noChanges)
+    setRound((current) => current + 1)
+  }
+  // Editing the settings is reviewing them, so saving approves them too, unless something still blocks it.
+  const saveAndApprove = async () => {
+    if (!actions) {
+      return
+    }
+    setIsSaving(true)
+    const found = await attempt(
+      () => actions.saveSettings({ clauses: changes.clauses, policy: changes.policy }),
+      "The settings weren't saved."
+    )
+    const approved = found
+      ? await attempt(() => actions.review([{ type: "settings" }], "approved", null), "The settings weren't approved.")
+      : undefined
+    setIsSaving(false)
+    if (!found) {
+      return
+    }
+    reset()
+    const reason = approved?.skipped[0]?.reasons[0]
+    if (reason) {
+      toast.warning(`Saved, but not approved yet. ${reason}`)
+    } else if (approved) {
+      toast.success("Saved and approved.")
+    }
+  }
+  useWindowEvent("beforeunload", (event) => {
+    if (isChanged) {
+      event.preventDefault()
+    }
+  })
   return (
-    <div className="flex flex-col gap-4">
-      {actions ? (
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Review the settings</CardTitle>
-            <CardDescription>
-              They&rsquo;re published with the rules, so they&rsquo;re approved like a rule.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            {settings.issues.length > 0 || (issues.get("settings") ?? []).length > 0 ? (
-              <IssueList
-                issues={settings.issues}
-                found={issues.get("settings") ?? []}
-                onResolve={(index, note) => actions.resolveIssue({ type: "settings" }, index, note)}
-              />
-            ) : null}
-            <ReviewControls record={{ type: "settings" }} status={settings.review.status} blockers={blockers} />
-          </CardContent>
-        </Card>
-      ) : null}
-      <SettingCard
-        name="precedence"
-        description="When two documents disagree, the higher-ranked one wins. Drag a document onto another rank to make them equal, or between ranks to rank it on its own."
-      >
-        <PrecedenceSetting />
-      </SettingCard>
-      <SettingCard
-        name="time"
-        description="How every deadline in your rules is counted: which days count, and in what time zone."
-      >
-        <Deadlines />
-      </SettingCard>
-      <SettingCard name="cure" description="How long an owner has to fix a violation when a rule doesn't say.">
-        <Cure />
-      </SettingCard>
-      <SettingCard name="deciders" description="The person or group whose decision a request waits for.">
-        <Deciders />
-      </SettingCard>
-      <SettingCard
-        name="liability"
-        description="When someone breaks a rule, who else is responsible for the fine, such as an owner for a tenant."
-      >
-        <Liability />
-      </SettingCard>
-      <SettingCard
-        name="sanctionPreconditions"
-        description="What must happen first, such as notice and a chance to be heard."
-      >
-        <Preconditions />
-      </SettingCard>
-      <PolicyCard />
-    </div>
+    <SettingsDraftContext value={draft}>
+      <div key={round} className="flex flex-col gap-4">
+        {actions ? (
+          <Card size="sm">
+            <CardHeader>
+              <CardTitle>Review the settings</CardTitle>
+              <CardDescription>
+                They&rsquo;re published with the rules, so they&rsquo;re approved like a rule.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {settings.issues.length > 0 || (issues.get("settings") ?? []).length > 0 ? (
+                <IssueList
+                  issues={settings.issues}
+                  found={issues.get("settings") ?? []}
+                  onResolve={(index, note) => actions.resolveIssue({ type: "settings" }, index, note)}
+                />
+              ) : null}
+              {isChanged ? (
+                <p className="text-sm text-muted-foreground">
+                  You have unsaved changes. Save and approve them, or discard them, at the end of the settings.
+                </p>
+              ) : (
+                <ReviewControls record={{ type: "settings" }} status={settings.review.status} blockers={blockers} />
+              )}
+            </CardContent>
+          </Card>
+        ) : null}
+        <SettingCard
+          name="precedence"
+          description="When two documents disagree, the higher-ranked one wins. Drag a document onto another rank to make them equal, or between ranks to rank it on its own."
+        >
+          <PrecedenceSetting />
+        </SettingCard>
+        <SettingCard
+          name="time"
+          description="How every deadline in your rules is counted: which days count, and in what time zone."
+        >
+          <Deadlines />
+        </SettingCard>
+        <SettingCard name="cure" description="How long an owner has to fix a violation when a rule doesn't say.">
+          <Cure />
+        </SettingCard>
+        <SettingCard name="deciders" description="The person or group whose decision a request waits for.">
+          <Deciders />
+        </SettingCard>
+        <SettingCard
+          name="liability"
+          description="When someone breaks a rule, who else is responsible for the fine, such as an owner for a tenant."
+        >
+          <Liability />
+        </SettingCard>
+        <SettingCard
+          name="sanctionPreconditions"
+          description="What must happen first, such as notice and a chance to be heard."
+        >
+          <Preconditions />
+        </SettingCard>
+        <PolicyCard />
+        {actions && isChanged ? (
+          <section
+            aria-label="Unsaved settings"
+            className="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-lg border bg-background p-3 shadow-md"
+          >
+            <p className="min-w-0 flex-1 text-sm">You have unsaved changes to the settings.</p>
+            <Button variant="ghost" disabled={isSaving} onClick={reset}>
+              Discard changes
+            </Button>
+            <Button disabled={isSaving} onClick={() => void saveAndApprove()}>
+              {isSaving ? "Saving" : "Save and approve"}
+            </Button>
+          </section>
+        ) : null}
+      </div>
+    </SettingsDraftContext>
   )
 }
 
@@ -149,10 +238,9 @@ type SettingCardProps = { name: ClauseName; description: string; children: React
 
 /** One setting: what it means, the form, and the passages it comes from, when its documents state it. */
 function SettingCard({ name, description, children }: SettingCardProps) {
-  const { records, citations, source } = useRulebookWorkspace()
-  const cited = [
-    ...new Map(clauseCitations(name, records.settings.clauses).map((item) => [item.provisionKey, item])).values()
-  ]
+  const { citations, source } = useRulebookWorkspace()
+  const { clauses } = useSettingsDraft()
+  const cited = [...new Map(clauseCitations(name, clauses).map((item) => [item.provisionKey, item])).values()]
   return (
     <Card size="sm">
       <CardHeader>
@@ -178,43 +266,23 @@ function SettingCard({ name, description, children }: SettingCardProps) {
   )
 }
 
-/** The order of authority as a draft: moves show at once, and save or reset together. */
+/** The order of authority: each move changes the draft. */
 function PrecedenceSetting() {
-  const { records, actions } = useRulebookWorkspace()
-  const save = useSaveClauses()
-  const { precedence } = records.settings.clauses
-  const [order, setOrder] = useState(precedence.order)
-  const [isSaving, setIsSaving] = useState(false)
-  const isChanged = JSON.stringify(order) !== JSON.stringify(precedence.order)
+  const { clauses, change, isEditable } = useSettingsDraft()
+  const { precedence } = clauses
   return (
-    <div className="flex flex-col gap-3">
-      <Precedence order={order} onChange={actions ? setOrder : null} />
-      {actions ? (
-        <div className="flex gap-2">
-          <Button
-            disabled={!isChanged || isSaving}
-            onClick={async () => {
-              setIsSaving(true)
-              await save({ precedence: { ...precedence, order } })
-              setIsSaving(false)
-            }}
-          >
-            {isSaving ? "Saving" : "Save the order"}
-          </Button>
-          <Button variant="ghost" disabled={!isChanged || isSaving} onClick={() => setOrder(precedence.order)}>
-            Reset
-          </Button>
-        </div>
-      ) : null}
-    </div>
+    <Precedence
+      order={precedence.order}
+      onChange={isEditable ? (order) => change({ precedence: { ...precedence, order } }) : null}
+    />
   )
 }
 
 /** How days are counted, and whether a deadline on a day off moves to the next business day. */
 function Deadlines() {
-  const { records, vocabulary, actions } = useRulebookWorkspace()
-  const save = useSaveClauses()
-  const { time } = records.settings.clauses
+  const { vocabulary } = useRulebookWorkspace()
+  const { clauses, change, isEditable: actions } = useSettingsDraft()
+  const { time } = clauses
   const id = useId()
   const days = dayChoices.find((choice) => choice.value === time.days)
   const holidays = holidayChoices.find((choice) => choice.value === time.holidays)
@@ -230,7 +298,7 @@ function Deadlines() {
             className="w-44"
             value={days.value}
             choices={dayChoices}
-            onChange={(value) => void save({ time: { ...time, days: value } })}
+            onChange={(value) => change({ time: { ...time, days: value } })}
           />
         ) : (
           <span id={`${id}-days`}>{days?.label ?? sentenceCase(vocabulary.label(time.days, true))}</span>
@@ -241,7 +309,7 @@ function Deadlines() {
           id={`${id}-roll`}
           checked={time.rollForward}
           disabled={!actions}
-          onCheckedChange={(checked) => void save({ time: { ...time, rollForward: checked } })}
+          onCheckedChange={(checked) => change({ time: { ...time, rollForward: checked } })}
         />
         <FieldContent>
           <FieldLabel htmlFor={`${id}-roll`} className="font-normal">
@@ -259,7 +327,7 @@ function Deadlines() {
             className="w-56"
             value={holidays.value}
             choices={holidayChoices}
-            onChange={(value) => void save({ time: { ...time, holidays: value } })}
+            onChange={(value) => change({ time: { ...time, holidays: value } })}
           />
         ) : (
           <span id={`${id}-holidays`}>{holidays?.label ?? time.holidays}</span>
@@ -273,7 +341,7 @@ function Deadlines() {
           <TimeZonePicker
             id={`${id}-zone`}
             value={time.zone}
-            onChange={(zone) => void save({ time: { ...time, zone } })}
+            onChange={(zone) => change({ time: { ...time, zone } })}
           />
         ) : (
           <span id={`${id}-zone`}>{zoneLabel(time.zone)}</span>
@@ -285,9 +353,10 @@ function Deadlines() {
 
 /** The default cure period: how long, counted from what; set one where the documents give none, or remove it. */
 function Cure() {
-  const { records, vocabulary, actions } = useRulebookWorkspace()
-  const save = useSaveClauses()
-  const { cure } = records.settings.clauses
+  const { records, vocabulary } = useRulebookWorkspace()
+  const { clauses, change, restore, isEditable } = useSettingsDraft()
+  const saved = records.settings.clauses.cure
+  const { cure } = clauses
   const dates = dateChoices(records.terms, vocabulary, null)
   const [isAdding, setIsAdding] = useState(false)
   const [value, setValue] = useState(cure ? String(cure.value) : "")
@@ -298,7 +367,7 @@ function Cure() {
     return (
       <div className="flex flex-col gap-3">
         <p>There&rsquo;s no default time to fix a violation.</p>
-        {actions && dates.length > 0 ? (
+        {isEditable && dates.length > 0 ? (
           <Button variant="outline" size="sm" className="self-start" onClick={() => setIsAdding(true)}>
             <PlusIcon />
             Set a time to fix a violation
@@ -307,8 +376,8 @@ function Cure() {
       </div>
     )
   }
-  if (cure && !actions) {
-    const from = cure.after.path.map((key) => `{{${key}}}`).join("’s ")
+  if (cure && !isEditable) {
+    const from = cure.after.path.map((key) => `{{${key}}}`).join("\u2019s ")
     return (
       <p>
         <Statement
@@ -319,14 +388,24 @@ function Cure() {
     )
   }
   const units = withCurrent(cureUnits, unit, vocabulary)
-  const amount = Number(value)
-  const isValid = value.trim() !== "" && Number.isInteger(amount) && amount >= 0
   // A period counted from a date further down a path than the request's own is read here, not edited.
   const isSimple = !cure || cure.after.path.length === 1
-  const change = (next: Partial<T.Cure>) => {
-    if (cure) {
-      void save({ cure: { ...cure, ...next } })
+  /** Puts the period in the draft once it has a whole number of days and a date to count from. */
+  const update = (next: { value?: string; unit?: T.TermKey; after?: T.TermKey }) => {
+    const amount = Number(next.value ?? value)
+    const from = next.after ?? after
+    if ((next.value ?? value).trim() === "" || !Number.isInteger(amount) || amount < 0 || !from) {
+      return
     }
+    change({
+      cure: {
+        value: amount,
+        unit: next.unit ?? unit,
+        after: next.after || !cure ? { path: [from] } : cure.after,
+        curedBy: cure?.curedBy ?? null,
+        citations: cure?.citations ?? []
+      }
+    })
   }
   return (
     <div className="flex flex-col gap-3">
@@ -339,11 +418,9 @@ function Cure() {
           min={0}
           className="w-20"
           value={value}
-          onChange={(event) => setValue(event.target.value)}
-          onBlur={() => {
-            if (isValid && amount !== cure?.value) {
-              change({ value: amount })
-            }
+          onChange={(event) => {
+            setValue(event.target.value)
+            update({ value: event.target.value })
           }}
         />
         <ChoiceSelect
@@ -353,7 +430,7 @@ function Cure() {
           choices={units}
           onChange={(next) => {
             setUnit(next)
-            change({ unit: next })
+            update({ unit: next })
           }}
         />
         <span>counted from the</span>
@@ -365,43 +442,31 @@ function Cure() {
             choices={withCurrent(dates, after, vocabulary)}
             onChange={(next) => {
               setAfter(next)
-              change({ after: { path: [next] } })
+              update({ after: next })
             }}
           />
         ) : (
-          <Statement text={cure?.after.path.map((key) => `{{${key}}}`).join("’s ") ?? ""} vocabulary={vocabulary} />
+          <Statement
+            text={cure?.after.path.map((key) => `{{${key}}}`).join("\u2019s ") ?? ""}
+            vocabulary={vocabulary}
+          />
         )}
       </div>
-      {cure ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="self-start"
-          onClick={() => {
-            setIsAdding(false)
-            void save({ cure: null })
-          }}
-        >
-          Remove the default time
-        </Button>
-      ) : (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            disabled={!isValid || !after}
-            onClick={() => {
-              if (after) {
-                void save({ cure: { value: amount, unit, after: { path: [after] }, curedBy: null, citations: [] } })
-              }
-            }}
-          >
-            Save
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
-            Cancel
-          </Button>
-        </div>
-      )}
+      <Button
+        variant="ghost"
+        size="sm"
+        className="self-start"
+        onClick={() => {
+          setIsAdding(false)
+          if (saved) {
+            change({ cure: null })
+          } else {
+            restore("cure")
+          }
+        }}
+      >
+        {saved ? "Remove the default time" : "Cancel"}
+      </Button>
     </div>
   )
 }
@@ -440,12 +505,12 @@ function RemoveButton({ name, onRemove }: { name: string; onRemove: () => void }
 
 /** Each kind of request with who decides it. */
 function Deciders() {
-  const { records, vocabulary, actions } = useRulebookWorkspace()
-  const save = useSaveClauses()
-  const { deciders } = records.settings.clauses
+  const { records, vocabulary } = useRulebookWorkspace()
+  const { clauses, change: changeClauses, isEditable: actions } = useSettingsDraft()
+  const { deciders } = clauses
   const requests = requestChoices(records.terms, vocabulary)
   const parties = partyChoices(records.terms, vocabulary)
-  const update = (next: Clauses["deciders"]) => void save({ deciders: next })
+  const update = (next: Clauses["deciders"]) => changeClauses({ deciders: next })
   const free = requests.find((request) => !deciders.some((item) => item.requestType === request.value))
   return (
     <Rows
@@ -499,11 +564,11 @@ function Deciders() {
 
 /** Who answers for whose violations, with what the documents limit it to. */
 function Liability() {
-  const { records, vocabulary, actions } = useRulebookWorkspace()
-  const save = useSaveClauses()
-  const { liability } = records.settings.clauses
+  const { records, vocabulary } = useRulebookWorkspace()
+  const { clauses, change: changeClauses, isEditable: actions } = useSettingsDraft()
+  const { liability } = clauses
   const parties = partyChoices(records.terms, vocabulary)
-  const update = (next: Clauses["liability"]) => void save({ liability: next })
+  const update = (next: Clauses["liability"]) => changeClauses({ liability: next })
   const [first, second] = parties
   return (
     <Rows
@@ -576,9 +641,9 @@ function Liability() {
 
 /** What a sanction needs first, as the documents state it; an administrator can remove one that's wrong. */
 function Preconditions() {
-  const { records, vocabulary, actions } = useRulebookWorkspace()
-  const save = useSaveClauses()
-  const { sanctionPreconditions } = records.settings.clauses
+  const { records, vocabulary } = useRulebookWorkspace()
+  const { clauses, change, isEditable: actions } = useSettingsDraft()
+  const { sanctionPreconditions } = clauses
   const [isAdding, setIsAdding] = useState(false)
   const requests = enforcementChoices(records.terms, vocabulary)
   return (
@@ -598,7 +663,7 @@ function Preconditions() {
               <RemoveButton
                 name={`step ${index + 1} before a sanction`}
                 onRemove={() =>
-                  void save({ sanctionPreconditions: sanctionPreconditions.filter((_, at) => at !== index) })
+                  change({ sanctionPreconditions: sanctionPreconditions.filter((_, at) => at !== index) })
                 }
               />
             ) : null}
@@ -610,7 +675,7 @@ function Preconditions() {
           requests={requests}
           onAdd={(precondition) => {
             setIsAdding(false)
-            void save({ sanctionPreconditions: [...sanctionPreconditions, precondition] })
+            change({ sanctionPreconditions: [...sanctionPreconditions, precondition] })
           }}
           onCancel={() => setIsAdding(false)}
         />
@@ -712,20 +777,8 @@ const thresholdText: Record<Threshold, { label: string; description: string }> =
 
 /** The organization's own choices: what a review recommends when a rule isn't met, and how sure it must be. */
 function PolicyCard() {
-  const { records, actions } = useRulebookWorkspace()
-  const { policy } = records.settings
-  const [draft, setDraft] = useState(policy)
-  const [isSaving, setIsSaving] = useState(false)
+  const { policy: draft, changePolicy: setDraft, isEditable: actions } = useSettingsDraft()
   const id = useId()
-  const isChanged = JSON.stringify(draft) !== JSON.stringify(policy)
-  const save = async () => {
-    if (!actions) {
-      return
-    }
-    setIsSaving(true)
-    await attempt(() => actions.saveSettings({ clauses: {}, policy: draft }), "The policy wasn't saved.")
-    setIsSaving(false)
-  }
   return (
     <Card size="sm">
       <CardHeader>
@@ -760,7 +813,7 @@ function PolicyCard() {
                     }
                   />
                 ) : (
-                  <span id={`${id}-${remedy}`}>{actionLabels[policy.decisionPolicy[remedy]]}</span>
+                  <span id={`${id}-${remedy}`}>{actionLabels[draft.decisionPolicy[remedy]]}</span>
                 )}
               </Field>
             ))}
@@ -804,18 +857,6 @@ function PolicyCard() {
             ))}
           </div>
         </section>
-        {actions ? (
-          <div className="flex gap-2">
-            <Button disabled={!isChanged || isSaving} onClick={() => void save()}>
-              {isSaving ? "Saving" : "Save"}
-            </Button>
-            {isChanged ? (
-              <Button variant="ghost" onClick={() => setDraft(policy)}>
-                Undo the changes
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   )

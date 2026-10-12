@@ -381,13 +381,13 @@ list is ordered by relevance; without, in its usual order. The other filters sti
   passages it comes from, when the documents state it. Which document wins is a tier list: each rank (1st, 2nd) a row of
   the documents equal in it; a document is dragged by its handle onto another rank to rank equal (before or after a chosen document there), or into a gap to
   rank alone, and its menu does the same from the keyboard; law (federal law, state law, then county and city ordinances) is fixed at the top, each marked with a lock, since no
-  document an organization writes outranks it, so it can't be moved and nothing goes into or above it; each document is named as an owner knows it (Federal laws, Declaration (CC&Rs)), and moves save together with Save the order, or Reset; deadlines are a choice of calendar or business days, whether a deadline on a day off moves, the holidays that
+  document an organization writes outranks it, so it can't be moved and nothing goes into or above it; each document is named as an owner knows it (Federal laws, Declaration (CC&Rs)); deadlines are a choice of calendar or business days, whether a deadline on a day off moves, the holidays that
   aren't business days (US federal, Washington state, or none) and the time zone, searched from every zone, west to east
   by its offset from UTC; the cure
   period's length and unit; who decides each request and who answers for whom are rows of pickers, added and removed;
   what a sanction needs first is read as sentences, removable. Conditions and exceptions the documents attach show as
-  sentences, not edited here. A cure period or a step before a sanction can be added where the documents give none: a step needs a date the request records, every time or only when another is recorded (a hearing, if one was requested). Changes save as they're made. Then "Project application reviews": what to recommend when a rule
-  isn't met, by what would fix it, and how sure the review must be, in percent. Nothing is edited as JSON.
+  sentences, not edited here. A cure period or a step before a sanction can be added where the documents give none: a step needs a date the request records, every time or only when another is recorded (a hearing, if one was requested). Then "Project application reviews": what to recommend when a rule
+  isn't met, by what would fix it, and how sure the review must be, in percent. Nothing is edited as JSON. Every card edits one draft over the saved settings, kept while another tab is open; a bar at the end saves it with Save and approve (editing the settings is reviewing them, so saving approves them unless something still blocks it, which a toast names) or discards it, and the review card's Approve waits until the draft is saved or discarded.
 - **Coverage:** one share for the documents the build read from their pages ("97.7% of the text of 2 documents is
   covered by a rule, a term, a setting or a reason for having no rule"), one bar and a small legend. A document whose
   provisions aren't linked to any upload's pages says it's not built yet instead of showing a share. Two views:

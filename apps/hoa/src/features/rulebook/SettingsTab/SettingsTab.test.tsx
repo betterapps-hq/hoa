@@ -45,7 +45,7 @@ describe("SettingsTab", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
   })
 
-  it("approves the settings, and ranks a document on its own from its menu", async () => {
+  it("approves the settings as they are, and ranks a document on its own from its menu", async () => {
     const { user, actions } = renderInWorkspace(<SettingsTab />, { records })
     await user.click(screen.getByRole("button", { name: "Approve" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "settings" }], "approved", null)
@@ -55,11 +55,8 @@ describe("SettingsTab", () => {
     await user.click(precedence.getByRole("button", { name: "Move Declaration (CC&Rs)" }))
     await user.click(await screen.findByRole("menuitem", { name: "Just below its rank now" }))
     expect(actions?.saveSettings).not.toHaveBeenCalled()
-    await user.click(precedence.getByRole("button", { name: "Reset" }))
-    expect(precedence.getByRole("listitem", { name: /^5th: / })).toHaveAccessibleName("5th: Articles of incorporation")
-    await user.click(precedence.getByRole("button", { name: "Move Declaration (CC&Rs)" }))
-    await user.click(await screen.findByRole("menuitem", { name: "Just below its rank now" }))
-    await user.click(precedence.getByRole("button", { name: "Save the order" }))
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument()
+    await saveAndApprove(user)
     expect(actions?.saveSettings).toHaveBeenLastCalledWith({
       clauses: {
         precedence: expect.objectContaining({
@@ -73,40 +70,59 @@ describe("SettingsTab", () => {
       },
       policy: null
     })
+    expect(actions?.review).toHaveBeenLastCalledWith([{ type: "settings" }], "approved", null)
+    expect(screen.queryByRole("region", { name: "Unsaved settings" })).not.toBeInTheDocument()
   })
 
-  it("changes who decides a request and how deadlines count, as forms", async () => {
+  it("keeps every change in one draft, saved or discarded together", async () => {
     const { user, actions } = renderInWorkspace(<SettingsTab />, { records })
-    const deciders = card("Who decides each request")
-    await user.selectOptions(deciders.getAllByRole("combobox", { name: /^Who decides/ })[0]!, "board")
-    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
-      clauses: { deciders: [expect.objectContaining({ party: "board" })] },
-      policy: null
-    })
+    await user.selectOptions(
+      card("Who decides each request").getAllByRole("combobox", { name: /^Who decides/ })[0]!,
+      "board"
+    )
+    const deadlines = card("Deadlines")
     await user.click(
-      card("Deadlines").getByRole("checkbox", {
+      deadlines.getByRole("checkbox", {
         name: "A deadline that falls on a weekend or holiday moves to the next business day"
       })
     )
-    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
-      clauses: { time: expect.objectContaining({ rollForward: !records.settings.clauses.time.rollForward }) },
-      policy: null
-    })
+    await user.selectOptions(deadlines.getByRole("combobox", { name: "Holidays that aren’t business days" }), "us-wa")
+    const zone = deadlines.getByRole("combobox", { name: "Dates and times are in" })
+    await user.clear(zone)
+    await user.type(zone, "Denver")
+    await user.click(await screen.findByRole("option", { name: /\(America\/Denver\)/ }))
+    const policy = card("Project application reviews")
+    await user.selectOptions(
+      policy.getByRole("combobox", { name: "If it would take a redesign" }),
+      "refer-to-committee"
+    )
+    const facts = policy.getByRole("spinbutton", { name: /^Use a detail read from an application/ })
+    expect(facts).toHaveValue(percentOf(records.settings.policy.thresholds.factConfidence))
+    await user.clear(facts)
+    await user.type(facts, "90")
+    expect(actions?.saveSettings).not.toHaveBeenCalled()
+
+    await user.click(within(unsaved()).getByRole("button", { name: "Discard changes" }))
+    expect(card("Deadlines").getByRole("combobox", { name: "Holidays that aren’t business days" })).toHaveValue(
+      records.settings.clauses.time.holidays
+    )
+
     await user.selectOptions(
       card("Deadlines").getByRole("combobox", { name: "Holidays that aren’t business days" }),
       "us-wa"
     )
+    await user.selectOptions(
+      card("Project application reviews").getByRole("combobox", { name: "If it would take a redesign" }),
+      "refer-to-committee"
+    )
+    await saveAndApprove(user)
+    expect(actions?.saveSettings).toHaveBeenCalledOnce()
     expect(actions?.saveSettings).toHaveBeenLastCalledWith({
-      clauses: { time: expect.objectContaining({ holidays: "us-wa" }) },
-      policy: null
-    })
-    const zone = card("Deadlines").getByRole("combobox", { name: "Dates and times are in" })
-    await user.clear(zone)
-    await user.type(zone, "Denver")
-    await user.click(await screen.findByRole("option", { name: /\(America\/Denver\)/ }))
-    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
-      clauses: { time: expect.objectContaining({ zone: "America/Denver" }) },
-      policy: null
+      clauses: { time: { ...records.settings.clauses.time, holidays: "us-wa" } },
+      policy: {
+        ...records.settings.policy,
+        decisionPolicy: { ...records.settings.policy.decisionPolicy, redesign: "refer-to-committee" }
+      }
     })
   })
 
@@ -123,19 +139,6 @@ describe("SettingsTab", () => {
     await user.click(cure.getByRole("button", { name: "Set a time to fix a violation" }))
     await user.type(cure.getByRole("spinbutton", { name: "How many" }), "30")
     await user.selectOptions(cure.getByRole("combobox", { name: "Counted from" }), "violation.notice-delivered-on")
-    await user.click(cure.getByRole("button", { name: "Save" }))
-    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
-      clauses: {
-        cure: {
-          value: 30,
-          unit: "calendar-day",
-          after: { path: ["violation.notice-delivered-on"] },
-          curedBy: null,
-          citations: []
-        }
-      },
-      policy: null
-    })
 
     const steps = card("Before a fine or other sanction")
     await user.click(steps.getByRole("button", { name: "Add a step before a sanction" }))
@@ -149,8 +152,16 @@ describe("SettingsTab", () => {
       "violation.hearing-requested-on"
     )
     await user.click(steps.getByRole("button", { name: "Add the step" }))
+    await saveAndApprove(user)
     expect(actions?.saveSettings).toHaveBeenLastCalledWith({
       clauses: {
+        cure: {
+          value: 30,
+          unit: "calendar-day",
+          after: { path: ["violation.notice-delivered-on"] },
+          curedBy: null,
+          citations: []
+        },
         sanctionPreconditions: [
           preconditionOf("violation", "violation.hearing-held-on", "violation.hearing-requested-on")
         ]
@@ -158,28 +169,15 @@ describe("SettingsTab", () => {
       policy: null
     })
   })
-
-  it("sets the recommendations and how sure the review must be, in percent", async () => {
-    const { user, actions } = renderInWorkspace(<SettingsTab />, { records })
-    const policy = card("Project application reviews")
-    await user.selectOptions(
-      policy.getByRole("combobox", { name: "If it would take a redesign" }),
-      "refer-to-committee"
-    )
-    const facts = policy.getByRole("spinbutton", { name: /^Use a detail read from an application/ })
-    expect(facts).toHaveValue(percentOf(records.settings.policy.thresholds.factConfidence))
-    await user.clear(facts)
-    await user.type(facts, "90")
-    await user.click(policy.getByRole("button", { name: "Save" }))
-    expect(actions?.saveSettings).toHaveBeenCalledWith({
-      clauses: {},
-      policy: {
-        decisionPolicy: { ...records.settings.policy.decisionPolicy, redesign: "refer-to-committee" },
-        thresholds: { ...records.settings.policy.thresholds, factConfidence: 0.9 }
-      }
-    })
-  })
 })
+
+function unsaved() {
+  return screen.getByRole("region", { name: "Unsaved settings" })
+}
+
+async function saveAndApprove(user: ReturnType<typeof renderInWorkspace>["user"]) {
+  await user.click(within(unsaved()).getByRole("button", { name: "Save and approve" }))
+}
 
 describe("placeDocument", () => {
   const order: T.DocumentKind[][] = [

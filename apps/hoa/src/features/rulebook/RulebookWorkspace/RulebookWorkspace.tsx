@@ -106,8 +106,9 @@ export function RulebookWorkspace({
             <QuestionsTab />
           </TabsContent>
         ) : null}
+        {/* Kept mounted, so a settings draft survives a look at another tab. */}
         {tabs.includes("settings") ? (
-          <TabsContent value="settings">
+          <TabsContent value="settings" keepMounted>
             <SettingsTab />
           </TabsContent>
         ) : null}
