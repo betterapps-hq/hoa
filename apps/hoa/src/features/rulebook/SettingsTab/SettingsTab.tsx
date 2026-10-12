@@ -23,7 +23,10 @@ import {
   clauseCitations,
   clauseTitles,
   dayUnits,
+  dateChoices,
+  enforcementChoices,
   holidayChoices,
+  preconditionOf,
   liabilityLimits,
   partyChoices,
   percentOf,
@@ -64,7 +67,7 @@ const dayLabels: Record<(typeof dayUnits)[number], string> = {
   "business-day": "Business days"
 }
 const dayChoices = dayUnits.map((value) => ({ value, label: dayLabels[value] }))
-const cureUnits = ["calendar-day", "business-day", "month", "year"]
+const cureUnits = [...dayChoices, { value: "month", label: "Months" }, { value: "year", label: "Years" }]
 
 /** Saves a change to some clauses, saying when it leaves problems to fix. */
 function useSaveClauses() {
@@ -113,7 +116,10 @@ export function SettingsTab() {
       >
         <PrecedenceSetting />
       </SettingCard>
-      <SettingCard name="time" description="How the review counts the days a deadline gives.">
+      <SettingCard
+        name="time"
+        description="How every deadline in your rules is counted: which days count, and in what time zone."
+      >
         <Deadlines />
       </SettingCard>
       <SettingCard name="cure" description="How long an owner has to fix a violation when a rule doesn't say.">
@@ -277,60 +283,125 @@ function Deadlines() {
   )
 }
 
-/** The default cure period: how long, counted from what. */
+/** The default cure period: how long, counted from what; set one where the documents give none, or remove it. */
 function Cure() {
   const { records, vocabulary, actions } = useRulebookWorkspace()
   const save = useSaveClauses()
   const { cure } = records.settings.clauses
+  const dates = dateChoices(records.terms, vocabulary, null)
+  const [isAdding, setIsAdding] = useState(false)
   const [value, setValue] = useState(cure ? String(cure.value) : "")
+  const [unit, setUnit] = useState<T.TermKey>(cure?.unit ?? "calendar-day")
+  const [after, setAfter] = useState<T.TermKey | null>(cure?.after.path.at(-1) ?? dates[0]?.value ?? null)
   const id = useId()
-  if (!cure) {
-    return <p>There&rsquo;s no default time to fix a violation.</p>
+  if (!cure && !isAdding) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p>There&rsquo;s no default time to fix a violation.</p>
+        {actions && dates.length > 0 ? (
+          <Button variant="outline" size="sm" className="self-start" onClick={() => setIsAdding(true)}>
+            <PlusIcon />
+            Set a time to fix a violation
+          </Button>
+        ) : null}
+      </div>
+    )
   }
-  const after = cure.after.path.map((key) => `{{${key}}}`).join("’s ")
-  if (!actions) {
+  if (cure && !actions) {
+    const from = cure.after.path.map((key) => `{{${key}}}`).join("’s ")
     return (
       <p>
         <Statement
-          text={`Within ${amountText(cure.value, cure.unit, vocabulary)} of the ${after}.`}
+          text={`Within ${amountText(cure.value, cure.unit, vocabulary)} of the ${from}.`}
           vocabulary={vocabulary}
         />
       </p>
     )
   }
-  const units = withCurrent(
-    cureUnits.map((key) => ({ value: key, label: sentenceCase(vocabulary.label(key, true)) })),
-    cure.unit,
-    vocabulary
-  )
+  const units = withCurrent(cureUnits, unit, vocabulary)
+  const amount = Number(value)
+  const isValid = value.trim() !== "" && Number.isInteger(amount) && amount >= 0
+  // A period counted from a date further down a path than the request's own is read here, not edited.
+  const isSimple = !cure || cure.after.path.length === 1
+  const change = (next: Partial<T.Cure>) => {
+    if (cure) {
+      void save({ cure: { ...cure, ...next } })
+    }
+  }
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span>Within</span>
-      <Input
-        id={`${id}-value`}
-        aria-label="How many"
-        type="number"
-        min={0}
-        className="w-20"
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        onBlur={() => {
-          const amount = Number(value)
-          if (Number.isFinite(amount) && amount >= 0 && amount !== cure.value) {
-            void save({ cure: { ...cure, value: amount } })
-          }
-        }}
-      />
-      <ChoiceSelect
-        label="Counted in"
-        className="w-40"
-        value={cure.unit}
-        choices={units}
-        onChange={(unit) => void save({ cure: { ...cure, unit } })}
-      />
-      <span>
-        of the <Statement text={after} vocabulary={vocabulary} />
-      </span>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span>Within</span>
+        <Input
+          id={`${id}-value`}
+          aria-label="How many"
+          type="number"
+          min={0}
+          className="w-20"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+          onBlur={() => {
+            if (isValid && amount !== cure?.value) {
+              change({ value: amount })
+            }
+          }}
+        />
+        <ChoiceSelect
+          label="Counted in"
+          className="w-40"
+          value={unit}
+          choices={units}
+          onChange={(next) => {
+            setUnit(next)
+            change({ unit: next })
+          }}
+        />
+        <span>counted from the</span>
+        {isSimple && after ? (
+          <ChoiceSelect
+            label="Counted from"
+            className="w-72"
+            value={after}
+            choices={withCurrent(dates, after, vocabulary)}
+            onChange={(next) => {
+              setAfter(next)
+              change({ after: { path: [next] } })
+            }}
+          />
+        ) : (
+          <Statement text={cure?.after.path.map((key) => `{{${key}}}`).join("’s ") ?? ""} vocabulary={vocabulary} />
+        )}
+      </div>
+      {cure ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="self-start"
+          onClick={() => {
+            setIsAdding(false)
+            void save({ cure: null })
+          }}
+        >
+          Remove the default time
+        </Button>
+      ) : (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            disabled={!isValid || !after}
+            onClick={() => {
+              if (after) {
+                void save({ cure: { value: amount, unit, after: { path: [after] }, curedBy: null, citations: [] } })
+              }
+            }}
+          >
+            Save
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
+            Cancel
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -508,24 +579,121 @@ function Preconditions() {
   const { records, vocabulary, actions } = useRulebookWorkspace()
   const save = useSaveClauses()
   const { sanctionPreconditions } = records.settings.clauses
+  const [isAdding, setIsAdding] = useState(false)
+  const requests = enforcementChoices(records.terms, vocabulary)
   return (
-    <Rows label="Before a fine or other sanction" empty="Nothing is required first." addLabel="" onAdd={null}>
-      {sanctionPreconditions.map((precondition, index) => (
-        <li key={index} className="flex items-start gap-2 px-3 py-2">
-          <p className="min-w-0 flex-1">
-            <Statement text={preconditionText(precondition, vocabulary)} vocabulary={vocabulary} />
-          </p>
-          {actions ? (
-            <RemoveButton
-              name={`step ${index + 1} before a sanction`}
-              onRemove={() =>
-                void save({ sanctionPreconditions: sanctionPreconditions.filter((_, at) => at !== index) })
-              }
-            />
-          ) : null}
-        </li>
-      ))}
-    </Rows>
+    <div className="flex flex-col gap-3">
+      <Rows
+        label="Before a fine or other sanction"
+        empty="Nothing is required first."
+        addLabel="Add a step before a sanction"
+        onAdd={actions && requests.length > 0 && !isAdding ? () => setIsAdding(true) : null}
+      >
+        {sanctionPreconditions.map((precondition, index) => (
+          <li key={index} className="flex items-start gap-2 px-3 py-2">
+            <p className="min-w-0 flex-1">
+              <Statement text={preconditionText(precondition, vocabulary)} vocabulary={vocabulary} />
+            </p>
+            {actions ? (
+              <RemoveButton
+                name={`step ${index + 1} before a sanction`}
+                onRemove={() =>
+                  void save({ sanctionPreconditions: sanctionPreconditions.filter((_, at) => at !== index) })
+                }
+              />
+            ) : null}
+          </li>
+        ))}
+      </Rows>
+      {isAdding ? (
+        <NewPrecondition
+          requests={requests}
+          onAdd={(precondition) => {
+            setIsAdding(false)
+            void save({ sanctionPreconditions: [...sanctionPreconditions, precondition] })
+          }}
+          onCancel={() => setIsAdding(false)}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+/** The "every time" choice of when a step is needed. */
+const always = "always"
+
+type NewPreconditionProps = {
+  requests: { value: T.TermKey; label: string }[]
+  onAdd: (precondition: Clauses["sanctionPreconditions"][number]) => void
+  onCancel: () => void
+}
+
+/** A new step before a sanction: for which requests, the date it needs recorded, and when it's needed. */
+function NewPrecondition({ requests, onAdd, onCancel }: NewPreconditionProps) {
+  const { records, vocabulary } = useRulebookWorkspace()
+  const [requestType, setRequestType] = useState(requests[0]?.value ?? "")
+  const dates = dateChoices(records.terms, vocabulary, requestType)
+  const [needs, setNeeds] = useState<T.TermKey | null>(null)
+  const [onlyWhen, setOnlyWhen] = useState<T.TermKey>(always)
+  const needed = dates.find((date) => date.value === needs) ?? dates[0]
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span>For</span>
+        <ChoiceSelect
+          label="For which requests"
+          className="w-48"
+          value={requestType}
+          choices={requests}
+          onChange={(next) => {
+            setRequestType(next)
+            setNeeds(null)
+            setOnlyWhen(always)
+          }}
+        />
+        <span>record the</span>
+        {needed ? (
+          <ChoiceSelect
+            label="The date needed first"
+            className="w-56"
+            value={needed.value}
+            choices={dates}
+            onChange={setNeeds}
+          />
+        ) : (
+          <span className="text-muted-foreground">(no dates to choose)</span>
+        )}
+        <span>date first,</span>
+        <ChoiceSelect
+          label="When it's needed"
+          className="w-72"
+          value={onlyWhen}
+          choices={[
+            { value: always, label: "every time" },
+            ...dates
+              .filter((date) => date.value !== needed?.value)
+              .map((date) => ({ value: date.value, label: `only if it has a ${date.label.toLowerCase()} date` }))
+          ]}
+          onChange={setOnlyWhen}
+        />
+      </div>
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          disabled={!needed}
+          onClick={() => {
+            if (needed) {
+              onAdd(preconditionOf(requestType, needed.value, onlyWhen === always ? null : onlyWhen))
+            }
+          }}
+        >
+          Add the step
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -561,10 +729,10 @@ function PolicyCard() {
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle>Your recommendations</CardTitle>
+        <CardTitle>Project application reviews</CardTitle>
         <CardDescription>
-          Your organization&rsquo;s own choices, not your documents&rsquo;: what a review recommends, and how sure it
-          must be.
+          How the review of an owner&rsquo;s project application decides: what it recommends when a rule isn&rsquo;t
+          met, and how sure it must be. These are your organization&rsquo;s own choices, not your documents&rsquo;.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6 text-sm">

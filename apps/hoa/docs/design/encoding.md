@@ -386,7 +386,7 @@ list is ordered by relevance; without, in its usual order. The other filters sti
   by its offset from UTC; the cure
   period's length and unit; who decides each request and who answers for whom are rows of pickers, added and removed;
   what a sanction needs first is read as sentences, removable. Conditions and exceptions the documents attach show as
-  sentences, not edited here. Changes save as they're made. Then "Your recommendations": what to recommend when a rule
+  sentences, not edited here. A cure period or a step before a sanction can be added where the documents give none: a step needs a date the request records, every time or only when another is recorded (a hearing, if one was requested). Changes save as they're made. Then "Project application reviews": what to recommend when a rule
   isn't met, by what would fix it, and how sure the review must be, in percent. Nothing is edited as JSON.
 - **Coverage:** one share for the documents the build read from their pages ("97.7% of the text of 2 documents is
   covered by a rule, a term, a setting or a reason for having no rule"), one bar and a small legend. A document whose

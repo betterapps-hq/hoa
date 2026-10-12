@@ -142,6 +142,59 @@ export function partyChoices(terms: readonly TermContent[], vocabulary: Vocabula
     .toSorted(byLabel)
 }
 
+/** The requests that enforce rules, which a cure period or a step before a sanction is about: violations, assessments. */
+export function enforcementChoices(terms: readonly TermContent[], vocabulary: Vocabulary): Choice[] {
+  return [...allTerms(terms).values()]
+    .filter((term) => term.kind === "thing" && term.request?.flow === "enforcement")
+    .map((term) => ({ value: term.key, label: sentenceCase(vocabulary.label(term.key, true)) }))
+    .toSorted(byLabel)
+}
+
+/**
+ * The dates a request records that a period can count from or a step can need: "Violation: notice delivered on". Only
+ * the given request's, when one is given; otherwise every enforcing request's.
+ */
+export function dateChoices(
+  terms: readonly TermContent[],
+  vocabulary: Vocabulary,
+  request: T.TermKey | null
+): Choice[] {
+  const requests = new Set(
+    request === null ? enforcementChoices(terms, vocabulary).map((choice) => choice.value) : [request]
+  )
+  return [...allTerms(terms).values()]
+    .flatMap((term) =>
+      term.kind === "property" && term.valueType.type === "date" && requests.has(term.of)
+        ? [
+            {
+              value: term.key,
+              label:
+                request === null
+                  ? `${sentenceCase(vocabulary.label(term.of))}: ${vocabulary.label(term.key)}`
+                  : sentenceCase(vocabulary.label(term.key))
+            }
+          ]
+        : []
+    )
+    .toSorted(byLabel)
+}
+
+/**
+ * A step a sanction needs first, from the form: a date the request records, always or only when another one is
+ * recorded (a hearing held, only when one was requested).
+ */
+export function preconditionOf(requestType: T.TermKey, needs: T.TermKey, onlyWhen: T.TermKey | null) {
+  const recorded = (key: T.TermKey): T.Condition => ({ type: "exists", from: "request", path: [key] })
+  return {
+    requestTypes: [requestType],
+    condition: onlyWhen
+      ? { type: "any" as const, of: [recorded(needs), { type: "not" as const, of: recorded(onlyWhen) }] }
+      : recorded(needs),
+    except: [],
+    citations: []
+  } satisfies Clauses["sanctionPreconditions"][number]
+}
+
 /** The kinds of request someone decides: applications, appeals, assessments. */
 export function requestChoices(terms: readonly TermContent[], vocabulary: Vocabulary): Choice[] {
   return [...allTerms(terms).values()]

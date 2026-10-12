@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 import type * as T from "@/schema/types"
 import { renderInWorkspace, sampleRecords } from "@/tests/rulebookWorkspace"
 import { SettingsTab } from "./SettingsTab"
-import { ordinal, percentOf, placeDocument, shareOf, zoneLabel } from "./SettingsTab.utils"
+import { ordinal, percentOf, placeDocument, preconditionOf, shareOf, zoneLabel } from "./SettingsTab.utils"
 
 vi.mock("sonner", () => ({
   toast: {
@@ -110,9 +110,58 @@ describe("SettingsTab", () => {
     })
   })
 
+  it("sets a time to fix a violation and a step before a sanction where the documents give none", async () => {
+    const bare = {
+      ...records,
+      settings: {
+        ...records.settings,
+        clauses: { ...records.settings.clauses, cure: null, sanctionPreconditions: [] }
+      }
+    }
+    const { user, actions } = renderInWorkspace(<SettingsTab />, { records: bare })
+    const cure = card("Time to fix a violation")
+    await user.click(cure.getByRole("button", { name: "Set a time to fix a violation" }))
+    await user.type(cure.getByRole("spinbutton", { name: "How many" }), "30")
+    await user.selectOptions(cure.getByRole("combobox", { name: "Counted from" }), "violation.notice-delivered-on")
+    await user.click(cure.getByRole("button", { name: "Save" }))
+    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
+      clauses: {
+        cure: {
+          value: 30,
+          unit: "calendar-day",
+          after: { path: ["violation.notice-delivered-on"] },
+          curedBy: null,
+          citations: []
+        }
+      },
+      policy: null
+    })
+
+    const steps = card("Before a fine or other sanction")
+    await user.click(steps.getByRole("button", { name: "Add a step before a sanction" }))
+    await user.selectOptions(steps.getByRole("combobox", { name: "For which requests" }), "violation")
+    await user.selectOptions(
+      steps.getByRole("combobox", { name: "The date needed first" }),
+      "violation.hearing-held-on"
+    )
+    await user.selectOptions(
+      steps.getByRole("combobox", { name: "When it's needed" }),
+      "violation.hearing-requested-on"
+    )
+    await user.click(steps.getByRole("button", { name: "Add the step" }))
+    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
+      clauses: {
+        sanctionPreconditions: [
+          preconditionOf("violation", "violation.hearing-held-on", "violation.hearing-requested-on")
+        ]
+      },
+      policy: null
+    })
+  })
+
   it("sets the recommendations and how sure the review must be, in percent", async () => {
     const { user, actions } = renderInWorkspace(<SettingsTab />, { records })
-    const policy = card("Your recommendations")
+    const policy = card("Project application reviews")
     await user.selectOptions(
       policy.getByRole("combobox", { name: "If it would take a redesign" }),
       "refer-to-committee"
@@ -192,6 +241,25 @@ describe("ordinal", () => {
       "21st",
       "22nd"
     ])
+  })
+})
+
+describe("preconditionOf", () => {
+  it("needs a date recorded every time, or only when another one is", () => {
+    expect(preconditionOf("violation", "violation.notice-delivered-on", null).condition).toEqual({
+      type: "exists",
+      from: "request",
+      path: ["violation.notice-delivered-on"]
+    })
+    expect(
+      preconditionOf("violation", "violation.hearing-held-on", "violation.hearing-requested-on").condition
+    ).toEqual({
+      type: "any",
+      of: [
+        { type: "exists", from: "request", path: ["violation.hearing-held-on"] },
+        { type: "not", of: { type: "exists", from: "request", path: ["violation.hearing-requested-on"] } }
+      ]
+    })
   })
 })
 
