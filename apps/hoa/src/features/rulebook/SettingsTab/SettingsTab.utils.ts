@@ -27,17 +27,21 @@ const suffixes: Record<Intl.LDMLPluralRule, string> = {
 /** "1st", "2nd", "3rd", "4th": a rank as people say it. */
 export const ordinal = (n: number) => `${n}${suffixes[ordinals.select(n)]}`
 
-/** One row of the precedence list: the documents of equal rank, as one item to drag. */
-export const rankId = (rank: readonly string[]) => rank.join("+")
+/** Where a document is dropped: into a rank, equal to the documents there, or into the gap before a rank, alone. */
+export type RankTarget = { type: "rank"; index: number } | { type: "gap"; index: number }
 
-/** Moves one rank of the order to another place. */
-export function moveRank(order: readonly T.DocumentKind[][], from: number, to: number) {
-  const next = [...order]
-  const [moved] = next.splice(from, 1)
-  if (moved) {
-    next.splice(to, 0, moved)
+/**
+ * Moves one document: into a rank (`index` of the rank) or into a rank of its own at a gap (`index` of the rank it
+ * goes before; the number of ranks for the end). A rank left empty goes away.
+ */
+export function placeDocument(order: readonly T.DocumentKind[][], kind: T.DocumentKind, target: RankTarget) {
+  const next = order.map((rank) => rank.filter((item) => item !== kind))
+  if (target.type === "rank") {
+    next[target.index]?.push(kind)
+  } else {
+    next.splice(target.index, 0, [kind])
   }
-  return next
+  return next.filter((rank) => rank.length > 0)
 }
 
 /** The units a number of days can be counted in. */

@@ -1,8 +1,9 @@
 import { screen, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
+import type * as T from "@/schema/types"
 import { renderInWorkspace, sampleRecords } from "@/tests/rulebookWorkspace"
 import { SettingsTab } from "./SettingsTab"
-import { moveRank, ordinal, percentOf, shareOf } from "./SettingsTab.utils"
+import { ordinal, percentOf, placeDocument, shareOf } from "./SettingsTab.utils"
 
 vi.mock("sonner", () => ({
   toast: {
@@ -28,7 +29,8 @@ describe("SettingsTab", () => {
     const ranks = within(precedence.getByRole("list", { name: "Documents in order of authority" })).getAllByRole(
       "listitem"
     )
-    expect(ranks[0]).toHaveTextContent("1stStatuteOrdinance")
+    expect(ranks[0]).toHaveAccessibleName("1st: Statute, Ordinance")
+    expect(ranks[1]).toHaveAccessibleName("2nd: Declaration, Supplemental declaration, Plat")
     expect(precedence.getByRole("link", { name: "Declaration 1.3, paragraph 3" })).toBeInTheDocument()
     expect(card("Who decides each request").getByText(/decided by the Reviewer/)).toBeInTheDocument()
     expect(card("Deadlines").getByText("US federal holidays")).toBeInTheDocument()
@@ -36,13 +38,24 @@ describe("SettingsTab", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
   })
 
-  it("approves the settings, and orders the documents by dragging a handle", async () => {
+  it("approves the settings, and ranks a document on its own from its menu", async () => {
     const { user, actions } = renderInWorkspace(<SettingsTab />, { records })
     await user.click(screen.getByRole("button", { name: "Approve" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "settings" }], "approved", null)
-    expect(card("Which document wins").getAllByRole("button", { name: /^Move “/ }).length).toBe(
-      records.settings.clauses.precedence.order.length
+    const precedence = card("Which document wins")
+    expect(precedence.getAllByRole("button", { name: /^Drag / }).length).toBe(
+      records.settings.clauses.precedence.order.flat().length
     )
+    await user.click(precedence.getByRole("button", { name: "Move Ordinance" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Just below its rank now" }))
+    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
+      clauses: {
+        precedence: expect.objectContaining({
+          order: [["statute"], ["ordinance"], ...records.settings.clauses.precedence.order.slice(1)]
+        })
+      },
+      policy: null
+    })
   })
 
   it("changes who decides a request and how deadlines count, as forms", async () => {
@@ -86,13 +99,24 @@ describe("SettingsTab", () => {
   })
 })
 
-describe("moveRank", () => {
-  it("moves one rank of the order, keeping equal documents together", () => {
-    expect(moveRank([["statute", "ordinance"], ["declaration"], ["bylaws"]], 2, 0)).toEqual([
-      ["bylaws"],
-      ["statute", "ordinance"],
-      ["declaration"]
+describe("placeDocument", () => {
+  const order: T.DocumentKind[][] = [["statute", "ordinance"], ["declaration"], ["rules", "policy", "resolution"]]
+
+  it("ranks a document equal to another rank's, dropping a rank it leaves empty", () => {
+    expect(placeDocument(order, "declaration", { type: "rank", index: 0 })).toEqual([
+      ["statute", "ordinance", "declaration"],
+      ["rules", "policy", "resolution"]
     ])
+  })
+
+  it("ranks a document on its own at a gap", () => {
+    expect(placeDocument(order, "policy", { type: "gap", index: 3 })).toEqual([
+      ["statute", "ordinance"],
+      ["declaration"],
+      ["rules", "resolution"],
+      ["policy"]
+    ])
+    expect(placeDocument(order, "resolution", { type: "gap", index: 0 })[0]).toEqual(["resolution"])
   })
 })
 

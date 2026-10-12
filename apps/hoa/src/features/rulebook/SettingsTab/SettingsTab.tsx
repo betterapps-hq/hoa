@@ -1,14 +1,12 @@
 import { PlusIcon, Trash2Icon } from "lucide-react"
 import { useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group"
-import { SortableList } from "@/features/projectTypes/SortableList/SortableList"
 import { sentenceCase } from "@/lib/text"
 import { approvalBlockers } from "@/rulebook/review"
 import type * as T from "@/schema/types"
@@ -20,19 +18,16 @@ import { ReviewControls } from "../ReviewControls/ReviewControls"
 import { amountText, citedProvision, countOf } from "../rulebookRecords"
 import { Statement } from "../Statement/Statement"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
+import { Precedence } from "./Precedence"
 import {
   clauseCitations,
   clauseTitles,
   dayUnits,
-  documentKindLabel,
   holidayLabels,
   liabilityLimits,
-  moveRank,
-  ordinal,
   partyChoices,
   percentOf,
   preconditionText,
-  rankId,
   requestChoices,
   shareOf,
   withCurrent,
@@ -113,9 +108,9 @@ export function SettingsTab() {
       ) : null}
       <SettingCard
         name="precedence"
-        description="When two documents disagree, the one higher on this list wins. Documents on the same row rank equally."
+        description="When two documents disagree, the higher-ranked one wins. Drag a document onto another rank to make them equal, or between ranks to rank it on its own."
       >
-        <Precedence />
+        <PrecedenceSetting />
       </SettingCard>
       <SettingCard name="time" description="How the review counts the days a deadline gives.">
         <Deadlines />
@@ -178,47 +173,23 @@ function SettingCard({ name, description, children }: SettingCardProps) {
   )
 }
 
-/** The documents in order of authority; an administrator drags a row by its handle to move it. */
-function Precedence() {
+/** The order of authority, saved as it changes. */
+function PrecedenceSetting() {
   const { records, actions } = useRulebookWorkspace()
   const save = useSaveClauses()
   const { precedence } = records.settings.clauses
   const [order, setOrder] = useState(precedence.order)
-  const row = (rank: readonly string[], index: number, handle: ReactNode = null) => (
-    <div className="flex items-center gap-3 py-2">
-      {handle}
-      <span className="w-8 shrink-0 text-muted-foreground tabular-nums">{ordinal(index + 1)}</span>
-      <span className="flex flex-wrap gap-1.5">
-        {rank.map((kind) => (
-          <Badge key={kind} variant="outline" className="font-normal">
-            {documentKindLabel(kind)}
-          </Badge>
-        ))}
-      </span>
-    </div>
-  )
-  if (!actions) {
-    return (
-      <ol className="divide-y rounded-lg border px-3" aria-label="Documents in order of authority">
-        {order.map((rank, index) => (
-          <li key={rankId(rank)}>{row(rank, index)}</li>
-        ))}
-      </ol>
-    )
-  }
   return (
-    <SortableList
-      items={order}
-      getId={rankId}
-      getName={(rank) => rank.map(documentKindLabel).join(" and ")}
-      label="Documents in order of authority"
-      className="divide-y rounded-lg border px-3"
-      onMove={(from, to) => {
-        const moved = moveRank(order, from, to)
-        setOrder(moved)
-        void save({ precedence: { ...precedence, order: moved } })
-      }}
-      renderItem={(rank, { index, handle }) => row(rank, index, handle)}
+    <Precedence
+      order={order}
+      onChange={
+        actions
+          ? (next) => {
+              setOrder(next)
+              void save({ precedence: { ...precedence, order: next } })
+            }
+          : null
+      }
     />
   )
 }
