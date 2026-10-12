@@ -13,9 +13,10 @@ import { BuildReader } from "./BuildReader"
 
 const meta = {
   component: BuildReader,
+  // A story sets `width` to show it at another width.
   decorators: [
-    (Story) => (
-      <div className="max-w-xl">
+    (Story, { parameters }) => (
+      <div className={typeof parameters.width === "string" ? parameters.width : "max-w-xl"}>
         <Story />
       </div>
     )
@@ -67,18 +68,30 @@ function Replaying({ speed, from = 0, withProgress = false, onReplay }: ReplayPr
   const hasDocuments = readingDocuments(replay.seconds).length > 0
   const documents = useMemo(() => (hasDocuments ? readingDocuments(simulatedBuildSeconds) : []), [hasDocuments])
   const minutes = Math.floor(replay.seconds / 60)
+  const reader = <BuildReader results={replay.results} documents={documents} isRunning={replay.isRunning} />
   return (
     <div className="flex flex-col gap-6">
-      <BuildReader results={replay.results} documents={documents} isRunning={replay.isRunning} />
       {withProgress ? (
-        <BuildProgress
-          jobId={`replay-${speed}`}
-          loadJob={async () => simulatedJob(replay.now())}
-          loadResults={async () => ({ results: readingResults(replay.now()), cursor: null, documents: [] })}
-          onFinished={fn()}
-          onStop={async () => undefined}
-        />
-      ) : null}
+        // The rulebook page's status while it builds (RulebookPage), with the reader above the progress.
+        <section aria-label="Status" className="flex flex-col gap-3 rounded-lg border p-5">
+          <p className="text-lg leading-snug">Updating the rulebook from your documents.</p>
+          <p className="text-sm text-muted-foreground">
+            You can leave this page. When it&rsquo;s done, you review what changed here before it&rsquo;s published.
+          </p>
+          <div className="py-2">{reader}</div>
+          <div className="text-sm text-muted-foreground">
+            <BuildProgress
+              jobId={`replay-${speed}`}
+              loadJob={async () => simulatedJob(replay.now())}
+              loadResults={async () => ({ results: readingResults(replay.now()), cursor: null, documents: [] })}
+              onFinished={fn()}
+              onStop={async () => undefined}
+            />
+          </div>
+        </section>
+      ) : (
+        reader
+      )}
       <div className="flex items-center justify-between gap-3 border-t pt-3 text-xs text-muted-foreground">
         <span>
           {replay.isRunning ? `${minutes} of 17 minutes in` : "Finished after 17 minutes"}, at {speed} times speed
@@ -116,19 +129,19 @@ export const ReplayedFromTheCheck: Story = {
   render: () => <Replay speed={1} from={1000} />
 }
 
-/** Where it would sit: above the build's progress, both following the same build. */
-export const WithTheBuildProgress: Story = {
-  render: () => <Replay speed={8} withProgress />
+/** On the rulebook page while it builds: the reader above the build's progress, both following the same build. */
+export const OnTheRulebookPage: Story = {
+  parameters: { width: "max-w-3xl" },
+  render: () => <Replay speed={4} withProgress />
+}
+
+export const OnTheRulebookPageOnAPhone: Story = {
+  parameters: { width: "max-w-[375px]" },
+  render: () => <Replay speed={4} withProgress />
 }
 
 export const ReplayedOnAPhone: Story = {
-  decorators: [
-    (Story) => (
-      <div className="max-w-[343px]">
-        <Story />
-      </div>
-    )
-  ],
+  parameters: { width: "max-w-[343px]" },
   render: () => <Replay speed={8} />
 }
 
