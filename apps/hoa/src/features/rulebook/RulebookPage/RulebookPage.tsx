@@ -81,7 +81,7 @@ export function RulebookPage(props: RulebookPageProps) {
   if (isReviewing && draftRecords && draftId) {
     const publishedRecords =
       published.rulebook && published.content
-        ? recordsOf(sources, published.rulebook, published.content, "published")
+        ? recordsOf(sources, published.rulebook, published.content, "published", published.filedSources)
         : null
     return (
       <DraftReview
@@ -342,7 +342,7 @@ function RulesInForce({
   if (!rulebook || !content) {
     return null
   }
-  const records = recordsOf(sources, rulebook, content, "published")
+  const records = recordsOf(sources, rulebook, content, "published", published.filedSources)
   const download = async () => {
     setIsDownloading(true)
     const json = await attempt(loadRulesFile, "The rules file couldn't be downloaded.")

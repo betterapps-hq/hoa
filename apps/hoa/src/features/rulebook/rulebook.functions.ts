@@ -13,7 +13,7 @@ import {
 } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus } from "@/db/rulebookRepository"
 import type { JobFailure } from "@/jobs/job"
-import { readRulesFileJson } from "@/rulebook/assemble"
+import { readRulesFile, readRulesFileJson } from "@/rulebook/assemble"
 import { loadBuildResults, type BuildResults } from "@/rulebook/buildResults.server"
 import { checkCurrentSources, isRefusedBuild, type RefusedDocument } from "@/rulebook/buildSources"
 import { rulebookChanges, type RulebookChanges } from "@/rulebook/changes"
@@ -44,6 +44,11 @@ export type RulebookView = {
   content: RulebookContent | null
   /** The published rules file's SHA-256. */
   fileSha256: string | null
+  /**
+   * The documents and provisions the published rules file holds, which its rules cite as they were published; null
+   * for a draft. The stored ones can change under it: a new upload's build takes over its document's key.
+   */
+  filedSources: Pick<RulebookSources, "documents" | "provisions"> | null
   /** The latest build, so the page can follow one in progress. */
   buildJobId: string | null
   isBuilding: boolean
@@ -200,6 +205,9 @@ export const getRulebookView = createServerFn({ method: "GET" })
     ])
     const content = rulebook ? await getRulebookContent(db, hoaId, rulebook.id) : null
     const file = data.which === "published" ? await getPublishedRulesFile(db, hoaId) : null
+    // A rules file that can't be read leaves the stored documents and provisions standing in; downloading it says why.
+    const filed =
+      file && file.rulebookId === rulebook?.id ? await readRulesFile(getBucket(), file).catch(() => null) : null
     const review =
       rulebook && data.which === "draft" && content ? await draftReview(db, context.hoa, rulebook, content) : null
     // A refused build is checked again against the documents as they are now, so removing or replacing the one at
@@ -213,6 +221,7 @@ export const getRulebookView = createServerFn({ method: "GET" })
       rulebook,
       content,
       fileSha256: file?.rulebookId === rulebook?.id ? (file?.fileSha256 ?? null) : null,
+      filedSources: filed ? { documents: filed.documents, provisions: filed.provisions } : null,
       buildJobId: latestBuild?.id ?? null,
       isBuilding: building !== null,
       lastBuildError: isRefused ? null : describeBuildProblem(latestBuild),

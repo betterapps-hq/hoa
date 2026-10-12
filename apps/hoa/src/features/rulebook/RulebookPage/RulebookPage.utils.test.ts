@@ -43,6 +43,7 @@ const view = (overrides: Partial<RulebookView> = {}): RulebookView => ({
   rulebook: null,
   content: null,
   fileSha256: null,
+  filedSources: null,
   buildJobId: null,
   isBuilding: false,
   lastBuildError: null,

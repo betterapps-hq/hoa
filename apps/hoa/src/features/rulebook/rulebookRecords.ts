@@ -3,7 +3,7 @@ import type { RulebookRecords } from "@/rulebook/assemble"
 import type * as T from "@/schema/types"
 import type { Vocabulary } from "@/schema/vocabulary"
 import type { CitedProvision } from "./citedProvision"
-import type { RulebookSources } from "./rulebook.functions"
+import type { RulebookSources, RulebookView } from "./rulebook.functions"
 import type { ReferencedRule } from "./RuleReference/RuleReference"
 
 // A rulebook's records as the rules UX reads them, and the citations its rule references show.
@@ -25,17 +25,21 @@ export function provisionsBuiltFrom(
   })
 }
 
-/** A rulebook's records with the sources they cite. The published rulebook shows only what its rules file holds. */
+/**
+ * A rulebook's records with the sources they cite. The published rulebook shows only what its rules file holds, and
+ * cites the documents and provisions as the file holds them (`filedSources`) when there is one.
+ */
 export function recordsOf(
   sources: RulebookSources,
   rulebook: { sourceDocumentIds: readonly string[] },
   content: RulebookContent,
-  which: "draft" | "published"
+  which: "draft" | "published",
+  filedSources: RulebookView["filedSources"] = null
 ): RulebookRecords {
   return {
     organization: sources.organization,
-    documents: sources.documents,
-    provisions: provisionsBuiltFrom(sources, rulebook.sourceDocumentIds),
+    documents: filedSources?.documents ?? sources.documents,
+    provisions: filedSources?.provisions ?? provisionsBuiltFrom(sources, rulebook.sourceDocumentIds),
     terms: which === "draft" ? content.terms : content.terms.filter(isApproved),
     rules: which === "draft" ? content.rules : content.rules.filter(isApproved),
     settings: content.settings,

@@ -53,6 +53,7 @@ const draft: RulebookView = {
   rulebook: rulebook("draft"),
   content,
   fileSha256: null,
+  filedSources: null,
   buildJobId: null,
   isBuilding: false,
   lastBuildError: null,

@@ -79,6 +79,28 @@ describe("recordsOf", () => {
     expect(recordsOf(sources, rulebook, content, "published").terms).toHaveLength(0)
     expect(recordsOf(sources, rulebook, content, "draft").rules).toHaveLength(records.rules.length)
   })
+
+  it("cites the published rulebook's provisions as its rules file holds them", () => {
+    // A later upload's build took over the declaration's key, so the stored provisions are another document's.
+    const content: RulebookContent = {
+      settings: records.settings,
+      coverage: { provisions: 0, uncovered: [] },
+      rules: [],
+      terms: [],
+      questions: []
+    }
+    const sources = {
+      organization: records.organization,
+      documents: [],
+      provisions: [],
+      provisionDocumentIds: {},
+      files: []
+    }
+    const filed = { documents: records.documents, provisions: records.provisions }
+    const published = recordsOf(sources, { sourceDocumentIds: ["upload"] }, content, "published", filed)
+    expect(published.provisions).toEqual(records.provisions)
+    expect(published.documents).toEqual(records.documents)
+  })
 })
 
 describe("provisionsBuiltFrom", () => {
