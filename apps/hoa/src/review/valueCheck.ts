@@ -15,17 +15,35 @@ export type ValueProblem = (typeof valueProblems)[number]
 /** An exact amount in a unit term. */
 export type ExactQuantity = { value: D.Exact; unit: T.TermKey }
 
-/** The sizes, in the dimension's base, a value of this unit can be written in: every converting unit and the base. */
-function sizesOf(vocabulary: EngineVocabulary, units: readonly T.TermKey[], unit: T.TermKey) {
+/** Whether a quote names a unit by one of its labels: a word as a whole word ("ft", "yards"), a symbol anywhere (″, $). */
+function isNamed(quote: string, labels: readonly string[]) {
+  const text = quote.toLowerCase()
+  return labels.some((label) => {
+    const word = label.toLowerCase()
+    return /^[\p{L} ]+$/u.test(word) ? new RegExp(`(?<!\\p{L})${word}(?!\\p{L})`, "u").test(text) : text.includes(word)
+  })
+}
+
+/**
+ * The sizes, in the dimension's base, a value of this unit can be written in: the converting units the quote names, or
+ * every converting unit and the base when it names none. Only named units count where there are some, so that with many
+ * units a stray numeral ("6 ft, Type 2") can't agree by coincidence (2 yards are 6 feet).
+ */
+function sizesOf(vocabulary: EngineVocabulary, units: readonly T.TermKey[], unit: T.TermKey, quote: string) {
   const found = vocabulary.unit(unit)
   if (!found?.perBase) {
     return { amount: null, sizes: [] }
   }
-  const sizes = units.flatMap((key) => {
+  const converting = units.filter((key) => {
     const other = vocabulary.unit(key)
-    return other?.dimension === found.dimension && other.perBase ? [other.perBase] : []
+    return other?.dimension === found.dimension && other.perBase
   })
-  const unique = [D.integer(1), ...sizes].filter(
+  const named = converting.filter((key) => isNamed(quote, vocabulary.get(key)?.labels.map((label) => label.text) ?? []))
+  const sizes = (named.length > 0 ? named : converting).flatMap((key) => {
+    const perBase = vocabulary.unit(key)?.perBase
+    return perBase ? [perBase] : []
+  })
+  const unique = [...(named.length > 0 ? [] : [D.integer(1)]), ...sizes].filter(
     (size, index, all) => all.findIndex((other) => D.compare(other, size) === 0) === index
   )
   return { amount: found.perBase, sizes: unique.toSorted((a, b) => D.compare(b, a)) }
@@ -69,7 +87,7 @@ export function checkQuantity(
   if (numerals.length === 0) {
     return ["no-numeral"]
   }
-  const { amount, sizes } = sizesOf(vocabulary, context.units, proposed.unit)
+  const { amount, sizes } = sizesOf(vocabulary, context.units, proposed.unit, quote)
   // A unit that converts to nothing (business days) is only written in itself.
   const isAgreeing =
     amount === null

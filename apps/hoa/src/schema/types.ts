@@ -105,9 +105,10 @@ export type Dimension =
   | "speed"
   | "money"
   | "ratio"
-  | "elapsed-time" // minute, hour, calendar-day, week
+  | "elapsed-time" // second, minute, hour, calendar-day, week
   | "calendar-period" // month, year
   | "business-time" // business-day
+  | "sound-level" // decibel
 
 export type ValueType =
   | { type: "quantity"; unit: TermKey } // stored in this unit; any unit of the same dimension converts

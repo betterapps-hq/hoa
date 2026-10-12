@@ -261,7 +261,8 @@ export const dimension = z.enum([
   "ratio",
   "elapsed-time",
   "calendar-period",
-  "business-time"
+  "business-time",
+  "sound-level"
 ])
 
 export const valueType = z.union([

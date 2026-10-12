@@ -39,11 +39,11 @@ describe("B's expected terms", () => {
       citations: cites("rules:2")
     }),
     term({ key: "fee-type.annual", kind: "value", set: "fee-type", labels: labels("annual fee") }),
-    term({ key: "animal", kind: "thing", nature: "object", labels: labels("animal") }),
+    term({ key: "creature", kind: "thing", nature: "object", labels: labels("creature") }),
     term({
       key: "kept-animal",
       kind: "category",
-      of: "animal",
+      of: "creature",
       criteria: { type: "text", text: "kept on a leash" },
       labels: labels("Kept Animal"),
       citations: cites("rules:10")
@@ -59,7 +59,7 @@ describe("B's expected terms", () => {
 
   it("are the terms named as the document defines them, with a defined value's set and a category's thing", () => {
     expect(expected.map((found) => found.key).toSorted()).toEqual([
-      "animal",
+      "creature",
       "fee-type",
       "fee-type.late",
       "garden-fixture",

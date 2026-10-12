@@ -58,15 +58,34 @@ describe("the engine's vocabulary", () => {
   })
 
   it("converts units within a dimension by perBase", () => {
-    expect(vocabulary.unit("foot")).toEqual({ dimension: "length", perBase: D.integer(12) })
+    expect(vocabulary.unit("foot")).toEqual({ dimension: "length", perBase: D.exact("304.8") })
     expect(vocabulary.unit("foot")).toBe(vocabulary.unit("foot"))
     expect(vocabulary.unit("fence-run")).toBeUndefined()
-    expect(toBase(vocabulary, D.integer(6), "foot")?.value).toEqual(D.integer(72))
+    expect(toBase(vocabulary, D.integer(6), "foot")?.value).toEqual(toBase(vocabulary, D.integer(72), "inch")?.value)
+    expect(toBase(vocabulary, D.integer(1), "acre")?.value).toEqual(
+      toBase(vocabulary, D.integer(43560), "square-foot")?.value
+    )
+    expect(toBase(vocabulary, D.integer(72), "hour")?.value).toEqual(
+      toBase(vocabulary, D.integer(3), "calendar-day")?.value
+    )
     expect(toBase(vocabulary, D.integer(20), "percent")?.value).toEqual(D.fraction(1, 5))
     expect(toBase(vocabulary, D.integer(3), "business-day")).toEqual({
       value: D.integer(3),
       dimension: "business-time"
     })
     expect(toBase(vocabulary, D.integer(3), "furlong")).toBeUndefined()
+  })
+
+  it("keeps a core unit's conversion when a rulebook refines it", () => {
+    const acre = termDraft.parse({
+      key: "acre",
+      kind: "unit",
+      dimension: "area",
+      perBase: "6272640",
+      labels: [{ text: "ac", role: "preferred" }]
+    })
+    const refined = createEngineVocabulary([acre])
+    expect(refined.unit("acre")).toEqual({ dimension: "area", perBase: D.exact("4046856422.4") })
+    expect(refined.label("acre")).toBe("ac")
   })
 })

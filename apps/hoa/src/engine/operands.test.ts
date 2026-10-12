@@ -67,8 +67,9 @@ const pets = (facts: ReturnType<typeof fact>[], isComplete: boolean) =>
 describe("constants and references", () => {
   it("converts quantities to their dimension's base: 6 feet are 72 inches", () => {
     const context = exampleContext()
+    // The base is the millimeter, so every unit converts exactly; what matters is that the two agree.
     expect(evaluateOperand(context, scope("lot"), { type: "quantity", value: 6, unit: "foot" })).toEqual(
-      number(72, 72, "length")
+      evaluateOperand(context, scope("lot"), { type: "quantity", value: 72, unit: "inch" })
     )
     expect(evaluateOperand(context, scope("lot"), { type: "quantity", value: 6, unit: "furlong" })).toEqual(V.unknown)
     expect(evaluateOperand(context, scope("lot"), { type: "fraction", numerator: 2, denominator: 3 })).toEqual({
@@ -121,7 +122,8 @@ describe("arithmetic carries ranges (schema.md, Expressions 4 and 7)", () => {
       ]
     })
     const sum: Operand = { type: "sum", of: [ref("fence-run.height"), ref("fence-run.lattice-height")] }
-    expect(evaluateOperand(context, scope("run-1"), sum)).toEqual(number(95, null, "length"))
+    // 95 inches is 2,413 millimeters, the base; the unclear lattice leaves the top open.
+    expect(evaluateOperand(context, scope("run-1"), sum)).toEqual(number(2413, null, "length"))
   })
 
   it("takes the greater of $25 and a tenth of the balance", () => {
@@ -270,25 +272,28 @@ describe("aggregates over a list (schema.md, Expressions 5)", () => {
       where: where && { type: "compare", left: ref("pet.weight"), op: ">", right: where }
     })
     const context = pets(weights, true)
-    expect(evaluateOperand(context, scope("lot"), over("sum-of"))).toEqual(number(60, 60, "weight"))
-    expect(evaluateOperand(context, scope("lot"), over("greatest-of"))).toEqual(number(30, 30, "weight"))
-    expect(evaluateOperand(context, scope("lot"), over("least-of"))).toEqual(number(10, 10, "weight"))
+    // Pounds in the weight base (the milligram): 1 pound is 453,592.37 mg exactly.
+    const mg = (pounds: number) => pounds * 453592.37
+    const lb = (min: number, max: number | null) => number(mg(min), max === null ? null : mg(max), "weight")
+    expect(evaluateOperand(context, scope("lot"), over("sum-of"))).toEqual(lb(60, 60))
+    expect(evaluateOperand(context, scope("lot"), over("greatest-of"))).toEqual(lb(30, 30))
+    expect(evaluateOperand(context, scope("lot"), over("least-of"))).toEqual(lb(10, 10))
     expect(
       evaluateOperand(context, scope("lot"), over("sum-of", { type: "quantity", value: 15, unit: "pound" }))
-    ).toEqual(number(50, 50, "weight"))
+    ).toEqual(lb(50, 50))
     expect(
       evaluateOperand(context, scope("lot"), over("greatest-of", { type: "quantity", value: 99, unit: "pound" }))
     ).toEqual(V.absent)
     const open = pets(weights, false)
-    expect(evaluateOperand(open, scope("lot"), over("greatest-of"))).toEqual(number(30, null, "weight"))
-    expect(evaluateOperand(open, scope("lot"), over("least-of"))).toEqual(number(null, 10, "weight"))
+    expect(evaluateOperand(open, scope("lot"), over("greatest-of"))).toEqual(lb(30, null))
+    expect(evaluateOperand(open, scope("lot"), over("least-of"))).toEqual(number(null, mg(10), "weight"))
     expect(
       evaluateOperand(
         pets([], false),
         scope("lot"),
         over("greatest-of", { type: "quantity", value: 99, unit: "pound" })
       )
-    ).toEqual(number(0, null, "weight"))
+    ).toEqual(lb(0, null))
     expect(evaluateOperand(pets([], true), scope("lot"), { ...over("sum-of"), value: ["pet.species"] })).toEqual(
       V.unknown
     )

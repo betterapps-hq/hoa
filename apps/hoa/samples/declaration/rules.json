@@ -21279,7 +21279,7 @@
       "organizationId": "org-sample",
       "kind": "unit",
       "dimension": "length",
-      "perBase": "39.37007874015748031496",
+      "perBase": "1000",
       "labels": [
         {
           "text": "meter",
@@ -45053,7 +45053,7 @@
       "organizationId": "org-sample",
       "kind": "unit",
       "dimension": "area",
-      "perBase": "6272640",
+      "perBase": "4046856422.4",
       "labels": [
         {
           "text": "acre",

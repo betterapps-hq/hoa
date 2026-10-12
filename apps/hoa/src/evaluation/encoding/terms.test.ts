@@ -72,10 +72,10 @@ describe("alignTerms", () => {
   })
 
   it("reserves every same-key match before matching labels", () => {
-    const reference = [draft("fence", "fence panel"), draft("fence-panel", "fence panel")]
-    const matches = alignTerms(reference, [draft("fence-panel", "fence panel")])
-    expect(matches.get("fence-panel")).toMatchObject({ pipeline: "fence-panel", by: "key" })
-    expect(matches.has("fence")).toBe(false)
+    const reference = [draft("gate", "gate panel"), draft("gate-panel", "gate panel")]
+    const matches = alignTerms(reference, [draft("gate-panel", "gate panel")])
+    expect(matches.get("gate-panel")).toMatchObject({ pipeline: "gate-panel", by: "key" })
+    expect(matches.has("gate")).toBe(false)
   })
 
   it("matches a property only under its thing's match, or the same thing when the thing isn't being aligned", () => {

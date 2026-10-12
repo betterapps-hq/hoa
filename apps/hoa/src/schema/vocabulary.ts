@@ -24,8 +24,18 @@ const maxDepth = 10
 
 export function createVocabulary(organizationTerms: TermContent[]): Vocabulary {
   const byKey = new Map<TermKey, TermContent>()
-  for (const term of [...coreTerms, ...organizationTerms]) {
+  for (const term of coreTerms) {
     byKey.set(term.key, term)
+  }
+  for (const term of organizationTerms) {
+    // A core unit's dimension and conversion are physical facts: a refinement may add labels, never change them.
+    const core = byKey.get(term.key)
+    byKey.set(
+      term.key,
+      core?.kind === "unit" && term.kind === "unit"
+        ? { ...term, dimension: core.dimension, perBase: core.perBase }
+        : term
+    )
   }
 
   function chain(key: TermKey) {
