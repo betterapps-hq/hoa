@@ -168,7 +168,10 @@ function StatusLine({
       // A short title over the progress, which says the rest.
       return (
         <section aria-label="Status" className="flex flex-col gap-4 rounded-lg border p-5">
-          <p className="font-medium">Processing your documents</p>
+          <div className="flex flex-col gap-0.5">
+            <p className="font-medium">Processing your documents</p>
+            <p className="text-sm text-muted-foreground">You can leave this page and come back.</p>
+          </div>
           {props.draft.buildJobId ? (
             <div className="text-sm text-muted-foreground">
               <DocumentEncodingSteps

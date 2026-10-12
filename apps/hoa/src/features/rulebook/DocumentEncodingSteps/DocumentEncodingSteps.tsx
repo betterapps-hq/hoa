@@ -117,12 +117,7 @@ export function DocumentEncodingSteps({
           <StepList steps={steps} />
         </CollapsibleContent>
       </Collapsible>
-      {isRunning ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <StopBuild onStop={onStop} />
-          <span className="text-xs text-muted-foreground">You can leave this page and come back.</span>
-        </div>
-      ) : null}
+      {isRunning ? <StopBuild onStop={onStop} /> : null}
     </div>
   )
 }
