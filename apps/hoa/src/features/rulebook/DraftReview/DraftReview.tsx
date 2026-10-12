@@ -42,6 +42,8 @@ export type DraftReviewProps = {
   onBack: (() => void) | null
   onPublish: () => Promise<void>
   onDiscard: () => Promise<void>
+  /** Processes the documents again, redoing only what was skipped. */
+  onRetry: () => Promise<void>
 }
 
 /**
@@ -60,7 +62,8 @@ export function DraftReview({
   actions,
   onBack,
   onPublish,
-  onDiscard
+  onDiscard,
+  onRetry
 }: DraftReviewProps) {
   const todos = draftTodos(records, coverageOf(records))
   const skipped = skippedParts(buildFailures, records)
@@ -142,7 +145,13 @@ export function DraftReview({
             everything that didn&rsquo;t change.
           </p>
         ) : null}
-        {skipped.length > 0 ? <SkippedNotice failures={buildFailures} parts={skipped} /> : null}
+        {skipped.length > 0 ? (
+          <SkippedNotice
+            parts={skipped}
+            isBusy={isBusy}
+            onRetry={isRebuilding ? null : () => void run(onRetry, "Processing didn’t start.")}
+          />
+        ) : null}
       </header>
 
       <section aria-labelledby="draft-next" className="flex flex-col gap-4 rounded-lg border p-5">

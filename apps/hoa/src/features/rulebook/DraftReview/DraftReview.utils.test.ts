@@ -48,7 +48,7 @@ describe("draftTodos", () => {
 })
 
 describe("skippedParts", () => {
-  it("says in words where the build skipped something, one line per place, with the errors behind it", () => {
+  it("says in a few words where the build skipped something, one line per place, linked to it", () => {
     const records = sampleRecords()
     const [provision] = records.provisions
     const [document] = records.documents
@@ -62,13 +62,15 @@ describe("skippedParts", () => {
       { stage: "consolidate", itemId: "rulebook", message: "no answer" }
     ]
     const parts = skippedParts(failures, records)
-    expect(parts.map((part) => part.text)).toEqual([
-      expect.stringMatching(/: 2 rules weren't drafted$/),
-      expect.stringMatching(/: not every rule from here on was drafted$/),
-      expect.stringMatching(/: it wasn't read for rules$/),
-      `${document!.title}: its defined terms weren't read`,
-      "The rules weren't checked against each other for conflicts"
+    expect(parts.map((part) => [part.place?.label ?? null, part.text])).toEqual([
+      [expect.any(String), "2 rules not drafted"],
+      [expect.any(String), "some rules not drafted"],
+      [expect.any(String), "not read for rules"],
+      [document!.title, "defined terms not read"],
+      [null, "Rules not checked for conflicts"]
     ])
-    expect(parts[0]?.details).toEqual(["zod: imposedBy", "zod: against"])
+    // Each place opens in the documents: a section at itself, a document at its start.
+    expect(parts[0]?.place?.href).toMatch(new RegExp(`\\?provision=${encodeURIComponent(key)}$`))
+    expect(parts[3]?.place?.href).toBe(`/documents/${encodeURIComponent(document!.key)}`)
   })
 })

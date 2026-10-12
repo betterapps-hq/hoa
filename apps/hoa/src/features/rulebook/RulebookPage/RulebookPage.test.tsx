@@ -163,7 +163,7 @@ describe("RulebookPage", () => {
     expect(screen.getByRole("tab", { name: "Questions", selected: true })).toBeInTheDocument()
   })
 
-  it("says what the build skipped, on the status line and in the review, with the errors folded away", async () => {
+  it("says what the build skipped, on the status line and in the review, where it is, and tries again", async () => {
     const failures = [
       { stage: "structure-rules", itemId: "declaration:21#fine", message: "zod: imposedBy" },
       { stage: "structure-rules", itemId: "declaration:21#notice", message: "zod: against" }
@@ -172,17 +172,22 @@ describe("RulebookPage", () => {
     setup({ draft: skipped })
     expect(
       within(screen.getByRole("region", { name: "Status" })).getByText(
-        /The build skipped 2 items, listed in the review\./
+        /Some parts weren’t finished\. They’re listed in the review\./
       )
     ).toBeInTheDocument()
     cleanup()
-    const { user } = setup({ draft: skipped, isReviewing: true })
+    const { props, user } = setup({ draft: skipped, isReviewing: true })
     const notice = screen.getByRole("alert")
-    expect(within(notice).getByText("The build skipped 2 items")).toBeInTheDocument()
-    expect(within(notice).getByText("Declaration 21: 2 rules weren't drafted")).toBeInTheDocument()
-    expect(within(notice).queryByText("zod: imposedBy")).not.toBeInTheDocument()
-    await user.click(within(notice).getByRole("button", { name: "What went wrong" }))
-    expect(within(notice).getByText("zod: imposedBy")).toBeInTheDocument()
+    expect(within(notice).getByText("1 part wasn't finished")).toBeInTheDocument()
+    expect(within(notice).getByRole("listitem")).toHaveTextContent("Declaration 21: 2 rules not drafted")
+    expect(within(notice).getByRole("link", { name: "Declaration 21" })).toHaveAttribute(
+      "href",
+      expect.stringContaining("provision=declaration%3A21")
+    )
+    // The errors themselves aren't the reviewer's to read.
+    expect(within(notice).queryByText(/zod/)).not.toBeInTheDocument()
+    await user.click(within(notice).getByRole("button", { name: "Try again" }))
+    expect(props.onBuild).toHaveBeenCalled()
   })
 
   it("discards the draft after saying what's lost", async () => {

@@ -319,9 +319,10 @@ is reported as such, not as an error.
 leads with the way back to the rules in force, what the draft changes against them, and **Discard draft**, whose
 confirmation says how many review decisions are lost and that the published version stays in force. When the build
 that made the draft skipped items (a rule that still failed its checks, a section a call never answered), a notice
-says where, in words (`skippedParts`: "Declaration Article 21: 2 rules weren't drafted"), asks the reviewer to check
-those parts of the documents before publishing, and folds the errors behind "What went wrong"; the status line outside
-review counts them too. A failed build is the only one the status line reports as not finished. Then the next step
+("4 parts weren't finished") says where in a few words, each place linked to it in the documents (`skippedParts`:
+"Declaration 21: 2 rules not drafted"), and offers **Try again**, which processes the documents again: what finished
+comes from the content cache, so only the skipped parts are redone. The errors themselves stay on the job, not on the
+page. The status line outside review says some parts weren't finished. A failed build is the only one the status line reports as not finished. Then the next step
 as one sentence with one action, from the draft's to-do list in the order the work goes (`draftTodos`): terms to
 review (a rule waits for the terms it reads), questions to answer, rules to review, the settings, reasons for having no
 rule, provisions with no rule and no reason, and approved rules with open problems. The rest of the list follows as

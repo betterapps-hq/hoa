@@ -1,3 +1,4 @@
+import { citationHref, citedProvisionHref } from "@/features/documents/citationLink"
 import type { JobFailure } from "@/jobs/job"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import type { Coverage } from "@/rulebook/coverage"
@@ -107,18 +108,21 @@ export function draftTodos(records: RulebookRecords, coverage: Pick<Coverage, "u
   return todos.filter((todo) => todo !== null)
 }
 
-/** Something the build skipped, in words: "Declaration Article 21: 2 rules weren't drafted", and the errors behind it. */
-export type SkippedPart = { id: string; text: string; details: string[] }
+/**
+ * Something the build skipped, in a few words: where ("Declaration 21", linked to it in the documents), and what
+ * ("2 rules not drafted"); a skip of the whole draft has no place.
+ */
+export type SkippedPart = { id: string; place: { label: string; href: string } | null; text: string }
 
 // What a stage didn't do, said of the section it started at, or of the whole draft.
 const sectionWords: Partial<Record<string, string>> = {
-  "find-rules": "it wasn't read for rules",
-  vocabulary: "the terms its rules use weren't named",
-  "structure-rules": "not every rule from here on was drafted"
+  "find-rules": "not read for rules",
+  vocabulary: "its terms not named",
+  "structure-rules": "some rules not drafted"
 }
 const draftWords: Partial<Record<string, string>> = {
-  "vocabulary-merge": "The terms weren't combined into one vocabulary",
-  consolidate: "The rules weren't checked against each other for conflicts"
+  "vocabulary-merge": "Terms not combined into one vocabulary",
+  consolidate: "Rules not checked for conflicts"
 }
 
 /**
@@ -128,51 +132,49 @@ const draftWords: Partial<Record<string, string>> = {
 function placeOf(itemId: string, records: Pick<RulebookRecords, "provisions" | "documents">) {
   const base = itemId.replace(/:(first-pass|retry-\d+)$/, "")
   const [provisionKey = base, aspect] = base.split("#")
+  const provision = records.provisions.find((found) => found.key === provisionKey)
+  const href = citedProvisionHref({ provisionKey, anchors: provision?.anchors ?? [] })
   if (aspect !== undefined && base === itemId) {
-    return { kind: "rule" as const, label: citationLabel(provisionKey) }
+    return { kind: "rule" as const, label: citationLabel(provisionKey), href }
   }
-  if (records.provisions.some((provision) => provision.key === provisionKey)) {
-    return { kind: "section" as const, label: citationLabel(provisionKey) }
+  if (provision) {
+    return { kind: "section" as const, label: citationLabel(provisionKey), href }
   }
   const document = records.documents.find((found) => found.key === base)
-  return document ? { kind: "document" as const, label: document.title } : null
+  return document ? { kind: "document" as const, label: document.title, href: citationHref(document.key) } : null
 }
 
 /**
  * What the build that made the draft skipped (encoding.md, UX, Draft review), one line per place and kind: what's in
- * those sections may be missing from the draft, so the reviewer reads them in the documents.
+ * those sections may be missing from the draft.
  */
 export function skippedParts(
   failures: readonly JobFailure[],
   records: Pick<RulebookRecords, "provisions" | "documents">
 ): SkippedPart[] {
-  const parts = new Map<string, { place: ReturnType<typeof placeOf>; stage: string; details: string[] }>()
+  const parts = new Map<string, { place: ReturnType<typeof placeOf>; stage: string; count: number }>()
   for (const failure of failures) {
     const place = placeOf(failure.itemId, records)
     const id = `${failure.stage} ${place?.kind ?? ""} ${place?.label ?? ""}`
-    const part = parts.get(id) ?? { place, stage: failure.stage, details: [] }
-    part.details.push(failure.message)
+    const part = parts.get(id) ?? { place, stage: failure.stage, count: 0 }
+    part.count += 1
     parts.set(id, part)
   }
-  return [...parts].map(([id, { place, stage, details }]) => {
+  return [...parts].map(([id, { place, stage, count }]) => {
     const what = (() => {
       switch (place?.kind) {
         case "rule":
-          return details.length === 1
-            ? "a rule wasn't drafted"
-            : `${countOf(details.length, "rule", "rules")} weren't drafted`
+          return `${countOf(count, "rule", "rules")} not drafted`
         case "section":
-          return sectionWords[stage] ?? "it wasn't finished"
+          return sectionWords[stage] ?? "not finished"
         case "document":
-          return stage === "defined-terms" ? "its defined terms weren't read" : "it wasn't finished"
+          return stage === "defined-terms" ? "defined terms not read" : "not finished"
         case undefined:
           return null
       }
     })()
-    return {
-      id,
-      text: place && what ? `${place.label}: ${what}` : (draftWords[stage] ?? "Part of the build wasn't finished"),
-      details
-    }
+    return place && what
+      ? { id, place: { label: place.label, href: place.href }, text: what }
+      : { id, place: null, text: draftWords[stage] ?? "Part of the draft not finished" }
   })
 }

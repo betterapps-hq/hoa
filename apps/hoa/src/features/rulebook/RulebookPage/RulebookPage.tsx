@@ -28,7 +28,7 @@ import { BuildProgress } from "../BuildProgress/BuildProgress"
 import { DraftReview } from "../DraftReview/DraftReview"
 import { saveFile } from "../PublishedRulebook/PublishedRulebook.utils"
 import type { RulebookSources, RulebookView } from "../rulebook.functions"
-import { countOf, recordsOf } from "../rulebookRecords"
+import { recordsOf } from "../rulebookRecords"
 import { RulebookWorkspace } from "../RulebookWorkspace/RulebookWorkspace"
 import type { RulebookActions, RulebookSource } from "../useRulebookWorkspace"
 import { refusalSentence, rulebookStatus, type RulebookStatus } from "./RulebookPage.utils"
@@ -102,6 +102,10 @@ export function RulebookPage(props: RulebookPageProps) {
         onDiscard={async () => {
           await props.onDiscard(draftId)
           onReviewingChange(false)
+        }}
+        onRetry={async () => {
+          await props.onBuild()
+          props.onChanged()
         }}
       />
     )
@@ -192,9 +196,7 @@ function StatusLine({
                 status.builtFrom.length > 0 ? `It was built after ${status.builtFrom.join(", ")} changed.` : null,
                 status.summary ? `It ${status.summary}.` : "It has the same rules as the rulebook in force."
               ]),
-          status.skipped > 0
-            ? `The build skipped ${countOf(status.skipped, "item", "items")}, listed in the review.`
-            : null
+          status.skipped > 0 ? "Some parts weren’t finished. They’re listed in the review." : null
         ]
           .filter((part) => part !== null)
           .join(" "),
