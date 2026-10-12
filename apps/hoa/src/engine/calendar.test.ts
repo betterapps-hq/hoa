@@ -36,6 +36,13 @@ describe("calendar arithmetic (schema.md, Expressions 11)", () => {
     expect(C.addBusinessDays(day("2026-07-02"), 0, holidays)).toBe(day("2026-07-02"))
   })
 
+  it("knows Washington's holidays: no Columbus Day, and the day after Thanksgiving", () => {
+    const holidays = C.holidayCalendar("us-wa")
+    expect(C.isBusinessDay(day("2026-10-12"), holidays)).toBe(true)
+    expect(C.isBusinessDay(day("2026-11-27"), holidays)).toBe(false)
+    expect(C.isBusinessDay(day("2026-11-26"), holidays)).toBe(false)
+  })
+
   it("reads a timestamp in the organization's local time", () => {
     // 07:30 UTC on February 3 is 01:30 in Chicago.
     expect(C.localMinutes("2026-02-03T07:30:00Z", "America/Chicago")).toBe(day("2026-02-03") * 1440 + 90)

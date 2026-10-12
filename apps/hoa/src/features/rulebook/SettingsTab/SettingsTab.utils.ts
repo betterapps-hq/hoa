@@ -1,4 +1,5 @@
 import { match } from "ts-pattern"
+import { holidayCalendars } from "@/engine/calendar"
 import { sentenceCase } from "@/lib/text"
 import { coreTerms } from "@/schema/coreTerms"
 import { describeCondition } from "@/schema/describe"
@@ -90,14 +91,38 @@ export function placeDocument(order: readonly T.DocumentKind[][], kind: T.Docume
 /** The units a number of days can be counted in. */
 export const dayUnits = ["calendar-day", "business-day"] as const
 
-export const holidayLabels: Record<string, string> = { "us-federal": "US federal holidays" }
+const holidayLabels: Record<(typeof holidayCalendars)[number], string> = {
+  "us-federal": "US federal holidays",
+  "us-wa": "Washington state holidays",
+  none: "None, only weekends"
+}
 
-/** "Pacific time (America/Los_Angeles)", or the zone's own name when it has no short one. */
-export function zoneLabel(zone: string) {
-  const name = new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "longGeneric" })
-    .formatToParts(new Date())
+/** The holiday calendars a deadline can skip, by name. */
+export const holidayChoices = holidayCalendars.map((value) => ({ value, label: holidayLabels[value] }))
+
+function zoneName(zone: string, style: "longGeneric" | "longOffset", at: Date) {
+  return new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: style })
+    .formatToParts(at)
     .find((part) => part.type === "timeZoneName")?.value
-  return name ? `${name} (${zone})` : zone
+}
+
+/** A zone's offset from UTC today, in minutes: -420 for Los Angeles in summer. */
+export function zoneOffset(zone: string, at = new Date()) {
+  const [, sign = "+", hours = "0", minutes = "0"] =
+    /GMT([+-])(\d{2}):(\d{2})/.exec(zoneName(zone, "longOffset", at) ?? "") ?? []
+  return (sign === "-" ? -1 : 1) * (Number(hours) * 60 + Number(minutes))
+}
+
+/**
+ * "UTC−07:00 Pacific Time (America/Los Angeles)": the offset today, the zone's name when it has one, and its city.
+ */
+export function zoneLabel(zone: string, at = new Date()) {
+  const offset = zoneOffset(zone, at)
+  const hours = String(Math.floor(Math.abs(offset) / 60)).padStart(2, "0")
+  const minutes = String(Math.abs(offset) % 60).padStart(2, "0")
+  const name = zoneName(zone, "longGeneric", at)
+  const city = zone.replaceAll("_", " ")
+  return `UTC${offset < 0 ? "−" : "+"}${hours}:${minutes} ${name && name !== city ? `${name} (${city})` : city}`
 }
 
 type Choice = { value: T.TermKey; label: string }

@@ -516,7 +516,8 @@ __TYPES:Questions__
 - **Settings** hold two things. `clauses` are what the documents and law say about how rules work, each cited:
   `precedence` (from the conflicts clause and state law; decisions take their rank as described above),
   `time` (what an unqualified "days" means, whether a deadline on a weekend or holiday rolls to the next business day,
-  the holiday calendar and the time zone), `liability` (who answers for whom: an owner for a tenant or a guest, a seller
+  the holiday calendar (`us-federal`, `us-wa` for Washington's legal holidays, or `none`, weekends only) and the IANA
+  time zone), `liability` (who answers for whom: an owner for a tenant or a guest, a seller
   until the board receives notice of the sale, with the sanctions it doesn't reach), `deciders` (who decides each request type: the committee decides architectural applications), the default `cure`
   period (none when it's null) and `sanctionPreconditions`, the procedures sanctions need first (notice, and a hearing if one was
   requested), each for some request types and with the sanctions it exempts, so none is copied into each sanction. `policy` is the organization's own operating choices: the decision policy for applications

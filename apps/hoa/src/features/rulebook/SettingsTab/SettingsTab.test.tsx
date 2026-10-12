@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 import type * as T from "@/schema/types"
 import { renderInWorkspace, sampleRecords } from "@/tests/rulebookWorkspace"
 import { SettingsTab } from "./SettingsTab"
-import { ordinal, percentOf, placeDocument, shareOf } from "./SettingsTab.utils"
+import { ordinal, percentOf, placeDocument, shareOf, zoneLabel } from "./SettingsTab.utils"
 
 vi.mock("sonner", () => ({
   toast: {
@@ -40,6 +40,7 @@ describe("SettingsTab", () => {
     expect(precedence.getByRole("link", { name: "Declaration 1.3, paragraph 3" })).toBeInTheDocument()
     expect(card("Who decides each request").getByText(/decided by the Reviewer/)).toBeInTheDocument()
     expect(card("Deadlines").getByText("US federal holidays")).toBeInTheDocument()
+    expect(card("Deadlines").getByText(/^UTC[−+]\d{2}:\d{2} /)).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /^Move/ })).not.toBeInTheDocument()
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
   })
@@ -89,6 +90,22 @@ describe("SettingsTab", () => {
     )
     expect(actions?.saveSettings).toHaveBeenLastCalledWith({
       clauses: { time: expect.objectContaining({ rollForward: !records.settings.clauses.time.rollForward }) },
+      policy: null
+    })
+    await user.selectOptions(
+      card("Deadlines").getByRole("combobox", { name: "Holidays that aren’t business days" }),
+      "us-wa"
+    )
+    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
+      clauses: { time: expect.objectContaining({ holidays: "us-wa" }) },
+      policy: null
+    })
+    const zone = card("Deadlines").getByRole("combobox", { name: "Dates and times are in" })
+    await user.clear(zone)
+    await user.type(zone, "Denver")
+    await user.click(await screen.findByRole("option", { name: /\(America\/Denver\)/ }))
+    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
+      clauses: { time: expect.objectContaining({ zone: "America/Denver" }) },
       policy: null
     })
   })
@@ -175,6 +192,20 @@ describe("ordinal", () => {
       "21st",
       "22nd"
     ])
+  })
+})
+
+describe("zoneLabel", () => {
+  it("says a zone's offset from UTC on the day, its name and its city", () => {
+    expect(zoneLabel("America/Los_Angeles", new Date("2026-07-01T12:00:00Z"))).toBe(
+      "UTC−07:00 Pacific Time (America/Los Angeles)"
+    )
+    expect(zoneLabel("America/Los_Angeles", new Date("2026-01-01T12:00:00Z"))).toBe(
+      "UTC−08:00 Pacific Time (America/Los Angeles)"
+    )
+    expect(zoneLabel("Asia/Kolkata", new Date("2026-01-01T12:00:00Z"))).toBe(
+      "UTC+05:30 India Standard Time (Asia/Kolkata)"
+    )
   })
 })
 

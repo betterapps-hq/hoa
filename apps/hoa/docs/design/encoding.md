@@ -381,7 +381,9 @@ list is ordered by relevance; without, in its usual order. The other filters sti
   passages it comes from, when the documents state it. Which document wins is a tier list: each rank (1st, 2nd) a row of
   the documents equal in it; a document is dragged by its handle onto another rank to rank equal (before or after a chosen document there), or into a gap to
   rank alone, and its menu does the same from the keyboard; law (federal law, state law, then county and city ordinances) is fixed at the top, each marked with a lock, since no
-  document an organization writes outranks it, so it can't be moved and nothing goes into or above it; each document is named as an owner knows it (Federal laws, Declaration (CC&Rs)), and moves save together with Save the order, or Reset; deadlines are a choice of calendar or business days and whether a deadline on a day off moves; the cure
+  document an organization writes outranks it, so it can't be moved and nothing goes into or above it; each document is named as an owner knows it (Federal laws, Declaration (CC&Rs)), and moves save together with Save the order, or Reset; deadlines are a choice of calendar or business days, whether a deadline on a day off moves, the holidays that
+  aren't business days (US federal, Washington state, or none) and the time zone, searched from every zone, west to east
+  by its offset from UTC; the cure
   period's length and unit; who decides each request and who answers for whom are rows of pickers, added and removed;
   what a sanction needs first is read as sentences, removable. Conditions and exceptions the documents attach show as
   sentences, not edited here. Changes save as they're made. Then "Your recommendations": what to recommend when a rule

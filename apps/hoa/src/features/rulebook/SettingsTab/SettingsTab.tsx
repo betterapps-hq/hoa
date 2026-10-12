@@ -23,7 +23,7 @@ import {
   clauseCitations,
   clauseTitles,
   dayUnits,
-  holidayLabels,
+  holidayChoices,
   liabilityLimits,
   partyChoices,
   percentOf,
@@ -34,6 +34,7 @@ import {
   zoneLabel,
   type ClauseName
 } from "./SettingsTab.utils"
+import { TimeZonePicker } from "./TimeZonePicker"
 
 // The rulebook's settings (encoding.md, UX, Settings): what the documents say about deadlines, authority and
 // enforcement, each as a small form in plain words with the passages it comes from, then the organization's own policy
@@ -210,6 +211,7 @@ function Deadlines() {
   const { time } = records.settings.clauses
   const id = useId()
   const days = dayChoices.find((choice) => choice.value === time.days)
+  const holidays = holidayChoices.find((choice) => choice.value === time.holidays)
   return (
     <div className="flex flex-col gap-4">
       <Field orientation="horizontal" className="justify-between">
@@ -241,12 +243,36 @@ function Deadlines() {
           </FieldLabel>
         </FieldContent>
       </Field>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-muted-foreground">
-        <dt>Holidays</dt>
-        <dd>{holidayLabels[time.holidays] ?? time.holidays}</dd>
-        <dt>Time zone</dt>
-        <dd>{zoneLabel(time.zone)}</dd>
-      </dl>
+      <Field orientation="horizontal" className="justify-between">
+        <FieldLabel htmlFor={`${id}-holidays`} className="font-normal">
+          Holidays that aren&rsquo;t business days
+        </FieldLabel>
+        {actions && holidays ? (
+          <ChoiceSelect
+            id={`${id}-holidays`}
+            className="w-56"
+            value={holidays.value}
+            choices={holidayChoices}
+            onChange={(value) => void save({ time: { ...time, holidays: value } })}
+          />
+        ) : (
+          <span id={`${id}-holidays`}>{holidays?.label ?? time.holidays}</span>
+        )}
+      </Field>
+      <Field orientation="horizontal" className="justify-between">
+        <FieldLabel htmlFor={`${id}-zone`} className="font-normal">
+          Dates and times are in
+        </FieldLabel>
+        {actions ? (
+          <TimeZonePicker
+            id={`${id}-zone`}
+            value={time.zone}
+            onChange={(zone) => void save({ time: { ...time, zone } })}
+          />
+        ) : (
+          <span id={`${id}-zone`}>{zoneLabel(time.zone)}</span>
+        )}
+      </Field>
     </div>
   )
 }
