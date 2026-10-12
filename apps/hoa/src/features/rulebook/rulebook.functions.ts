@@ -6,6 +6,7 @@ import type { Database } from "@/db/database"
 import { listDocumentProvisions, listDocumentRecords, listGoverningDocuments } from "@/db/documentRepository"
 import { getLatestJobOfKind } from "@/db/jobRepository"
 import {
+  copyToDraft,
   discardDraftRulebook,
   getPublishedRulesFile,
   getRulebookContent,
@@ -128,6 +129,33 @@ export const getSourceText = createServerFn({ method: "GET" }).handler(async ():
         )
       )
   )
+})
+
+/**
+ * Starts a draft from the published rulebook, to change its settings, rules or terms without processing the documents
+ * again (encoding.md, UX, Changing a published rulebook). Refused while a draft is open or a build is running.
+ */
+export const changePublishedRulebook = createServerFn({ method: "POST" }).handler(async () => {
+  const context = await requireAdministrator()
+  const db = getDb()
+  const hoaId = context.hoa.id
+  const [published, draft, building] = await Promise.all([
+    getRulebookByStatus(db, hoaId, "published"),
+    getRulebookByStatus(db, hoaId, "draft"),
+    getRulebookByStatus(db, hoaId, "building")
+  ])
+  if (!published) {
+    throw new Error("Nothing is published yet.")
+  }
+  if (building) {
+    throw new Error("Your documents are being processed. Change the rulebook once its new draft is ready.")
+  }
+  if (draft) {
+    throw new Error("A draft is already open. Review it, or discard it first.")
+  }
+  const id = crypto.randomUUID()
+  await copyToDraft(db, hoaId, published, { id, now: new Date().toISOString() })
+  return { rulebookId: id }
 })
 
 const skippedBuild = {

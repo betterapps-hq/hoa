@@ -206,10 +206,11 @@ hash decides its review, approved, rejected or still proposed, with the resoluti
 current draft decides first, then the published rulebook, so a rebuild keeps the review work on the draft and only asks
 about what changed. Rejected records stay in the draft with their status, so rejecting a record is how it's dropped,
 and stays dropped. The same goes for the settings (whose decision policy, which only the administrator sets, always
-carries), for a question asked again in the same words (its answer), and for a provision's no-rule reason: a reason
+carries, as does each clause the documents don't state, cited by no passage, so a default an administrator changed
+survives), for a question asked again in the same words (its answer), and for a provision's no-rule reason: a reason
 the build gives again for the same wording keeps its review, and a reason someone gave a provision the build leaves
-uncovered comes back. Edits don't carry: a rule, term or clause an administrator edited comes back as the build
-encodes it, proposed. The job reports counts: provisions, terms, rules by kind, uncovered provisions, issues.
+uncovered comes back. Other edits don't carry: a rule, a term, or a clause the documents state that an administrator
+edited comes back as the build encodes it, proposed. The job reports counts: provisions, terms, rules by kind, uncovered provisions, issues.
 
 ### 12. Review and 13. Publish
 
@@ -224,7 +225,17 @@ provision, and approved records that make a valid rules file. A rulebook covers 
 it was built from (its `sourceDocumentIds`): a replaced document's provisions stay stored for the rulebook that cites
 them, but a draft built without it doesn't count them. Code assembles the rules file from the approved records
 (schema.md, Rules file), validates it with `rulesFile`, writes it to R2, stores its SHA-256 on the rulebook and marks
-the previous published rulebook `superseded`.
+the previous published rulebook `superseded`. The settings must be approved: they can't be rejected, since every
+rulebook has them, so they're changed instead.
+
+#### Changing a published rulebook
+
+Processing the documents again costs model calls and takes an hour, so a change that isn't about the documents (a
+setting, a rule's wording, a term) doesn't need it. "Change the rulebook" on the rules in force
+(`changePublishedRulebook`) copies the published rulebook into a new draft in one batch: its rules, terms, questions,
+settings and coverage, with their reviews, and the same documents and build job. The draft is reviewed and published
+as the next version like any other, and discarding it leaves the published rulebook as it is. It's offered only when
+nothing else is under way, since a build's draft would replace the copy.
 
 ## Storage
 

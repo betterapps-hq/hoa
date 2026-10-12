@@ -158,6 +158,49 @@ export async function promoteToDraft(db: Database, hoaId: string, rulebookId: st
   ])
 }
 
+/**
+ * Starts a draft from a published rulebook (encoding.md, UX, Changing a published rulebook): a new rulebook row with
+ * the published one's records, reviews and all, written in one batch. Refused while the organization has a draft or a
+ * build running, since a build's draft would replace it.
+ */
+export async function copyToDraft(
+  db: Database,
+  hoaId: string,
+  from: { id: string; catalogVersion: number; sourceDocumentIds: string[]; jobId: string },
+  draft: { id: string; now: string }
+) {
+  const content = await getRulebookContent(db, hoaId, from.id)
+  if (!content) {
+    throw new Error("The published rulebook has no records to copy.")
+  }
+  const [ruleRows, termRows] = await Promise.all([
+    Promise.all(content.rules.map((rule) => ruleRow(hoaId, draft.id, rule))),
+    Promise.all(content.terms.map((term) => termRow(hoaId, draft.id, term)))
+  ])
+  const questionRows = content.questions.map((question) => questionRow(hoaId, draft.id, question))
+  // The unique indexes allow one draft and one build per organization; this insert fails if either exists.
+  await runBatch(db, [
+    db.insert(rulebooks).values({
+      id: draft.id,
+      hoaId,
+      version: null,
+      status: "draft",
+      error: null,
+      catalogVersion: from.catalogVersion,
+      sourceDocumentIds: from.sourceDocumentIds,
+      jobId: from.jobId,
+      createdAt: draft.now,
+      publishedBy: null,
+      publishedAt: null,
+      settings: content.settings,
+      coverage: content.coverage
+    }),
+    ...insertChunks(rulebookRules, ruleRows).map((rows) => db.insert(rulebookRules).values(rows)),
+    ...insertChunks(rulebookTerms, termRows).map((rows) => db.insert(rulebookTerms).values(rows)),
+    ...insertChunks(rulebookQuestions, questionRows).map((rows) => db.insert(rulebookQuestions).values(rows))
+  ])
+}
+
 /** A rulebook's records, or null while it has none (a rulebook still building). */
 export async function getRulebookContent(
   db: Database,

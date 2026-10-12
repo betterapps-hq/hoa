@@ -96,13 +96,34 @@ async function carryReviews<R extends Reviewed>(
   )
 }
 
+type Clauses = Settings["clauses"]
+
+/** Whether the documents state a clause: it cites a passage, rather than being a default or an administrator's choice. */
+function isStated(clause: Clauses[keyof Clauses]) {
+  if (clause === null) {
+    return false
+  }
+  return Array.isArray(clause) ? clause.some((item) => item.citations.length > 0) : clause.citations.length > 0
+}
+
 /**
- * The built settings with the decision policy an administrator set (the build only proposes clauses), and the review of
- * the first earlier settings with the same clauses and policy.
+ * The built settings with the decision policy an administrator set (the build only proposes clauses), and each clause
+ * the documents don't state as the latest rulebook had it, so a default an administrator changed survives a rebuild;
+ * a clause the documents state comes from them. With the review of the first earlier settings with the same content.
  */
 async function carrySettings(built: Settings, earlier: readonly Settings[]): Promise<Settings> {
   const [latest] = earlier
-  const settings = latest ? { ...built, policy: latest.policy } : built
+  const keep = <K extends keyof Clauses>(name: K): Clauses[K] =>
+    !latest || isStated(built.clauses[name]) ? built.clauses[name] : latest.clauses[name]
+  const clauses: Clauses = {
+    precedence: keep("precedence"),
+    time: keep("time"),
+    liability: keep("liability"),
+    cure: keep("cure"),
+    deciders: keep("deciders"),
+    sanctionPreconditions: keep("sanctionPreconditions")
+  }
+  const settings = latest ? { ...built, clauses, policy: latest.policy } : built
   const content = await settingsContentHash(settings)
   const hashes = await Promise.all(earlier.map(settingsContentHash))
   const match = earlier.find((_, index) => hashes[index] === content)

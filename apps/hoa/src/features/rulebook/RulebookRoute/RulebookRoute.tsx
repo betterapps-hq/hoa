@@ -13,6 +13,7 @@ import { uploadDocument } from "@/features/documents/uploadDocument"
 import { getSession } from "@/session/session.functions"
 import { PublishedRulebook } from "../PublishedRulebook/PublishedRulebook"
 import {
+  changePublishedRulebook,
   discardRulebookDraft,
   getBuildDocuments,
   getBuildResults,
@@ -154,6 +155,9 @@ export function RulebookRoute({ data, isReviewing }: { data: RulebookRouteData; 
         })}
         onDiscard={changing(async (id: string) => {
           await discardRulebookDraft({ data: { rulebookId: id } })
+        })}
+        onChangePublished={changing(async () => {
+          await changePublishedRulebook()
         })}
         onChanged={() => void router.invalidate()}
       />

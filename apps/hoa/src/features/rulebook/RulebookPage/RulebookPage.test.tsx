@@ -125,6 +125,7 @@ function setup(overrides: Partial<RulebookPageProps> = {}) {
     loadBuildDocuments: vi.fn<RulebookPageProps["loadBuildDocuments"]>(async () => []),
     onPublish: vi.fn<(rulebookId: string) => Promise<void>>(async () => undefined),
     onDiscard: vi.fn<(rulebookId: string) => Promise<void>>(async () => undefined),
+    onChangePublished: vi.fn<() => Promise<void>>(async () => undefined),
     onChanged: vi.fn<() => void>(),
     ...overrides
   }
@@ -151,6 +152,18 @@ describe("RulebookPage", () => {
     expect(screen.queryByRole("button", { name: /^Approve/ })).not.toBeInTheDocument()
     await user.click(within(status).getByRole("button", { name: "Review changes" }))
     expect(props.onReviewingChange).toHaveBeenCalledWith(true)
+  })
+
+  it("opens the published rulebook for changes without processing the documents again", async () => {
+    const { props, user } = setup({ draft: noDraft })
+    await user.click(screen.getByRole("button", { name: "Change the rulebook" }))
+    expect(props.onChangePublished).toHaveBeenCalledOnce()
+    expect(props.onReviewingChange).toHaveBeenCalledWith(true)
+  })
+
+  it("offers no change to the published rulebook while a draft is open", () => {
+    setup()
+    expect(screen.queryByRole("button", { name: "Change the rulebook" })).not.toBeInTheDocument()
   })
 
   it("reviews the draft as a focused mode: the next step, the to-do list, and what changed", async () => {

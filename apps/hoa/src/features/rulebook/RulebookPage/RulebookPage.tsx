@@ -1,4 +1,4 @@
-import { DownloadIcon, UploadIcon } from "lucide-react"
+import { DownloadIcon, PencilIcon, UploadIcon } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import {
@@ -65,6 +65,8 @@ export type RulebookPageProps = {
   loadBuildDocuments: (jobId: string) => Promise<BuildDocument[]>
   onPublish: (rulebookId: string) => Promise<void>
   onDiscard: (rulebookId: string) => Promise<void>
+  /** Starts a draft from the published rulebook, to change it without processing the documents again. */
+  onChangePublished: () => Promise<void>
   onChanged: () => void
 }
 
@@ -137,7 +139,26 @@ function RulebookOverview(props: RulebookPageProps) {
         onUpload={props.onUpload}
         onChanged={props.onChanged}
       />
-      <RulesInForce published={published} sources={sources} source={source} loadRulesFile={props.loadRulesFile} />
+      <RulesInForce
+        published={published}
+        sources={sources}
+        source={source}
+        loadRulesFile={props.loadRulesFile}
+        // Only with nothing else under way: a draft or a build would be replaced, or replace the change.
+        onChange={
+          status.kind === "none"
+            ? async () => {
+                const started = await attempt(async () => {
+                  await props.onChangePublished()
+                  return true
+                }, "The rulebook couldn't be opened for changes.")
+                if (started) {
+                  props.onReviewingChange(true)
+                }
+              }
+            : null
+        }
+      />
     </div>
   )
 }
@@ -337,9 +358,14 @@ function RulesInForce({
   published,
   sources,
   source,
-  loadRulesFile
-}: Pick<RulebookPageProps, "published" | "sources" | "source" | "loadRulesFile">) {
+  loadRulesFile,
+  onChange
+}: Pick<RulebookPageProps, "published" | "sources" | "source" | "loadRulesFile"> & {
+  /** Opens the published rulebook as a draft to change; null while something else is under way. */
+  onChange: (() => Promise<void>) | null
+}) {
   const [isDownloading, setIsDownloading] = useState(false)
+  const [isOpening, setIsOpening] = useState(false)
   const { rulebook, content } = published
   if (!rulebook || !content) {
     return null
@@ -366,12 +392,29 @@ function RulesInForce({
             Applications are checked against it.
           </p>
         </div>
-        {published.fileSha256 ? (
-          <Button size="sm" variant="ghost" disabled={isDownloading} onClick={() => void download()}>
-            <DownloadIcon />
-            {isDownloading ? "Downloading" : "Rules file"}
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          {published.fileSha256 ? (
+            <Button size="sm" variant="ghost" disabled={isDownloading} onClick={() => void download()}>
+              <DownloadIcon />
+              {isDownloading ? "Downloading" : "Rules file"}
+            </Button>
+          ) : null}
+          {onChange ? (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isOpening}
+              onClick={async () => {
+                setIsOpening(true)
+                await onChange()
+                setIsOpening(false)
+              }}
+            >
+              <PencilIcon />
+              {isOpening ? "Opening" : "Change the rulebook"}
+            </Button>
+          ) : null}
+        </div>
       </div>
       <RulebookWorkspace records={records} source={source} actions={null} audience="administrator" />
     </section>
