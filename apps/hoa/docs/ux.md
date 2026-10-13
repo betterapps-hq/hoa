@@ -17,6 +17,12 @@ feedback; follow them everywhere, and fix a violation when you touch the code ar
   display helper, and leave the rest as written so names and acronyms (CC&Rs, HOA) survive. Never change stored data to
   fix display case.
 
+## Navigation
+
+- **The sidebar never disappears.** Collapsed, it's a rail of icons with the workspace and the user's avatar; on a small
+  screen it stays as that rail, and the header's toggle opens the full navigation over the page, which closes when a
+  link is followed (`AppSidebar`).
+
 ## Page actions
 
 - **What acts on the page's subject as a whole is a page action**, at the right of the site header on every page

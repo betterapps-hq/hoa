@@ -74,7 +74,8 @@ function RootLayout() {
           <TooltipProvider>
             <SidebarProvider style={layoutStyle}>
               <AppSidebar variant="inset" />
-              <SidebarInset>
+              {/* min-w-0 lets the page narrow beside the small-screen rail instead of running past the edge. */}
+              <SidebarInset className="min-w-0">
                 <PageActionsProvider>
                   <SiteHeader />
                   <div className="flex flex-1 flex-col">
