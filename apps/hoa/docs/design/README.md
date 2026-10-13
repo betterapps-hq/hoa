@@ -16,6 +16,7 @@ applications against it. It's written for a product that many HOAs onboard to, s
 | [application-review.md](application-review.md) | Spec: reviewing an application against the rules file: selection, facts, the engine, the recommendation |
 | [implementation-plan.md](implementation-plan.md) | The phased tasks that build the schema, both pipelines and their UX |
 | [implementation-log.md](implementation-log.md) | Progress, decisions, open questions and evaluation results while the plan is built |
+| [document-requirements.md](document-requirements.md) | Design: document requirements, form templates and the answer choices administrators make when the documents don't settle them |
 | [documents.md](documents.md) | What lives where, the records and D1 tables, storage layout, uploads, access, privacy and retention |
 | [ocr.md](ocr.md) | Turning every uploaded file into stored page records with Azure Document Intelligence Layout |
 | [evaluation.md](evaluation.md) | Datasets, scores, production evaluators and the prompt tuning loop in Langfuse |
