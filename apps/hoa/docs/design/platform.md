@@ -184,6 +184,7 @@ Each checks the role and access rules.
 | `getPacketImage` | Owner, or administrator once submitted | Application id, file id | A presigned `GET` URL for a photo, or the image inline |
 | `recordDecision` | Administrator | Application id, outcome, note | `Application` |
 | `getDashboardSummary`, `getNextRulebook` | Any | | The dashboard's numbers; the coming rulebook, for administrators |
+| `listRecentActivity` | Any | | What happened lately, newest first, with who did it: across the HOA's areas for administrators; a homeowner's applications and the rules for a homeowner ([dashboard.md](../dashboard.md)) |
 | `getSession`, `setDemoRole` | Any | Role, to switch | The user, role and HOA |
 
 Job progress polls `getJobStatus` every 2 seconds with TanStack Query's `refetchInterval` until the job ends. A

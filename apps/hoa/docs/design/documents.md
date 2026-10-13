@@ -23,14 +23,14 @@ D1 tables, defined with Drizzle in `src/db/schema.ts` with migrations in `apps/h
 | Table | One row per | Notes |
 | --- | --- | --- |
 | `hoas` | HOA | `settings_json` holds `HoaSettings` |
-| `governing_documents` | Uploaded version of a document, or a document the rules name that nobody uploaded | `UNIQUE(lineage_id, version)`. `key` is unique per HOA and `document_json` holds the rules schema's `GoverningDocument`, both set once a build or the sample seed keys the document. A referenced document (status `referenced`) has no file columns. `structure_json` holds how a build structures the upload; `removed_at` is set when an administrator removes the document. The upload list shows only rows with a file that aren't removed |
+| `governing_documents` | Uploaded version of a document, or a document the rules name that nobody uploaded | `UNIQUE(lineage_id, version)`. `key` is unique per HOA and `document_json` holds the rules schema's `GoverningDocument`, both set once a build or the sample seed keys the document. A referenced document (status `referenced`) has no file columns. `structure_json` holds how a build structures the upload; `removed_at` and `removed_by` are set when an administrator removes the document. The upload list shows only rows with a file that aren't removed |
 | `provisions` | Provision of a keyed document | Primary key `(hoa_id, key)`; `document_id`, `label`, `parent_key`, `kind` and `ordinal` for lookups and order; the whole `Provision` in `provision_json` |
 | `jobs` | Workflow instance | `id` is the Workflow instance id; stage, counts, errors, and the step list in `progress_json` |
 | `rulebooks` | Rulebook | `UNIQUE(hoa_id, version)`; partial unique indexes allow one `building` and one `draft` per HOA. `settings_json` and `coverage_json` once the build saves the draft; `file_key` and `file_sha256` once it's published |
 | `rulebook_rules` | Rule in a rulebook | Primary key `(rulebook_id, rule_key)`; `kind`, `request_types`, `applies_to` and `review_status` for filtering, `content_hash` for carrying approvals forward; the whole `Rule` in `rule_json` |
 | `rulebook_terms` | Organization term, or proposed core term, in a rulebook | Primary key `(rulebook_id, term_key)`; `kind`, `review_status`, `content_hash`; the whole `Term` in `term_json` |
 | `rulebook_questions` | Interpretation or conflict question | Primary key `(rulebook_id, id)`; `question_json` and `answer_json` |
-| `project_types` | An organization's project type | `status` active or archived; `rulebook_id` it was built against; the `ProjectTypeDefinition` (fields and documents) in `definition_json` |
+| `project_types` | An organization's project type | `status` active or archived; `rulebook_id` it was built against; the `ProjectTypeDefinition` (fields and documents) in `definition_json`; `created_by`, the administrator who added it |
 | `applications` | Application | `project_type_id` and the form's answers in `answers_json` |
 | `application_files` | Uploaded or derived file | |
 | `application_pages` | Page of an application file | `(file_id, page_index)` and the page's `kind` from classification |
@@ -86,7 +86,7 @@ type GoverningDocument = {
 ```
 
 The row also carries what this type leaves out: `key` and `document_json` (the rules schema's document) once a build
-keys it, `structure_json`, and `removed_at`. Rows for referenced documents have status `referenced` and no file;
+keys it, `structure_json`, and `removed_at` and `removed_by`. Rows for referenced documents have status `referenced` and no file;
 `listGoverningDocuments` returns only uploads that aren't removed. A removed document drops out of builds and the
 documents list, while what already cites its pages still opens them.
 

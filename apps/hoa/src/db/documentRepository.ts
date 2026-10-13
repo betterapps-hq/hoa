@@ -91,6 +91,24 @@ export async function listGoverningDocuments(db: Database, hoaId: string) {
   return rows.map(toDocument)
 }
 
+/** Every upload, removed ones too, for what happened to the governing documents. */
+export function listUploadHistory(db: Database, hoaId: string) {
+  return db
+    .select({
+      id: governingDocuments.id,
+      lineageId: governingDocuments.lineageId,
+      version: governingDocuments.version,
+      title: governingDocuments.title,
+      status: governingDocuments.status,
+      uploadedBy: governingDocuments.uploadedBy,
+      uploadedAt: governingDocuments.uploadedAt,
+      removedBy: governingDocuments.removedBy,
+      removedAt: governingDocuments.removedAt
+    })
+    .from(governingDocuments)
+    .where(and(eq(governingDocuments.hoaId, hoaId), hasFile))
+}
+
 /** Another document in the HOA with the same content, for refusing duplicate uploads. */
 export async function findDocumentByHash(db: Database, hoaId: string, sha256: string, excludeId: string) {
   const rows = await db
@@ -104,7 +122,12 @@ export async function findDocumentByHash(db: Database, hoaId: string, sha256: st
  * Removes an upload's document, every version of it, so builds and the documents list leave it out; false when it
  * wasn't one in use. What cites its pages, such as the rulebook in force, still opens them.
  */
-export async function removeGoverningDocument(db: Database, hoaId: string, id: string, now: string) {
+export async function removeGoverningDocument(
+  db: Database,
+  hoaId: string,
+  id: string,
+  removal: { now: string; userId: string }
+) {
   const document = await db
     .select({ lineageId: governingDocuments.lineageId })
     .from(governingDocuments)
@@ -115,7 +138,7 @@ export async function removeGoverningDocument(db: Database, hoaId: string, id: s
   }
   await db
     .update(governingDocuments)
-    .set({ removedAt: now })
+    .set({ removedAt: removal.now, removedBy: removal.userId })
     .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.lineageId, document.lineageId), hasFile))
   return true
 }

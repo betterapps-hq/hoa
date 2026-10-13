@@ -1,10 +1,9 @@
 import { getCookie, getRequestHeader } from "@tanstack/react-start/server"
 import { getDb } from "@/db/client.server"
 import { getDefaultHoa } from "@/db/hoaRepository"
-import { assertAdministrator, isRoleId, roleCookie, roles, type RoleId } from "@/features/role/roles"
+import { assertAdministrator, isRoleId, roleCookie, type RoleId } from "@/features/role/roles"
 import type { Hoa } from "@/hoa/hoa"
-
-export type RequestUser = { id: string; name: string; email: string }
+import { demoUserId, userOf, type RequestUser } from "./users"
 
 export type RequestContext = { hoa: Hoa; role: RoleId; user: RequestUser }
 
@@ -17,10 +16,7 @@ export async function getRequestContext(): Promise<RequestContext> {
   const cookieRole = getCookie(roleCookie)
   const role: RoleId = isRoleId(cookieRole) ? cookieRole : "homeowner"
   const accessEmail = getRequestHeader("cf-access-authenticated-user-email")
-  const demoUser = roles[role].user
-  const user = accessEmail
-    ? { id: accessEmail, name: accessEmail, email: accessEmail }
-    : { id: `demo-${role}`, name: demoUser.name, email: demoUser.email }
+  const user = userOf(accessEmail ?? demoUserId(role))
   return { hoa: await getDefaultHoa(getDb()), role, user }
 }
 

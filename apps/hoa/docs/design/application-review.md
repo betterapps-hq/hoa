@@ -426,9 +426,10 @@ A value shown on its own starts with a capital.
 - **Reviewed or not, an application is a draft until it's submitted,** and its status says so. Changing it after a
   review (its description, answers or files) means the review no longer covers it: the page says to run it again, and
   it can't be submitted until it has. A draft that was never submitted can be deleted, with everything stored for it.
-- **The homeowner's dashboard** lists what waits on them (what the committee asked for, then drafts), each with its
-  next step, and says in a sentence where their other applications stand. Every application is on the applications
-  page, which the dashboard links to.
+- **The homeowner's dashboard** lists the applications that wait on them (what the committee asked for, then drafts),
+  each with its next step, and says in a sentence where all their applications stand, opening the applications page.
+  The committee's dashboard lists the applications waiting for its decision among what needs its attention. Both
+  show the applications' submissions and decisions in their recent activity ([dashboard.md](../dashboard.md)).
 - **The application page** (`ApplicationPage`, `ReviewReport`) is a record page: what's needed to act up front, the
   rest a tab away. The reader is the homeowner, or the committee when an administrator opens someone else's
   application (the role switcher's role), and every heading and sentence is worded for that reader. On a wide screen
@@ -666,7 +667,7 @@ wording so adding one back keeps it).
   added choices, order, required flags and citations survive either way. Until then, edits are bound against the
   rulebook the type was built with, homeowners apply with the saved form, and a cited passage the published rulebook
   doesn't have is left out of their "Why we ask"; reviews of applications already submitted are untouched. The
-  committee's dashboard says how many active types need updating, with a link.
+  committee's dashboard lists them among what needs its attention ([dashboard.md](../dashboard.md)).
 - **Delete or archive**: from the list's or the page's menu. A type no application uses can be deleted after a
   confirmation naming it; for one in use, the confirmation offers archiving instead (hidden from new applications,
   kept for the ones that use it). An archived type offers Unarchive.

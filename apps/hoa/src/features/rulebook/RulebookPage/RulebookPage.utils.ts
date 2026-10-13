@@ -1,4 +1,5 @@
 import type { GoverningDocument } from "@/documents/governingDocument"
+import { counted } from "@/lib/text"
 import type { RefusedDocument } from "@/rulebook/buildSources"
 import { currentDocumentIds, isSameDocumentSet } from "@/rulebook/currentDocuments"
 import type { RulebookView } from "../rulebook.functions"
@@ -16,8 +17,6 @@ export type RulebookStatus =
   | { kind: "documents-changed"; version: number | null }
   | { kind: "not-built" }
   | { kind: "none" }
-
-const counted = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 
 /** "adds 5 rules, changes 12 and removes 2": what a draft does to the rules, or null when it leaves them alone. */
 export function changeSummary(changes: NonNullable<RulebookView["changes"]>) {

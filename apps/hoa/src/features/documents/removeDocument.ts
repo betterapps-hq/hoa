@@ -10,7 +10,7 @@ import { assertAdministrator, type RoleId } from "@/features/role/roles"
  */
 export async function removeDocument(
   db: Database,
-  context: { hoa: { id: string }; role: RoleId },
+  context: { hoa: { id: string }; role: RoleId; user: { id: string } },
   documentId: string,
   now: string
 ) {
@@ -18,7 +18,7 @@ export async function removeDocument(
   if (await getRulebookByStatus(db, context.hoa.id, "building")) {
     throw new Error("Your documents are being processed. Remove the document once that finishes.")
   }
-  if (!(await removeGoverningDocument(db, context.hoa.id, documentId, now))) {
+  if (!(await removeGoverningDocument(db, context.hoa.id, documentId, { now, userId: context.user.id }))) {
     throw new Error("That document was already removed.")
   }
 }

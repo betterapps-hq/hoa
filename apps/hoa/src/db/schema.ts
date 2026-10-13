@@ -43,7 +43,9 @@ export const governingDocuments = sqliteTable(
     structure: json<unknown>("structure_json"),
     // When an administrator removed the document: builds and the documents list leave it out, while what already
     // cites its pages still opens them. Null for a document in use.
-    removedAt: text("removed_at")
+    removedAt: text("removed_at"),
+    // Who removed it, for the committee's recent activity; null for one in use, or removed before this was kept.
+    removedBy: text("removed_by")
   },
   (table) => [
     uniqueIndex("governing_documents_lineage_version").on(table.lineageId, table.version),
@@ -225,6 +227,8 @@ export const projectTypes = sqliteTable(
     status: text("status").notNull(),
     rulebookId: text("rulebook_id"),
     definition: json<unknown>("definition_json").notNull(),
+    // Who added it, for the committee's recent activity; null for one added before this was kept.
+    createdBy: text("created_by"),
     createdAt: timestamp("created_at"),
     updatedAt: timestamp("updated_at")
   },

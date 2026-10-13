@@ -15,13 +15,3 @@ export type DashboardApplication = Pick<
   /** What the latest review asks the homeowner to add to the packet, as its action items say it. */
   missingInformation: string[]
 }
-
-/** Something that happened to an application, for the committee's recent activity. */
-export type ActivityEvent = {
-  /** Unique among the events. */
-  id: string
-  application: DashboardApplication
-  at: string
-  /** What happened, as a short phrase: "Submitted to the committee". */
-  summary: string
-}

@@ -333,6 +333,7 @@ export const createProjectType = createServerFn({ method: "POST" })
       description: data.description || null,
       rulebookId: published.id,
       definition: data.definition ? bindDefinition(data.definition, built) : built,
+      createdBy: context.user.id,
       now: new Date().toISOString()
     })
   })
