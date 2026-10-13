@@ -38,6 +38,17 @@ export function acceptedTypes(target: UploadTarget): Record<string, string[]> {
   )
 }
 
+/** A target's rules as UploadCN checks files: the types and extensions it takes, and the app's own check. */
+export function uploadValidation(target: UploadTarget) {
+  return {
+    accept: Object.entries(acceptedTypes(target)).flatMap(([type, extensions]) => [type, ...extensions]),
+    validate: (file: File) => {
+      const validation = validateUpload(file, target)
+      return validation.isValid ? null : validation.message
+    }
+  }
+}
+
 const formatNames: Record<UploadFormat, string> = { pdf: "PDF", docx: "Word", image: "JPEG or PNG" }
 
 /** What a target accepts, in words: "PDF or Word up to 25 MB, JPEG or PNG up to 5 MB." */
@@ -68,10 +79,10 @@ export function validateUpload(
   const limit = format ? limits[target][format] : undefined
   if (!format || limit === undefined) {
     const allowed = target === "application" ? "PDF, Word, JPEG or PNG" : "PDF or Word"
-    const imageHint =
-      /^(heic|heif|tif|tiff|bmp|webp|gif)$/.test(extension) || file.type.startsWith("image/")
-        ? " Save photos as JPEG or PNG."
-        : ""
+    const isImage = /^(heic|heif|tif|tiff|bmp|webp|gif|png|jpe?g)$/.test(extension) || file.type.startsWith("image/")
+    // Where photos are taken, say which; where they aren't, say what the file can be instead.
+    const photoHint = limits[target].image === undefined ? " Save it as a PDF." : " Save photos as JPEG or PNG."
+    const imageHint = isImage ? photoHint : ""
     return { isValid: false, message: `${file.name} isn't a ${allowed} file.${imageHint}` }
   }
   if (file.size > limit) {

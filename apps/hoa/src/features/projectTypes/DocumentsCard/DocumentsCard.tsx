@@ -1,3 +1,4 @@
+import type { UploadAdapter } from "@uploadcn/core"
 import {
   AsteriskIcon,
   CircleCheckIcon,
@@ -50,8 +51,8 @@ export type DocumentsCardProps = {
   loadProvisions: () => Promise<CitedProvision[]>
   /** The project type, for its templates' links. */
   projectTypeId: string
-  /** Uploads a document's new template and returns what the document keeps of it. */
-  uploadTemplate: (file: File) => Promise<DocumentTemplate>
+  /** Where a document's new template uploads; what the document keeps of it comes back as its result. */
+  templateAdapter: UploadAdapter<DocumentTemplate>
   onUpdate: DefinitionUpdate
 }
 
@@ -72,7 +73,7 @@ export function DocumentsCard({
   citations,
   loadProvisions,
   projectTypeId,
-  uploadTemplate,
+  templateAdapter,
   onUpdate
 }: DocumentsCardProps) {
   const [isAdding, setIsAdding] = useState(false)
@@ -253,7 +254,7 @@ export function DocumentsCard({
           loadProvisions={loadProvisions}
           newKey={(label) => customKey(definition, label)}
           projectTypeId={projectTypeId}
-          uploadTemplate={uploadTemplate}
+          templateAdapter={templateAdapter}
           onOpenChange={(open) => {
             if (!open) {
               const name = edited ? sentenceCase(edited.label) : null

@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { createAdapter, type UploadAdapterContext } from "@uploadcn/core"
 import { describe, expect, it, vi } from "vitest"
 import type {
   DocumentTemplate,
@@ -171,6 +172,13 @@ const view: ProjectTypeView = {
   ]
 }
 
+const uploadTemplate = vi.fn<(context: UploadAdapterContext) => Promise<DocumentTemplate>>(async ({ file }) => ({
+  id: "00000000-0000-4000-8000-000000000001",
+  fileName: file.name,
+  mediaType: file.type,
+  sizeBytes: file.size
+}))
+
 function setup(overrides: Partial<ProjectTypePageProps> = {}) {
   const props: ProjectTypePageProps = {
     view,
@@ -179,14 +187,10 @@ function setup(overrides: Partial<ProjectTypePageProps> = {}) {
     onSetStatus: vi.fn<(status: ProjectTypeStatus) => Promise<void>>(async () => undefined),
     onDelete: vi.fn<() => Promise<void>>(async () => undefined),
     loadProvisions: vi.fn<() => Promise<CitedProvision[]>>(async () => [heightLimit, colors, roofs]),
-    uploadTemplate: vi.fn<(file: File) => Promise<DocumentTemplate>>(async (file) => ({
-      id: "00000000-0000-4000-8000-000000000001",
-      fileName: file.name,
-      mediaType: file.type,
-      sizeBytes: file.size
-    })),
+    templateAdapter: createAdapter(uploadTemplate),
     ...overrides
   }
+  uploadTemplate.mockClear()
   render(<ProjectTypePage {...props} />)
   return { props, user: userEvent.setup() }
 }
@@ -423,18 +427,18 @@ describe("ProjectTypePage", () => {
     const { props, user } = setup()
     await chooseFromMenu(user, "Actions for Site plan", "Edit")
     const dialog = await screen.findByRole("dialog", { name: "Edit document" })
-    const input = document.getElementById("document-template")
+    const input = dialog.querySelector("input[type=file]")
     if (!(input instanceof HTMLInputElement)) {
       throw new Error("No template input")
     }
     await user.upload(input, new File(["%PDF"], "neighbor approval.pdf", { type: "application/pdf" }))
-    expect(within(dialog).getByText("neighbor approval.pdf")).toBeInTheDocument()
-    expect(props.uploadTemplate).not.toHaveBeenCalled()
+    expect(await within(dialog).findByText("neighbor approval.pdf")).toBeInTheDocument()
+    expect(uploadTemplate).not.toHaveBeenCalled()
     await user.click(within(dialog).getByRole("button", { name: "Save" }))
     await waitFor(() =>
       expect(savedDefinition(props)?.documents[0]?.template).toMatchObject({ fileName: "neighbor approval.pdf" })
     )
-    expect(props.uploadTemplate).toHaveBeenCalledTimes(1)
+    expect(uploadTemplate).toHaveBeenCalledTimes(1)
     expect(screen.getByRole("link", { name: "Template: neighbor approval.pdf" })).toHaveAttribute(
       "href",
       "/files/project-types/type-1/templates/00000000-0000-4000-8000-000000000001"
@@ -444,7 +448,7 @@ describe("ProjectTypePage", () => {
     await user.click(within(again).getByRole("button", { name: "Remove neighbor approval.pdf" }))
     await user.click(within(again).getByRole("button", { name: "Save" }))
     await waitFor(() => expect(savedDefinition(props)?.documents[0]?.template).toBeUndefined())
-    expect(props.uploadTemplate).toHaveBeenCalledTimes(1)
+    expect(uploadTemplate).toHaveBeenCalledTimes(1)
   })
 
   it("shows the documents the application form provides as met by it, never among the uploads", async () => {

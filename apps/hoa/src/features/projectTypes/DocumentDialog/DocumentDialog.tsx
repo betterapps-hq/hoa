@@ -1,9 +1,11 @@
 import { useForm } from "@tanstack/react-form"
+import type { UploadAdapter } from "@uploadcn/core"
+import { useUploadSelector } from "@uploadcn/react"
 import { DownloadIcon, PlusIcon, XIcon } from "lucide-react"
 import { useState } from "react"
 import { z } from "zod"
-import { FileDropzone, type ChosenFile } from "@/components/FileDropzone/FileDropzone"
 import { FileTypeMedia } from "@/components/FileTypeMedia/FileTypeMedia"
+import { FileUpload, fileStatusText, useFileUploader } from "@/components/FileUpload/FileUpload"
 import {
   Attachment,
   AttachmentAction,
@@ -36,6 +38,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { fileSizeText, sentenceCase } from "@/lib/text"
 import { uploadFormats, type DocumentTemplate, type ProjectDocument } from "@/projectTypes/projectType"
+import { uploadAll } from "@/storage/serverUpload"
 import type { CitedProvision } from "../../rulebook/citedProvision"
 import { CitationPicker } from "../../rulebook/RuleReference/CitationPicker"
 import { CitationChips } from "../CitationChips/CitationChips"
@@ -56,8 +59,8 @@ export type DocumentDialogProps = {
   newKey: (label: string) => string
   /** The project type, for its templates' links. */
   projectTypeId: string
-  /** Uploads a new template and returns what the document keeps of it. */
-  uploadTemplate: (file: File) => Promise<DocumentTemplate>
+  /** Where a new template uploads; what the document keeps of it comes back as its result. */
+  templateAdapter: UploadAdapter<DocumentTemplate>
   onOpenChange: (isOpen: boolean) => void
   onSave: (document: ProjectDocument) => void
 }
@@ -83,12 +86,13 @@ export function DocumentDialog({
   loadProvisions,
   newKey,
   projectTypeId,
-  uploadTemplate,
+  templateAdapter,
   onOpenChange,
   onSave
 }: DocumentDialogProps) {
   const [provisions, setProvisions] = useState<CitedProvision[] | null>(null)
-  const [chosen, setChosen] = useState<ChosenFile[]>([])
+  const uploader = useFileUploader("template", { adapter: templateAdapter, autoUpload: false })
+  const chosen = useUploadSelector(uploader, (state) => state.items.length)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const isOwn = document === null || document.ruleKeys.length === 0
   const submitLabel = document ? "Save" : "Add document"
@@ -110,16 +114,15 @@ export function DocumentDialog({
     onSubmit: async ({ value }) => {
       const label = value.label.trim()
       const accepts = value.accepts.length === uploadFormats.length ? null : value.accepts
-      const [file] = chosen
       let template = value.template ?? undefined
-      if (file) {
-        try {
-          setUploadError(null)
-          template = await uploadTemplate(file.file)
-        } catch (caught) {
-          setUploadError(caught instanceof Error ? caught.message : "The template didn't upload. Try again.")
+      if (chosen > 0) {
+        setUploadError(null)
+        const [item] = await uploadAll(uploader)
+        if (!item?.result) {
+          setUploadError(item ? fileStatusText(item, "template") : "The template didn't upload. Try again.")
           return
         }
+        template = item.result
       }
       if (document && !isOwn) {
         onSave({ ...document, label, isRequired: value.isRequired, accepts, template })
@@ -256,10 +259,10 @@ export function DocumentDialog({
             <form.Field name="template">
               {(item) => {
                 const stored = item.state.value
-                const isStored = stored !== null && chosen.length === 0
+                const isStored = stored !== null && chosen === 0
                 return (
                   <Field data-invalid={uploadError !== null}>
-                    <FieldLabel htmlFor={isStored ? undefined : "document-template"}>Template</FieldLabel>
+                    <FieldLabel>Template</FieldLabel>
                     <FieldDescription>
                       A file homeowners download and fill in, such as a form for a neighbor to sign.
                     </FieldDescription>
@@ -291,18 +294,15 @@ export function DocumentDialog({
                         </AttachmentActions>
                       </Attachment>
                     ) : (
-                      <FileDropzone
+                      <FileUpload
                         id="document-template"
+                        uploader={uploader}
                         target="template"
                         multiple={false}
+                        label="Choose a template"
                         size="compact"
                         isInvalid={uploadError !== null}
                         describedBy={uploadError ? "document-template-error" : undefined}
-                        value={chosen}
-                        onChange={(files) => {
-                          setUploadError(null)
-                          setChosen(files)
-                        }}
                       />
                     )}
                     {uploadError ? <FieldError id="document-template-error">{uploadError}</FieldError> : null}
@@ -358,7 +358,7 @@ export function DocumentDialog({
             <form.Subscribe selector={(state) => state.isSubmitting}>
               {(isSubmitting) => (
                 <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && chosen.length > 0 ? "Uploading" : submitLabel}
+                  {isSubmitting && chosen > 0 ? "Uploading" : submitLabel}
                 </Button>
               )}
             </form.Subscribe>

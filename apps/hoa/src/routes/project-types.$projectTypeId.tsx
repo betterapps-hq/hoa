@@ -11,7 +11,7 @@ import {
   updateProjectType,
   uploadTemplateFile
 } from "@/features/projectTypes/projectTypes.functions"
-import { uploadTemplate } from "@/features/projectTypes/uploadTemplate"
+import { templateAdapter } from "@/features/projectTypes/uploadTemplate"
 
 export const Route = createFileRoute("/project-types/$projectTypeId")({
   staticData: { title: "Project type" },
@@ -25,6 +25,13 @@ function ProjectTypeRoute() {
   const router = useRouter()
   const navigate = useNavigate()
   const id = view.projectType.id
+  const adapter = templateAdapter(
+    {
+      createUpload: (data) => createTemplateUpload({ data }),
+      uploadThroughServer: (form) => uploadTemplateFile({ data: form })
+    },
+    id
+  )
   return (
     <ProjectTypePage
       view={view}
@@ -49,16 +56,7 @@ function ProjectTypeRoute() {
         await navigate({ to: "/project-types" })
       }}
       loadProvisions={() => listCitableProvisions()}
-      uploadTemplate={(file) =>
-        uploadTemplate(
-          {
-            createUpload: (data) => createTemplateUpload({ data }),
-            uploadThroughServer: (form) => uploadTemplateFile({ data: form })
-          },
-          id,
-          file
-        )
-      }
+      templateAdapter={adapter}
     />
   )
 }

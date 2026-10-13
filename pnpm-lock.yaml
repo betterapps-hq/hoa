@@ -260,6 +260,12 @@ importers:
       '@tanstack/react-table':
         specifier: ^9.2.8
         version: 9.2.8(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@uploadcn/core':
+        specifier: ^0.1.1
+        version: 0.1.1
+      '@uploadcn/react':
+        specifier: ^0.1.1
+        version: 0.1.1(react@19.3.0)
       ai:
         specifier: 7.0.128
         version: 7.0.128(zod@4.6.5)
@@ -3096,6 +3102,19 @@ packages:
 
   '@ungap/structured-clone@1.4.0':
     resolution: {integrity: sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==}
+
+  '@uploadcn/core@0.1.1':
+    resolution: {integrity: sha512-LItZKguZ8w+pjY46nehTKJgarHzE6tQG6fGBc55VTpohATn/cfWd3uldqo1faDtiJIZz2BzxHlvjZcFEqdke3w==}
+    peerDependencies:
+      tus-js-client: ^4.0.0
+    peerDependenciesMeta:
+      tus-js-client:
+        optional: true
+
+  '@uploadcn/react@0.1.1':
+    resolution: {integrity: sha512-OjSYLqSbZ2f9aR1QK+zIwbHcjdaYItZTZKw5eeUnOQ30WqkJEWjYKcwaKB6AYxdwOv1TzJhuisBwBM6BqMueZQ==}
+    peerDependencies:
+      react: 19.3.0
 
   '@vercel/oidc@3.2.0':
     resolution: {integrity: sha512-UycprH3T6n3jH0k44NHMa7pnFHGu/N05MjojYr+Mc6I7obkoLIJujSWwin1pCvdy/eOxrI/l3uDLQsmcrOb4ug==}
@@ -7699,6 +7718,15 @@ snapshots:
     optional: true
 
   '@ungap/structured-clone@1.4.0': {}
+
+  '@uploadcn/core@0.1.1': {}
+
+  '@uploadcn/react@0.1.1(react@19.3.0)':
+    dependencies:
+      '@uploadcn/core': 0.1.1
+      react: 19.3.0
+    transitivePeerDependencies:
+      - tus-js-client
 
   '@vercel/oidc@3.2.0': {}
 

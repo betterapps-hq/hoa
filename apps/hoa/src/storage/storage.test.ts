@@ -28,7 +28,7 @@ describe("validateUpload", () => {
     })
     expect(validateUpload({ name: "plan.png", type: "image/png", size: megabyte }, "governing")).toMatchObject({
       isValid: false,
-      message: "plan.png isn't a PDF or Word file. Save photos as JPEG or PNG."
+      message: "plan.png isn't a PDF or Word file. Save it as a PDF."
     })
   })
 
@@ -59,7 +59,7 @@ describe("acceptedTypes and uploadHint", () => {
     expect(uploadHint("application")).toBe("PDF or Word up to 25 MB, JPEG or PNG up to 5 MB.")
     expect(uploadHint("template")).toBe("PDF or Word up to 10 MB.")
     expect(validateUpload({ name: "form.png", type: "image/png", size: 10 }, "template")).toMatchObject({
-      message: "form.png isn't a PDF or Word file. Save photos as JPEG or PNG."
+      message: "form.png isn't a PDF or Word file. Save it as a PDF."
     })
   })
 })

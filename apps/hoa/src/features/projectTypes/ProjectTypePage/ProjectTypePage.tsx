@@ -1,5 +1,6 @@
 import { useForm } from "@tanstack/react-form"
 import { Link } from "@tanstack/react-router"
+import type { UploadAdapter } from "@uploadcn/core"
 import { ArrowLeftIcon, ChevronDownIcon, CircleCheckIcon } from "lucide-react"
 import { useState } from "react"
 import { PageActions } from "@/components/PageActions/PageActions"
@@ -55,8 +56,8 @@ export type ProjectTypePageProps = {
   onDelete: () => Promise<void>
   /** Every passage of the rulebook's documents, for linking one to a question. */
   loadProvisions: () => Promise<CitedProvision[]>
-  /** Uploads a document's new template and returns what the document keeps of it. */
-  uploadTemplate: (file: File) => Promise<DocumentTemplate>
+  /** Where a document's new template uploads; what the document keeps of it comes back as its result. */
+  templateAdapter: UploadAdapter<DocumentTemplate>
 }
 
 const messageOf = (caught: unknown, fallback: string) => (caught instanceof Error ? caught.message : fallback)
@@ -158,7 +159,7 @@ function ProjectTypeEditor({
   onSetStatus,
   onDelete,
   loadProvisions,
-  uploadTemplate,
+  templateAdapter,
   onReset
 }: EditorProps) {
   const { projectType, applicationCount, requirements, subjectLabels, isOutdated, updates } = view
@@ -251,7 +252,7 @@ function ProjectTypeEditor({
         citations={view.citations}
         loadProvisions={loadProvisions}
         projectTypeId={projectType.id}
-        uploadTemplate={uploadTemplate}
+        templateAdapter={templateAdapter}
         onUpdate={update}
       />
       <Card>

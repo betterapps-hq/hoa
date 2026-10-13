@@ -255,6 +255,12 @@ Duplicates are caught by hash instead of being cached:
 
 ## Uploads
 
+Pages choose and upload files with [UploadCN](https://uploadcn.dev) (`src/components/ui/upload.tsx`, added with the
+shadcn CLI from the `@uploadcn` registry). `FileUpload` (`src/components/FileUpload`) is the app's one drop zone and
+file list on it: it checks each file against the target's rules below and words every status and problem itself. Each
+kind of file has an UploadCN adapter built by `serverUploadAdapter` (`src/storage/serverUpload.ts`) around the steps
+below, so UploadCN runs the queue: progress, retries, cancelling and removing.
+
 Browsers upload directly to R2 with presigned `PUT` URLs, so large files never pass through a Worker:
 
 1. The page calls `createDocumentUpload` or `createApplicationUpload` with the file name, size and type (and for an
@@ -276,7 +282,8 @@ goes through `uploadTemplateFile`. Deleting the type deletes its templates.
 presigned URL. That works at demo sizes (the largest sample is 14 MB); with a token, uploads and OCR skip the Worker.
 
 Accepted types: PDF and DOCX for every upload, and JPEG and PNG for application files. HEIF, TIFF, BMP, WebP and GIF are
-refused with a message asking for JPEG or PNG, because the review model can't read them. Limits: 50 MB and 300 pages per governing document (OCR reads PDFs in 50-page ranges, see
+refused with a message asking for JPEG or PNG, because the review model can't read them; where images aren't taken at
+all, an image is refused with a message asking for a PDF. Limits: 50 MB and 300 pages per governing document (OCR reads PDFs in 50-page ranges, see
 [ocr.md](ocr.md#flow); peak memory per range is measured on the 81-page CC&Rs), 25 MB per application PDF or Word file,
 and 5 MB per image; a template is PDF or Word up to 10 MB. `src/storage/uploadRules.ts` holds these rules.
 
