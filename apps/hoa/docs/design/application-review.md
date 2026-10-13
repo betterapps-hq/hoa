@@ -655,7 +655,9 @@ wording so adding one back keeps it).
   items (`answerSections`). Each question's info button holds its help and, quietly, why it's asked: the rules that
   read it and its citations, opening in the document reader in a new tab.
 - **Suggested by a model** (`hoa-project-type-suggestion`): it reads the published rulebook as it applies to
-  applications and proposes types with a homeowner-facing description, the fields to ask and the rules they rest on.
+  applications and proposes types with a homeowner-facing description, the fields to ask (each required or not, and,
+  for a subject a project can have several of, whether one answer usually holds for all of them, which the form then
+  asks once) and the rules they rest on.
   Code keeps only subjects the rules apply to, fields those rules test, rule keys that exist, and every document the
   rules require (`checkSuggestions`); the administrator adds or dismisses each. Rewording questions with a model is
   deferred.

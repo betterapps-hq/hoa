@@ -123,6 +123,11 @@ for (const path of rulebooks) {
       (sum, suggestion) => sum + suggestion.definition.groups.reduce((n, group) => n + group.fields.length, 0),
       0
     ),
+    askedOnce: checked.flatMap((suggestion) =>
+      suggestion.definition.groups.flatMap((group) =>
+        group.fields.filter((field) => field.isShared).map((field) => `${suggestion.label}: ${field.label}`)
+      )
+    ),
     madeUp: madeUp(result.object, offered, ruleKeys),
     subjectsWithRulesUncovered: withRules.filter((key) => !covered.has(key)),
     traceId: result.traceId

@@ -22,7 +22,12 @@ export const suggestionAnswerSchema = z.object({
           property: z.string().describe("A property key listed under that subject."),
           label: z.string(),
           help: z.string().nullable(),
-          isRequired: z.boolean()
+          isRequired: z.boolean(),
+          isShared: z
+            .boolean()
+            .describe(
+              "For a subject a project can have several of: true when one answer usually holds for all of them."
+            )
         })
       ),
       documents: z.array(z.object({ documentType: z.string(), label: z.string() })),
@@ -151,7 +156,8 @@ export function checkSuggestions(
                 ...field,
                 label: pick.label.trim() || field.label,
                 help: pick.help?.trim() || field.help,
-                isRequired: pick.isRequired
+                isRequired: pick.isRequired,
+                ...(group.isRepeatable && pick.isShared ? { isShared: true } : {})
               }
             ]
           : []

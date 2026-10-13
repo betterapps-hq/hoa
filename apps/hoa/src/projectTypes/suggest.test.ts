@@ -17,7 +17,16 @@ const suggestion = (overrides: Partial<SuggestionAnswer["suggestions"][number]> 
   label: "A project",
   description: "What it covers.",
   subjects: [subject!.key],
-  fields: [{ subject: subject!.key, property: field.property, label: "Asked plainly", help: null, isRequired: true }],
+  fields: [
+    {
+      subject: subject!.key,
+      property: field.property,
+      label: "Asked plainly",
+      help: null,
+      isRequired: true,
+      isShared: false
+    }
+  ],
   documents: [],
   basis: [ruleKey],
   ...overrides
@@ -32,9 +41,24 @@ describe("checkSuggestions", () => {
     expect(checked?.definition.documents).toEqual(built.documents)
   })
 
+  it("asks once for every item what the model says they all share", () => {
+    const fields = [
+      { subject: subject!.key, property: field.property, label: "Asked", help: null, isRequired: true, isShared: true }
+    ]
+    const [checked] = checkSuggestions(
+      { suggestions: [suggestion({ fields })] },
+      { rulesFile, requestType, on, existing: [] }
+    )
+    expect(checked?.definition.groups.flatMap((group) => group.fields)).toEqual([
+      { ...field, label: "Asked", isRequired: true, isShared: true }
+    ])
+  })
+
   it("takes a field named without its subject's prefix, as models often write it", () => {
     const short = field.property.slice(subject!.key.length + 1)
-    const fields = [{ subject: subject!.key, property: short, label: "Asked plainly", help: null, isRequired: true }]
+    const fields = [
+      { subject: subject!.key, property: short, label: "Asked plainly", help: null, isRequired: true, isShared: false }
+    ]
     const [checked] = checkSuggestions(
       { suggestions: [suggestion({ fields })] },
       { rulesFile, requestType, on, existing: [] }
@@ -49,7 +73,16 @@ describe("checkSuggestions", () => {
       suggestions: [
         suggestion({
           subjects: [subject!.key, "made-up"],
-          fields: [{ subject: "made-up", property: "made-up.size", label: "Size", help: null, isRequired: true }]
+          fields: [
+            {
+              subject: "made-up",
+              property: "made-up.size",
+              label: "Size",
+              help: null,
+              isRequired: true,
+              isShared: false
+            }
+          ]
         }),
         suggestion({ label: "Unfounded", basis: ["no-such-rule"] })
       ]
