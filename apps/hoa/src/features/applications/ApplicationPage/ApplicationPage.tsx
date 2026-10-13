@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form"
-import { ArrowLeftIcon, DownloadIcon, Trash2Icon } from "lucide-react"
+import { ArrowLeftIcon, DownloadIcon, RotateCwIcon, SendIcon, Trash2Icon } from "lucide-react"
 import { useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -7,6 +7,8 @@ import { decisionOutcomes, type Application, type ApplicationStatus } from "@/ap
 import { FileDropzone } from "@/components/FileDropzone/FileDropzone"
 import { FileTypeMedia } from "@/components/FileTypeMedia/FileTypeMedia"
 import { ImageViewer } from "@/components/ImageViewer/ImageViewer"
+import { PageActions, type PageAction } from "@/components/PageActions/PageActions"
+import type { RowAction } from "@/components/RowActions/RowActions"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -535,6 +537,22 @@ export function ApplicationPage({
 
   const isOpen = review !== null && hasOpenRequests(review)
   const isSubmitFirst = canSubmit && !isOpen
+  // The page's actions (ux.md, Page actions): running the review while there's none, submitting once nothing is open;
+  // running it again, and submitting with requests open, in the menu.
+  const canRunReview = view.canEdit && !isReviewing && fileCount > 0
+  const firstReview: PageAction | null =
+    canRunReview && !review ? { label: "Run review", isBusy, onSelect: runReview } : null
+  const submitFirst: PageAction | null = isSubmitFirst
+    ? { label: "Submit to the committee", isBusy, onSelect: () => void submit(false) }
+    : null
+  const more: RowAction[] = [
+    ...(canRunReview && review
+      ? [{ label: "Run review again", icon: RotateCwIcon, disabled: isBusy, onSelect: runReview }]
+      : []),
+    ...(canSubmit && isOpen
+      ? [{ label: "Submit anyway", icon: SendIcon, disabled: isBusy, onSelect: () => setIsConfirming(true) }]
+      : [])
+  ]
   const homeownerAction =
     review && view.canEdit ? (
       <Card>
@@ -549,23 +567,7 @@ export function ApplicationPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isSubmitFirst ? (
-            <>
-              <Button className="w-full" disabled={isBusy} onClick={() => void submit(false)}>
-                Submit to the committee
-              </Button>
-              <AddFiles id="add-files" size="compact" disabled={isBusy} onAdd={addFiles} />
-            </>
-          ) : (
-            <>
-              <AddFiles id="add-files" disabled={isBusy} onAdd={addFiles} />
-              {canSubmit ? (
-                <Button variant="outline" className="w-full" disabled={isBusy} onClick={() => setIsConfirming(true)}>
-                  Submit anyway
-                </Button>
-              ) : null}
-            </>
-          )}
+          <AddFiles id="add-files" size={isSubmitFirst ? "compact" : "default"} disabled={isBusy} onAdd={addFiles} />
         </CardContent>
       </Card>
     ) : null
@@ -588,16 +590,7 @@ export function ApplicationPage({
       value: "files",
       label: "Files",
       count: fileCount,
-      content: (
-        <div className="flex flex-col gap-3">
-          <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
-          {view.canEdit ? (
-            <Button variant="outline" size="sm" className="self-start" disabled={isBusy} onClick={runReview}>
-              Run review again
-            </Button>
-          ) : null}
-        </div>
-      )
+      content: <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
     }
   ]
   if (view.history.length > 1) {
@@ -659,14 +652,7 @@ export function ApplicationPage({
       >
         <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
         {view.canEdit ? (
-          <div className="flex flex-col gap-3">
-            {fileCount > 0 ? (
-              <Button className="self-start" disabled={isBusy} onClick={runReview}>
-                Run review
-              </Button>
-            ) : null}
-            <AddFiles id="add-files" size={fileCount > 0 ? "compact" : "default"} disabled={isBusy} onAdd={addFiles} />
-          </div>
+          <AddFiles id="add-files" size={fileCount > 0 ? "compact" : "default"} disabled={isBusy} onAdd={addFiles} />
         ) : null}
       </Stage>
     )
@@ -676,6 +662,7 @@ export function ApplicationPage({
     // Reading a citation is a step in reading the application: it opens over the page, not in place of it.
     <CitationsOpenInSheet>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 lg:px-6">
+        <PageActions primary={firstReview ?? submitFirst} more={more} />
         <div className="flex flex-col gap-3">
           <Button variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" onClick={onBack}>
             <ArrowLeftIcon />

@@ -1,5 +1,5 @@
 import { EllipsisIcon, type LucideIcon } from "lucide-react"
-import type { ReactNode } from "react"
+import type { ReactElement, ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -32,6 +32,23 @@ export type RowActionsProps = {
 
 /** A row's actions behind an ellipsis (ux.md, Menus and lists), each with its icon. */
 export function RowActions({ name, actions, note, disabled = false }: RowActionsProps) {
+  return (
+    <ActionsMenu
+      trigger={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${name}`} />}
+      actions={actions}
+      note={note}
+      disabled={disabled}
+    />
+  )
+}
+
+type ActionsMenuProps = Omit<RowActionsProps, "name"> & {
+  /** The button that opens the menu, without its icon. */
+  trigger: ReactElement
+}
+
+/** Actions behind an ellipsis, each with its icon, destructive ones last after a separator. */
+export function ActionsMenu({ trigger, actions, note, disabled = false }: ActionsMenuProps) {
   const safe = actions.filter((action) => !action.isDestructive)
   const destructive = actions.filter((action) => action.isDestructive)
   const item = ({ label, icon: Icon, onSelect, href, download, disabled: isDisabled, isDestructive }: RowAction) => (
@@ -56,10 +73,7 @@ export function RowActions({ name, actions, note, disabled = false }: RowActions
   )
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        disabled={disabled}
-        render={<Button variant="ghost" size="icon-sm" aria-label={`Actions for ${name}`} />}
-      >
+      <DropdownMenuTrigger disabled={disabled} render={trigger}>
         <EllipsisIcon />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">

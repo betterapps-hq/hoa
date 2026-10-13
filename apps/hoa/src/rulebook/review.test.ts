@@ -7,6 +7,7 @@ import {
   answerQuestion,
   approvalBlockers,
   approvalContext,
+  proposedTermsOf,
   questionsIn,
   resolveIssue,
   reviewedRulebook,
@@ -76,12 +77,21 @@ describe("termKeysOf", () => {
 })
 
 describe("approvalBlockers", () => {
-  it("blocks a rule that reads a proposed term until the term is approved", () => {
+  it("lets a rule be approved with the terms it reads still to review, unless one of them is blocked", () => {
     const records = sampleRecords()
-    expect(approvalBlockers(approvalContext(records), { type: "rule", key: ageRule })).toEqual([
-      expect.stringMatching(/^It reads terms still to review: /)
+    const context = approvalContext(records)
+    const rule = records.rules.find((item) => item.key === ageRule)!
+    const [term] = proposedTermsOf(context, rule)
+    expect(term).toBeDefined()
+    expect(approvalBlockers(context, { type: "rule", key: ageRule })).toEqual([])
+    const issue: T.Issue = { code: "conflict", message: "Two meanings", related: [], resolution: null }
+    const blocked = {
+      ...records,
+      terms: records.terms.map((item) => (item.key === term ? { ...item, issues: [issue] } : item))
+    }
+    expect(approvalBlockers(approvalContext(blocked), { type: "rule", key: ageRule })).toEqual([
+      `The term “${context.vocabulary.label(term!)}”: 1 open issue needs resolving.`
     ])
-    expect(approvalBlockers(approvalContext(withTermsApproved(records)), { type: "rule", key: ageRule })).toEqual([])
   })
 
   it("blocks a candidate reading of an open question", () => {
@@ -139,9 +149,13 @@ describe("reviewRecords", () => {
       ],
       { status: "approved", by, at, note: null }
     )
-    expect(approvals.rules).toEqual([])
-    expect(approvals.skipped.map((skip) => skip.ref)).toEqual([{ type: "rule", key: ageRule }])
-    expect(approvals.terms.map((item) => item.review.status)).toEqual(["approved"])
+    // The rule comes with the terms it reads still to review, each approved once.
+    const rule = records.rules.find((item) => item.key === ageRule)!
+    const withRule = proposedTermsOf(approvalContext(records), rule)
+    expect(approvals.rules.map((item) => [item.key, item.review.status])).toEqual([[ageRule, "approved"]])
+    expect(approvals.skipped).toEqual([])
+    expect(new Set(approvals.terms.map((item) => item.key))).toEqual(new Set([...withRule, term?.key]))
+    expect(approvals.terms.every((item) => item.review.status === "approved")).toBe(true)
     expect(approvals.settings?.review).toEqual(approved)
     expect(approvals.provisions[0]?.noRule?.review).toEqual(approved)
 
@@ -184,7 +198,13 @@ describe("answerQuestion", () => {
   })
 
   it("leaves a kept reading proposed when something else blocks it", () => {
-    const result = answerQuestion(sampleRecords(), {
+    const records = sampleRecords()
+    const issue: T.Issue = { code: "conflict", message: "Conflicts", related: [], resolution: null }
+    const blocked = {
+      ...records,
+      rules: records.rules.map((rule) => (rule.key === keptReading ? { ...rule, issues: [issue] } : rule))
+    }
+    const result = answerQuestion(blocked, {
       questionId: leaseQuestion,
       option: 0,
       text: "Only the term.",

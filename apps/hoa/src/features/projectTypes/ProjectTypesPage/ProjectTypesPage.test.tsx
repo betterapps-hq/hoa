@@ -7,6 +7,7 @@ import type { ProjectTypesOverview } from "../projectTypes.functions"
 import { ProjectTypesPage, type NewProjectType, type ProjectTypesPageProps } from "./ProjectTypesPage"
 
 vi.mock("@tanstack/react-router", () => ({
+  useRouter: () => undefined,
   Link: ({ to, children, ...props }: { to: string; children?: React.ReactNode }) => (
     <a href={to} {...props}>
       {children}

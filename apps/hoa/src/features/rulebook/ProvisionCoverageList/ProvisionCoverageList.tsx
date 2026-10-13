@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { usePageSize } from "@/hooks/usePageSize"
 import { useSearch } from "@/hooks/useSearch"
-import { BulkApprove } from "../BulkApprove/BulkApprove"
 import { ProvisionCoverageCard } from "../ProvisionCoverageCard/ProvisionCoverageCard"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 import { filterProvisions, provisionSearchSetup, type CoverageFilter } from "./ProvisionCoverageList.utils"
@@ -76,12 +75,6 @@ export function ProvisionCoverageList({ initialFilter = null }: { initialFilter?
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        {filter === "to-review" ? (
-          <BulkApprove
-            refs={shown.map((provision) => ({ type: "provision" as const, key: provision.key }))}
-            noun="reasons"
-          />
-        ) : null}
       </div>
       {shown.length === 0 ? (
         <p className="rounded-lg border py-8 text-center text-sm text-muted-foreground">

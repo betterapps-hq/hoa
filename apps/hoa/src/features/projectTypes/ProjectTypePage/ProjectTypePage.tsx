@@ -3,6 +3,7 @@ import { useForm } from "@tanstack/react-form"
 import { Link } from "@tanstack/react-router"
 import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, CircleCheckIcon } from "lucide-react"
 import { useRef, useState } from "react"
+import { PageActions } from "@/components/PageActions/PageActions"
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -28,7 +29,7 @@ import type { CitedProvision } from "../../rulebook/citedProvision"
 import { RuleReference } from "../../rulebook/RuleReference/RuleReference"
 import { DocumentsCard } from "../DocumentsCard/DocumentsCard"
 import { outdatedText } from "../outdated"
-import { ProjectTypeMenu } from "../ProjectTypeMenu/ProjectTypeMenu"
+import { useProjectTypeActions } from "../ProjectTypeMenu/ProjectTypeMenu"
 import type { ProjectTypeView } from "../projectTypes.functions"
 import { QuestionsCard, type DefinitionUpdate } from "../QuestionsCard/QuestionsCard"
 import { changesSummary, UpdatesDialog } from "../UpdatesDialog/UpdatesDialog"
@@ -240,8 +241,19 @@ function ProjectTypeEditor({
   const update: DefinitionUpdate = (change) =>
     editor.update((current) => bindDefinition(change(current), view.available))
   const ruleCount = requirements.reduce((total, group) => total + group.rules.length, 0)
+  const typeActions = useProjectTypeActions({
+    label: projectType.label,
+    status: projectType.status,
+    applicationCount,
+    onEdit: () => setIsEditing(true),
+    onSetStatus,
+    onDelete,
+    onError: setError
+  })
   return (
     <div className="flex flex-col gap-4 px-4 lg:px-6">
+      <PageActions status={<SaveStatus state={editor.state} onRetry={editor.retry} />} more={typeActions.actions} />
+      {typeActions.confirmation}
       <Button
         variant="ghost"
         size="sm"
@@ -252,31 +264,17 @@ function ProjectTypeEditor({
         <ArrowLeftIcon />
         Project types
       </Button>
-      <header className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-xl font-semibold">{projectType.label}</h2>
-            {projectType.status === "archived" ? <Badge variant="outline">Archived</Badge> : null}
-          </div>
-          {projectType.description ? (
-            <p className="max-w-prose text-sm text-muted-foreground">{projectType.description}</p>
-          ) : null}
-          {subjectLabels.length > 0 ? (
-            <p className="text-sm text-muted-foreground">Covers {subjectLabels.join(", ")}.</p>
-          ) : null}
+      <header className="flex min-w-0 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-xl font-semibold">{projectType.label}</h2>
+          {projectType.status === "archived" ? <Badge variant="outline">Archived</Badge> : null}
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <SaveStatus state={editor.state} onRetry={editor.retry} />
-          <ProjectTypeMenu
-            label={projectType.label}
-            status={projectType.status}
-            applicationCount={applicationCount}
-            onEdit={() => setIsEditing(true)}
-            onSetStatus={onSetStatus}
-            onDelete={onDelete}
-            onError={setError}
-          />
-        </div>
+        {projectType.description ? (
+          <p className="max-w-prose text-sm text-muted-foreground">{projectType.description}</p>
+        ) : null}
+        {subjectLabels.length > 0 ? (
+          <p className="text-sm text-muted-foreground">Covers {subjectLabels.join(", ")}.</p>
+        ) : null}
       </header>
       {isOutdated && updates ? (
         <Alert>

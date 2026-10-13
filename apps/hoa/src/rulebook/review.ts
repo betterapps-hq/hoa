@@ -150,6 +150,11 @@ function issueBlockers(stored: T.Issue[], live: RulebookIssue[] = []) {
   ]
 }
 
+/** The terms a rule reads that are still to review: approving the rule approves them with it. */
+export function proposedTermsOf(context: ApprovalContext, rule: T.Rule) {
+  return [...termKeysOf(rule)].filter((term) => context.termStatus.get(term) === "proposed")
+}
+
 /** Why a record can't be approved yet; empty when it can. */
 export function approvalBlockers(context: ApprovalContext, ref: RecordRef): string[] {
   const { records, issues } = context
@@ -159,14 +164,15 @@ export function approvalBlockers(context: ApprovalContext, ref: RecordRef): stri
       if (!rule) {
         return ["The rule no longer exists."]
       }
-      const proposedTerms = [...termKeysOf(rule)].filter((term) => context.termStatus.get(term) === "proposed")
+      // A rule is approved with the terms it reads that are still to review, so what blocks one of them blocks it.
+      const termBlockers = proposedTermsOf(context, rule).flatMap((term) =>
+        approvalBlockers(context, { type: "term", key: term }).map(
+          (reason) => `The term “${context.vocabulary.label(term)}”: ${reason}`
+        )
+      )
       return [
         ...issueBlockers(rule.issues, issues.get(rule.key)),
-        ...(proposedTerms.length > 0
-          ? [
-              `It reads terms still to review: ${proposedTerms.map((term) => context.vocabulary.label(term)).join(", ")}.`
-            ]
-          : []),
+        ...termBlockers,
         ...(context.openQuestions.has(rule.key)
           ? ["It's a candidate reading of an open question; answer the question instead."]
           : [])
@@ -202,8 +208,8 @@ export type ReviewChanges = {
 
 /**
  * Sets the review of records. Approving checks each one's blockers; a record with blockers is skipped, not approved.
- * Rejecting and returning to proposed always apply, except that the settings can't be rejected: every rulebook has
- * them, so they're edited instead.
+ * Approving a rule approves the terms it reads that are still to review with it. Rejecting and returning to proposed
+ * always apply, except that the settings can't be rejected: every rulebook has them, so they're edited instead.
  */
 export function reviewRecords(
   records: RulebookRecords,
@@ -213,6 +219,14 @@ export function reviewRecords(
   const context = approvalContext(records)
   const changes: ReviewChanges = { rules: [], terms: [], provisions: [], settings: null, skipped: [] }
   const next = reviewed(review.status, review.by, review.at, review.note)
+  const decidedTerms = new Set<T.TermKey>()
+  const decideTerm = (key: T.TermKey) => {
+    const term = records.terms.find((item) => item.key === key)
+    if (term && !decidedTerms.has(key)) {
+      decidedTerms.add(key)
+      changes.terms.push({ ...term, review: next })
+    }
+  }
   for (const ref of refs) {
     const reasons = match(review.status)
       .with("approved", () => approvalBlockers(context, ref))
@@ -227,15 +241,13 @@ export function reviewRecords(
       .with({ type: "rule" }, ({ key }) => {
         const rule = records.rules.find((item) => item.key === key)
         if (rule) {
+          if (review.status === "approved") {
+            proposedTermsOf(context, rule).forEach(decideTerm)
+          }
           changes.rules.push({ ...rule, review: next })
         }
       })
-      .with({ type: "term" }, ({ key }) => {
-        const term = records.terms.find((item) => item.key === key)
-        if (term) {
-          changes.terms.push({ ...term, review: next })
-        }
-      })
+      .with({ type: "term" }, ({ key }) => decideTerm(key))
       .with({ type: "settings" }, () => {
         changes.settings = { ...records.settings, review: next }
       })
@@ -252,8 +264,9 @@ export function reviewRecords(
 
 /**
  * Answers an interpretation or conflict question (schema.md, Settings and questions): the chosen option's rules are
- * approved where nothing else blocks them, the other candidates are rejected, and a conflict's open issues on the rules
- * it's about are resolved with the answer. Gives every rule that changed.
+ * approved where nothing else blocks them, with the terms they read still to review, the other candidates are rejected,
+ * and a conflict's open issues on the rules it's about are resolved with the answer. Gives every rule and term that
+ * changed.
  */
 export function answerQuestion(
   records: RulebookRecords,
@@ -291,7 +304,7 @@ export function answerQuestion(
   const approvals = reviewRecords(withAnswer, toRefs(kept), { status: "approved", ...review })
   const rejections = reviewRecords(withAnswer, toRefs(dropped), { status: "rejected", ...review })
   const changed = new Map([...resolved, ...approvals.rules, ...rejections.rules].map((rule) => [rule.key, rule]))
-  return { question: answered, rules: [...changed.values()], notApproved: approvals.skipped }
+  return { question: answered, rules: [...changed.values()], terms: approvals.terms, notApproved: approvals.skipped }
 }
 
 /** Resolves a stored issue with a note, so it no longer blocks approval. */

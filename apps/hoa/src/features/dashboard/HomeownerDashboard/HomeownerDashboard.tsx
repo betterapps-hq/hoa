@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router"
-import { Button } from "@/components/ui/button"
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { PlusIcon } from "lucide-react"
+import { PageActions } from "@/components/PageActions/PageActions"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import type { DashboardSummary } from "@/features/rulebook/rulebook.functions"
 import type { DashboardApplication } from "../dashboardData"
@@ -27,17 +28,13 @@ export function HomeownerDashboard({ summary, applications, asOf }: HomeownerDas
   const groups = groupForHomeowner(applications)
   return (
     <div className="grid grid-cols-1 items-start gap-4 px-4 lg:px-6 @4xl/main:grid-cols-3 @4xl/main:gap-6">
+      <PageActions primary={{ label: "Start an application", icon: PlusIcon, href: "/applications" }} />
       <Card className="@4xl/main:col-span-2">
         <CardHeader>
           <CardTitle>
             <h2>Your applications</h2>
           </CardTitle>
           {groups.length > 0 ? <CardDescription>Where each one stands and what comes next.</CardDescription> : null}
-          <CardAction>
-            <Button render={<Link to="/applications" />} nativeButton={false}>
-              Start an application
-            </Button>
-          </CardAction>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           {groups.length === 0 ? (

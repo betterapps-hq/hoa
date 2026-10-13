@@ -6,6 +6,7 @@ import { dashboardApplication as application, decision } from "../dashboard.test
 import { HomeownerDashboard } from "./HomeownerDashboard"
 
 vi.mock("@tanstack/react-router", () => ({
+  useRouter: () => undefined,
   Link: ({
     children,
     to,

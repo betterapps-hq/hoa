@@ -11,7 +11,6 @@ import { sentenceCase } from "@/lib/text"
 import { approvalBlockers } from "@/rulebook/review"
 import { renderStatement } from "@/schema/statement"
 import type * as T from "@/schema/types"
-import { BulkApprove } from "../BulkApprove/BulkApprove"
 import { ChoiceSelect } from "../ChoiceSelect/ChoiceSelect"
 import { ReviewMenu } from "../ReviewMenu/ReviewMenu"
 import { domainLabels, domains, ruleKindLabels, ruleKinds } from "../ruleLabels"
@@ -183,9 +182,6 @@ export function RuleTable({ initialStatus = null }: RuleTableProps) {
               </Button>
             ) : null}
           </p>
-          {filters.status === "proposed" ? (
-            <BulkApprove refs={shown.map((rule) => ({ type: "rule" as const, key: rule.key }))} noun="rules" />
-          ) : null}
         </div>
       )}
       empty={

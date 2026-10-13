@@ -1,6 +1,8 @@
-import { DownloadIcon, PencilIcon, UploadIcon } from "lucide-react"
+import { DownloadIcon, HistoryIcon, PencilIcon, UploadIcon } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
+import { PageActions, type PageAction, type PageActionsProps } from "@/components/PageActions/PageActions"
+import type { RowAction } from "@/components/RowActions/RowActions"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -130,6 +132,7 @@ function RulebookOverview(props: RulebookPageProps) {
   const status = rulebookStatus({ draft, published, uploads })
   return (
     <div className="flex flex-col gap-10">
+      <PageActions {...useOverviewActions(status, props)} />
       <StatusLine status={status} uploadDialog={uploadDialog} {...props} />
       <GoverningDocuments
         uploadDialog={uploadDialog}
@@ -139,42 +142,101 @@ function RulebookOverview(props: RulebookPageProps) {
         onUpload={props.onUpload}
         onChanged={props.onChanged}
       />
-      <RulesInForce
-        published={published}
-        sources={sources}
-        source={source}
-        loadRulesFile={props.loadRulesFile}
-        // Only with nothing else under way: a draft or a build would be replaced, or replace the change.
-        onChange={
-          status.kind === "none"
-            ? async () => {
-                const started = await attempt(async () => {
-                  await props.onChangePublished()
-                  return true
-                }, "The rulebook couldn't be opened for changes.")
-                if (started) {
-                  props.onReviewingChange(true)
-                }
-              }
-            : null
-        }
-      />
+      <RulesInForce published={published} sources={sources} source={source} />
     </div>
   )
 }
 
+/**
+ * The page's actions (ux.md, Page actions): the status line's next step as the main one; changing the published
+ * rulebook when nothing else is under way, since a draft or a build would replace the change; the rules file in the
+ * menu.
+ */
+function useOverviewActions(status: RulebookStatus, props: RulebookPageProps): PageActionsProps {
+  const [busy, setBusy] = useState<"build" | "change" | "download" | null>(null)
+  const { rulebook, content, fileSha256 } = props.published
+  const build = async () => {
+    setBusy("build")
+    await attempt(props.onBuild, "Processing didn't start.")
+    setBusy(null)
+    props.onChanged()
+  }
+  const change = async () => {
+    setBusy("change")
+    const started = await attempt(async () => {
+      await props.onChangePublished()
+      return true
+    }, "The rulebook couldn't be opened for changes.")
+    setBusy(null)
+    if (started) {
+      props.onReviewingChange(true)
+    }
+  }
+  const download = async () => {
+    setBusy("download")
+    const json = await attempt(props.loadRulesFile, "The rules file couldn't be downloaded.")
+    setBusy(null)
+    if (json) {
+      saveFile(`rules-version-${rulebook?.version ?? "draft"}.json`, json)
+    }
+  }
+  const processDocuments: PageAction = {
+    label: "Process documents",
+    isBusy: busy === "build",
+    onSelect: () => void build()
+  }
+  const review = (label: string): PageAction => ({ label, onSelect: () => props.onReviewingChange(true) })
+  const more: RowAction[] =
+    rulebook && fileSha256
+      ? [
+          {
+            label: "Download the rules file",
+            icon: DownloadIcon,
+            disabled: busy === "download",
+            onSelect: () => void download()
+          }
+        ]
+      : []
+  switch (status.kind) {
+    case "draft-ready":
+      return { primary: review(status.isFirst ? "Review the draft" : "Review changes"), more }
+    case "build-stopped":
+      return {
+        primary: processDocuments,
+        secondary: status.hasDraft ? { ...review("Review the earlier draft"), icon: HistoryIcon } : null,
+        more
+      }
+    case "build-failed":
+      return { primary: status.isRetryable ? processDocuments : null, more }
+    case "documents-changed":
+    case "not-built":
+      return { primary: processDocuments, more }
+    case "none":
+      return {
+        secondary:
+          rulebook && content
+            ? {
+                label: "Change the rulebook",
+                icon: PencilIcon,
+                isBusy: busy === "change",
+                onSelect: () => void change()
+              }
+            : null,
+        more
+      }
+    case "building":
+    case "reading":
+    case "build-refused":
+      return { more }
+  }
+}
+
+/** What's happening or next, in a sentence; its action is the page's main action, at the top. */
 function StatusLine({
   status,
   uploadDialog,
   ...props
 }: { status: RulebookStatus; uploadDialog: UploadDialog } & RulebookPageProps) {
-  const [isBusy, setIsBusy] = useState(false)
-  const build = async () => {
-    setIsBusy(true)
-    await attempt(props.onBuild, "Processing didn't start.")
-    setIsBusy(false)
-    props.onChanged()
-  }
   const stop = async () => {
     const result = await attempt(props.onStop, "Processing couldn’t be stopped.")
     if (result && result.status !== "stopped") {
@@ -224,27 +286,14 @@ function StatusLine({
           status.skipped > 0 ? "Some parts weren’t finished. They’re listed in the review." : null
         ]
           .filter((part) => part !== null)
-          .join(" "),
-        <Button className="w-fit" onClick={() => props.onReviewingChange(true)}>
-          {status.isFirst ? "Review the draft" : "Review changes"}
-        </Button>
+          .join(" ")
       )
     case "build-stopped":
       return line(
         "Processing was stopped.",
         status.hasDraft
           ? "Work it finished is kept and reused next time. The earlier draft is still here to review."
-          : "Work it finished is kept and reused next time. Nothing was published.",
-        <div className="flex flex-wrap gap-2">
-          <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-            Process documents
-          </Button>
-          {status.hasDraft ? (
-            <Button variant="ghost" className="w-fit" onClick={() => props.onReviewingChange(true)}>
-              Review the earlier draft
-            </Button>
-          ) : null}
-        </div>
+          : "Work it finished is kept and reused next time. Nothing was published."
       )
     case "build-refused":
       return line(
@@ -267,28 +316,17 @@ function StatusLine({
     case "build-failed":
       return line(
         "The last update of the rulebook didn’t finish.",
-        <p className="line-clamp-3 break-words">{status.error}</p>,
-        status.isRetryable ? (
-          <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-            Try again
-          </Button>
-        ) : null
+        <p className="line-clamp-3 break-words">{status.error}</p>
       )
     case "documents-changed":
       return line(
         `Your documents changed since version ${status.version ?? ""} was published.`,
-        "Process them to see what changes.",
-        <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-          Process documents
-        </Button>
+        "Process them to see what changes."
       )
     case "not-built":
       return line(
         "Turn your documents into a rulebook.",
-        "Each provision is read and encoded as rules for you to review and publish.",
-        <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-          Process documents
-        </Button>
+        "Each provision is read and encoded as rules for you to review and publish."
       )
     case "none":
       return null
@@ -354,67 +392,23 @@ function RemoveDocument({
   )
 }
 
-function RulesInForce({
-  published,
-  sources,
-  source,
-  loadRulesFile,
-  onChange
-}: Pick<RulebookPageProps, "published" | "sources" | "source" | "loadRulesFile"> & {
-  /** Opens the published rulebook as a draft to change; null while something else is under way. */
-  onChange: (() => Promise<void>) | null
-}) {
-  const [isDownloading, setIsDownloading] = useState(false)
-  const [isOpening, setIsOpening] = useState(false)
+function RulesInForce({ published, sources, source }: Pick<RulebookPageProps, "published" | "sources" | "source">) {
   const { rulebook, content } = published
   if (!rulebook || !content) {
     return null
   }
   const records = recordsOf(sources, rulebook, content, "published", published.filedSources)
-  const download = async () => {
-    setIsDownloading(true)
-    const json = await attempt(loadRulesFile, "The rules file couldn't be downloaded.")
-    setIsDownloading(false)
-    if (json) {
-      saveFile(`rules-version-${rulebook.version ?? "draft"}.json`, json)
-    }
-  }
   return (
     <section aria-labelledby="rules-in-force" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div className="flex flex-col gap-0.5">
-          <h2 id="rules-in-force" className="text-base font-semibold">
-            Rules in force
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Version {rulebook.version}
-            {rulebook.publishedAt ? `, published ${dateFormat.format(new Date(rulebook.publishedAt))}` : ""}.
-            Applications are checked against it.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {published.fileSha256 ? (
-            <Button size="sm" variant="ghost" disabled={isDownloading} onClick={() => void download()}>
-              <DownloadIcon />
-              {isDownloading ? "Downloading" : "Rules file"}
-            </Button>
-          ) : null}
-          {onChange ? (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={isOpening}
-              onClick={async () => {
-                setIsOpening(true)
-                await onChange()
-                setIsOpening(false)
-              }}
-            >
-              <PencilIcon />
-              {isOpening ? "Opening" : "Change the rulebook"}
-            </Button>
-          ) : null}
-        </div>
+      <div className="flex flex-col gap-0.5">
+        <h2 id="rules-in-force" className="text-base font-semibold">
+          Rules in force
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Version {rulebook.version}
+          {rulebook.publishedAt ? `, published ${dateFormat.format(new Date(rulebook.publishedAt))}` : ""}. Applications
+          are checked against it.
+        </p>
       </div>
       <RulebookWorkspace records={records} source={source} actions={null} audience="administrator" />
     </section>

@@ -1,14 +1,12 @@
 import { useRouter } from "@tanstack/react-router"
-import type { ComponentProps, MouseEvent } from "react"
+import type { ComponentProps } from "react"
+import { isPlainClick } from "@/lib/links"
 import { useReaderSheet } from "../ReaderSheet/readerSheetContext"
 
 export type ReaderLinkProps = Omit<ComponentProps<"a">, "href"> & {
   /** A reader URL from `citationHref`. */
   href: string
 }
-
-const isPlainClick = (event: MouseEvent<HTMLAnchorElement>) =>
-  event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
 
 /**
  * A real link to the document reader: middle-click, a modifier or the context menu opens it in a new tab. A plain

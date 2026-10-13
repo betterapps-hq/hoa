@@ -5,7 +5,6 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useSearch } from "@/hooks/useSearch"
-import { BulkApprove } from "../BulkApprove/BulkApprove"
 import { ChoiceSelect } from "../ChoiceSelect/ChoiceSelect"
 import { TermGroup } from "../TermGroup/TermGroup"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
@@ -43,7 +42,7 @@ const noKeys: ReadonlySet<string> = new Set()
  * The organization's terms (encoding.md, UX, Terms), grouped under what they describe: things, requests, people and
  * organizations, events and documents, each with its kinds and details folded under it and each choice property with
  * its choices, then the lists and units nothing holds. In a draft, each term has its review, and a subject approves
- * what it holds together. Approving a term is separate from approving rules; a rule waits for the terms it reads.
+ * what it holds together. A term is approved here, or with the first rule approved that reads it.
  */
 export function VocabularyTab() {
   const { records, vocabulary, actions } = useRulebookWorkspace()
@@ -78,7 +77,6 @@ export function VocabularyTab() {
     }
   }
 
-  const toReview = [...matched.values()].filter((term) => term.review.status === "proposed")
   // A search lists its matches best first; otherwise each section lists its subjects, most used first.
   const lists = isSearching
     ? [
@@ -152,9 +150,6 @@ export function VocabularyTab() {
             </Button>
           )}
         </p>
-        {filters.status === "proposed" ? (
-          <BulkApprove refs={toReview.map((term) => ({ type: "term" as const, key: term.key }))} noun="terms" />
-        ) : null}
       </div>
       {lists.length === 0 ? (
         <p className="rounded-lg border py-10 text-center text-sm text-muted-foreground">

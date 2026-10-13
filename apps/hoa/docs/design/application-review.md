@@ -443,9 +443,11 @@ A value shown on its own starts with a capital.
     writer's words, the rules it marks as links; opening the line shows its rule as a `RuleReference` and the parts it
     covers, each opening the finding sheet. A group shows its first five items and "Show N more"; suggestions, which
     don't affect the decision, start hidden. With nothing to do, the page says so.
-  - **One primary action,** in the side column: the homeowner adds files while information is missing (the review runs
-    again; submitting anyway asks for confirmation) and otherwise submits to the committee; the committee records its
-    decision, each outcome a choice card, the one that follows the recommendation marked "Recommended by the review"
+  - **The page's actions** ([ux.md, Page actions](../ux.md#page-actions)): **Run review** while the packet has files
+    and no review, **Submit to the committee** once nothing is open, and in the menu **Run review again** and, while
+    information is missing, **Submit anyway**, which asks for confirmation.
+  - **One thing to do now,** in the side column: the homeowner adds files (while information is missing, the review
+    runs again on the whole packet); the committee records its decision, each outcome a choice card, the one that follows the recommendation marked "Recommended by the review"
     and preselected (none for a referral), with "Start from the review's next steps" to draft the note. Under it, the
     details: project type, started, submitted, reviewed (provisional or not), decided, and the number of files.
   - **Files:** each packet file as an attachment with what the review made of it. A photo opens in the viewer; any
@@ -590,7 +592,8 @@ wording so adding one back keeps it).
   editor.
 - **The list** (`ProjectTypesPage`): until a rulebook is published there's nothing to build a type from, so the page
   is one empty state, "Publish your rulebook first", leading to the rulebook; nothing else shows. Once one is, a
-  header with "Suggest project types" and "Add project type", then each type as a card: its name (the card opens it),
+  short line on what project types are, with "Add project type" and "Suggest project types" as the page's actions,
+  then each type as a card: its name (the card opens it),
   description, how many questions, documents and applications, an archived badge or the out-of-date line, and its
   menu. Suggestions, once asked for, appear above the cards, each to add or dismiss.
 - **The editor** (`ProjectTypePage`): each question rendered exactly as homeowners see it (`QuestionField`, shared

@@ -105,18 +105,6 @@ describe("VocabularyTab", () => {
     )
   })
 
-  it("approves every term shown", async () => {
-    const { user, actions } = renderInWorkspace(<VocabularyTab />)
-    await user.type(screen.getByRole("searchbox", { name: "Search terms" }), "lease-registration.")
-    await user.click(screen.getByRole("button", { name: /^Approve the \d+ terms shown$/ }))
-    await user.click(await screen.findByRole("button", { name: "Approve them" }))
-    expect(actions?.review).toHaveBeenCalledWith(
-      expect.arrayContaining([{ type: "term", key: "lease-registration.premises" }]),
-      "approved",
-      null
-    )
-  })
-
   it("filters by review behind Filters", async () => {
     const records = sampleRecords()
     const { user } = renderInWorkspace(<VocabularyTab />, {

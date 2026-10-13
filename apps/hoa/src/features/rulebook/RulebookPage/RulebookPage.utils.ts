@@ -3,8 +3,8 @@ import type { RefusedDocument } from "@/rulebook/buildSources"
 import { currentDocumentIds, isSameDocumentSet } from "@/rulebook/currentDocuments"
 import type { RulebookView } from "../rulebook.functions"
 
-// What the rulebook page says first (encoding.md, UX): the one thing that's happening or next, in a sentence, with at
-// most one action.
+// What the rulebook page says first (encoding.md, UX): the one thing that's happening or next, in a sentence. Its
+// action is the page's main action, at the top of the page (ux.md, Page actions).
 
 export type RulebookStatus =
   | { kind: "building"; reading: string[] }

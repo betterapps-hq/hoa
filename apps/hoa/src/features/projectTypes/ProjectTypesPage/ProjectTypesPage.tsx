@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { useId, useState } from "react"
 import { z } from "zod"
+import { PageActions } from "@/components/PageActions/PageActions"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -449,25 +450,19 @@ export function ProjectTypesPage({
   }
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 lg:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex max-w-2xl flex-col gap-1">
-          <h2 className="text-2xl font-semibold tracking-tight">Project types</h2>
-          <p className="text-muted-foreground">
-            What homeowners choose when they apply. Each asks for the details the rules check and the documents they
-            require.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void suggestions.suggest()} disabled={suggestions.isLoading}>
-            {suggestions.isLoading ? <Spinner /> : <SparklesIcon />}
-            {suggestions.suggestions ? "Suggest again" : "Suggest project types"}
-          </Button>
-          <Button onClick={() => setIsAdding(true)}>
-            <PlusIcon />
-            Add project type
-          </Button>
-        </div>
-      </header>
+      <PageActions
+        primary={{ label: "Add project type", icon: PlusIcon, onSelect: () => setIsAdding(true) }}
+        secondary={{
+          label: suggestions.suggestions ? "Suggest again" : "Suggest project types",
+          icon: SparklesIcon,
+          isBusy: suggestions.isLoading,
+          onSelect: () => void suggestions.suggest()
+        }}
+      />
+      <p className="max-w-2xl text-muted-foreground">
+        What homeowners choose when they apply. Each asks for the details the rules check and the documents they
+        require.
+      </p>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           {error}

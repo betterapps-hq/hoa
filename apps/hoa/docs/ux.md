@@ -7,7 +7,8 @@ feedback; follow them everywhere, and fix a violation when you touch the code ar
 
 - **One primary action per view.** Secondary actions are quieter buttons or live in a menu.
 - **Say the state in a sentence, not in counters.** "3 questions need your answer before you can publish", not a row of
-  badges with numbers.
+  badges with numbers. The one exception is a to-do list split into tabs: each tab's count is what it has left, and a
+  tab with nothing left shows a check.
 - **Details on demand.** Evidence, history, explanations and long lists go behind a disclosure, a sheet or a popover.
 - **No redundant labels.** Don't label the default state. Don't repeat what the layout already says.
 - **Never use a dot glyph (`·`, `•`) as a separator.** Use layout or a worded phrase.
@@ -15,6 +16,22 @@ feedback; follow them everywhere, and fix a violation when you touch the code ar
   rulebook labels are stored as written (often lowercase); capitalize the first letter when rendering, through the shared
   display helper, and leave the rest as written so names and acronyms (CC&Rs, HOA) survive. Never change stored data to
   fix display case.
+
+## Page actions
+
+- **What acts on the page's subject as a whole is a page action**, at the right of the site header on every page
+  (`PageActions`), so it's in reach however far down the page is read: publishing or discarding a draft, submitting an
+  application, adding a project type. Sections, rows and forms keep their own actions (a form's submit, a row's
+  menu, a section's Upload).
+- **One filled button for the page's main action**, at most one quieter one beside it, and the rest in the More
+  actions menu, destructive ones last. On a phone the quieter one moves into the menu, so the title keeps its room.
+- **The page's state stays on the page**, in a sentence ("Your rulebook is ready to review."); its action is the
+  page action, not a second button beside the sentence. An action that only fixes one notice (Try again on a failed
+  part) stays in the notice.
+- **A page with nothing to do on its subject shows no page actions.** A status that isn't an action ("Saved") sits
+  beside them.
+- **Don't repeat the site header's title** as a heading on the page; a detail page's heading names its subject (the
+  project type's name), not the page.
 
 ## Forms
 

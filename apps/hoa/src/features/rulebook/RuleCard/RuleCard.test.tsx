@@ -75,9 +75,24 @@ describe("RuleCard", () => {
     expect(actions?.review).toHaveBeenCalledWith([{ type: "rule", key: approvalRule }], "proposed", null)
   })
 
+  it("approves the terms it uses still to review with it, and lists them with how many rules share each", async () => {
+    const { user, actions } = renderCard(sampleRecords())
+    const terms = within(screen.getByRole("list", { name: "Terms it uses" })).getAllByRole("listitem")
+    expect(within(terms[0]!).getByText("To review")).toBeInTheDocument()
+    expect(within(terms[0]!).getByText(/^Used in \d+ rules$|^Only this rule$/)).toBeInTheDocument()
+    expect(screen.getByText(/^Approving the rule approves the \d+ still to review\./)).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: /^Approve, with its \d+ terms$/ }))
+    expect(actions?.review).toHaveBeenCalledWith([{ type: "rule", key: approvalRule }], "approved", null)
+  })
+
   it("says why it can't be approved yet", () => {
-    renderCard(sampleRecords())
-    expect(screen.getByText(/It reads terms still to review/)).toBeInTheDocument()
+    const records = sampleWithTermsApproved()
+    const issue: T.Issue = { code: "conflict", message: "Conflicts with 4.2", related: [], resolution: null }
+    renderCard({
+      ...records,
+      rules: records.rules.map((rule) => (rule.key === approvalRule ? { ...rule, issues: [issue] } : rule))
+    })
+    expect(screen.getByText("1 open issue needs resolving.")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled()
   })
 

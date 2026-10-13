@@ -5,6 +5,7 @@ import { RowActions } from "@/components/RowActions/RowActions"
 import type { RecordRef } from "@/rulebook/review"
 import type * as T from "@/schema/types"
 import { reviewRecord } from "../attempt"
+import { approveLabel } from "../ReviewControls/ReviewControls.utils"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 
 export type ReviewMenuProps = {
@@ -22,7 +23,7 @@ export type ReviewMenuProps = {
  * ellipsis menu approves, rejects or sends it back to review. Approving or rejecting confirms with an undo.
  */
 export function ReviewMenu({ record, status, name, blockers = [] }: ReviewMenuProps) {
-  const { actions } = useRulebookWorkspace()
+  const { actions, approval, records } = useRulebookWorkspace()
   const [isBusy, setIsBusy] = useState(false)
   if (!actions) {
     return null
@@ -57,7 +58,7 @@ export function ReviewMenu({ record, status, name, blockers = [] }: ReviewMenuPr
           status === "proposed"
             ? [
                 {
-                  label: "Approve",
+                  label: approveLabel(approval, records, record),
                   icon: CheckIcon,
                   disabled: blockers.length > 0,
                   onSelect: () => void review("approved")

@@ -139,7 +139,7 @@ function setup(overrides: Partial<RulebookPageProps> = {}) {
 const noDraft: RulebookView = { ...draft, rulebook: null, content: null, changes: null, blockers: [] }
 
 describe("RulebookPage", () => {
-  it("shows the rules in force and the documents, with a ready draft as one sentence and one action", async () => {
+  it("shows the rules in force and the documents, with a ready draft as a sentence and the page's action", async () => {
     const { props, user } = setup()
     const status = screen.getByRole("region", { name: "Status" })
     expect(within(status).getByText("A new draft of the rulebook is ready to review.")).toBeInTheDocument()
@@ -150,7 +150,9 @@ describe("RulebookPage", () => {
     expect(screen.getByRole("heading", { name: "Governing documents" })).toBeInTheDocument()
     expect(screen.queryByRole("tab", { name: "Draft" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /^Approve/ })).not.toBeInTheDocument()
-    await user.click(within(status).getByRole("button", { name: "Review changes" }))
+    await user.click(
+      within(screen.getByRole("group", { name: "Page actions" })).getByRole("button", { name: "Review changes" })
+    )
     expect(props.onReviewingChange).toHaveBeenCalledWith(true)
   })
 
@@ -166,16 +168,28 @@ describe("RulebookPage", () => {
     expect(screen.queryByRole("button", { name: "Change the rulebook" })).not.toBeInTheDocument()
   })
 
-  it("reviews the draft as a focused mode: the next step, the to-do list, and what changed", async () => {
+  it("reviews the draft as a focused mode: how much is decided, what changed, and the tabs as the to-do list", async () => {
     const { user } = setup({ isReviewing: true })
-    expect(screen.getByText("1096 terms need your review before you can publish.")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Answer 15 questions" })).toBeInTheDocument()
+    expect(screen.getByText(/^0 of [\d,]+ decided\. The number on each tab is what it has left/)).toBeInTheDocument()
     expect(screen.getByRole("tab", { name: "Changes", selected: true })).toBeInTheDocument()
     expect(screen.getByRole("region", { name: /^New rules/ })).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Review terms" }))
-    expect(screen.getByRole("tab", { name: "Terms", selected: true })).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Answer 15 questions" }))
-    expect(screen.getByRole("tab", { name: "Questions", selected: true })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled()
+    await user.click(screen.getByRole("tab", { name: /^Questions \d+$/ }))
+    expect(screen.getByRole("tab", { name: /^Questions/, selected: true })).toBeInTheDocument()
+  })
+
+  it("approves everything left from the page's menu, after saying what that is", async () => {
+    const { props, user } = setup({ isReviewing: true })
+    await user.click(screen.getByRole("button", { name: "More actions" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Approve everything left" }))
+    const confirm = await screen.findByRole("alertdialog", { name: "Approve everything left to review?" })
+    expect(within(confirm).getByText(/^This approves \d+ rules?, \d+ terms, the settings/)).toBeInTheDocument()
+    await user.click(within(confirm).getByRole("button", { name: "Approve them" }))
+    expect(props.actions.review).toHaveBeenCalledWith(
+      expect.arrayContaining([{ type: "settings" }, expect.objectContaining({ type: "term" })]),
+      "approved",
+      null
+    )
   })
 
   it("says what the build skipped, on the status line and in the review, where it is, and tries again", async () => {
@@ -211,7 +225,8 @@ describe("RulebookPage", () => {
 
   it("discards the draft after saying what's lost", async () => {
     const { props, user } = setup({ isReviewing: true })
-    await user.click(screen.getByRole("button", { name: "Discard draft" }))
+    await user.click(screen.getByRole("button", { name: "More actions" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Discard draft" }))
     const confirm = await screen.findByRole("alertdialog", { name: "Discard this draft?" })
     expect(within(confirm).getByText(/Version 1 stays in force\./)).toBeInTheDocument()
     await user.click(within(confirm).getByRole("button", { name: "Discard draft" }))
@@ -240,7 +255,7 @@ describe("RulebookPage", () => {
       sources: reasonsApproved,
       draft: { ...draft, content: reviewed, blockers: [] }
     })
-    expect(screen.getByText(/^Everything is reviewed\./)).toBeInTheDocument()
+    expect(screen.getByText(/^Everything is decided\./)).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: "Publish" }))
     await user.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Publish" }))
     expect(props.onPublish).toHaveBeenCalledWith("draft-1")
@@ -252,9 +267,10 @@ describe("RulebookPage", () => {
     vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL }))
     const { props, user } = setup({ draft: { ...noDraft, lastBuildError: "Unit 4 failed." } })
     expect(screen.getByText("Unit 4 failed.")).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Try again" }))
+    await user.click(screen.getByRole("button", { name: "Process documents" }))
     expect(props.onBuild).toHaveBeenCalled()
-    await user.click(screen.getByRole("button", { name: "Rules file" }))
+    await user.click(screen.getByRole("button", { name: "More actions" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Download the rules file" }))
     expect(props.loadRulesFile).toHaveBeenCalled()
     expect(createObjectURL).toHaveBeenCalled()
     vi.unstubAllGlobals()
@@ -263,7 +279,7 @@ describe("RulebookPage", () => {
   it("offers no try again for a failure that would fail the same way", () => {
     setup({ draft: { ...noDraft, lastBuildError: "Missing settings.", isLastBuildRetryable: false } })
     expect(screen.getByText("The last update of the rulebook didn’t finish.")).toBeInTheDocument()
-    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Process documents" })).not.toBeInTheDocument()
   })
 
   it("says plainly which documents a refused build can't use, with upload and remove instead of try again", async () => {
@@ -288,7 +304,7 @@ describe("RulebookPage", () => {
     expect(
       within(status).getByText("“Declaration, restated” uses the same name as “Declaration”. Remove one of them.")
     ).toBeInTheDocument()
-    expect(within(status).queryByRole("button", { name: "Try again" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Process documents" })).not.toBeInTheDocument()
     expect(status).not.toHaveTextContent(/sha256|edition|pattern/)
 
     await user.click(within(status).getByRole("button", { name: "Upload" }))

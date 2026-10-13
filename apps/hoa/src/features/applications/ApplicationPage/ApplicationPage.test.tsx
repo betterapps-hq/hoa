@@ -159,7 +159,8 @@ describe("ApplicationPage", () => {
     await user.click(screen.getByRole("button", { name: "Remove form.pdf" }))
     expect(actions.removeFile).toHaveBeenCalledWith("f1")
     expect(props.onChanged).toHaveBeenCalled()
-    await user.click(screen.getByRole("button", { name: "Run review again" }))
+    await user.click(screen.getByRole("button", { name: "More actions" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Run review again" }))
     expect(actions.runReview).toHaveBeenCalled()
   })
 
@@ -183,21 +184,25 @@ describe("ApplicationPage", () => {
 
   it("confirms before submitting with open requests", async () => {
     const { actions, user } = setup()
-    await user.click(screen.getByRole("button", { name: "Submit anyway" }))
+    await user.click(screen.getByRole("button", { name: "More actions" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Submit anyway" }))
     const dialog = await screen.findByRole("alertdialog")
     expect(within(dialog).getByText("Submit with open requests?")).toBeInTheDocument()
     await user.click(within(dialog).getByRole("button", { name: "Submit anyway" }))
     expect(actions.submit).toHaveBeenCalledWith(true)
   })
 
-  it("makes submitting the primary action when nothing is open", async () => {
+  it("makes submitting the page's main action when nothing is open", async () => {
     const { actions, user } = setup({
       review: { ...review, recommendation: "approve-with-conditions", missingInformation: [] }
     })
     expect(screen.getByRole("heading", { name: "Approvable with conditions" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Add files" })).toHaveTextContent("Add files")
-    expect(screen.getByRole("button", { name: "Submit to the committee" })).toHaveClass("bg-primary")
-    await user.click(screen.getByRole("button", { name: "Submit to the committee" }))
+    const submit = within(screen.getByRole("group", { name: "Page actions" })).getByRole("button", {
+      name: "Submit to the committee"
+    })
+    expect(submit).toHaveClass("bg-primary")
+    await user.click(submit)
     expect(actions.submit).toHaveBeenCalledWith(false)
   })
 
@@ -223,7 +228,9 @@ describe("ApplicationPage", () => {
     })
     expect(screen.getByText("Model unavailable.")).toBeInTheDocument()
     expect(screen.getByRole("heading", { name: "Not reviewed yet" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: /^Run review$/ })).toBeInTheDocument()
+    expect(
+      within(screen.getByRole("group", { name: "Page actions" })).getByRole("button", { name: "Run review" })
+    ).toBeInTheDocument()
   })
 
   it("lets the committee decide, preselecting the decision that follows the review", async () => {

@@ -465,9 +465,9 @@ describe("ProjectTypePage", () => {
     expect(onSave).toHaveBeenCalledTimes(2)
   })
 
-  it("edits the name and description from the header menu", async () => {
+  it("edits the name and description from the page's menu", async () => {
     const { props, user } = setup()
-    await chooseFromMenu(user, "Actions for Garden structure", "Edit name and description")
+    await chooseFromMenu(user, "More actions", "Edit name and description")
     const dialog = await screen.findByRole("dialog", { name: "Edit project type" })
     await user.clear(within(dialog).getByLabelText("Name"))
     await user.type(within(dialog).getByLabelText("Name"), "Yard structure")
@@ -481,7 +481,7 @@ describe("ProjectTypePage", () => {
 
   it("deletes a type no application uses, after a confirmation that names it", async () => {
     const { props, user } = setup()
-    await chooseFromMenu(user, "Actions for Garden structure", "Delete")
+    await chooseFromMenu(user, "More actions", "Delete")
     const dialog = await screen.findByRole("alertdialog", { name: "Delete Garden structure?" })
     await user.click(within(dialog).getByRole("button", { name: "Delete" }))
     expect(props.onDelete).toHaveBeenCalled()
@@ -489,7 +489,7 @@ describe("ProjectTypePage", () => {
 
   it("offers archiving a type applications use instead of deleting it", async () => {
     const { props, user } = setup({ view: { ...view, applicationCount: 2 } })
-    await chooseFromMenu(user, "Actions for Garden structure", "Delete")
+    await chooseFromMenu(user, "More actions", "Delete")
     const dialog = await screen.findByRole("alertdialog", { name: "Garden structure can't be deleted" })
     expect(dialog).toHaveTextContent("2 applications use it. Archive it instead")
     await user.click(within(dialog).getByRole("button", { name: "Archive" }))

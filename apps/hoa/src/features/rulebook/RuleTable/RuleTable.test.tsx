@@ -62,7 +62,7 @@ describe("RuleTable", () => {
     expect(screen.getByText("No rules match.")).toBeInTheDocument()
   })
 
-  it("opens a rule from its title, reviews it in its row, and approves the rules shown after confirming", async () => {
+  it("opens a rule from its title, and reviews it in its row", async () => {
     const { user, openRule, actions } = renderInWorkspace(<RuleTable />, { records: sampleWithTermsApproved() })
     await user.type(screen.getByRole("searchbox", { name: "Search rules" }), "occupied unit someone")
     await user.click(screen.getByRole("button", { name: "Each occupied Unit has someone 55 or older" }))
@@ -70,8 +70,8 @@ describe("RuleTable", () => {
     await user.click(screen.getByRole("button", { name: "Actions for Each occupied Unit has someone 55 or older" }))
     await user.click(await screen.findByRole("menuitem", { name: "Reject" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "rule", key: ageRule }], "rejected", null)
-    await user.click(screen.getByRole("button", { name: "Approve the 1 rules shown" }))
-    await user.click(await screen.findByRole("button", { name: "Approve them" }))
+    await user.click(screen.getByRole("button", { name: "Actions for Each occupied Unit has someone 55 or older" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Approve" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "rule", key: ageRule }], "approved", null)
   })
 

@@ -134,7 +134,11 @@ export const answerRulebookQuestion = createServerFn({ method: "POST" })
       by,
       at
     })
-    await saveRulebookChanges(db, hoaId, data.rulebookId, { questions: [result.question], rules: result.rules })
+    await saveRulebookChanges(db, hoaId, data.rulebookId, {
+      questions: [result.question],
+      rules: result.rules,
+      terms: result.terms
+    })
     return { notApproved: result.notApproved }
   })
 
