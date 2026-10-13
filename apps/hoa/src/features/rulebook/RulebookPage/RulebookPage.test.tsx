@@ -14,6 +14,7 @@ vi.mock("sonner", () => ({
   toast: Object.assign(vi.fn<(message: string) => void>(), {
     error: vi.fn<(message: string) => void>(),
     success: vi.fn<(message: string) => void>(),
+    warning: vi.fn<(message: string) => void>(),
     message: vi.fn<(message: string) => void>()
   })
 }))
@@ -190,6 +191,25 @@ describe("RulebookPage", () => {
       "approved",
       null
     )
+  })
+
+  it("opens what approving everything left couldn't approve, and says why", async () => {
+    const { props, user } = setup({ isReviewing: true })
+    vi.mocked(props.actions.review).mockResolvedValueOnce({
+      updated: 12,
+      skipped: [{ ref: { type: "rule", key: "declaration:1#a" }, reasons: ["it reads a term with a problem"] }]
+    })
+    await user.click(screen.getByRole("button", { name: "More actions" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Approve everything left" }))
+    const confirm = await screen.findByRole("alertdialog", { name: "Approve everything left to review?" })
+    await user.click(within(confirm).getByRole("button", { name: "Approve them" }))
+    const { toast } = await import("sonner")
+    expect(toast.warning).toHaveBeenCalledWith(
+      "Approved 12. 1 item couldn't be and needs you: it reads a term with a problem",
+      expect.anything()
+    )
+    // jsdom never ends the dialog's closing animation, so the page behind it stays hidden from the accessibility tree.
+    expect(await screen.findByRole("tab", { name: /^Rules/, selected: true, hidden: true })).toBeInTheDocument()
   })
 
   it("says what the build skipped, on the status line and in the review, where it is, and tries again", async () => {

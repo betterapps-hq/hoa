@@ -126,13 +126,13 @@ describe("mergeDrafts", () => {
     expect(merged.issues).toEqual([
       {
         code: "coverage",
-        message: "it's cited, so it has no reason for having no rule",
+        message: "a rule, term, setting or question already cites it, so remove its reason for having no rule",
         recordKey: "rules:2",
         path: ["noRule"]
       },
       {
         code: "coverage",
-        message: "nothing cites it, and it has no reason for having no rule",
+        message: "no rule, term, setting or question cites it, and it has no reason for having no rule",
         recordKey: "rules:3",
         path: ["noRule"]
       }

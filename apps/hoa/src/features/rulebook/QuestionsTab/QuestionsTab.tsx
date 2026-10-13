@@ -1,5 +1,7 @@
+import { CircleCheckIcon } from "lucide-react"
 import { useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldLabel } from "@/components/ui/field"
@@ -327,20 +329,20 @@ function QuestionCard({ question }: { question: T.Question }) {
             ))}
           </RadioGroup>
         ) : (
-          <ul className="flex flex-col gap-3">
-            {question.options.map((item, index) => (
-              <li key={item.label}>
-                <OptionBlock option={item}>
-                  <p className="font-medium">
-                    {item.label}
-                    {chosen === index ? <span className="ml-2 font-normal text-muted-foreground">(chosen)</span> : null}
-                  </p>
-                </OptionBlock>
-              </li>
-            ))}
+          <ul className="flex flex-col gap-3" aria-label="Readings">
+            {question.options.map((item, index) =>
+              chosen === index ? (
+                <li key={item.label}>
+                  <ChosenReading option={item} why={question.answer?.text ?? null} />
+                </li>
+              ) : (
+                <li key={item.label}>
+                  <SetAsideReading option={item} />
+                </li>
+              )
+            )}
           </ul>
         )}
-        {question.answer?.text && !isAnswering ? <p className="text-sm">Note: {question.answer.text}</p> : null}
         {isAnswering ? (
           <Field>
             <FieldLabel htmlFor={`${question.id}-note`}>Why (optional)</FieldLabel>
@@ -376,21 +378,83 @@ function QuestionCard({ question }: { question: T.Question }) {
   )
 }
 
-function OptionBlock({ option, children }: { option: T.Question["options"][number]; children: ReactNode }) {
+/** The reading an answer chose: marked as the answer, with the rules it keeps and the reason given. */
+function ChosenReading({ option, why }: { option: T.Question["options"][number]; why: string | null }) {
   return (
-    <div className="flex flex-col gap-2 rounded-md border p-3">
-      {children}
-      {option.keeps.length > 0 ? (
-        <ul className="flex flex-col gap-1 pl-6 text-sm" aria-label={`Rules kept by: ${option.label}`}>
-          {option.keeps.map((key) => (
+    <div className="flex flex-col gap-2 rounded-md border border-primary bg-primary/5 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <CircleCheckIcon className="size-4 shrink-0 text-primary" aria-hidden />
+        <p className="font-medium">{option.label}</p>
+        <Badge>Your answer</Badge>
+      </div>
+      <KeptRules option={option} />
+      {why ? (
+        <p className="pl-6 text-sm">
+          <span className="text-muted-foreground">Why: </span>
+          {why}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * A reading the answer didn't choose. Its rules were rejected, so they're left out of the rulebook and have no card to
+ * open; the reading says so instead of naming them.
+ */
+function SetAsideReading({ option }: { option: T.Question["options"][number] }) {
+  const { records } = useRulebookWorkspace()
+  const shown = option.keeps.filter((key) => records.rules.some((rule) => rule.key === key))
+  const rulesNote = (() => {
+    if (shown.length > 0) {
+      return (
+        <ul className="flex flex-col gap-1 text-sm" aria-label={`Rules set aside by: ${option.label}`}>
+          {shown.map((key) => (
             <li key={key}>
               <RuleLink ruleKey={key} />
             </li>
           ))}
         </ul>
-      ) : (
-        <p className="pl-6 text-sm text-muted-foreground">Keeps no rule.</p>
-      )}
+      )
+    }
+    if (option.keeps.length === 0) {
+      return null
+    }
+    return (
+      <p className="text-sm">{option.keeps.length === 1 ? "Its rule is" : "Its rules are"} left out of the rulebook.</p>
+    )
+  })()
+  return (
+    <div className="flex flex-col gap-1 rounded-md border border-dashed p-3 text-muted-foreground">
+      <p className="text-sm">
+        <span className="font-medium">{option.label}</span>
+        <span className="ml-2">Not chosen</span>
+      </p>
+      {rulesNote}
+    </div>
+  )
+}
+
+/** The rules a reading keeps, each opening its card. */
+function KeptRules({ option }: { option: T.Question["options"][number] }) {
+  return option.keeps.length > 0 ? (
+    <ul className="flex flex-col gap-1 pl-6 text-sm" aria-label={`Rules kept by: ${option.label}`}>
+      {option.keeps.map((key) => (
+        <li key={key}>
+          <RuleLink ruleKey={key} />
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p className="pl-6 text-sm text-muted-foreground">Keeps no rule.</p>
+  )
+}
+
+function OptionBlock({ option, children }: { option: T.Question["options"][number]; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-md border p-3">
+      {children}
+      <KeptRules option={option} />
     </div>
   )
 }

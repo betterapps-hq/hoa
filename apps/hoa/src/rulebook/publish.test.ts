@@ -49,7 +49,7 @@ describe("publishBlockers", () => {
     }
     expect(publishBlockers(withoutReason)).toEqual([
       "1 provision isn't covered by a rule or a reason.",
-      "The approved records would make a rules file with 1 problem, such as rules:3: nothing cites it, and it has no reason for having no rule."
+      "The approved records would make a rules file with 1 problem, such as rules:3: no rule, term, setting or question cites it, and it has no reason for having no rule."
     ])
   })
 })

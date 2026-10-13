@@ -337,8 +337,9 @@ leads with the way back to the rules in force, one sentence on what the draft is
 that nothing is published yet), a bar of how much is decided and a sentence that says it ("2 of 292 decided."). Its
 page actions are **Publish** and, in the menu, **Approve everything left** and **Discard draft**. Approve everything
 left first says what it approves in counts (rules, terms, the settings and reasons for having no rule) and that
-anything with a problem, or that's a reading of an open question, stays to review with why; questions still need
-answers. Discard's confirmation says how many review decisions are lost and that the published version stays in
+anything with a problem, or that's a reading of an open question, stays to review; questions still need answers.
+When something stays, the page opens the tab it's in and a warning says how many and why, such as a passage that a
+rule already cites keeping a reason for having no rule. Discard's confirmation says how many review decisions are lost and that the published version stays in
 force. When the build
 that made the draft skipped items (a rule that still failed its checks, a section a call never answered), a notice
 ("4 parts weren't finished") shows the same steps the progress did, each done or, where it skipped something, with a
@@ -416,7 +417,9 @@ list is ordered by relevance; without, in its usual order. The other filters sti
 - **Questions:** the open questions one at a time (shadcn's Questionnaire, "Question 1 of 4"), each with its citations
   and readings, each reading naming the rules it keeps. Choosing a reading and moving on saves the answer; Skip leaves
   the question open, and finishing brings back the skipped ones as one line to answer later. Answered questions
-  follow, each with its chosen reading and a way to change it.
+  follow, each with a way to change it: the chosen reading outlined with a check and "Your answer", its rules and
+  the reason given; the others dashed and marked "Not chosen", saying their rules are left out of the rulebook rather
+  than naming rules that no longer exist.
 - **Settings:** the review, then each clause as a card that says what it's for, a small form in plain words and the
   passages it comes from, when the documents state it. Which document wins is a tier list: each rank (1st, 2nd) a row of
   the documents equal in it; a document is dragged by its handle onto another rank to rank equal (before or after a chosen document there), or into a gap to

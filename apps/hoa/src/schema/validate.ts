@@ -925,10 +925,18 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
   for (const provision of rulebook.provisions) {
     const isCited = cited.has(provision.key)
     if (!isCited && provision.noRule === null) {
-      site(provision.key).report("coverage", "nothing cites it, and it has no reason for having no rule", ["noRule"])
+      site(provision.key).report(
+        "coverage",
+        "no rule, term, setting or question cites it, and it has no reason for having no rule",
+        ["noRule"]
+      )
     }
     if (isCited && provision.noRule !== null) {
-      site(provision.key).report("coverage", "it's cited, so it has no reason for having no rule", ["noRule"])
+      site(provision.key).report(
+        "coverage",
+        "a rule, term, setting or question already cites it, so remove its reason for having no rule",
+        ["noRule"]
+      )
     }
   }
 
