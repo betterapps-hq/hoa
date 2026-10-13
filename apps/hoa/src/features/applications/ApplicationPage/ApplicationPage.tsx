@@ -1,4 +1,6 @@
 import { useForm } from "@tanstack/react-form"
+import type { Uploader } from "@uploadcn/core"
+import { useUploadProgress } from "@uploadcn/react"
 import { ArrowLeftIcon, RotateCwIcon, SendIcon, Trash2Icon } from "lucide-react"
 import { useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
@@ -10,7 +12,7 @@ import {
   type ApplicationFile,
   type ApplicationStatus
 } from "@/applications/application"
-import { FileDropzone } from "@/components/FileDropzone/FileDropzone"
+import { FileUpload, useFileUploader } from "@/components/FileUpload/FileUpload"
 import { PageActions, type PageAction } from "@/components/PageActions/PageActions"
 import type { RowAction } from "@/components/RowActions/RowActions"
 import { SaveStatus } from "@/components/SaveStatus/SaveStatus"
@@ -68,12 +70,13 @@ import { createReviewContext, ruleName, type ReviewAudience } from "../reviewCon
 import { ReviewReport, type ReportTab } from "../ReviewReport/ReviewReport"
 import { verdictTones } from "../ReviewVerdict/ReviewVerdict"
 import { decisionTones, suggestedDecisions } from "../ReviewVerdict/ReviewVerdict.utils"
+import { applicationAdapter, type ApplicationUploadApi } from "../uploadApplicationFiles"
 
 export type ApplicationActions = {
   /** Keeps what the homeowner has written so far. */
   save: (content: DraftContent) => Promise<void>
-  /** Uploads files, each with what it was guessed to be. */
-  upload: (files: File[], uploadedAs: ReadonlyMap<File, string>) => Promise<void>
+  /** How the application's files upload. */
+  uploads: ApplicationUploadApi
   /** Says what a file is: one of the project type's documents, other, or nothing yet (null). */
   setUploadedAs: (fileId: string, uploadedAs: string | null) => Promise<void>
   removeFile: (fileId: string) => Promise<void>
@@ -256,20 +259,20 @@ function DecisionForm({ review, ruleTitle, onDecide }: DecisionFormProps) {
 
 type AddFilesProps = {
   id: string
+  uploader: Uploader<{ fileId: string }>
   size?: "default" | "compact"
   disabled: boolean
-  onAdd: (files: File[]) => void
 }
 
 /** Takes files by drop or browse, and they upload to the application. Files it can't take are named with why. */
-function AddFiles({ id, size = "default", disabled, onAdd }: AddFilesProps) {
+function AddFiles({ id, uploader, size = "default", disabled }: AddFilesProps) {
   return (
-    <FileDropzone
+    <FileUpload
       id={id}
+      uploader={uploader}
       target="application"
       size={size}
       disabled={disabled}
-      onFiles={onAdd}
       prompt={size === "compact" ? "Add files" : undefined}
       className="w-full"
     />
@@ -486,20 +489,22 @@ export function ApplicationPage({
     changed()
     draft.update(() => next)
   }
-  const addFiles = (added: File[]) =>
-    void busy(async () => {
-      // Each file starts as what its name says, where that's clear and its format suits.
-      const uploadedAs = new Map<File, string>()
-      for (const file of added) {
-        const guess = kinds ? guessKind(file.name, kinds) : ""
-        if (guess && !kindProblem(file, definition, guess)) {
-          uploadedAs.set(file, guess)
-        }
-      }
+  // Each file starts as what its name says, where that's clear and its format suits.
+  const adapter = applicationAdapter(actions.uploads, application.id, (file) => {
+    const guess = kinds ? guessKind(file.name, kinds) : ""
+    return guess && !kindProblem(file, definition, guess) ? guess : null
+  })
+  const uploader = useFileUploader("application", {
+    adapter,
+    onAdd: () => setFilesError(null),
+    // A stored file changes the application and joins the packet, which lists it from then on.
+    onSuccess: (item) => {
       changed()
-      setFilesError(null)
-      await actions.upload(added, uploadedAs)
-    }, "The files didn't upload.")
+      uploader.remove(item.id)
+      onChanged()
+    }
+  })
+  const { isUploading } = useUploadProgress(uploader)
   const chooseKind = async (file: ApplicationFile, kind: string | null) => {
     const problem = kind
       ? kindProblem({ name: file.fileName, type: file.mediaType, size: file.sizeBytes }, definition, kind)
@@ -534,7 +539,7 @@ export function ApplicationPage({
       setFilesError("Add your application packet.")
       return "Add your application packet first."
     }
-    if (files.some(({ file }) => file.status === "uploading")) {
+    if (isUploading || files.some(({ file }) => file.status === "uploading")) {
       return "Wait for every file to finish uploading."
     }
     return null
@@ -646,7 +651,7 @@ export function ApplicationPage({
         />
       ) : null}
       {packet}
-      <AddFiles id="add-files" size={fileCount > 0 ? "compact" : "default"} disabled={isBusy} onAdd={addFiles} />
+      <AddFiles id="add-files" uploader={uploader} size={fileCount > 0 ? "compact" : "default"} disabled={isBusy} />
       {filesError ? <FieldError>{filesError}</FieldError> : null}
     </div>
   ) : (
@@ -687,9 +692,9 @@ export function ApplicationPage({
       >
         <AddFiles
           id="add-missing-files"
+          uploader={uploader}
           size={isSubmitFirst ? "compact" : "default"}
           disabled={isBusy}
-          onAdd={addFiles}
         />
       </NextCard>
     )

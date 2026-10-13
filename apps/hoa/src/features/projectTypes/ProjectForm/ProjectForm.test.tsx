@@ -284,6 +284,37 @@ describe("ProjectForm", () => {
     expect(screen.queryByText("Confirm you'll pay this fee.")).not.toBeInTheDocument()
   })
 
+  it("closes the form with its fee and then its signature, after every section", () => {
+    const own = { ...base, binding: null, isRequired: true }
+    const closing: ProjectTypeDefinition = {
+      ...definition,
+      groups: [
+        {
+          ...definition.groups[0]!,
+          subject: "work",
+          label: "The project",
+          isRepeatable: false,
+          fields: [
+            { ...own, property: "custom.signed", kind: "signature", label: "I confirm the plans are complete" },
+            { ...own, property: "custom.why", kind: "text", label: "Why are you building it?" },
+            { ...own, property: "custom.fee", kind: "fee", label: "Filing fee", amount: 50 }
+          ]
+        },
+        ...definition.groups
+      ]
+    }
+    render(<Form onChange={vi.fn<(value: ProjectAnswers) => void>()} of={closing} />)
+    const sections = screen.getAllByRole("group").filter((group) => group.tagName === "FIELDSET")
+    const last = sections.at(-1)
+    expect(last).toHaveAccessibleName("Fee and signature")
+    expect(
+      within(last!)
+        .getAllByText(/^(Filing fee|I confirm the plans are complete)$/)
+        .map((label) => label.textContent?.replace("*", ""))
+    ).toEqual(["Filing fee", "I confirm the plans are complete"])
+    expect(within(sections[0]!).queryByText("Filing fee")).not.toBeInTheDocument()
+  })
+
   it("says what's wrong once a question is left, or all at once after a submit", async () => {
     const user = userEvent.setup()
     const { rerender } = render(<Form onChange={vi.fn<(value: ProjectAnswers) => void>()} />)

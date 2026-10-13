@@ -262,7 +262,8 @@ describe("ProjectTypePage", () => {
     const { props, user } = setup()
     await chooseFromMenu(user, "Actions for What color is it?", "Ask once for every structure")
     await waitFor(() => expect(savedDefinition(props)?.groups[0]!.fields[1]).toMatchObject({ isShared: true }))
-    expect(screen.getByText("Asked once for every structure")).toBeInTheDocument()
+    const sharedList = await screen.findByRole("region", { name: "Once for every structure" })
+    expect(within(sharedList).getByText("What color is it?")).toBeInTheDocument()
     await chooseFromMenu(user, "Actions for What color is it?", "Edit")
     const dialog = await screen.findByRole("dialog", { name: "Edit question" })
     const once = within(dialog).getByRole("checkbox", { name: "Ask once for every structure" })
@@ -270,7 +271,20 @@ describe("ProjectTypePage", () => {
     await user.click(once)
     await user.click(within(dialog).getByRole("button", { name: "Save" }))
     await waitFor(() => expect(savedDefinition(props)?.groups[0]!.fields[1]).toMatchObject({ isShared: false }))
-    expect(screen.queryByText("Asked once for every structure")).not.toBeInTheDocument()
+    expect(screen.queryByRole("region", { name: "Once for every structure" })).not.toBeInTheDocument()
+  })
+
+  it("lists the questions asked once first, under their own heading, and asks one for each again from its menu", async () => {
+    const { props, user } = setup()
+    await chooseFromMenu(user, "Actions for What color is it?", "Ask once for every structure")
+    const once = await screen.findByRole("region", { name: "Once for every structure" })
+    const each = screen.getByRole("region", { name: "For each structure" })
+    const regions = screen.getAllByRole("region")
+    expect(regions.indexOf(once)).toBeLessThan(regions.indexOf(each))
+    expect(within(each).getByText(/^How tall is it/)).toBeInTheDocument()
+    await chooseFromMenu(user, "Actions for What color is it?", "Ask for each structure")
+    await waitFor(() => expect(savedDefinition(props)?.groups[0]!.fields[1]).toMatchObject({ isShared: false }))
+    expect(screen.queryByRole("region", { name: "For each structure" })).not.toBeInTheDocument()
   })
 
   it("removes a question, which Add question then suggests again", async () => {
@@ -439,7 +453,7 @@ describe("ProjectTypePage", () => {
       expect(savedDefinition(props)?.documents[0]?.template).toMatchObject({ fileName: "neighbor approval.pdf" })
     )
     expect(uploadTemplate).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole("link", { name: "Template: neighbor approval.pdf" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Download neighbor approval.pdf" })).toHaveAttribute(
       "href",
       "/files/project-types/type-1/templates/00000000-0000-4000-8000-000000000001"
     )
@@ -449,6 +463,30 @@ describe("ProjectTypePage", () => {
     await user.click(within(again).getByRole("button", { name: "Save" }))
     await waitFor(() => expect(savedDefinition(props)?.documents[0]?.template).toBeUndefined())
     expect(uploadTemplate).toHaveBeenCalledTimes(1)
+  })
+
+  it("takes a template dropped or chosen on a document, and replaces or removes it from there", async () => {
+    const { props, user } = setup()
+    const row = () => {
+      const found = screen.getByText("Site plan").closest("[data-slot=upload]")
+      const input = found?.querySelector("input[type=file]")
+      if (!(found instanceof HTMLElement) || !(input instanceof HTMLInputElement)) {
+        throw new Error("No document row")
+      }
+      return { found, input }
+    }
+    await chooseFromMenu(user, "Actions for Site plan", "Add template")
+    await user.upload(row().input, new File(["%PDF"], "neighbor approval.pdf", { type: "application/pdf" }))
+    await waitFor(() =>
+      expect(savedDefinition(props)?.documents[0]?.template).toMatchObject({ fileName: "neighbor approval.pdf" })
+    )
+    await chooseFromMenu(user, "Actions for Site plan", "Replace template")
+    await user.upload(row().input, new File(["%PDF"], "signed approval.pdf", { type: "application/pdf" }))
+    await waitFor(() =>
+      expect(savedDefinition(props)?.documents[0]?.template).toMatchObject({ fileName: "signed approval.pdf" })
+    )
+    await user.click(await within(row().found).findByRole("button", { name: "Remove signed approval.pdf" }))
+    await waitFor(() => expect(savedDefinition(props)?.documents[0]?.template).toBeUndefined())
   })
 
   it("shows the documents the application form provides as met by it, never among the uploads", async () => {

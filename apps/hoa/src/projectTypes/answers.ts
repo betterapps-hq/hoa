@@ -120,6 +120,31 @@ export const blankItem = (group: ProjectGroup): Record<string, AnswerValue> =>
 /** Whether a question is answered once for every item of its section, which only a section that repeats has. */
 export const isSharedIn = (group: ProjectGroup, field: ProjectField) => group.isRepeatable && field.isShared === true
 
+/** Paying a fee and signing close a form: homeowners do them last, after everything they sign for. */
+export const isClosing = (group: ProjectGroup, field: ProjectField) =>
+  !group.isRepeatable && (field.kind === "fee" || field.kind === "signature")
+
+/** A form's closing questions, fees before signatures and each in the form's order, with their sections. */
+export function closingQuestions(definition: ProjectTypeDefinition) {
+  const closing = definition.groups.flatMap((group) =>
+    group.fields.filter((field) => isClosing(group, field)).map((field) => ({ group, field }))
+  )
+  return [
+    ...closing.filter(({ field }) => field.kind === "fee"),
+    ...closing.filter(({ field }) => field.kind === "signature")
+  ]
+}
+
+/** The closing section's heading, from what it asks. */
+export function closingHeading(questions: readonly { field: ProjectField }[]) {
+  const hasFee = questions.some(({ field }) => field.kind === "fee")
+  const hasSignature = questions.some(({ field }) => field.kind === "signature")
+  if (hasFee && hasSignature) {
+    return "Fee and signature"
+  }
+  return hasFee ? "Fee" : "Signature"
+}
+
 /** A new item of a section: blank, but for the answers given once for every item, which it keeps. */
 export function nextItem(group: ProjectGroup, items: readonly Record<string, AnswerValue>[]) {
   const first = items[0] ?? {}
@@ -185,11 +210,19 @@ export function answerLines(definition: ProjectTypeDefinition, answers: ProjectA
 
 /**
  * The answers as the homeowner and the committee read them back: like `answerLines`, but where a section repeats, an
- * answer given once for every item shows once, above the items, when every item has it.
+ * answer given once for every item shows once, above the items, when every item has it; and fees and signatures last.
  */
 export function answerSections(definition: ProjectTypeDefinition, answers: ProjectAnswers) {
-  const sections = answerLines(definition, answers)
-  return definition.groups.flatMap((group) => {
+  const all = answerLines(definition, answers)
+  const closing = closingQuestions(definition).flatMap(({ group, field }) => {
+    const line = all.find((section) => section.group === group)?.lines.find((item) => item.field === field)?.line
+    return line === undefined ? [] : [{ key: `${group.subject} ${field.property}`, line }]
+  })
+  const sections = all.map((section) => ({
+    ...section,
+    lines: section.lines.filter((item) => !isClosing(section.group, item.field))
+  }))
+  const body = definition.groups.flatMap((group) => {
     const items = sections.filter((section) => section.group === group)
     const lineOf = (section: (typeof items)[number], field: ProjectField) =>
       section.lines.find((item) => item.field === field)?.line
@@ -219,6 +252,9 @@ export function answerSections(definition: ProjectTypeDefinition, answers: Proje
       })
     ]
   })
+  return closing.length > 0
+    ? [...body, { key: "closing", heading: closingHeading(closingQuestions(definition)), lines: closing }]
+    : body
 }
 
 /**

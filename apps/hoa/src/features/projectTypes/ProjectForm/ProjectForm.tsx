@@ -3,7 +3,15 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { FieldDescription, FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field"
 import { sentenceCase } from "@/lib/text"
-import { answerErrors, blankItem, isSharedIn, nextItem } from "@/projectTypes/answers"
+import {
+  answerErrors,
+  blankItem,
+  closingHeading,
+  closingQuestions,
+  isClosing,
+  isSharedIn,
+  nextItem
+} from "@/projectTypes/answers"
 import type {
   AnswerValue,
   ProjectAnswers,
@@ -17,7 +25,7 @@ import { QuestionField } from "../QuestionField/QuestionField"
 // The form a project type defines (application-review.md, Project types), rendered from its definition: a section per
 // group, in the administrator's order, and items the homeowner can add and remove where a group repeats. There, the
 // questions asked once for every item come first, and each answer is kept on every item, so the review reads each item
-// whole. Each answer is checked by the definition's own schema (answerErrors) once its question is left, or for all
+// whole. Fees and signatures close the form, after every section, fees first. Each answer is checked by the definition's own schema (answerErrors) once its question is left, or for all
 // after a submit.
 
 export type ProjectFormProps = {
@@ -29,6 +37,13 @@ export type ProjectFormProps = {
   /** Why each question is asked, behind its info button. */
   reasons?: QuestionReasons
 }
+
+/** Why a question is asked, for its info button. */
+const reasonsFor = (field: ProjectField, reasons: QuestionReasons | undefined) =>
+  reasons && {
+    rules: field.binding ? (reasons.rules[field.binding] ?? []) : [],
+    citations: (field.citations ?? []).flatMap((citation) => reasons.citations[citation] ?? [])
+  }
 
 type GroupProps = {
   group: ProjectGroup
@@ -44,7 +59,7 @@ function ProjectGroupFields({ group, items, onChange, showsAllErrors, reasons }:
   const [nextId, setNextId] = useState(items.length)
   const [left, setLeft] = useState<ReadonlySet<string>>(new Set())
   const shared = group.fields.filter((field) => isSharedIn(group, field))
-  const own = group.fields.filter((field) => !isSharedIn(group, field))
+  const own = group.fields.filter((field) => !isSharedIn(group, field) && !isClosing(group, field))
   /** Sets one item's answer, or, for a question asked once (no index), every item's. */
   const setValue = (index: number | null, property: string, value: AnswerValue) =>
     onChange(items.map((item, at) => (index === null || at === index ? { ...item, [property]: value } : item)))
@@ -70,12 +85,7 @@ function ProjectGroupFields({ group, items, onChange, showsAllErrors, reasons }:
         onChange={(next) => setValue(index, field.property, next)}
         onBlur={() => setLeft(new Set([...left, fieldId]))}
         errors={shows ? answerErrors(field, value) : []}
-        reasons={
-          reasons && {
-            rules: field.binding ? (reasons.rules[field.binding] ?? []) : [],
-            citations: (field.citations ?? []).flatMap((citation) => reasons.citations[citation] ?? [])
-          }
-        }
+        reasons={reasonsFor(field, reasons)}
       />
     )
   }
@@ -134,11 +144,54 @@ function ProjectGroupFields({ group, items, onChange, showsAllErrors, reasons }:
   )
 }
 
-/** The project type's questions, section by section. */
+type ClosingProps = Omit<ProjectFormProps, "definition"> & {
+  questions: ReturnType<typeof closingQuestions>
+}
+
+/** The fee and signature questions, which close the form whatever section they belong to. */
+function ClosingFields({ questions, value, onChange, showsAllErrors, reasons }: ClosingProps) {
+  const [left, setLeft] = useState<ReadonlySet<string>>(new Set())
+  return (
+    <FieldSet className="min-w-0 gap-4">
+      <FieldLegend className="mb-0">{closingHeading(questions)}</FieldLegend>
+      <FieldGroup className="gap-5">
+        {questions.map(({ group, field }) => {
+          const items = value[group.subject] ?? [blankItem(group)]
+          const answer = items[0]?.[field.property] ?? null
+          const fieldId = `answer-${group.subject}-closing-${field.property}`
+          return (
+            <QuestionField
+              key={`${group.subject} ${field.property}`}
+              field={field}
+              id={fieldId}
+              value={answer}
+              onChange={(next) =>
+                onChange({
+                  ...value,
+                  [group.subject]: items.map((item, at) => (at === 0 ? { ...item, [field.property]: next } : item))
+                })
+              }
+              onBlur={() => setLeft(new Set([...left, fieldId]))}
+              errors={showsAllErrors || left.has(fieldId) ? answerErrors(field, answer) : []}
+              reasons={reasonsFor(field, reasons)}
+            />
+          )
+        })}
+      </FieldGroup>
+    </FieldSet>
+  )
+}
+
+/** The project type's questions, section by section, then the fee and signature that close it. */
 export function ProjectForm({ definition, value, onChange, showsAllErrors, reasons }: ProjectFormProps) {
+  const closing = closingQuestions(definition)
+  // A section whose only questions close the form has nothing of its own to show.
+  const sections = definition.groups.filter(
+    (group) => group.isRepeatable || group.fields.some((field) => !isClosing(group, field))
+  )
   return (
     <div className="flex flex-col gap-8">
-      {definition.groups.map((group) => (
+      {sections.map((group) => (
         <ProjectGroupFields
           key={group.subject}
           group={group}
@@ -148,6 +201,15 @@ export function ProjectForm({ definition, value, onChange, showsAllErrors, reaso
           reasons={reasons}
         />
       ))}
+      {closing.length > 0 ? (
+        <ClosingFields
+          questions={closing}
+          value={value}
+          onChange={onChange}
+          showsAllErrors={showsAllErrors}
+          reasons={reasons}
+        />
+      ) : null}
     </div>
   )
 }

@@ -12,6 +12,7 @@ import { fenceReview } from "@/tests/fenceReview"
 import type { ApplicationView } from "../applications.functions"
 import { gardenStructure } from "../applications.test-data"
 import type { ReviewAudience } from "../reviewContext"
+import type { ApplicationUploadApi } from "../uploadApplicationFiles"
 import { ApplicationPage, type ApplicationActions, type ApplicationPageProps } from "./ApplicationPage"
 
 vi.mock("sonner", () => ({
@@ -114,7 +115,15 @@ const draftView: Partial<ApplicationView> = {
 function setup(overrides: Partial<ApplicationView> = {}, audience: ReviewAudience = "homeowner") {
   const actions = {
     save: vi.fn<ApplicationActions["save"]>(async () => undefined),
-    upload: vi.fn<ApplicationActions["upload"]>(async () => undefined),
+    uploads: {
+      createUpload: vi.fn<ApplicationUploadApi["createUpload"]>(async (input) => ({
+        fileId: `file-${input.fileName}`,
+        uploadUrl: null,
+        contentType: input.mediaType
+      })),
+      uploadThroughServer: vi.fn<ApplicationUploadApi["uploadThroughServer"]>(async () => undefined),
+      completeUpload: vi.fn<ApplicationUploadApi["completeUpload"]>(async () => undefined)
+    },
     setUploadedAs: vi.fn<ApplicationActions["setUploadedAs"]>(async () => undefined),
     removeFile: vi.fn<ApplicationActions["removeFile"]>(async () => undefined),
     runReview: vi.fn<ApplicationActions["runReview"]>(async () => undefined),
@@ -146,7 +155,7 @@ const committeeView: Partial<ApplicationView> = {
 
 /** A drop zone's file input, which browsing and dropping both fill. */
 function filesInput(id = "add-files") {
-  const input = document.getElementById(id)
+  const input = document.getElementById(id)?.closest("[data-slot=upload]")?.querySelector("input[type=file]")
   if (!(input instanceof HTMLInputElement)) {
     throw new Error("No drop zone")
   }
@@ -209,7 +218,13 @@ describe("ApplicationPage", () => {
     expect(screen.queryByRole("button", { name: "Submit to the committee" })).not.toBeInTheDocument()
     const plan = pdf("plan.pdf")
     await user.upload(filesInput("add-missing-files"), plan)
-    await waitFor(() => expect(actions.upload).toHaveBeenCalledWith([plan], new Map()))
+    await waitFor(() => expect(actions.uploads.completeUpload).toHaveBeenCalledWith("file-plan.pdf"))
+    expect(actions.uploads.createUpload).toHaveBeenCalledWith({
+      applicationId: application.id,
+      fileName: "plan.pdf",
+      mediaType: "application/pdf",
+      sizeBytes: 4
+    })
     expect(actions.runReview).not.toHaveBeenCalled()
     expect(await screen.findByRole("heading", { name: "Run the review again" })).toBeInTheDocument()
     expect(pageActions().getByRole("button", { name: "Run review again" })).toBeInTheDocument()
@@ -219,8 +234,10 @@ describe("ApplicationPage", () => {
     const { actions } = setup()
     const user = userEvent.setup({ applyAccept: false })
     await user.upload(filesInput("add-missing-files"), new File(["x"], "fence.heic", { type: "image/heic" }))
-    expect(await screen.findByRole("alert")).toHaveTextContent(/Save photos as JPEG or PNG/)
-    expect(actions.upload).not.toHaveBeenCalled()
+    expect(
+      await screen.findByText("fence.heic isn't a PDF, Word, JPEG or PNG file. Save photos as JPEG or PNG.")
+    ).toBeInTheDocument()
+    expect(actions.uploads.createUpload).not.toHaveBeenCalled()
   })
 
   it("confirms before submitting with open requests", async () => {
@@ -361,9 +378,11 @@ describe("ApplicationPage", () => {
       const photo = new File(["x"], "site plan.jpg", { type: "image/jpeg" })
       await user.upload(filesInput(), [sitePlan, photo])
       // The site plan takes PDFs only, so the photo isn't taken as one.
-      await waitFor(() =>
-        expect(actions.upload).toHaveBeenCalledWith([sitePlan, photo], new Map([[sitePlan, "site-plan"]]))
-      )
+      await waitFor(() => expect(actions.uploads.completeUpload).toHaveBeenCalledTimes(2))
+      expect(actions.uploads.createUpload.mock.calls.map(([input]) => [input.fileName, input.uploadedAs])).toEqual([
+        ["Site_Plan.pdf", "site-plan"],
+        ["site plan.jpg", undefined]
+      ])
     })
 
     it("says what each file is, and ticks off the documents it covers", async () => {

@@ -14,7 +14,6 @@ import {
   submitApplication,
   uploadApplicationFile
 } from "@/features/applications/applications.functions"
-import { uploadApplicationFiles } from "@/features/applications/uploadApplicationFiles"
 import { getDocumentPage, getJobStatus } from "@/features/documents/documents.functions"
 import { useRole } from "@/features/role/RoleProvider"
 
@@ -47,17 +46,11 @@ function ApplicationRoute() {
       loadImage={async (fileId) => (await getPacketImage({ data: { applicationId, fileId } })).url}
       actions={{
         save: (content) => saveApplication({ data: { applicationId, ...content } }),
-        upload: (files, uploadedAs) =>
-          uploadApplicationFiles(
-            {
-              createUpload: (input) => createApplicationUpload({ data: input }),
-              uploadThroughServer: (form) => uploadApplicationFile({ data: form }),
-              completeUpload: (fileId) => completeApplicationUpload({ data: { fileId } })
-            },
-            applicationId,
-            files,
-            uploadedAs
-          ),
+        uploads: {
+          createUpload: (input) => createApplicationUpload({ data: input }),
+          uploadThroughServer: (form) => uploadApplicationFile({ data: form }),
+          completeUpload: (fileId) => completeApplicationUpload({ data: { fileId } })
+        },
         setUploadedAs: (fileId, uploadedAs) => setApplicationFileUploadedAs({ data: { fileId, uploadedAs } }),
         removeFile: (fileId) => removeApplicationFile({ data: { fileId } }),
         runReview: async () => {

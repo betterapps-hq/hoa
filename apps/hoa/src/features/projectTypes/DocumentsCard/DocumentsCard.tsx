@@ -1,4 +1,5 @@
-import type { UploadAdapter } from "@uploadcn/core"
+import type { UploadAdapter, Uploader, UploadItem } from "@uploadcn/core"
+import { UploadDropzone as DropTarget, useUploadContext, useUploadProgress } from "@uploadcn/react"
 import {
   AsteriskIcon,
   CircleCheckIcon,
@@ -7,15 +8,18 @@ import {
   PaperclipIcon,
   PencilIcon,
   PlusIcon,
-  Trash2Icon
+  Trash2Icon,
+  UploadIcon
 } from "lucide-react"
-import { useState } from "react"
+import { useState, type ComponentProps, type ReactNode } from "react"
 import { toast } from "sonner"
+import { fileStatusText, useFileUploader } from "@/components/FileUpload/FileUpload"
 import { InfoTip } from "@/components/InfoTip/InfoTip"
 import { RowActions } from "@/components/RowActions/RowActions"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { Upload } from "@/components/ui/upload"
 import { sentenceCase } from "@/lib/text"
 import {
   addDocument,
@@ -23,6 +27,7 @@ import {
   customKey,
   moveDocument,
   removeDocument,
+  setDocumentTemplate,
   updateDocument
 } from "@/projectTypes/definition"
 import type { DocumentTemplate, ProjectDocument, ProjectTypeDefinition } from "@/projectTypes/projectType"
@@ -33,12 +38,13 @@ import { PickerDialog } from "../PickerDialog/PickerDialog"
 import type { DefinitionUpdate } from "../QuestionsCard/QuestionsCard"
 import { RuleCitations } from "../RuleCitations/RuleCitations"
 import { SortableList } from "../SortableList/SortableList"
-import { templateHref } from "../uploadTemplate"
+import { TemplateAttachment } from "../TemplateAttachment/TemplateAttachment"
 
 // The documents a project type's form asks for (application-review.md, Project types): one list, in the order
 // homeowners see it in their checklist, each with its citations, what it must show behind an info button, and the same
-// handle and menu as the questions, and its template, when it gives one, as a link to download. "Add document" offers
-// what the rules require that the list leaves out. The
+// handle and menu as the questions, and its template, when it gives one, as an attached file to download, replace or
+// remove. A file dropped on a document becomes its template. "Add document" offers what the rules require that the
+// list leaves out. The
 // documents the application form itself provides (its answers, the description) follow, with their citations, as met
 // by the form: homeowners never upload them.
 
@@ -129,69 +135,20 @@ export function DocumentsCard({
             label="Documents"
             onMove={(from, to) => onUpdate((current) => moveDocument(current, from, to))}
             renderItem={(document, { index, handle }) => (
-              <div className="flex items-start gap-1 rounded-lg border bg-card py-3 pr-2 pl-1 sm:gap-2 sm:pr-3">
-                {handle}
-                <div className="flex min-w-0 flex-1 flex-col gap-1 pt-1.5">
-                  <div className="flex flex-wrap items-center gap-x-1">
-                    <span className="text-sm font-medium">
-                      {sentenceCase(document.label)}
-                      {document.isRequired ? (
-                        <span aria-hidden className="ml-0.5 text-destructive">
-                          *
-                        </span>
-                      ) : null}
-                      {document.isRequired ? <span className="sr-only"> (required)</span> : null}
-                    </span>
-                    {document.mustShow.length > 0 ? (
-                      <InfoTip label={`What the ${document.label.toLowerCase()} must show`} icon="info">
-                        <p className="font-medium">It must show</p>
-                        <ul className="flex list-disc flex-col gap-1 pl-4 text-muted-foreground">
-                          {document.mustShow.map((item) => (
-                            <li key={item}>{sentenceCase(item)}</li>
-                          ))}
-                        </ul>
-                      </InfoTip>
-                    ) : null}
-                  </div>
-                  {document.template ? (
-                    <a
-                      className="flex min-w-0 items-center gap-1.5 self-start text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                      href={templateHref(projectTypeId, document.template)}
-                      download
-                    >
-                      <PaperclipIcon aria-hidden className="size-4 shrink-0" />
-                      <span className="truncate">Template: {document.template.fileName}</span>
-                    </a>
-                  ) : null}
-                  <RuleCitations
-                    citations={[
-                      ...rulesOf(document).flatMap((rule) => rule.citations),
-                      ...document.citations.flatMap((key) => citations[key] ?? [])
-                    ]}
-                    missing={document.citations.filter((key) => !citations[key]).length}
-                  />
-                </div>
-                <RowActions
-                  name={sentenceCase(document.label)}
-                  actions={[
-                    { label: "Edit", icon: PencilIcon, onSelect: () => setEditing(document.documentType) },
-                    document.isRequired
-                      ? {
-                          label: "Make optional",
-                          icon: CircleDashedIcon,
-                          onSelect: () =>
-                            onUpdate((current) => updateDocument(current, { ...document, isRequired: false }))
-                        }
-                      : {
-                          label: "Make required",
-                          icon: AsteriskIcon,
-                          onSelect: () =>
-                            onUpdate((current) => updateDocument(current, { ...document, isRequired: true }))
-                        },
-                    { label: "Remove", icon: Trash2Icon, onSelect: () => remove(document, index), isDestructive: true }
-                  ]}
-                />
-              </div>
+              <DocumentRow
+                document={document}
+                handle={handle}
+                projectTypeId={projectTypeId}
+                templateAdapter={templateAdapter}
+                citations={[
+                  ...rulesOf(document).flatMap((rule) => rule.citations),
+                  ...document.citations.flatMap((key) => citations[key] ?? [])
+                ]}
+                missing={document.citations.filter((key) => !citations[key]).length}
+                onEdit={() => setEditing(document.documentType)}
+                onUpdate={onUpdate}
+                onRemove={() => remove(document, index)}
+              />
             )}
           />
         )}
@@ -272,5 +229,142 @@ export function DocumentsCard({
         />
       ) : null}
     </Card>
+  )
+}
+
+type DocumentRowProps = {
+  document: ProjectDocument
+  handle: ReactNode
+  projectTypeId: string
+  templateAdapter: UploadAdapter<DocumentTemplate>
+  citations: ComponentProps<typeof RuleCitations>["citations"]
+  missing: number
+  onEdit: () => void
+  onUpdate: DefinitionUpdate
+  onRemove: () => void
+}
+
+/** A document in the checklist. A file dropped on it, or chosen from Add or Replace template, becomes its template. */
+function DocumentRow(props: DocumentRowProps) {
+  const { document, templateAdapter, onUpdate } = props
+  const label = sentenceCase(document.label)
+  const settle = (item: UploadItem<DocumentTemplate>) => {
+    uploader.remove(item.id)
+    if (item.status !== "success" || !item.result) {
+      toast.error(fileStatusText(item, "template"))
+      return
+    }
+    const template = item.result
+    onUpdate((current) => setDocumentTemplate(current, document.documentType, template))
+    toast(`${document.template ? "Replaced" : "Added"} the template for “${label}”`)
+  }
+  const uploader = useFileUploader("template", {
+    adapter: templateAdapter,
+    onSuccess: settle,
+    onError: settle,
+    onReject: settle
+  })
+  return (
+    <Upload uploader={uploader} multiple={false}>
+      <DocumentRowBody {...props} uploader={uploader} label={label} />
+    </Upload>
+  )
+}
+
+function DocumentRowBody({
+  document,
+  handle,
+  projectTypeId,
+  citations,
+  missing,
+  onEdit,
+  onUpdate,
+  onRemove,
+  uploader,
+  label
+}: DocumentRowProps & { uploader: Uploader<DocumentTemplate>; label: string }) {
+  const { openFileDialog } = useUploadContext()
+  const { isUploading, percent } = useUploadProgress(uploader)
+  const { template } = document
+  const removeTemplate = () => {
+    if (!template) {
+      return
+    }
+    onUpdate((current) => setDocumentTemplate(current, document.documentType, undefined))
+    toast(`Removed the template for “${label}”`, {
+      action: {
+        label: "Undo",
+        onClick: () => onUpdate((current) => setDocumentTemplate(current, document.documentType, template))
+      }
+    })
+  }
+  const uploading = isUploading ? `Uploading the template, ${Math.round(percent)}%` : null
+  return (
+    <DropTarget
+      clickable={false}
+      className="group/document relative flex items-start gap-1 rounded-lg border bg-card py-3 pr-2 pl-1 sm:gap-2 sm:pr-3"
+    >
+      {handle}
+      <div className="isolate flex min-w-0 flex-1 flex-col gap-2.5 pt-1.5">
+        <div className="flex flex-wrap items-center gap-x-1">
+          <span className="text-sm font-medium">
+            {label}
+            {document.isRequired ? (
+              <span aria-hidden className="ml-0.5 text-destructive">
+                *
+              </span>
+            ) : null}
+            {document.isRequired ? <span className="sr-only"> (required)</span> : null}
+          </span>
+          {document.mustShow.length > 0 ? (
+            <InfoTip label={`What the ${document.label.toLowerCase()} must show`} icon="info">
+              <p className="font-medium">It must show</p>
+              <ul className="flex list-disc flex-col gap-1 pl-4 text-muted-foreground">
+                {document.mustShow.map((item) => (
+                  <li key={item}>{sentenceCase(item)}</li>
+                ))}
+              </ul>
+            </InfoTip>
+          ) : null}
+        </div>
+        {template ? (
+          <TemplateAttachment
+            projectTypeId={projectTypeId}
+            template={template}
+            size="sm"
+            onRemove={removeTemplate}
+            progress={uploading}
+          />
+        ) : null}
+        {!template && uploading ? <p className="text-sm text-muted-foreground">{uploading}</p> : null}
+        <RuleCitations citations={citations} missing={missing} />
+      </div>
+      <RowActions
+        name={label}
+        actions={[
+          { label: "Edit", icon: PencilIcon, onSelect: onEdit },
+          document.isRequired
+            ? {
+                label: "Make optional",
+                icon: CircleDashedIcon,
+                onSelect: () => onUpdate((current) => updateDocument(current, { ...document, isRequired: false }))
+              }
+            : {
+                label: "Make required",
+                icon: AsteriskIcon,
+                onSelect: () => onUpdate((current) => updateDocument(current, { ...document, isRequired: true }))
+              },
+          { label: template ? "Replace template" : "Add template", icon: PaperclipIcon, onSelect: openFileDialog },
+          { label: "Remove", icon: Trash2Icon, onSelect: onRemove, isDestructive: true }
+        ]}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-10 hidden items-center justify-center gap-2 rounded-lg border-2 border-dashed border-primary/60 bg-background/80 text-sm font-medium backdrop-blur-sm group-data-dragging/document:flex group-data-drag-reject/document:border-destructive/60"
+      >
+        <UploadIcon aria-hidden className="size-4" />
+        {template ? "Drop to replace its template" : "Drop to use as its template"}
+      </div>
+    </DropTarget>
   )
 }

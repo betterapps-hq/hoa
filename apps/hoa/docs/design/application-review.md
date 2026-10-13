@@ -639,7 +639,11 @@ wording so adding one back keeps it).
 - **The editor** (`ProjectTypePage`): each question rendered exactly as homeowners see it (`QuestionField`, shared
   with the homeowner form), one info button for long help, its citations on a quiet line, a drag
   handle (dnd-kit, keyboard sensor and announcements) and a menu (edit, required or optional, in a section that
-  repeats asked once for every item or for each, remove with undo); a question asked once says so under it.
+  repeats asked once for every item or for each, remove with undo). In a section that repeats, the questions asked
+  once are listed first under "Once for every fence run" and the rest under "For each fence run", as homeowners see
+  them. Fee and signature questions close the form, after every section, fees first, under "Fee and signature"; they
+  don't move. A document's template shows as an attached file to download or remove; a file dropped on a document,
+  or chosen from its menu (Add template, Replace template), becomes its template.
   Changes save as they're made. "Add question" suggests what the rules check and always lets the administrator write
   their own (a "File upload" answer becomes a document requirement); "Add document" suggests what the rules require and
   always lets them create their own (name, what it must show, required, accepted file formats, citations). Any
@@ -672,8 +676,9 @@ wording so adding one back keeps it).
   names what's still missing; a document with a template offers "Download the template" under its name
   (`/files/project-types/{id}/templates/{templateId}`, anyone in the organization). In a section that repeats, the questions asked once for every item come first, in their
   own card ("Every fence run"), and each item's card holds only its own; the answer is kept on every item, a new item
-  starts with it, and the review reads each item whole. Read back, an answer every item shares shows once, above the
-  items (`answerSections`). Each question's info button holds its help and, quietly, why it's asked: the rules that
+  starts with it, and the review reads each item whole. Fee and signature questions come last, in their own section, fees first
+  (`closingQuestions`). Read back, an answer every item shares shows once, above the items, and the fee and signature
+  last (`answerSections`). Each question's info button holds its help and, quietly, why it's asked: the rules that
   read it and its citations, opening in the document reader in a new tab.
 - **Suggested by a model** (`hoa-project-type-suggestion`): it reads the published rulebook as it applies to
   applications and proposes types with a homeowner-facing description, the fields to ask (each required or not, and,

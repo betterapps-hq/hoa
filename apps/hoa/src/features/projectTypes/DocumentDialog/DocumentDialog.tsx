@@ -1,20 +1,11 @@
 import { useForm } from "@tanstack/react-form"
 import type { UploadAdapter } from "@uploadcn/core"
 import { useUploadSelector } from "@uploadcn/react"
-import { DownloadIcon, PlusIcon, XIcon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 import { useState } from "react"
 import { z } from "zod"
-import { FileTypeMedia } from "@/components/FileTypeMedia/FileTypeMedia"
 import { FileUpload, fileStatusText, useFileUploader } from "@/components/FileUpload/FileUpload"
-import {
-  Attachment,
-  AttachmentAction,
-  AttachmentActions,
-  AttachmentContent,
-  AttachmentDescription,
-  AttachmentTitle
-} from "@/components/ui/attachment"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -36,13 +27,13 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { fileSizeText, sentenceCase } from "@/lib/text"
+import { sentenceCase } from "@/lib/text"
 import { uploadFormats, type DocumentTemplate, type ProjectDocument } from "@/projectTypes/projectType"
 import { uploadAll } from "@/storage/serverUpload"
 import type { CitedProvision } from "../../rulebook/citedProvision"
 import { CitationPicker } from "../../rulebook/RuleReference/CitationPicker"
 import { CitationChips } from "../CitationChips/CitationChips"
-import { templateHref } from "../uploadTemplate"
+import { TemplateAttachment } from "../TemplateAttachment/TemplateAttachment"
 
 // Writing or editing one document requirement (application-review.md, Project types): its name, whether it's
 // required, the file formats it takes and a template homeowners download and fill in. The administrator's own
@@ -267,32 +258,11 @@ export function DocumentDialog({
                       A file homeowners download and fill in, such as a form for a neighbor to sign.
                     </FieldDescription>
                     {isStored ? (
-                      <Attachment className="w-full">
-                        <FileTypeMedia fileName={stored.fileName} mediaType={stored.mediaType} />
-                        <AttachmentContent>
-                          <AttachmentTitle title={stored.fileName}>{stored.fileName}</AttachmentTitle>
-                          <AttachmentDescription>{fileSizeText(stored.sizeBytes)}</AttachmentDescription>
-                        </AttachmentContent>
-                        <AttachmentActions>
-                          <a
-                            className={buttonVariants({ variant: "ghost", size: "icon-xs" })}
-                            href={templateHref(projectTypeId, stored)}
-                            download
-                            aria-label={`Download ${stored.fileName}`}
-                            title="Download"
-                          >
-                            <DownloadIcon aria-hidden />
-                          </a>
-                          <AttachmentAction
-                            type="button"
-                            aria-label={`Remove ${stored.fileName}`}
-                            title="Remove"
-                            onClick={() => item.handleChange(null)}
-                          >
-                            <XIcon />
-                          </AttachmentAction>
-                        </AttachmentActions>
-                      </Attachment>
+                      <TemplateAttachment
+                        projectTypeId={projectTypeId}
+                        template={stored}
+                        onRemove={() => item.handleChange(null)}
+                      />
                     ) : (
                       <FileUpload
                         id="document-template"
