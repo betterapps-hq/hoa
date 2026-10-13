@@ -80,6 +80,22 @@ export const emptyAnswers = (definition: ProjectTypeDefinition): ProjectAnswers 
 export const blankItem = (group: ProjectGroup): Record<string, AnswerValue> =>
   Object.fromEntries(group.fields.map((field) => [field.property, null]))
 
+/** Whether a question is answered once for every item of its section, which only a section that repeats has. */
+export const isSharedIn = (group: ProjectGroup, field: ProjectField) => group.isRepeatable && field.isShared === true
+
+/** A new item of a section: blank, but for the answers given once for every item, which it keeps. */
+export function nextItem(group: ProjectGroup, items: readonly Record<string, AnswerValue>[]) {
+  const first = items[0] ?? {}
+  return {
+    ...blankItem(group),
+    ...Object.fromEntries(
+      group.fields
+        .filter((field) => isSharedIn(group, field))
+        .map((field) => [field.property, first[field.property] ?? null])
+    )
+  }
+}
+
 /** An answer in words, as the homeowner gave it. */
 function answerText(field: ProjectField, value: AnswerValue): string | null {
   if (isBlank(value)) {
@@ -120,6 +136,44 @@ export function answerLines(definition: ProjectTypeDefinition, answers: ProjectA
       return lines.length > 0 ? [{ group, index, heading: itemName(group, index), lines }] : []
     })
   )
+}
+
+/**
+ * The answers as the homeowner and the committee read them back: like `answerLines`, but where a section repeats, an
+ * answer given once for every item shows once, above the items, when every item has it.
+ */
+export function answerSections(definition: ProjectTypeDefinition, answers: ProjectAnswers) {
+  const sections = answerLines(definition, answers)
+  return definition.groups.flatMap((group) => {
+    const items = sections.filter((section) => section.group === group)
+    const lineOf = (section: (typeof items)[number], field: ProjectField) =>
+      section.lines.find((item) => item.field === field)?.line
+    const [first] = items
+    const once =
+      first && items.length > 1 && items.length === (answers[group.subject] ?? []).length
+        ? group.fields.filter(
+            (field) =>
+              isSharedIn(group, field) &&
+              lineOf(first, field) !== undefined &&
+              items.every((section) => lineOf(section, field) === lineOf(first, field))
+          )
+        : []
+    const shared = once.flatMap((field) => {
+      const line = first ? lineOf(first, field) : undefined
+      return line === undefined ? [] : [{ key: field.property, line }]
+    })
+    return [
+      ...(shared.length > 0
+        ? [{ key: `${group.subject} every`, heading: `Every ${group.itemLabel.toLowerCase()}`, lines: shared }]
+        : []),
+      ...items.flatMap((section) => {
+        const lines = section.lines
+          .filter((item) => !once.includes(item.field))
+          .map((item) => ({ key: item.field.property, line: item.line }))
+        return lines.length > 0 ? [{ key: `${group.subject} ${section.index}`, heading: section.heading, lines }] : []
+      })
+    ]
+  })
 }
 
 /**

@@ -17,7 +17,7 @@ const sameWords = (a: string, b: string) => a.trim().toLowerCase() === b.trim().
 
 /**
  * A bound question as the administrator worded it, typed by the rules: its wording, example, citations, who answers
- * it and whether it's required are theirs; for a choice, so are which of the rulebook's values to offer, their own
+ * it, whether it's required and whether it's asked once for every item are theirs; for a choice, so are which of the rulebook's values to offer, their own
  * added values, the order, and whether "Other" is offered. A label that's only the detail's name reads as code's
  * question.
  */
@@ -29,6 +29,7 @@ export function boundField(field: ProjectField, bound: ProjectField, section: Pr
     help: field.help,
     example: field.example,
     isRequired: field.isRequired,
+    isShared: field.isShared,
     answeredBy: bound.answeredBy,
     citations: field.citations ?? bound.citations
   }

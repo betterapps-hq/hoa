@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
@@ -113,6 +114,7 @@ const valuesSchema = z.object({
   help: z.string().trim().max(300, "Keep the help under 300 characters."),
   example: z.string().trim().max(80, "Keep the example under 80 characters."),
   isRequired: z.boolean(),
+  isShared: z.boolean(),
   subject: z.string(),
   answerType: z.string(),
   options: z.string(),
@@ -157,6 +159,9 @@ export function QuestionDialog({
   /** Whether the question stays the rules' detail: it was, and its answer type stays. */
   const staysBound = (answerType: string) => field !== null && field.binding !== null && answerType === field.kind
   const custom = customValues(field)
+  /** The section's item, when it repeats: only there can a question be asked once for every item. */
+  const itemOf = (subject: string) => sections.find((section) => section.subject === subject && section.isRepeatable)
+  const repeats = (subject: string) => itemOf(subject) !== undefined
   const known = new Map([
     ...Object.entries(citations),
     ...(provisions ?? []).map((provision) => [provision.provisionKey, provision] as const)
@@ -177,6 +182,7 @@ export function QuestionDialog({
     help: field?.help ?? "",
     example: field?.example ?? "",
     isRequired: field?.isRequired ?? true,
+    isShared: field?.isShared ?? false,
     subject: editing?.subject ?? sections[0]?.subject ?? "work",
     answerType: custom.answerType,
     options: custom.options,
@@ -203,16 +209,18 @@ export function QuestionDialog({
       })
     },
     onSubmit: ({ value }) => {
+      const subject = editing?.subject ?? value.subject
       const wording = {
         label: value.label.trim(),
         help: value.help.trim() || null,
         example: value.example.trim() || null,
         isRequired: value.isRequired,
+        isShared: repeats(subject) && value.isShared,
         citations: value.citations
       }
       if (field && staysBound(value.answerType)) {
         onSave(
-          editing?.subject ?? value.subject,
+          subject,
           field.kind === "choice"
             ? {
                 ...field,
@@ -233,7 +241,7 @@ export function QuestionDialog({
           accepts: null
         })
       } else {
-        onSave(editing?.subject ?? value.subject, customField(value, wording))
+        onSave(subject, customField(value, wording))
       }
       onOpenChange(false)
     }
@@ -242,7 +250,7 @@ export function QuestionDialog({
   /** The administrator's own question from what they chose. */
   function customField(
     value: Values,
-    wording: Pick<ProjectField, "label" | "help" | "example" | "isRequired" | "citations">
+    wording: Pick<ProjectField, "label" | "help" | "example" | "isRequired" | "isShared" | "citations">
   ): ProjectField {
     const base = {
       ...wording,
@@ -502,6 +510,32 @@ export function QuestionDialog({
                 </Field>
               )}
             </form.Field>
+            <form.Subscribe selector={(state) => state.values.subject}>
+              {(subject) => {
+                const section = itemOf(editing?.subject ?? subject)
+                return section ? (
+                  <form.Field name="isShared">
+                    {(item) => (
+                      <Field orientation="horizontal">
+                        <Checkbox
+                          id="question-shared"
+                          checked={item.state.value}
+                          onCheckedChange={(checked) => item.handleChange(checked)}
+                        />
+                        <FieldContent>
+                          <FieldLabel htmlFor="question-shared" className="font-normal">
+                            Ask once for every {section.itemLabel.toLowerCase()}
+                          </FieldLabel>
+                          <FieldDescription>
+                            Homeowners answer it once, above the list, for all of them.
+                          </FieldDescription>
+                        </FieldContent>
+                      </Field>
+                    )}
+                  </form.Field>
+                ) : null
+              }}
+            </form.Subscribe>
             <form.Subscribe selector={(state) => state.values.answerType}>
               {(answerType) =>
                 field?.kind === "choice" && staysBound(answerType) ? (

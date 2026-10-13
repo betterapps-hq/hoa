@@ -223,11 +223,16 @@ describe("ProjectTypePage", () => {
     expect(props.onSave).not.toHaveBeenCalled()
   })
 
-  it("offers only edit, required or optional, and remove in a question's menu, each with an icon", async () => {
+  it("offers only edit, required or optional, asking once in a section that repeats, and remove, each with an icon", async () => {
     const { user } = setup()
     await user.click(screen.getByRole("button", { name: "Actions for How tall is it?" }))
     const items = await screen.findAllByRole("menuitem")
-    expect(items.map((item) => item.textContent)).toEqual(["Edit", "Make optional", "Remove"])
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Edit",
+      "Make optional",
+      "Ask once for every structure",
+      "Remove"
+    ])
     expect(items.every((item) => item.querySelector("svg"))).toBe(true)
   })
 
@@ -236,6 +241,21 @@ describe("ProjectTypePage", () => {
     await chooseFromMenu(user, "Actions for How tall is it?", "Make optional")
     await waitFor(() => expect(savedDefinition(props)?.groups[0]!.fields[0]).toMatchObject({ isRequired: false }))
     expect(await screen.findByText("Saved")).toBeInTheDocument()
+  })
+
+  it("asks a question once for every item from its menu, and for each again from its dialog", async () => {
+    const { props, user } = setup()
+    await chooseFromMenu(user, "Actions for What color is it?", "Ask once for every structure")
+    await waitFor(() => expect(savedDefinition(props)?.groups[0]!.fields[1]).toMatchObject({ isShared: true }))
+    expect(screen.getByText("Asked once for every structure")).toBeInTheDocument()
+    await chooseFromMenu(user, "Actions for What color is it?", "Edit")
+    const dialog = await screen.findByRole("dialog", { name: "Edit question" })
+    const once = within(dialog).getByRole("checkbox", { name: "Ask once for every structure" })
+    expect(once).toBeChecked()
+    await user.click(once)
+    await user.click(within(dialog).getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(savedDefinition(props)?.groups[0]!.fields[1]).toMatchObject({ isShared: false }))
+    expect(screen.queryByText("Asked once for every structure")).not.toBeInTheDocument()
   })
 
   it("removes a question, which Add question then suggests again", async () => {

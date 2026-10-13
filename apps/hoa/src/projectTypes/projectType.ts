@@ -18,6 +18,12 @@ const fieldBase = {
   /** An example answer, shown in the empty input; null for none. */
   example: z.string().nullable().default(null),
   isRequired: z.boolean(),
+  /**
+   * In a section that repeats, answered once for every item (the same material for every fence run) instead of for
+   * each: the form asks it above the items and every item keeps the answer. Absent, it's asked for each item; ignored
+   * in a section that doesn't repeat.
+   */
+  isShared: z.boolean().optional(),
   /** Who can usually state it: the applicant, or only the association. */
   answeredBy: z.enum(["applicant", "association"]).default("applicant"),
   /**

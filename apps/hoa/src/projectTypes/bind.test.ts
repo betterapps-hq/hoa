@@ -80,6 +80,13 @@ describe("bindDefinition, by citations", () => {
     expect(bound(none)[0]?.binding).toBeNull()
   })
 
+  it("keeps a bound question asked once for every item, as the administrator set it", () => {
+    expect(bound({ ...placement, isShared: true }, { ...lit, label: "Lit", isShared: false })).toMatchObject([
+      { binding: "widget.placement", isShared: true },
+      { binding: "widget.lit", isShared: false }
+    ])
+  })
+
   it("picks the detail closest to the question's wording when several fit, and never one another question answers", () => {
     const question = own("How deep is it?", ["doc:1"], { ...length, label: "How much depth does it have?" })
     expect(bound(question)[0]?.binding).toBe("widget.depth")

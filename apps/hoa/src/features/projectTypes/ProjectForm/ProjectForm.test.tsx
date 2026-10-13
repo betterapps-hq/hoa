@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { useState } from "react"
 import { describe, expect, it, vi } from "vitest"
@@ -93,17 +93,30 @@ const definition: ProjectTypeDefinition = {
   unasked: []
 }
 
+// The same items with their color asked once for every item.
+const shared: ProjectTypeDefinition = {
+  ...definition,
+  groups: definition.groups.map((group) => ({
+    ...group,
+    fields: group.fields
+      .filter((field) => field.property === "item.name" || field.property === "item.color")
+      .map((field) => (field.property === "item.color" ? { ...field, isShared: true } : field))
+  }))
+}
+
 function Form({
   onChange,
-  showsAllErrors = false
+  showsAllErrors = false,
+  of = definition
 }: {
   onChange: (value: ProjectAnswers) => void
   showsAllErrors?: boolean
+  of?: ProjectTypeDefinition
 }) {
-  const [value, setValue] = useState(emptyAnswers(definition))
+  const [value, setValue] = useState(emptyAnswers(of))
   return (
     <ProjectForm
-      definition={definition}
+      definition={of}
       value={value}
       onChange={(next) => {
         setValue(next)
@@ -182,6 +195,22 @@ describe("ProjectForm", () => {
         .getAllByRole("textbox", { name: "What do you call it?" })
         .map((input) => (input instanceof HTMLInputElement ? input.value : null))
     ).toEqual(["", "Third"])
+  })
+
+  it("asks a question shared by every item once, above the items, and keeps its answer on each, new ones too", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn<(value: ProjectAnswers) => void>()
+    render(<Form onChange={onChange} of={shared} />)
+    await user.click(screen.getByRole("button", { name: "Add item" }))
+    const every = screen.getByRole("region", { name: "Every item" })
+    expect(screen.getAllByRole("radiogroup", { name: "What color is it?" })).toHaveLength(1)
+    expect(within(every).getByRole("radiogroup", { name: "What color is it?" })).toBeInTheDocument()
+    expect(within(screen.getByRole("region", { name: "Item 2" })).queryByRole("radiogroup")).not.toBeInTheDocument()
+    await user.click(within(every).getByRole("radio", { name: "Grey" }))
+    await user.click(screen.getByRole("button", { name: "Add item" }))
+    const items = onChange.mock.lastCall?.[0].item ?? []
+    expect(items.map((item) => item["item.color"])).toEqual(["color.grey", "color.grey", "color.grey"])
+    expect(screen.getAllByRole("textbox", { name: "What do you call it?" })).toHaveLength(3)
   })
 
   it("says what's wrong once a question is left, or all at once after a submit", async () => {

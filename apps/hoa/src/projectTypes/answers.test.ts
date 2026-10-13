@@ -4,8 +4,10 @@ import {
   answerLines,
   answerReadings,
   answersFileId,
+  answerSections,
   answersSchema,
   emptyAnswers,
+  nextItem,
   withAnswersPage
 } from "./answers"
 import type { ProjectTypeDefinition } from "./projectType"
@@ -118,6 +120,59 @@ describe("answerLines", () => {
     expect(answerLines(definition, answers)[0]!.lines.map((item) => item.line)).toEqual([
       "Replaces something: Yes",
       "Start date: 2026-11-01"
+    ])
+  })
+})
+
+describe("answers given once for every item", () => {
+  // The items' color asked once for all of them.
+  const items = definition.groups[1]!
+  const shared = {
+    ...definition,
+    groups: [
+      definition.groups[0]!,
+      {
+        ...items,
+        fields: items.fields.map((field) => (field.kind === "choice" ? { ...field, isShared: true } : field))
+      }
+    ]
+  }
+  const same = {
+    ...answers,
+    item: [
+      { "item.height": 72, "item.color": "color.grey" },
+      { "item.height": 48, "item.color": "color.grey" }
+    ]
+  }
+
+  it("start a new item with the answers it shares, and nothing else", () => {
+    expect(nextItem(shared.groups[1]!, same.item)).toEqual({ "item.height": null, "item.color": "color.grey" })
+    expect(nextItem(definition.groups[1]!, same.item)).toEqual({ "item.height": null, "item.color": null })
+  })
+
+  it("read back once, above the items, while the review still reads each item whole", () => {
+    expect(
+      answerSections(shared, same).map((section) => [section.heading, section.lines.map((item) => item.line)])
+    ).toEqual([
+      ["The project", ["Replaces something: Yes", "Start date: 2026-11-01"]],
+      ["Every item", ["Color: grey"]],
+      ["Item 1", ["Height: 72 inches"]],
+      ["Item 2", ["Height: 48 inches"]]
+    ])
+    expect(answerLines(shared, same)[1]!.lines.map((item) => item.line)).toEqual(["Height: 72 inches", "Color: grey"])
+  })
+
+  it("read back under each item when the items' answers differ, or the question isn't shared", () => {
+    const differ = { ...same, item: [same.item[0]!, { ...same.item[1]!, "item.color": null }] }
+    expect(answerSections(shared, differ).map((section) => section.heading)).toEqual([
+      "The project",
+      "Item 1",
+      "Item 2"
+    ])
+    expect(answerSections(definition, same).map((section) => section.heading)).toEqual([
+      "The project",
+      "Item 1",
+      "Item 2"
     ])
   })
 })

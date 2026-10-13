@@ -579,8 +579,9 @@ asks for in checklist order, the documents the form itself provides (`formDocume
 wording so adding one back keeps it).
 
 - **Questions.** Each has its wording, help, an answer type (text, long text, an amount with its unit and dimension, a
-  count, one choice, several choices, yes or no, a date, a time), an example for text, whether it's required, and the
-  passages it cites (`citations`). **A question's citations are what its answer is checked against.** Underneath, a
+  count, one choice, several choices, yes or no, a date, a time), an example for text, whether it's required, in a
+  section that repeats whether it's asked once for every item (`isShared`: one material for every fence run) or for
+  each, and the passages it cites (`citations`). **A question's citations are what its answer is checked against.** Underneath, a
   question is bound (`binding`: the property a rule tests, its answer type and values from the vocabulary) or not
   (`binding: null`), and code alone decides which (`src/projectTypes/bind.ts`, `bindDefinition`, run on every change in
   the editor and on every save): a question whose citations include a passage of the rules testing a detail its answer
@@ -616,7 +617,8 @@ wording so adding one back keeps it).
   menu. Suggestions, once asked for, appear above the cards, each to add or dismiss.
 - **The editor** (`ProjectTypePage`): each question rendered exactly as homeowners see it (`QuestionField`, shared
   with the homeowner form), one info button for long help, its citations on a quiet line, a drag
-  handle (dnd-kit, keyboard sensor and announcements) and a menu (edit, required or optional, remove with undo).
+  handle (dnd-kit, keyboard sensor and announcements) and a menu (edit, required or optional, in a section that
+  repeats asked once for every item or for each, remove with undo); a question asked once says so under it.
   Changes save as they're made. "Add question" suggests what the rules check and always lets the administrator write
   their own (a "File upload" answer becomes a document requirement); "Add document" suggests what the rules require and
   always lets them create their own (name, what it must show, required, accepted file formats, citations). The edit
@@ -643,7 +645,10 @@ wording so adding one back keeps it).
 - **The homeowner form**: the project type as cards, a description, the sections in order (amounts in the shared
   quantity inputs by dimension, in the organization's unit system, `HoaSettings.unitSystem`), and one drop zone for
   files, each file marked as one of the documents (guessed from its name only when clear) against a checklist that
-  names what's still missing. Each question's info button holds its help and, quietly, why it's asked: the rules that
+  names what's still missing. In a section that repeats, the questions asked once for every item come first, in their
+  own card ("Every fence run"), and each item's card holds only its own; the answer is kept on every item, a new item
+  starts with it, and the review reads each item whole. Read back, an answer every item shares shows once, above the
+  items (`answerSections`). Each question's info button holds its help and, quietly, why it's asked: the rules that
   read it and its citations, opening in the document reader in a new tab.
 - **Suggested by a model** (`hoa-project-type-suggestion`): it reads the published rulebook as it applies to
   applications and proposes types with a homeowner-facing description, the fields to ask and the rules they rest on.
@@ -664,8 +669,10 @@ wording so adding one back keeps it).
   `applyProjectTypeUpdates`). Kept, a question stays as worded (its citations still decide what it's checked against),
   a document becomes the administrator's own, a missing passage stays cited, and a new question or document stays out
   of the form, offered by Add question or Add document. The administrator's own questions and documents, wording,
-  added choices, order, required flags and citations survive either way. Until then, edits are bound against the
-  rulebook the type was built with, homeowners apply with the saved form, and a cited passage the published rulebook
+  added choices, order, required and asked-once flags and citations survive either way. Until then, edits are bound
+  against the rulebook the type was built with (when it can't be read any more, an edit saves the form as it stands
+  and the type stays out of date: never bound against the published rules unreviewed, which would drop what they
+  don't test), homeowners apply with the saved form, and a cited passage the published rulebook
   doesn't have is left out of their "Why we ask"; reviews of applications already submitted are untouched. The
   HOA management dashboard lists them among what needs its attention ([dashboard.md](../dashboard.md)).
 - **Delete or archive**: from the list's or the page's menu. A type no application uses can be deleted after a

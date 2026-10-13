@@ -77,17 +77,16 @@ const isOutdatedType = (type: ProjectType, published: Published) =>
 
 /**
  * The rules file a type's form is kept against: the rulebook it was built with while it's out of date (so editing it
- * doesn't take the published rulebook's changes unreviewed), else the published one; null when there's neither.
+ * doesn't take the published rulebook's changes unreviewed), else the published one. Null when there's neither, or
+ * when the type is out of date and its own rulebook can't be read: never the published one in its place, which would
+ * drop every question and document its rules don't test without the administrator reviewing it.
  */
 async function ownRulesFile(hoaId: string, type: ProjectType, published: Published) {
   if (!isOutdatedType(type, published) || type.rulebookId === null) {
     return published ? { id: published.id, rulesFile: published.rulesFile } : null
   }
   const file = await getRulesFileOf(getDb(), hoaId, type.rulebookId)
-  if (!file) {
-    return published ? { id: published.id, rulesFile: published.rulesFile } : null
-  }
-  return { id: type.rulebookId, rulesFile: await readRulesFile(getBucket(), file) }
+  return file ? { id: type.rulebookId, rulesFile: await readRulesFile(getBucket(), file) } : null
 }
 
 async function requirePublished(hoaId: string) {
@@ -355,7 +354,8 @@ function checkCitations(definition: ProjectTypeDefinition, before: ProjectTypeDe
 
 /**
  * Saves the label, description and form; the form is checked against the rules again: the rulebook it was built with
- * while it's out of date, so an edit never takes the published rulebook's changes unreviewed.
+ * while it's out of date, so an edit never takes the published rulebook's changes unreviewed. When that rulebook can't
+ * be read any more, the form is saved as it stands and the type stays out of date, for its updates to be reviewed.
  */
 export const updateProjectType = createServerFn({ method: "POST" })
   .validator((data: unknown) =>
@@ -367,14 +367,18 @@ export const updateProjectType = createServerFn({ method: "POST" })
       loadOwnType(context.hoa.id, data.id),
       requirePublished(context.hoa.id)
     ])
-    const own = (await ownRulesFile(context.hoa.id, type, published)) ?? published
-    const built = buildDefinition(own.rulesFile, applicationRequestType, type.definition.subjects, today())
+    const own = await ownRulesFile(context.hoa.id, type, published)
     checkCitations(data.definition, type.definition, published.rulesFile)
     await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
       label: data.label,
       description: data.description || null,
-      definition: bindDefinition(data.definition, built),
-      rulebookId: own.id,
+      definition: own
+        ? bindDefinition(
+            data.definition,
+            buildDefinition(own.rulesFile, applicationRequestType, type.definition.subjects, today())
+          )
+        : data.definition,
+      rulebookId: own?.id ?? type.rulebookId,
       updatedAt: new Date().toISOString()
     })
   })

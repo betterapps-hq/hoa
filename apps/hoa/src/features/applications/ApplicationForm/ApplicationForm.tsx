@@ -1,6 +1,6 @@
 import { Field, FieldGroup, FieldLabel, FieldSeparator } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
-import { answerLines, emptyAnswers } from "@/projectTypes/answers"
+import { answerSections, emptyAnswers } from "@/projectTypes/answers"
 import type { ProjectAnswers } from "@/projectTypes/projectType"
 import type { OfferedProjectType } from "../../projectTypes/offeredTypes"
 import { ProjectForm } from "../../projectTypes/ProjectForm/ProjectForm"
@@ -57,9 +57,12 @@ export type ApplicationAnswersProps = {
   answers: ProjectAnswers | null
 }
 
-/** The description and the answers as the homeowner gave them, one line each under what they describe. */
+/**
+ * The description and the answers as the homeowner gave them, one line each under what they describe; an answer given
+ * once for every item shows once.
+ */
 export function ApplicationAnswers({ projectType, description, answers }: ApplicationAnswersProps) {
-  const items = projectType && answers ? answerLines(projectType.definition, answers) : []
+  const items = projectType && answers ? answerSections(projectType.definition, answers) : []
   if (!description && items.length === 0) {
     return <p className="text-sm text-muted-foreground">No description or answers.</p>
   }
@@ -72,11 +75,11 @@ export function ApplicationAnswers({ projectType, description, answers }: Applic
         </section>
       ) : null}
       {items.map((item) => (
-        <section key={`${item.group.subject}-${item.index}`} className="flex flex-col gap-1.5">
+        <section key={item.key} className="flex flex-col gap-1.5">
           <h3 className="font-medium">{item.heading}</h3>
           <ul className="flex flex-col gap-1 text-muted-foreground">
             {item.lines.map((line) => (
-              <li key={line.field.property}>{line.line}</li>
+              <li key={line.key}>{line.line}</li>
             ))}
           </ul>
         </section>

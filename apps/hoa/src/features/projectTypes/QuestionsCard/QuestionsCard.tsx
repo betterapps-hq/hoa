@@ -1,4 +1,13 @@
-import { AsteriskIcon, CircleDashedIcon, ListPlusIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import {
+  AsteriskIcon,
+  CircleDashedIcon,
+  Layers2Icon,
+  ListOrderedIcon,
+  ListPlusIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon
+} from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { RowActions } from "@/components/RowActions/RowActions"
@@ -6,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { sentenceCase } from "@/lib/text"
+import { isSharedIn } from "@/projectTypes/answers"
 import {
   addDocument,
   addQuestion,
@@ -29,7 +39,8 @@ import { SortableList } from "../SortableList/SortableList"
 
 // A project type's questions as the administrator edits them (application-review.md, Project types): each question
 // rendered exactly as homeowners see it (the preview takes answers but never keeps them), its one info button holding
-// its help and what it checks, its citations under it, a handle to drag it and a menu for the rest. "Add question"
+// its help and what it checks, its citations under it, a handle to drag it and a menu for the rest. In a section that
+// repeats, a question can be asked once for every item instead of for each. "Add question"
 // suggests what the rules check that the form doesn't ask, and always lets the administrator write their own.
 
 export type DefinitionUpdate = (change: (current: ProjectTypeDefinition) => ProjectTypeDefinition) => void
@@ -74,17 +85,39 @@ type QuestionRowProps = {
   missing: number
   onEdit: () => void
   onSetRequired: (isRequired: boolean) => void
+  onSetShared: (isShared: boolean) => void
   onRemove: () => void
 }
 
-function QuestionRow({ group, field, handle, citations, missing, onEdit, onSetRequired, onRemove }: QuestionRowProps) {
+function QuestionRow({
+  group,
+  field,
+  handle,
+  citations,
+  missing,
+  onEdit,
+  onSetRequired,
+  onSetShared,
+  onRemove
+}: QuestionRowProps) {
   const [preview, setPreview] = useState<AnswerValue>(null)
   const id = `preview-${group.subject}-${field.property}`.replaceAll(/[^\w-]/g, "-")
+  const itemName = group.itemLabel.toLowerCase()
+  const isShared = isSharedIn(group, field)
+  const sharing = isShared
+    ? { label: `Ask for each ${itemName}`, icon: ListOrderedIcon, onSelect: () => onSetShared(false) }
+    : { label: `Ask once for every ${itemName}`, icon: Layers2Icon, onSelect: () => onSetShared(true) }
   return (
     <div className="flex items-start gap-1 rounded-lg border bg-card py-3 pr-2 pl-1 sm:gap-2 sm:py-4 sm:pr-3">
       {handle}
       <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
         <QuestionField field={field} id={id} value={preview} onChange={setPreview} errors={[]} />
+        {isShared ? (
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Layers2Icon aria-hidden className="size-4 shrink-0" />
+            Asked once for every {itemName}
+          </p>
+        ) : null}
         <RuleCitations citations={citations} missing={missing} />
       </div>
       <RowActions
@@ -94,6 +127,7 @@ function QuestionRow({ group, field, handle, citations, missing, onEdit, onSetRe
           field.isRequired
             ? { label: "Make optional", icon: CircleDashedIcon, onSelect: () => onSetRequired(false) }
             : { label: "Make required", icon: AsteriskIcon, onSelect: () => onSetRequired(true) },
+          ...(group.isRepeatable ? [sharing] : []),
           { label: "Remove", icon: Trash2Icon, onSelect: onRemove, isDestructive: true }
         ]}
       />
@@ -195,7 +229,9 @@ export function QuestionsCard({
                 {sentenceCase(group.label)}
               </h4>
               {group.isRepeatable ? (
-                <span className="text-sm text-muted-foreground">Asked for each {group.itemLabel.toLowerCase()}</span>
+                <span className="text-sm text-muted-foreground">
+                  Homeowners add each {group.itemLabel.toLowerCase()}
+                </span>
               ) : null}
             </div>
             <SortableList
@@ -216,6 +252,9 @@ export function QuestionsCard({
                     onEdit={() => setDialog({ subject: group.subject, property: field.property })}
                     onSetRequired={(isRequired) =>
                       onUpdate((current) => updateQuestion(current, group.subject, { ...field, isRequired }))
+                    }
+                    onSetShared={(isShared) =>
+                      onUpdate((current) => updateQuestion(current, group.subject, { ...field, isShared }))
                     }
                     onRemove={() => remove(group, field, index)}
                   />
