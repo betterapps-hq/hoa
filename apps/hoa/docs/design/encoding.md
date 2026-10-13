@@ -378,6 +378,16 @@ list is ordered by relevance; without, in its usual order. The other filters sti
   against facts" (the engine's preview). Editing is the form (title, statement, modality, bearer, remedy, request
   types, and the structured check and condition editors with their JSON fallback). There's no whole-rule JSON editor
   and no delete.
+- **A term where the rule means something else** (`src/rulebook/ruleTerms.ts`). A term means the same in every rule
+  that uses it, so each term in the card has a menu to change which term this rule uses, in this rule only (the rule
+  goes back to review; the other rules keep the term). **Use a different term here** lists the terms that fit where
+  the rule uses it, worked out from the schema, not from names: for a thing or a kind of one, things of the same
+  nature, or only that thing's kinds when the rule also reads its details or kinds; for a detail, the same thing's
+  details holding the same kind of value (a quantity of the same dimension, a choice from the same list); for a choice,
+  the same list's other choices; for a unit, the same dimension's. **Use a new term here** makes a new term from a copy,
+  named apart from the original and with its own meaning, and copies along what the rule reads that hangs off it (a
+  thing's details and kinds, and theirs), so the rule reads the copies as it read the originals. It isn't offered for
+  a term only this rule uses, nor for a unit or a list of choices. New terms are proposed, approved with the rule.
 - **Terms:** grouped under what they describe. Each subject (a thing, request, party, event or document the
   organization's terms hang off, core ones included, then the lists of choices no detail uses and the units) is a
   collapsed row in its section, most used first, the first eight until "Show all", saying what it holds ("37 questions

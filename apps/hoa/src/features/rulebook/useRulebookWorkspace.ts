@@ -3,6 +3,7 @@ import type { CitationSource } from "@/features/documents/DocumentViewer/Documen
 import type { RulebookRecords } from "@/rulebook/assemble"
 import type { Coverage, SourceText } from "@/rulebook/coverage"
 import type { ApprovalContext, RecordRef } from "@/rulebook/review"
+import type { TermChange } from "@/rulebook/ruleTerms"
 import type * as T from "@/schema/types"
 import type { RulebookIssue } from "@/schema/validate"
 import type { Vocabulary } from "@/schema/vocabulary"
@@ -18,6 +19,8 @@ export type RulebookActions = {
   review: (refs: RecordRef[], status: T.Review["status"], note: string | null) => Promise<ReviewResult>
   resolveIssue: (ref: Exclude<RecordRef, { type: "provision" }>, index: number, note: string) => Promise<void>
   saveRule: (rule: RuleDraft) => Promise<RulebookIssue[]>
+  /** Has one rule use a different term, or a new one made from a copy, in place of one it uses. */
+  changeRuleTerm: (ruleKey: T.RuleKey, from: T.TermKey, change: TermChange) => Promise<RulebookIssue[]>
   answerQuestion: (questionId: T.Id, option: number, text: string | null) => Promise<Omit<ReviewResult, "updated">>
   setNoRule: (
     provisionKey: T.ProvisionKey,

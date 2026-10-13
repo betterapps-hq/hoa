@@ -65,7 +65,7 @@ export function reviewIssues(records: RulebookRecords) {
 }
 
 // The fields of a rule whose strings, or lists of strings, are term keys.
-const termFields = new Set([
+export const termFields: ReadonlySet<string> = new Set([
   "appliesTo",
   "bearer",
   "beneficiary",
@@ -85,6 +85,34 @@ const termFields = new Set([
 ])
 const bookkeeping = new Set(["provenance", "review", "issues"])
 
+/**
+ * A copy of a record with every term key in its fields passed through `replace`: the strings, or lists of strings, in
+ * the fields that hold term keys, and the properties an aggregate's `value` lists (elsewhere `value` is a constant).
+ * Its bookkeeping, and a rule's statement, are left as they are.
+ */
+export function mapTermKeys(
+  value: unknown,
+  replace: (key: T.TermKey) => T.TermKey,
+  fields: ReadonlySet<string> = termFields,
+  field = ""
+): unknown {
+  if (typeof value === "string") {
+    return fields.has(field) ? replace(value) : value
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => mapTermKeys(item, replace, fields, field === "value" ? "term" : field))
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        bookkeeping.has(key) ? item : mapTermKeys(item, replace, fields, key)
+      ])
+    )
+  }
+  return value
+}
+
 /** Every term a rule reads: its statement's links and every term key in its fields. */
 export function termKeysOf(rule: T.Rule) {
   const keys = new Set<T.TermKey>()
@@ -93,25 +121,10 @@ export function termKeysOf(rule: T.Rule) {
       keys.add(part.key)
     }
   }
-  const visit = (value: unknown, field: string) => {
-    if (typeof value === "string") {
-      if (termFields.has(field)) {
-        keys.add(value)
-      }
-    } else if (Array.isArray(value)) {
-      // An aggregate's `value` lists the properties it reads; elsewhere `value` is a constant.
-      for (const item of value) {
-        visit(item, field === "value" ? "term" : field)
-      }
-    } else if (typeof value === "object" && value !== null) {
-      for (const [key, item] of Object.entries(value)) {
-        if (!bookkeeping.has(key)) {
-          visit(item, key)
-        }
-      }
-    }
-  }
-  visit(rule, "")
+  mapTermKeys(rule, (key) => {
+    keys.add(key)
+    return key
+  })
   return keys
 }
 

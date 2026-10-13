@@ -1,21 +1,15 @@
 import type { SearchSetup } from "@/lib/search"
-import { coreTerms } from "@/schema/coreTerms"
 import type * as T from "@/schema/types"
 import type { Vocabulary } from "@/schema/vocabulary"
 import type { TermContent } from "@/schema/zod"
 
-// The terms a picker offers: the organization's terms that aren't rejected, and the core terms they don't refine.
+// The terms a picker offers (`pickableTerms`): the organization's terms that aren't rejected, and the core terms they
+// don't refine.
 
 export type TermOption = { key: T.TermKey; label: string; hint: string }
 
 /** The vocabulary and the terms a picker can offer, which every editor reads. */
 export type TermCatalog = { vocabulary: Vocabulary; terms: TermContent[] }
-
-export function pickableTerms(terms: T.Term[]): TermContent[] {
-  const live = terms.filter((term) => term.review.status !== "rejected")
-  const refined = new Set(live.map((term) => term.key))
-  return [...coreTerms.filter((term) => !refined.has(term.key)), ...live]
-}
 
 export function termOptions({ terms, vocabulary }: TermCatalog, include: (term: TermContent) => boolean) {
   return terms

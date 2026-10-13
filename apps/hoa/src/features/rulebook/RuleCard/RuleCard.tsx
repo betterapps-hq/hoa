@@ -17,6 +17,7 @@ import { RuleForm } from "../RuleForm/RuleForm"
 import { domainLabels, remedyLabels } from "../ruleLabels"
 import { RuleLink } from "../RuleLink/RuleLink"
 import { RulePreview } from "../RulePreview/RulePreview"
+import { RuleTermMenu } from "../RuleTermMenu/RuleTermMenu"
 import { Statement } from "../Statement/Statement"
 import { TermChip } from "../TermChip/TermChip"
 import { describeTermKind } from "../TermChip/TermChip.utils"
@@ -71,15 +72,23 @@ function TermsItUses({ rule }: { rule: T.Rule }) {
         {terms.map((term) => {
           const shared = usage.get(term.key)?.length ?? 0
           return (
-            <li key={term.key} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 px-3 py-2">
+            <li key={term.key} className="flex items-start justify-between gap-3 px-3 py-2">
               <div className="flex min-w-0 flex-col gap-0.5">
                 <TermChip termKey={term.key} vocabulary={vocabulary} isStandalone />
                 <span className="text-sm text-muted-foreground">{describeTermKind(term, vocabulary)}</span>
               </div>
-              <div className="flex shrink-0 flex-col items-end gap-1 text-sm text-muted-foreground">
-                {term.review.status === "proposed" && actions ? <Badge variant="outline">To review</Badge> : null}
-                {term.review.status === "rejected" ? <span className="text-destructive">Rejected</span> : null}
-                <span>{shared > 1 ? `Used in ${countOf(shared, "rule", "rules")}` : "Only this rule"}</span>
+              <div className="flex shrink-0 items-start gap-1">
+                <div className="flex flex-col items-end gap-1 text-sm text-muted-foreground">
+                  {term.review.status === "proposed" && actions ? <Badge variant="outline">To review</Badge> : null}
+                  {term.review.status === "rejected" ? <span className="text-destructive">Rejected</span> : null}
+                  <span>{shared > 1 ? `Used in ${countOf(shared, "rule", "rules")}` : "Only this rule"}</span>
+                </div>
+                {/* Every row keeps the menu's place, so the rows line up whether a term has one or not. */}
+                {actions ? (
+                  <div className="flex w-8 shrink-0 justify-end">
+                    <RuleTermMenu rule={rule} term={term} usedBy={shared} />
+                  </div>
+                ) : null}
               </div>
             </li>
           )

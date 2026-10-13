@@ -28,6 +28,7 @@ import {
 import { RulebookPage } from "../RulebookPage/RulebookPage"
 import {
   answerRulebookQuestion,
+  changeRulebookRuleTerm,
   resolveRulebookIssue,
   reviewRulebookRecords,
   saveRulebookRule,
@@ -106,6 +107,9 @@ export function RulebookRoute({ data, isReviewing }: { data: RulebookRouteData; 
     review: changing((refs, status, note) => reviewRulebookRecords({ data: { rulebookId, refs, status, note } })),
     resolveIssue: changing((ref, index, note) => resolveRulebookIssue({ data: { rulebookId, ref, index, note } })),
     saveRule: changing((rule) => saveRulebookRule({ data: { rulebookId, rule } })),
+    changeRuleTerm: changing((ruleKey, from, change) =>
+      changeRulebookRuleTerm({ data: { rulebookId, ruleKey, from, change } })
+    ),
     answerQuestion: changing(async (questionId, option, text) => {
       const { notApproved } = await answerRulebookQuestion({ data: { rulebookId, questionId, option, text } })
       return { skipped: notApproved }

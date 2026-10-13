@@ -15,6 +15,7 @@ vi.mock("sonner", () => ({
 }))
 
 const approvalRule = "declaration:4.1/p1#approval-required"
+const notifyRule = "declaration:3.1(c)/p3#notify-board"
 
 function renderCard(records = sampleWithTermsApproved(), key = approvalRule, actions?: null) {
   return renderInWorkspace(<RuleCard rule={ruleIn(records, key)} />, {
@@ -83,6 +84,43 @@ describe("RuleCard", () => {
     expect(screen.getByText(/^Approving the rule approves the \d+ still to review\./)).toBeInTheDocument()
     await user.click(screen.getByRole("button", { name: /^Approve, with its \d+ terms$/ }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "rule", key: approvalRule }], "approved", null)
+  })
+
+  it("has the rule use a different term that fits, in this rule only", async () => {
+    const { user, actions } = renderCard(sampleWithTermsApproved(), notifyRule)
+    await user.click(screen.getByRole("button", { name: "Actions for Board notified on" }))
+    // Only this rule uses the term, so a copy for it would change nothing.
+    expect(screen.queryByRole("menuitem", { name: "Use a new term here" })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole("menuitem", { name: "Use a different term here" }))
+    const dialog = await screen.findByRole("dialog", { name: "Use a different term in this rule" })
+    expect(within(dialog).getByText(/In place of “Board notified on”, in this rule only\./)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole("combobox", { name: "Term" }))
+    await user.click(await screen.findByRole("option", { name: /^Lease signed on/ }))
+    await user.click(within(dialog).getByRole("button", { name: "Use it" }))
+    expect(actions?.changeRuleTerm).toHaveBeenCalledWith(notifyRule, "lease-registration.reported-on", {
+      type: "term",
+      key: "lease-registration.signed-on"
+    })
+  })
+
+  it("makes a new term for the rule from a copy, named apart from the one it copies", async () => {
+    const { user, actions } = renderCard(sampleWithTermsApproved(), notifyRule)
+    await user.click(screen.getByRole("button", { name: "Actions for Owner" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Use a new term here" }))
+    const dialog = await screen.findByRole("dialog", { name: "A new term for this rule" })
+    expect(within(dialog).getByText(/^It starts as a copy of “Owner”\. Only this rule uses it\./)).toBeInTheDocument()
+    const name = within(dialog).getByRole("textbox", { name: "Name" })
+    await user.type(name, "owner")
+    await user.click(within(dialog).getByRole("button", { name: "Make the term" }))
+    expect(await within(dialog).findByText("Give it a name that tells it apart from “Owner”.")).toBeInTheDocument()
+    await user.clear(name)
+    await user.type(name, "Unit owner")
+    await user.click(within(dialog).getByRole("button", { name: "Make the term" }))
+    expect(actions?.changeRuleTerm).toHaveBeenCalledWith(notifyRule, "owner", {
+      type: "copy",
+      label: "Unit owner",
+      definition: expect.toBeOneOf([expect.any(String), null])
+    })
   })
 
   it("says why it can't be approved yet", () => {

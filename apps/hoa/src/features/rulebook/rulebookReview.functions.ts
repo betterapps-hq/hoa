@@ -7,6 +7,7 @@ import { saveRulebookChanges } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus } from "@/db/rulebookRepository"
 import { loadRulebookRecords, type RulebookRecords } from "@/rulebook/assemble"
 import { answerQuestion, resolveIssue, reviewIssues, reviewRecords, type RecordRef } from "@/rulebook/review"
+import { changeRuleTerm } from "@/rulebook/ruleTerms"
 import { withLawFirst } from "@/schema/law"
 import type * as Rules from "@/schema/types"
 import { rule as ruleSchema, ruleDraft, settings as settingsSchema } from "@/schema/zod"
@@ -118,6 +119,36 @@ export const saveRulebookRule = createServerFn({ method: "POST" })
     })
     await saveRulebookChanges(db, hoaId, data.rulebookId, { rules: [rule] })
     return issuesOf({ ...records, rules: records.rules.map((item) => (item.key === rule.key ? rule : item)) }, rule.key)
+  })
+
+const termChange = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("term"), key: z.string() }),
+  z.object({ type: z.literal("copy"), label: z.string().trim().min(1), definition: note })
+])
+
+/**
+ * Changes which term one rule uses, in that rule only (encoding.md, UX, Rule card): to a term that fits where it's
+ * used, or to a new term made from a copy. The rule goes back to proposed, and a new term is proposed with it.
+ * Problems validation finds on the rule come back.
+ */
+export const changeRulebookRuleTerm = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    z.object({ ...draftInput, ruleKey: z.string(), from: z.string(), change: termChange }).parse(data)
+  )
+  .handler(async ({ data }) => {
+    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
+    const { rule, terms } = changeRuleTerm(
+      records,
+      { ruleKey: data.ruleKey, from: data.from, change: data.change },
+      { by, at }
+    )
+    await saveRulebookChanges(db, hoaId, data.rulebookId, { rules: [rule], terms })
+    const changed = {
+      ...records,
+      rules: records.rules.map((item) => (item.key === rule.key ? rule : item)),
+      terms: [...records.terms, ...terms]
+    }
+    return issuesOf(changed, rule.key)
   })
 
 /** Answers a question: its chosen reading's rules are approved, the other candidates rejected. */
