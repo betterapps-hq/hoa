@@ -15,7 +15,7 @@ import { getBucket } from "@/storage/storage.server"
 import { recentActivity, type ActivityEvent } from "./activity"
 import type { DashboardApplication } from "./dashboardData"
 
-/** The next rulebook, as the committee's dashboard shows it: being built, or a draft with work left to review. */
+/** The next rulebook, as the HOA management dashboard shows it: being built, or a draft with work left to review. */
 export type NextRulebook =
   | { status: "building" }
   | { status: "draft"; createdAt: string; rulesToReview: number; openQuestions: number }

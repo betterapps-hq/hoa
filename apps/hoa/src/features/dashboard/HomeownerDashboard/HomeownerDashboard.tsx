@@ -13,7 +13,7 @@ import {
   yourApplicationsText
 } from "../dashboardDisplay"
 import { ActivityRow, AreaRow, AttentionRow, EventRow } from "../DashboardRows/DashboardRows"
-import { sampleActivity, sampleAttention, sampleStandings } from "../samples"
+import { homeownerSampleActivity, homeownerSampleAttention, homeownerSampleStandings } from "../samples"
 
 export type HomeownerDashboardProps = {
   /** The published rulebook and the HOA's documents. */
@@ -36,10 +36,10 @@ const activityLimit = 8
  */
 export function HomeownerDashboard({ summary, applications, activity, asOf }: HomeownerDashboardProps) {
   const waiting = waitingOnHomeowner(applications)
-  const samples = sampleAttention(asOf)
+  const samples = homeownerSampleAttention(asOf)
   const happened = [
     ...activity.map((event) => ({ at: event.at, row: <EventRow key={event.id} event={event} asOf={asOf} /> })),
-    ...sampleActivity(asOf).map(({ id, ...sample }) => ({
+    ...homeownerSampleActivity(asOf).map(({ id, ...sample }) => ({
       at: sample.at,
       row: <ActivityRow key={id} {...sample} asOf={asOf} isSample />
     }))
@@ -93,7 +93,7 @@ export function HomeownerDashboard({ summary, applications, activity, asOf }: Ho
               <AreaRow area={areas.rulebook} link={summary.publishedAt ? <Link to="/rules" /> : null}>
                 {homeownerRulebookText(summary)}
               </AreaRow>
-              {sampleStandings(asOf).map(({ id, area, text }) => (
+              {homeownerSampleStandings(asOf).map(({ id, area, text }) => (
                 <AreaRow key={id} area={area} link={null} isSample>
                   {text}
                 </AreaRow>

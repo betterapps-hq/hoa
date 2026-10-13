@@ -38,7 +38,7 @@ export const roles: Record<RoleId, Role> = {
   administrator: {
     id: "administrator",
     name: "Administrator",
-    description: "Manage the rulebook and decide applications",
+    description: "Manage the whole HOA",
     user: { name: "Sam Rivera", email: "sam@example.com", initials: "SR" },
     navigation: [
       { label: null, items: [{ title: "Dashboard", to: "/" }] },

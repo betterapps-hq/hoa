@@ -16,26 +16,34 @@ The app manages an HOA, not only its architectural reviews. Each part of what th
 | Rulebook | The governing documents and the rulebook built from them | Rulebook |
 
 Violations and fines, dues and budgets, maintenance requests and voting become areas as they're built; until then the
-homeowner's dashboard shows them with [sample data](#samples). Every line on a dashboard belongs to one area and shows
+dashboards show them with [sample data](#samples). Every line on a dashboard belongs to one area and shows
 it: the area's icon on a tile beside the line, and its name under it. A list that mixes areas reads at a glance, and no
 line spells its area out in its words.
 
-## The committee's dashboard
+## The HOA management dashboard
 
-- **Needs your attention:** what waits on the committee from every area, longest waiting first: each application
-  waiting for a decision (with the review's recommendation), a draft rulebook with rules and questions left to review,
-  and project types out of date with the rulebook in force. Each line says how long it has waited and opens where it's
-  dealt with. With nothing waiting, it says so.
+The Administrator role is whoever runs the HOA: the board, or a manager working for it. Its dashboard covers the whole
+community, not one committee's work: architectural review and the rulebook from the app's records, and dues, violations
+and fines, maintenance, and meetings and votes from [samples](#samples) until those areas are built.
+
+- **Needs your attention:** what waits on the HOA's management from every area: each application waiting for a
+  decision (with the review's recommendation), a draft rulebook with rules and questions left to review, and project
+  types out of date with the rulebook in force, longest waiting first and each opening where it's dealt with; then the
+  samples' late assessments, a requested hearing, a maintenance request and the next meeting's agenda.
 - **The HOA, area by area:** a card titled with the HOA's name, a row per area saying where it stands in a sentence
   ("2 applications wait for a decision, and 1 waits on its homeowner."; "Version 3, with 42 rules, in force since Oct
-  7."). Each row opens the area's main page.
-- **Recent activity:** the latest things that happened across the areas, newest first, up to 8 (`listRecentActivity`):
+  7."). Each row opens the area's main page. The sample areas follow: assessments collected, open violations and
+  fines, open maintenance requests, and the next meeting and election.
+- **Coming up:** the meetings, votes and deadlines ahead, soonest first (samples for now).
+- **Recent activity:** the latest things that happened across the areas, newest first, up to 10, the app's own events
+  (`listRecentActivity`) among the samples' payments, fines, notices, closed requests and announcements:
   an application submitted, submitted again after the committee asked for more, or decided; a project type added; a
   rulebook version published; governing documents added or removed. Each says what it's about, linked, what happened
   and who did it ("Submitted to the committee by Jordan Avery"), its area and when. Documents one person added or
   removed within 15 minutes of each other are one line ("3 documents", their titles under it).
 
-On a wide screen the first two fill two columns and recent activity the third; on a phone they stack in that order.
+On a wide screen the first two fill two columns, and Coming up and recent activity the third; on a phone they stack in
+that order.
 
 ## The homeowner's dashboard
 
@@ -48,7 +56,7 @@ The same three parts, for one home, with **Start an application** as the page's 
   committee and 1 is decided."), opening the applications; the rules in force, opening the rulebook once one is
   published; then the sample areas.
 - **Recent activity:** what happened to their applications and the rules: an application submitted or decided, a
-  rulebook version published, each naming the person who did it, as the committee's does ("Approved by Sam
+  rulebook version published, each naming the person who did it, as the management dashboard does ("Approved by Sam
   Rivera"). The board's sample announcements are among them.
 
 ## Recent activity
@@ -65,9 +73,12 @@ directory of the HOA's members, replace the reading; the events and the dashboar
 
 ## Samples
 
-An HOA portal does more than the app does yet, so the homeowner's dashboard shows the rest with sample data
-(`src/features/dashboard/samples.ts`): a quarterly assessment and the dues paid, a courtesy notice about a violation,
-an open maintenance request, the next board meeting and election, and the board's announcements.
+An HOA portal does more than the app does yet, so both dashboards show the rest with sample data
+(`src/features/dashboard/samples.ts`). The homeowner sees their own home's: a quarterly assessment and the dues paid, a
+courtesy notice about a violation, an open maintenance request, the next board meeting and election, and the board's
+announcements. The HOA's management sees the community's, with figures that agree (200 homes, a $350 quarterly
+assessment): collections and late assessments, open violations, fines and a requested hearing, maintenance requests,
+the meetings, votes and deadlines coming up, and payments, fines and notices in recent activity.
 
 - **Only for what the app doesn't have.** Applications and the rulebook are always the real records, never samples.
 - **Marked as samples:** every sample line carries a "Sample" badge and opens nothing.

@@ -149,7 +149,7 @@ export const getProjectTypesOverview = createServerFn({ method: "GET" }).handler
   }
 )
 
-/** How many active project types are out of date with the published rulebook, for the committee's dashboard. */
+/** How many active project types are out of date with the published rulebook, for the HOA management dashboard. */
 export const countOutdatedProjectTypes = createServerFn({ method: "GET" }).handler(async (): Promise<number> => {
   const context = await getRequestContext()
   if (context.role !== "administrator") {

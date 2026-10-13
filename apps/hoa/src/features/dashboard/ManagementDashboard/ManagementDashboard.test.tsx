@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest"
 import type { DashboardSummary } from "@/features/rulebook/rulebook.functions"
 import type { ActivityEvent } from "../activity"
 import { dashboardApplication as application, decision } from "../dashboard.test-data"
-import { CommitteeDashboard } from "./CommitteeDashboard"
+import { ManagementDashboard } from "./ManagementDashboard"
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
@@ -90,11 +90,13 @@ const activity: ActivityEvent[] = [
 
 const card = (heading: string) => screen.getByRole("heading", { name: heading }).closest("[data-slot=card]")
 const rows = (heading: string) => within(card(heading) as HTMLElement).getAllByRole("listitem")
+/** A card's rows read from the app's records, leaving out the samples for the areas the app doesn't have yet. */
+const realRows = (heading: string) => rows(heading).filter((row) => !within(row).queryByText("Sample"))
 
-describe("CommitteeDashboard", () => {
-  it("lists what needs the committee across the HOA's areas, longest waiting first", () => {
+describe("ManagementDashboard", () => {
+  it("lists what needs the HOA's management across its areas, longest waiting first", () => {
     render(
-      <CommitteeDashboard
+      <ManagementDashboard
         summary={published}
         nextRulebook={{ status: "draft", createdAt: "2026-10-08T00:00:00.000Z", rulesToReview: 12, openQuestions: 2 }}
         applications={applications}
@@ -104,7 +106,7 @@ describe("CommitteeDashboard", () => {
       />
     )
 
-    const [porch, fence, projectTypes, rulebook] = rows("Needs your attention")
+    const [porch, fence, projectTypes, rulebook] = realRows("Needs your attention")
     expect(porch).toHaveTextContent("Porch")
     expect(porch).toHaveTextContent("Waiting 19 days")
     expect(porch).toHaveTextContent("A screened porch.")
@@ -122,7 +124,7 @@ describe("CommitteeDashboard", () => {
 
   it("says where each area stands, each opening its page", () => {
     render(
-      <CommitteeDashboard
+      <ManagementDashboard
         summary={published}
         nextRulebook={null}
         applications={applications}
@@ -131,7 +133,7 @@ describe("CommitteeDashboard", () => {
       />
     )
 
-    const [review, rulebook] = rows("Sample Ridge HOA")
+    const [review, rulebook] = realRows("Sample Ridge HOA")
     expect(review).toHaveTextContent("Architectural review")
     expect(review).toHaveTextContent("2 applications wait for a decision, and 1 waits on its homeowner.")
     expect(within(review!).getByRole("link")).toHaveAttribute("href", "/applications")
@@ -141,7 +143,7 @@ describe("CommitteeDashboard", () => {
 
   it("names each event's area and who did it in recent activity, and opens what it's about", () => {
     render(
-      <CommitteeDashboard
+      <ManagementDashboard
         summary={published}
         nextRulebook={null}
         applications={applications}
@@ -150,7 +152,7 @@ describe("CommitteeDashboard", () => {
       />
     )
 
-    const [submitted, added, amended, publishedVersion] = rows("Recent activity")
+    const [submitted, added, publishedVersion, amended] = realRows("Recent activity")
     expect(submitted).toHaveTextContent(
       "FenceA rear fence.Submitted to the committee by Jordan AveryArchitectural review2 hours ago"
     )
@@ -166,7 +168,7 @@ describe("CommitteeDashboard", () => {
 
   it("says the documents are being processed into a new draft", () => {
     render(
-      <CommitteeDashboard
+      <ManagementDashboard
         summary={published}
         nextRulebook={{ status: "building" }}
         applications={[]}
@@ -175,14 +177,14 @@ describe("CommitteeDashboard", () => {
       />
     )
 
-    const [, rulebook] = rows("Sample Ridge HOA")
+    const [, rulebook] = realRows("Sample Ridge HOA")
     expect(rulebook).toHaveTextContent("Your documents are being processed into a new draft.")
-    expect(screen.getByText("Nothing needs you right now.")).toBeInTheDocument()
+    expect(realRows("Needs your attention")).toEqual([])
   })
 
-  it("says so when nothing waits, no rulebook is in force and nothing happened", () => {
+  it("says so when no application waits and no rulebook is in force", () => {
     render(
-      <CommitteeDashboard
+      <ManagementDashboard
         summary={{ ...published, publishedVersion: null, publishedAt: null, ruleCount: 0 }}
         nextRulebook={null}
         applications={[]}
@@ -191,11 +193,29 @@ describe("CommitteeDashboard", () => {
       />
     )
 
-    expect(screen.getByText("Nothing needs you right now.")).toBeInTheDocument()
     expect(screen.getByText("No application is waiting.")).toBeInTheDocument()
     expect(
       screen.getByText("No rulebook is in force yet. Process the governing documents to make one.")
     ).toBeInTheDocument()
-    expect(screen.getByText("Nothing has happened yet.")).toBeInTheDocument()
+    expect(realRows("Recent activity")).toEqual([])
+  })
+
+  it("shows the rest of the portal with sample data, each marked as a sample and opening nothing", () => {
+    render(<ManagementDashboard summary={published} nextRulebook={null} applications={[]} activity={[]} asOf={asOf} />)
+
+    const samples = rows("Needs your attention")
+    expect(samples.map((row) => within(row).getByText("Sample"))).toHaveLength(4)
+    expect(samples[0]).toHaveTextContent("Late assessments")
+    expect(samples[0]).toHaveTextContent("Dues")
+    expect(rows("Sample Ridge HOA").map((row) => row.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("Violations and fines")])
+    )
+    const upcoming = rows("Coming up")
+    expect(upcoming[0]).toHaveTextContent("Board meeting")
+    expect(upcoming[0]).toHaveTextContent("Oct 18")
+    expect(rows("Recent activity")[0]).toHaveTextContent("Assessment paid")
+    for (const heading of ["Needs your attention", "Coming up", "Recent activity"]) {
+      expect(within(card(heading) as HTMLElement).queryAllByRole("link")).toEqual([])
+    }
   })
 })

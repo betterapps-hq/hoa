@@ -200,10 +200,10 @@ export const awaitingDecision = (applications: readonly DashboardApplication[]) 
 export const awaitingHomeowner = (applications: readonly DashboardApplication[]) =>
   applications.filter((application) => application.status === "information-requested").toSorted(longestWaitingFirst)
 
-// The committee's dashboard (docs/dashboard.md) lists what waits on the committee and what happened across the HOA's
-// areas. Each line says what it's about, a detail that tells it apart, and what's needed or what happened.
+// The HOA management dashboard (docs/dashboard.md) lists what waits on the HOA's management and what happened across
+// the HOA's areas. Each line says what it's about, a detail that tells it apart, and what's needed or what happened.
 
-/** A line on the committee's dashboard: what it's about, a detail that tells it apart, and what to know of it. */
+/** A line on the HOA management dashboard: what it's about, a detail that tells it apart, and what to know of it. */
 export type DashboardLine = { subject: string; detail: string | null; note: string }
 
 /** Something waiting on the committee, in one of the HOA's areas. */

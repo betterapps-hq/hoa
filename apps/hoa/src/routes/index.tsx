@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router"
-import { CommitteeDashboard } from "@/features/dashboard/CommitteeDashboard/CommitteeDashboard"
 import {
   getNextRulebook,
   listDashboardApplications,
   listRecentActivity
 } from "@/features/dashboard/dashboard.functions"
 import { HomeownerDashboard } from "@/features/dashboard/HomeownerDashboard/HomeownerDashboard"
+import { ManagementDashboard } from "@/features/dashboard/ManagementDashboard/ManagementDashboard"
 import { countOutdatedProjectTypes } from "@/features/projectTypes/projectTypes.functions"
 import { useRole } from "@/features/role/RoleProvider"
 import { getDashboardSummary } from "@/features/rulebook/rulebook.functions"
@@ -30,7 +30,7 @@ function DashboardRoute() {
   const { summary, nextRulebook, applications, projectTypesToUpdate, activity, asOf } = Route.useLoaderData()
   const { role } = useRole()
   return role.id === "administrator" ? (
-    <CommitteeDashboard
+    <ManagementDashboard
       summary={summary}
       nextRulebook={nextRulebook}
       applications={applications}
