@@ -13,6 +13,7 @@ import {
   type RulebookContent
 } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus } from "@/db/rulebookRepository"
+import { carryForwardProjectTypes } from "@/features/projectTypes/publishedRules.server"
 import type { JobFailure } from "@/jobs/job"
 import { readRulesFile, readRulesFileJson } from "@/rulebook/assemble"
 import type { BuildResultsPage } from "@/rulebook/buildResults"
@@ -309,11 +310,18 @@ export const publishRulebook = createServerFn({ method: "POST" })
     if (draft?.id !== data.rulebookId) {
       throw new Error("That draft is no longer current.")
     }
+    const now = new Date().toISOString()
     const { version } = await publishDraft(db, getBucket(), context.hoa.id, {
       rulebookId: draft.id,
       userId: context.user.id,
-      now: new Date().toISOString()
+      now
     })
+    // A type this leaves out of date waits for its updates to be reviewed, so a failure here doesn't undo the publish.
+    try {
+      await carryForwardProjectTypes(context.hoa.id, now)
+    } catch (error) {
+      console.error(error)
+    }
     return { version }
   })
 

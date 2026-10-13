@@ -13,7 +13,7 @@ import {
   listProjectTypes as listProjectTypeRecords,
   updateProjectType as updateProjectTypeRecord
 } from "@/db/projectTypeRepository"
-import { getPublishedRulesFile, getRulesFileOf } from "@/db/rulebookContentRepository"
+import { getPublishedRulesFile } from "@/db/rulebookContentRepository"
 import { bindDefinition } from "@/projectTypes/bind"
 import {
   buildDefinition,
@@ -39,7 +39,6 @@ import {
 } from "@/projectTypes/suggest"
 import { rulebookChanges, type RulebookChange } from "@/projectTypes/updates"
 import { definitionOf, rulebookVocabulary, scopeNoteOf } from "@/review/documentTypes"
-import { readRulesFile } from "@/rulebook/assemble"
 import type * as T from "@/schema/types"
 import { getRequestContext, requireAdministrator } from "@/session/requestContext.server"
 import { projectTypeKeys } from "@/storage/keys"
@@ -49,49 +48,13 @@ import { validateUpload } from "@/storage/uploadRules"
 import type { CitedProvision } from "../rulebook/citedProvision"
 import { citationIndex, citedProvision } from "../rulebook/rulebookRecords"
 import { citationsOf, citedKeys, currentType, offerType, type OfferedProjectType } from "./offeredTypes"
+import { isOutdatedType, ownRulesFile, publishedRulebook } from "./publishedRules.server"
 import { projectRequirements, type RequirementGroup } from "./requirements"
 
 // Project types (application-review.md, Project types): the organization's own list, which homeowners pick from and
 // administrators keep. Definitions, suggestions and requirements are built against the published rulebook.
 
 const today = () => new Date().toISOString().slice(0, 10)
-
-/**
- * The published rulebook's id, rules file and publish date; null before the organization publishes one. Written out
- * rather than read off `publishedRulebook`: a `typeof` of a server-only helper keeps it, and its storage import, in the
- * browser bundle, which the build refuses.
- */
-type Published = { id: string; publishedAt: string | null; rulesFile: T.RulesFile } | null
-
-/** Reads the published rulebook, or null before the organization publishes one. */
-async function publishedRulebook(hoaId: string): Promise<Published> {
-  const published = await getPublishedRulesFile(getDb(), hoaId)
-  return published
-    ? {
-        id: published.rulebookId,
-        publishedAt: published.publishedAt,
-        rulesFile: await readRulesFile(getBucket(), published)
-      }
-    : null
-}
-
-/** Whether a type was built against an earlier rulebook than the published one. */
-const isOutdatedType = (type: ProjectType, published: Published) =>
-  published !== null && type.rulebookId !== published.id
-
-/**
- * The rules file a type's form is kept against: the rulebook it was built with while it's out of date (so editing it
- * doesn't take the published rulebook's changes unreviewed), else the published one. Null when there's neither, or
- * when the type is out of date and its own rulebook can't be read: never the published one in its place, which would
- * drop every question and document its rules don't test without the administrator reviewing it.
- */
-async function ownRulesFile(hoaId: string, type: ProjectType, published: Published) {
-  if (!isOutdatedType(type, published) || type.rulebookId === null) {
-    return published ? { id: published.id, rulesFile: published.rulesFile } : null
-  }
-  const file = await getRulesFileOf(getDb(), hoaId, type.rulebookId)
-  return file ? { id: type.rulebookId, rulesFile: await readRulesFile(getBucket(), file) } : null
-}
 
 async function requirePublished(hoaId: string) {
   const published = await publishedRulebook(hoaId)

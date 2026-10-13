@@ -685,13 +685,15 @@ wording so adding one back keeps it).
 - **Requirements**: a type's page lists every rule the published rulebook applies to that kind of project
   (`projectRequirements`), behind a disclosure; a document rule the application form meets says so.
 - **Out of date**: a type records the rulebook it was built against (`rulebookId`). Published rulebooks never change,
-  so a type is out of date exactly when a newer rulebook is published. Code works out what that changes for the form,
-  with no model (`src/projectTypes/updates.ts`, `rulebookChanges`): the form the earlier rulebook builds against the
-  one the published rulebook builds, applied to the stored form. It finds questions the rules now ask or no longer
+  so a type can only go out of date when a newer rulebook is published. Code works out what that changes for the
+  form, with no model (`src/projectTypes/updates.ts`, `rulebookChanges`): the form the earlier rulebook builds against
+  the one the published rulebook builds, applied to the stored form. It finds questions the rules now ask or no longer
   ask, answers and choice lists that changed, cited passages the rulebook no longer has, documents the rules now
   require, no longer require or want to show more, and the administrator's edits that now conflict (an added choice
-  the rulebook now lists). The list of types says it in one quiet line ("Out of date with the rulebook published Oct
-  12"); the type's page shows a callout with a one-sentence summary and "Review updates", a dialog where each change is
+  the rulebook now lists). Publishing moves every type it changes nothing for onto the new rulebook, bound against it
+  with the administrator's edits kept (`carriedForward`, `carryForwardProjectTypes`), so only a type with something
+  to review stays out of date. The list of types says it in one quiet line ("Out of date with the rulebook published
+  Oct 12"); the type's page shows a callout with a one-sentence summary and "Review updates", a dialog where each change is
   accepted or the administrator's version kept ("Accept all" for the lot), then saved (`applyChanges`,
   `applyProjectTypeUpdates`). Kept, a question stays as worded (its citations still decide what it's checked against),
   a document becomes the administrator's own, a missing passage stays cited, and a new question or document stays out

@@ -203,6 +203,19 @@ export function rulebookChanges(
   return changes
 }
 
+/**
+ * The form a newer rulebook gives a type when it changes nothing the form rests on, bound against it, so the type moves
+ * onto that rulebook with nothing to review; null when there's something for the administrator to review.
+ */
+export function carriedForward(
+  stored: ProjectTypeDefinition,
+  previous: ProjectTypeDefinition | null,
+  latest: ProjectTypeDefinition,
+  provisions: ReadonlySet<string>
+): ProjectTypeDefinition | null {
+  return rulebookChanges(stored, previous, latest, provisions).length === 0 ? bindDefinition(stored, latest) : null
+}
+
 const withField = (
   definition: ProjectTypeDefinition,
   subject: string | null,

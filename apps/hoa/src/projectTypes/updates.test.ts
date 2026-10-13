@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
+import { allQuestions } from "./definition"
 import type { ProjectDocument, ProjectField, ProjectTypeDefinition } from "./projectType"
-import { applyChanges, rulebookChanges } from "./updates"
+import { applyChanges, carriedForward, rulebookChanges } from "./updates"
 
 // What a newer rulebook changes in a project type's form, and the form after a review (application-review.md,
 // Project types, Out of date), over synthetic forms: what an earlier rulebook built, what a newer one builds, and the
@@ -97,6 +98,24 @@ describe("rulebookChanges", () => {
 
   it("finds nothing when the newer rulebook changes nothing the form rests on", () => {
     expect(rulebookChanges(previous, previous, previous, provisions)).toEqual([])
+  })
+})
+
+describe("carriedForward", () => {
+  // The administrator's own wording and question, on a form whose rules a newer rulebook doesn't touch.
+  const edited = form([{ ...placement, label: "Where does it go?" }, lit, own], previous.documents)
+
+  it("moves a form the newer rulebook doesn't change onto it, keeping the administrator's edits", () => {
+    const moved = carriedForward(edited, previous, previous, provisions)
+    expect(moved && allQuestions(moved).map((item) => item.field.label)).toEqual([
+      "Where does it go?",
+      "Is the widget lit?",
+      "Why?"
+    ])
+  })
+
+  it("leaves a form the newer rulebook changes for the administrator to review", () => {
+    expect(carriedForward(edited, previous, latest, provisions)).toBeNull()
   })
 })
 
