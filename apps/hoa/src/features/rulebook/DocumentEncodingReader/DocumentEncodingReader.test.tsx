@@ -33,7 +33,9 @@ describe("DocumentEncodingReader", () => {
     const { container } = render(
       <DocumentEncodingReader results={readingResults(simulatedBuildSeconds)} documents={documents} isRunning={false} />
     )
-    expect(countOf("Terms found")).toBe("63")
+    // 12 terms the documents define, then the 51 entries the vocabulary adds, in one pile.
+    expect(countOf("Defined terms")).toBe("12")
+    expect(screen.getByText("51 vocabulary entries")).toBeInTheDocument()
     expect(countOf("Rules found")).toBe("37")
     expect(screen.getByText("37 drafted")).toBeInTheDocument()
     expect(container.querySelectorAll("circle")).toHaveLength(63 + 37)
@@ -73,7 +75,8 @@ describe("DocumentEncodingReader", () => {
     )
     expect(container.querySelector("svg")).toBeNull()
     expect(container.querySelector("[data-block]")).toBeNull()
-    expect(countOf("Terms found")).toBe("34")
+    expect(countOf("Defined terms")).toBe("12")
+    expect(screen.getByText("22 vocabulary entries")).toBeInTheDocument()
   })
 
   it("gets to a term's passage, marks the term green there, then counts it once it lands", async () => {
@@ -83,7 +86,7 @@ describe("DocumentEncodingReader", () => {
     )
     rerender(<DocumentEncodingReader results={readingResults(16)} documents={documents} isRunning />)
     await act(() => motion.advance(16))
-    expect(captionOf(container)).toBe("Term foundAssociation")
+    expect(captionOf(container)).toBe("Defined termAssociation")
     // The window gets there first.
     expect(container.querySelector("[data-term-mark]")).toBeNull()
 
@@ -91,10 +94,10 @@ describe("DocumentEncodingReader", () => {
     const mark = container.querySelector("[data-term-mark]")
     expect(mark?.textContent).toBe("Association")
     expect(mark?.closest("[data-active]")?.getAttribute("data-block")).toBe("declaration:article-2/association")
-    expect(countOf("Terms found")).toBe("0")
+    expect(countOf("Defined terms")).toBe("0")
 
     await act(() => motion.advance(beatMs.term))
-    expect(countOf("Terms found")).toBe("1")
+    expect(countOf("Defined terms")).toBe("1")
   })
 
   it("fills a drafted rule's blanks one at a time, then calls it drafted", async () => {

@@ -219,7 +219,7 @@ describe("readerLayout", () => {
   })
 })
 
-const term: ReaderEvent = { kind: "term", id: "term:Lot", label: "Lot", spot: null }
+const term: ReaderEvent = { kind: "term", id: "term:Lot", label: "Lot", source: "definition", spot: null }
 const passage: ReaderEvent = {
   kind: "passage",
   id: "passage",

@@ -175,6 +175,7 @@ describe("ReaderMotion", () => {
       kind: "term",
       id: `term:${index}`,
       label: `Term ${index}`,
+      source: "definition",
       spot: null
     }))
     const { motion, shown, engine } = start([])

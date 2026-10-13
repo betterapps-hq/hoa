@@ -44,7 +44,8 @@ export type Verdict =
 
 /** One thing the reader shows. Its id stays the same as more results come in. */
 export type ReaderEvent =
-  | { kind: "term"; id: string; label: string; spot: WordSpot | null }
+  /** A term the documents define, or an entry the vocabulary adds for what the rules read (a kind, a detail, a value). */
+  | { kind: "term"; id: string; label: string; source: "definition" | "vocabulary"; spot: WordSpot | null }
   | { kind: "passage"; id: string; spot: Spot | null; verdict: Verdict }
   | {
       kind: "draft"
@@ -71,6 +72,13 @@ export function findsOf(event: ReaderEvent): Shown {
       return { ...nothing, drafted: event.isRetry ? 0 : 1 }
   }
 }
+
+/**
+ * How many of the terms pile are terms the documents define. They all come before the vocabulary's entries, which the
+ * build adds later, so of the terms shown so far, the first this many are defined terms and the rest vocabulary.
+ */
+export const definedTermsOf = (events: readonly ReaderEvent[]) =>
+  events.filter((event) => event.kind === "term" && event.source === "definition").length
 
 export function countsOf(events: readonly ReaderEvent[]): Shown {
   return events.map(findsOf).reduce(
@@ -192,7 +200,8 @@ export function readerEvents(results: readonly BuildResult[], documents: readonl
             return []
           }
           terms.add(label)
-          return [{ kind: "term", id: `term:${label}`, label, spot: termSpot(label, documents) }]
+          const source = result.kind === "terms" ? "definition" : "vocabulary"
+          return [{ kind: "term", id: `term:${label}`, label, source, spot: termSpot(label, documents) }]
         })
       case "outlines":
         return newest.get(result.unitId) === result ? passageEvents(result, spots, definitions) : []

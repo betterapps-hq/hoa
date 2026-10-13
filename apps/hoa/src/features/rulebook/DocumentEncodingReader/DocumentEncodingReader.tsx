@@ -9,6 +9,7 @@ import {
   ScaleIcon,
   ScanTextIcon,
   Settings2Icon,
+  TagIcon,
   type LucideIcon
 } from "lucide-react"
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react"
@@ -23,6 +24,7 @@ import { dotClass, draftedClass } from "./DocumentEncodingReader.piles"
 import { slotCenter, type Box, type FindKind, type Point } from "./DocumentEncodingReader.piles"
 import {
   countsOf,
+  definedTermsOf,
   nextSpot,
   readerDocuments,
   readerEvents,
@@ -58,6 +60,7 @@ export function DocumentEncodingReader({ results, documents, isRunning }: Docume
   const read = useMemo(() => readerDocuments(documents), [documents])
   const events = useMemo(() => readerEvents(results, read), [results, read])
   const target = countsOf(events)
+  const defined = definedTermsOf(events)
   const layout = readerLayout(width, { terms: target.terms, rules: Math.max(target.rules, target.drafted) })
   const isAnimated = !isReduced && width > 0
   const {
@@ -80,8 +83,13 @@ export function DocumentEncodingReader({ results, documents, isRunning }: Docume
           className={cn("flex flex-col items-end text-right", isMeasured && "absolute")}
           style={isMeasured ? boxStyle(layout.counts.terms) : undefined}
         >
-          <dt className="text-xs text-muted-foreground">Terms found</dt>
-          <dd className="text-xl font-semibold tabular-nums">{shown.terms}</dd>
+          <dt className="text-xs text-muted-foreground">Defined terms</dt>
+          <dd className="text-xl font-semibold tabular-nums">{Math.min(shown.terms, defined)}</dd>
+          {shown.terms > defined ? (
+            <dd className="text-xs text-muted-foreground tabular-nums">
+              {shown.terms - defined === 1 ? "1 vocabulary entry" : `${shown.terms - defined} vocabulary entries`}
+            </dd>
+          ) : null}
         </div>
         <div
           className={cn("flex flex-col", isMeasured && "absolute")}
@@ -638,7 +646,11 @@ function CaptionBody({
     case "term":
       return (
         <>
-          <CaptionLabel icon={BookOpenIcon} tone="text-coverage-term" label="Term found" />
+          <CaptionLabel
+            icon={event.source === "definition" ? BookOpenIcon : TagIcon}
+            tone="text-coverage-term"
+            label={event.source === "definition" ? "Defined term" : "Vocabulary entry"}
+          />
           <p className="truncate text-sm font-medium">{event.label}</p>
         </>
       )
