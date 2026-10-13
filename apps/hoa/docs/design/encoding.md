@@ -403,6 +403,16 @@ list is ordered by relevance; without, in its usual order. The other filters sti
   those kinds and details ("3 of 37 questions"); "Approve all N terms" approves what an open subject keeps, its details
   and their choices included. A search lists the subjects it finds best first, opened: a found subject shows all of
   itself, otherwise only the details holding a match, and a found choice is marked.
+
+  Each term's menu also edits it (`src/rulebook/termEdits.ts`), and so does the rule card's term menu, as "Edit the
+  term": its name, its other names (one to a line, since a name may hold a comma), what it means, a quantity's unit
+  (another of the same kind, which amounts convert to) and whether a list allows only its choices. A term means the
+  same in every rule that uses it, so a change to what it means sends it and the approved rules that read it back to
+  review, and the editor says so before saving; a new name alone changes no rule, since a statement shows its terms'
+  current names. A list adds a choice from under its choices. **Merge into another term** has every rule and term
+  that used a term use another of the same kind in the same place, sends what changed back to review and rejects the
+  merged term with a note naming the other. A term other terms hang off (a thing's details or kinds, a list's
+  choices) isn't merged, nor one the settings use.
 - **Questions:** the open questions one at a time (shadcn's Questionnaire, "Question 1 of 4"), each with its citations
   and readings, each reading naming the rules it keeps. Choosing a reading and moving on saves the answer; Skip leaves
   the question open, and finishing brings back the skipped ones as one line to answer later. Answered questions

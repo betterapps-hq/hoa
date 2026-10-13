@@ -27,12 +27,15 @@ import {
 } from "../rulebook.functions"
 import { RulebookPage } from "../RulebookPage/RulebookPage"
 import {
+  addRulebookChoice,
   answerRulebookQuestion,
   changeRulebookRuleTerm,
+  mergeRulebookTerm,
   resolveRulebookIssue,
   reviewRulebookRecords,
   saveRulebookRule,
   saveRulebookSettings,
+  saveRulebookTerm,
   setProvisionNoRule
 } from "../rulebookReview.functions"
 import type { RulebookActions, RulebookSource } from "../useRulebookWorkspace"
@@ -110,6 +113,9 @@ export function RulebookRoute({ data, isReviewing }: { data: RulebookRouteData; 
     changeRuleTerm: changing((ruleKey, from, change) =>
       changeRulebookRuleTerm({ data: { rulebookId, ruleKey, from, change } })
     ),
+    saveTerm: changing((edit) => saveRulebookTerm({ data: { rulebookId, edit } })),
+    addChoice: changing((listKey, label) => addRulebookChoice({ data: { rulebookId, listKey, label } })),
+    mergeTerm: changing((from, into) => mergeRulebookTerm({ data: { rulebookId, from, into } })),
     answerQuestion: changing(async (questionId, option, text) => {
       const { notApproved } = await answerRulebookQuestion({ data: { rulebookId, questionId, option, text } })
       return { skipped: notApproved }

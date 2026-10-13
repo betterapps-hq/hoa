@@ -1,5 +1,6 @@
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react"
 import { useId, useState, type ReactElement } from "react"
+import { RowActions } from "@/components/RowActions/RowActions"
 import { badgeVariants } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -21,6 +22,7 @@ import { ReviewControls } from "../ReviewControls/ReviewControls"
 import { ReviewMenu } from "../ReviewMenu/ReviewMenu"
 import { RuleLink } from "../RuleLink/RuleLink"
 import { describeTermKind, describeValueType } from "../TermChip/TermChip.utils"
+import { AddChoice, useTermEditing } from "../TermEditor/TermEditor"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 import { labelWithin, subjectSummary, type TermNode, type TermSubject } from "../VocabularyTab/VocabularyTab.utils"
 
@@ -159,18 +161,25 @@ function TermAbout({ node }: { node: TermNode }) {
   )
 }
 
-/** A term's review in a row: its status in words and its menu. */
+/** A term's review in a row: its status in words and its menu, which edits or merges it too. */
 function TermReview({ term, name }: { term: T.Term; name: string }) {
   const { approval } = useRulebookWorkspace()
+  const editing = useTermEditing(term)
   return (
-    <ReviewMenu
-      record={{ type: "term", key: term.key }}
-      status={term.review.status}
-      name={name}
-      blockers={
-        approval && term.review.status === "proposed" ? approvalBlockers(approval, { type: "term", key: term.key }) : []
-      }
-    />
+    <>
+      <ReviewMenu
+        record={{ type: "term", key: term.key }}
+        status={term.review.status}
+        name={name}
+        blockers={
+          approval && term.review.status === "proposed"
+            ? approvalBlockers(approval, { type: "term", key: term.key })
+            : []
+        }
+        more={[editing.edit, editing.merge]}
+      />
+      {editing.dialogs}
+    </>
   )
 }
 
@@ -337,6 +346,7 @@ function ChoiceList({ list, found, many = false, sameAs = null, holder = "" }: C
       {sameAs || isComplete || list.values.length === 0 || hidden > 0 ? null : (
         <span className="text-xs text-muted-foreground">or another</span>
       )}
+      {!sameAs && list.term ? <AddChoice list={list.term} /> : null}
     </div>
   )
 }
@@ -346,39 +356,49 @@ type TermPopoverProps = { node: TermNode; trigger: ReactElement }
 /** A choice or list in a popover: what it is and means, the rules that read it, and its review. */
 function TermPopover({ node, trigger }: TermPopoverProps) {
   const { vocabulary, approval } = useRulebookWorkspace()
+  const editing = useTermEditing(node.term)
   const name = sentenceCase(node.label)
+  const more = [editing.edit, editing.merge].filter((item) => item !== null)
   return (
-    <Popover>
-      <PopoverTrigger render={trigger} />
-      <PopoverContent className="w-80 max-w-[calc(100vw-2rem)]">
-        <PopoverHeader>
-          <PopoverTitle>{name}</PopoverTitle>
-          {node.content ? <PopoverDescription>{describeTermKind(node.content, vocabulary)}</PopoverDescription> : null}
-        </PopoverHeader>
-        <TermAbout node={node} />
-        {node.usedBy.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Used in {rulesText(node.usedBy.length)}</p>
-            <RuleList name={name} rules={node.usedBy} />
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No rule uses it on its own.</p>
-        )}
-        {node.term ? (
-          <ReviewControls
-            record={{ type: "term", key: node.term.key }}
-            status={node.term.review.status}
-            name={name}
-            isCompact
-            blockers={
-              approval && node.term.review.status === "proposed"
-                ? approvalBlockers(approval, { type: "term", key: node.term.key })
-                : []
-            }
-          />
-        ) : null}
-      </PopoverContent>
-    </Popover>
+    <>
+      <Popover>
+        <PopoverTrigger render={trigger} />
+        <PopoverContent className="w-80 max-w-[calc(100vw-2rem)]">
+          <PopoverHeader>
+            <PopoverTitle>{name}</PopoverTitle>
+            {node.content ? (
+              <PopoverDescription>{describeTermKind(node.content, vocabulary)}</PopoverDescription>
+            ) : null}
+          </PopoverHeader>
+          <TermAbout node={node} />
+          {node.usedBy.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Used in {rulesText(node.usedBy.length)}</p>
+              <RuleList name={name} rules={node.usedBy} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No rule uses it on its own.</p>
+          )}
+          {node.term ? (
+            <div className="flex items-start justify-between gap-2">
+              <ReviewControls
+                record={{ type: "term", key: node.term.key }}
+                status={node.term.review.status}
+                name={name}
+                isCompact
+                blockers={
+                  approval && node.term.review.status === "proposed"
+                    ? approvalBlockers(approval, { type: "term", key: node.term.key })
+                    : []
+                }
+              />
+              {more.length > 0 ? <RowActions name={name} actions={more} /> : null}
+            </div>
+          ) : null}
+        </PopoverContent>
+      </Popover>
+      {editing.dialogs}
+    </>
   )
 }
 

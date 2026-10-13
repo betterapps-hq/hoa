@@ -22,6 +22,7 @@ import { copiedAlong, isCopyable, pickableTerms, swapCandidates, type TermChange
 import type * as T from "@/schema/types"
 import { attempt } from "../attempt"
 import { describeTermKind } from "../TermChip/TermChip.utils"
+import { useTermEditing } from "../TermEditor/TermEditor"
 import { TermPicker } from "../TermPicker/TermPicker"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 
@@ -52,6 +53,7 @@ function leftAlone(rule: T.Rule, label: string, usedBy: number) {
 export function RuleTermMenu({ rule, term, usedBy }: RuleTermMenuProps) {
   const { records, vocabulary, actions } = useRulebookWorkspace()
   const [dialog, setDialog] = useState<"swap" | "copy" | null>(null)
+  const editing = useTermEditing(term)
   if (!actions) {
     return null
   }
@@ -63,7 +65,9 @@ export function RuleTermMenu({ rule, term, usedBy }: RuleTermMenuProps) {
     ...(candidates.length > 0
       ? [{ label: "Use a different term here", icon: ArrowLeftRightIcon, onSelect: () => setDialog("swap") }]
       : []),
-    ...(canCopy ? [{ label: "Use a new term here", icon: CopyPlusIcon, onSelect: () => setDialog("copy") }] : [])
+    ...(canCopy ? [{ label: "Use a new term here", icon: CopyPlusIcon, onSelect: () => setDialog("copy") }] : []),
+    // Editing the term changes it in every rule that uses it, unlike the two above.
+    ...(editing.edit ? [{ ...editing.edit, label: "Edit the term" }] : [])
   ]
   if (items.length === 0) {
     return null
@@ -86,6 +90,7 @@ export function RuleTermMenu({ rule, term, usedBy }: RuleTermMenuProps) {
   return (
     <>
       <RowActions name={label} actions={items} />
+      {editing.dialogs}
       <Dialog open={dialog === "swap"} onOpenChange={(isOpen) => setDialog(isOpen ? "swap" : null)}>
         <DialogContent className="sm:max-w-lg">
           <SwapForm

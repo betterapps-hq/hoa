@@ -1,7 +1,7 @@
 import { CheckIcon, RotateCcwIcon, XIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
-import { RowActions } from "@/components/RowActions/RowActions"
+import { RowActions, type RowAction } from "@/components/RowActions/RowActions"
 import type { RecordRef } from "@/rulebook/review"
 import type * as T from "@/schema/types"
 import { reviewRecord } from "../attempt"
@@ -16,13 +16,15 @@ export type ReviewMenuProps = {
   name: string
   /** Why it can't be approved yet; Approve waits until there's nothing. */
   blockers?: string[]
+  /** What else the row offers, after its review: editing a term, merging it. */
+  more?: (RowAction | null)[]
 }
 
 /**
  * A row's review in a table (encoding.md, UX; ux.md, Menus and lists): a decided record says so in words, and the
  * ellipsis menu approves, rejects or sends it back to review. Approving or rejecting confirms with an undo.
  */
-export function ReviewMenu({ record, status, name, blockers = [] }: ReviewMenuProps) {
+export function ReviewMenu({ record, status, name, blockers = [], more = [] }: ReviewMenuProps) {
   const { actions, approval, records } = useRulebookWorkspace()
   const [isBusy, setIsBusy] = useState(false)
   if (!actions) {
@@ -54,8 +56,8 @@ export function ReviewMenu({ record, status, name, blockers = [] }: ReviewMenuPr
         name={name}
         disabled={isBusy}
         note={status === "proposed" && blocker ? `Can’t be approved yet. ${blockers.join(" ")}` : null}
-        actions={
-          status === "proposed"
+        actions={[
+          ...(status === "proposed"
             ? [
                 {
                   label: approveLabel(approval, records, record),
@@ -71,8 +73,9 @@ export function ReviewMenu({ record, status, name, blockers = [] }: ReviewMenuPr
                   icon: RotateCcwIcon,
                   onSelect: () => void review("proposed")
                 }
-              ]
-        }
+              ]),
+          ...more.filter((item) => item !== null)
+        ]}
       />
     </div>
   )

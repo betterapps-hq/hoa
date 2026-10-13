@@ -86,6 +86,61 @@ describe("VocabularyTab", () => {
     )
   })
 
+  it("edits a term from its menu, saying first when that sends the rules that use it back to review", async () => {
+    const records = sampleRecords()
+    const { user, actions } = renderInWorkspace(<VocabularyTab />, {
+      records: {
+        ...records,
+        rules: records.rules.map((rule) => ({ ...rule, review: approvedReview })),
+        terms: records.terms.map((term) => ({ ...term, review: approvedReview }))
+      }
+    })
+    await user.click(screen.getByRole("button", { name: "Filters" }))
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Review" }), "approved")
+    await user.keyboard("{Escape}")
+    await user.type(screen.getByRole("searchbox", { name: "Search terms" }), "premises leased")
+    await user.click(screen.getByRole("button", { name: "Actions for Premises leased" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Edit" }))
+    const dialog = within(await screen.findByRole("dialog", { name: "Edit Premises leased" }))
+    const name = dialog.getByRole("textbox", { name: "Name" })
+    await user.clear(name)
+    await user.type(name, "Part leased")
+    // A new name changes no rule: a statement shows its terms' current names.
+    expect(dialog.queryByText(/back to review/)).not.toBeInTheDocument()
+    await user.type(dialog.getByRole("textbox", { name: "What it means" }), " Or a room.")
+    expect(dialog.getByText(/^Saving sends the \d+ approved rules? that use it back to review/)).toBeInTheDocument()
+    await user.click(dialog.getByRole("button", { name: "Save" }))
+    expect(actions?.saveTerm).toHaveBeenCalledWith(
+      expect.objectContaining({ key: "lease-registration.premises", label: "Part leased" })
+    )
+  })
+
+  it("adds a choice to a list", async () => {
+    const { user, actions } = renderInWorkspace(<VocabularyTab />)
+    await user.click(subject("Fence run"))
+    const [add] = screen.getAllByRole("button", { name: "Add a choice" })
+    await user.click(add!)
+    const dialog = within(await screen.findByRole("dialog", { name: "Add a choice" }))
+    await user.type(dialog.getByRole("textbox", { name: "Name" }), "Stone")
+    await user.click(dialog.getByRole("button", { name: "Add it" }))
+    expect(actions?.addChoice).toHaveBeenCalledWith(expect.any(String), "Stone")
+  })
+
+  it("merges a choice into another from where it's shown", async () => {
+    const { user, actions } = renderInWorkspace(<VocabularyTab />)
+    await user.type(screen.getByRole("searchbox", { name: "Search terms" }), "vinyl")
+    const [vinyl] = screen.getAllByRole("button", { name: "Vinyl" })
+    await user.click(vinyl!)
+    const popover = within(await screen.findByRole("dialog", { name: "Vinyl" }))
+    await user.click(popover.getByRole("button", { name: "Actions for Vinyl" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Merge into another term" }))
+    const dialog = within(await screen.findByRole("dialog", { name: "Merge Vinyl into another term" }))
+    await user.click(dialog.getByRole("combobox", { name: "Merge into" }))
+    await user.click(await screen.findByRole("option", { name: /^Composite/ }))
+    await user.click(dialog.getByRole("button", { name: "Merge" }))
+    expect(actions?.mergeTerm).toHaveBeenCalledWith("fence-material.vinyl", "fence-material.composite")
+  })
+
   it("approves a subject with its details and their choices together", async () => {
     const { user, actions } = renderInWorkspace(<VocabularyTab />)
     await user.click(subject("Fence run"))

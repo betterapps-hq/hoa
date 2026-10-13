@@ -20,10 +20,10 @@ export function pickableTerms(terms: T.Term[]): TermContent[] {
 }
 
 /** A term's fields that hold term keys: a rule's, and what a term hangs off, draws its values from or narrows. */
-const termRefFields: ReadonlySet<string> = new Set([...termFields, "of", "set", "broader", "to"])
+export const termRefFields: ReadonlySet<string> = new Set([...termFields, "of", "set", "broader", "to"])
 
 /** The term keys a term's own fields name: what it hangs off, its values' list, its criteria's and derivations' terms. */
-function keysNamedBy(term: TermContent) {
+export function keysNamedBy(term: TermContent) {
   const keys: T.TermKey[] = []
   mapTermKeys(
     term,
@@ -56,7 +56,7 @@ const dimensionOf = (vocabulary: Vocabulary, key: T.TermKey) => {
 }
 
 /** Whether two properties hold the same kind of value: a quantity of the same dimension, a choice from the same list. */
-function isSameValueType(vocabulary: Vocabulary, a: T.ValueType, b: T.ValueType) {
+export function isSameValueType(vocabulary: Vocabulary, a: T.ValueType, b: T.ValueType) {
   return match(a)
     .with(
       { type: "quantity" },
@@ -119,7 +119,7 @@ export type TermCopy = { label: string; definition: string | null }
 export type ChangeStamp = { by: T.Id; at: string }
 
 /** A key's part made from a name: "Subdivided lot" is subdivided-lot. */
-const keyPart = (text: string) =>
+export const keyPart = (text: string) =>
   text
     .normalize("NFKD")
     .replaceAll(/[̀-ͯ]/g, "")

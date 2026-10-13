@@ -44,6 +44,9 @@ export function mockActions(): RulebookActions {
     resolveIssue: vi.fn<RulebookActions["resolveIssue"]>(async () => undefined),
     saveRule: vi.fn<RulebookActions["saveRule"]>(async () => []),
     changeRuleTerm: vi.fn<RulebookActions["changeRuleTerm"]>(async () => []),
+    saveTerm: vi.fn<RulebookActions["saveTerm"]>(async () => undefined),
+    addChoice: vi.fn<RulebookActions["addChoice"]>(async () => undefined),
+    mergeTerm: vi.fn<RulebookActions["mergeTerm"]>(async () => undefined),
     answerQuestion: vi.fn<RulebookActions["answerQuestion"]>(async () => ({ skipped: [] })),
     setNoRule: vi.fn<RulebookActions["setNoRule"]>(async () => undefined),
     saveSettings: vi.fn<RulebookActions["saveSettings"]>(async () => [])
