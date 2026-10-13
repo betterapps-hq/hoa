@@ -32,6 +32,18 @@ describe("checkSuggestions", () => {
     expect(checked?.definition.documents).toEqual(built.documents)
   })
 
+  it("takes a field named without its subject's prefix, as models often write it", () => {
+    const short = field.property.slice(subject!.key.length + 1)
+    const fields = [{ subject: subject!.key, property: short, label: "Asked plainly", help: null, isRequired: true }]
+    const [checked] = checkSuggestions(
+      { suggestions: [suggestion({ fields })] },
+      { rulesFile, requestType, on, existing: [] }
+    )
+    expect(checked?.definition.groups.flatMap((group) => group.fields)).toEqual([
+      { ...field, label: "Asked plainly", isRequired: true }
+    ])
+  })
+
   it("drops subjects, fields and rules the rulebook doesn't have, and suggestions that bind to nothing", () => {
     const answer = {
       suggestions: [
