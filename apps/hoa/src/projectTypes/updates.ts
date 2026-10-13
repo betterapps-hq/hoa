@@ -290,7 +290,15 @@ export function applyChanges(
             }
             const after = latest.documents.find((item) => item.documentType === change.key)
             return after
-              ? [{ ...after, label: document.label, isRequired: document.isRequired, accepts: document.accepts }]
+              ? [
+                  {
+                    ...after,
+                    label: document.label,
+                    isRequired: document.isRequired,
+                    accepts: document.accepts,
+                    template: document.template
+                  }
+                ]
               : []
           })
         }

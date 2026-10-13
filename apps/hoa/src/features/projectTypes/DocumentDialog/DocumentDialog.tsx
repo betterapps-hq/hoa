@@ -1,8 +1,18 @@
 import { useForm } from "@tanstack/react-form"
-import { PlusIcon } from "lucide-react"
+import { DownloadIcon, PlusIcon, XIcon } from "lucide-react"
 import { useState } from "react"
 import { z } from "zod"
-import { Button } from "@/components/ui/button"
+import { FileDropzone, type ChosenFile } from "@/components/FileDropzone/FileDropzone"
+import { FileTypeMedia } from "@/components/FileTypeMedia/FileTypeMedia"
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentTitle
+} from "@/components/ui/attachment"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
   Dialog,
@@ -24,15 +34,17 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { sentenceCase } from "@/lib/text"
-import { uploadFormats, type ProjectDocument } from "@/projectTypes/projectType"
+import { fileSizeText, sentenceCase } from "@/lib/text"
+import { uploadFormats, type DocumentTemplate, type ProjectDocument } from "@/projectTypes/projectType"
 import type { CitedProvision } from "../../rulebook/citedProvision"
 import { CitationPicker } from "../../rulebook/RuleReference/CitationPicker"
 import { CitationChips } from "../CitationChips/CitationChips"
+import { templateHref } from "../uploadTemplate"
 
 // Writing or editing one document requirement (application-review.md, Project types): its name, whether it's
-// required and the file formats it takes. The administrator's own requirement also has what it must show and the
-// passages it cites; one the rules require takes those from its rules.
+// required, the file formats it takes and a template homeowners download and fill in. The administrator's own
+// requirement also has what it must show and the passages it cites; one the rules require takes those from its rules.
+// A new template uploads when the document is saved, so a cancelled edit leaves nothing behind.
 
 export type DocumentDialogProps = {
   /** The requirement to edit; null writes a new one of the administrator's own. */
@@ -42,6 +54,10 @@ export type DocumentDialogProps = {
   loadProvisions: () => Promise<CitedProvision[]>
   /** A key for a new requirement. */
   newKey: (label: string) => string
+  /** The project type, for its templates' links. */
+  projectTypeId: string
+  /** Uploads a new template and returns what the document keeps of it. */
+  uploadTemplate: (file: File) => Promise<DocumentTemplate>
   onOpenChange: (isOpen: boolean) => void
   onSave: (document: ProjectDocument) => void
 }
@@ -57,7 +73,8 @@ const valuesSchema = z.object({
   mustShow: z.string().max(1000, "Keep this under 1,000 characters."),
   isRequired: z.boolean(),
   accepts: z.array(z.enum(uploadFormats)).min(1, "Take at least one kind of file."),
-  citations: z.array(z.string())
+  citations: z.array(z.string()),
+  template: z.custom<DocumentTemplate>().nullable()
 })
 
 export function DocumentDialog({
@@ -65,11 +82,16 @@ export function DocumentDialog({
   citations,
   loadProvisions,
   newKey,
+  projectTypeId,
+  uploadTemplate,
   onOpenChange,
   onSave
 }: DocumentDialogProps) {
   const [provisions, setProvisions] = useState<CitedProvision[] | null>(null)
+  const [chosen, setChosen] = useState<ChosenFile[]>([])
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const isOwn = document === null || document.ruleKeys.length === 0
+  const submitLabel = document ? "Save" : "Add document"
   const rulePoints = !isOwn && document ? document.mustShow : []
   const known = new Map([
     ...Object.entries(citations),
@@ -81,14 +103,26 @@ export function DocumentDialog({
       mustShow: (document?.mustShow ?? []).join("\n"),
       isRequired: document?.isRequired ?? true,
       accepts: [...(document?.accepts ?? uploadFormats)],
-      citations: document?.citations ?? []
+      citations: document?.citations ?? [],
+      template: document?.template ?? null
     },
     validators: { onSubmit: valuesSchema },
-    onSubmit: ({ value }) => {
+    onSubmit: async ({ value }) => {
       const label = value.label.trim()
       const accepts = value.accepts.length === uploadFormats.length ? null : value.accepts
+      const [file] = chosen
+      let template = value.template ?? undefined
+      if (file) {
+        try {
+          setUploadError(null)
+          template = await uploadTemplate(file.file)
+        } catch (caught) {
+          setUploadError(caught instanceof Error ? caught.message : "The template didn't upload. Try again.")
+          return
+        }
+      }
       if (document && !isOwn) {
-        onSave({ ...document, label, isRequired: value.isRequired, accepts })
+        onSave({ ...document, label, isRequired: value.isRequired, accepts, template })
       } else {
         onSave({
           documentType: document?.documentType ?? newKey(label),
@@ -100,7 +134,8 @@ export function DocumentDialog({
           ruleKeys: [],
           isRequired: value.isRequired,
           citations: value.citations,
-          accepts
+          accepts,
+          template
         })
       }
       onOpenChange(false)
@@ -218,6 +253,63 @@ export function DocumentDialog({
                 </FieldSet>
               )}
             </form.Field>
+            <form.Field name="template">
+              {(item) => {
+                const stored = item.state.value
+                const isStored = stored !== null && chosen.length === 0
+                return (
+                  <Field data-invalid={uploadError !== null}>
+                    <FieldLabel htmlFor={isStored ? undefined : "document-template"}>Template</FieldLabel>
+                    <FieldDescription>
+                      A file homeowners download and fill in, such as a form for a neighbor to sign.
+                    </FieldDescription>
+                    {isStored ? (
+                      <Attachment className="w-full">
+                        <FileTypeMedia fileName={stored.fileName} mediaType={stored.mediaType} />
+                        <AttachmentContent>
+                          <AttachmentTitle title={stored.fileName}>{stored.fileName}</AttachmentTitle>
+                          <AttachmentDescription>{fileSizeText(stored.sizeBytes)}</AttachmentDescription>
+                        </AttachmentContent>
+                        <AttachmentActions>
+                          <a
+                            className={buttonVariants({ variant: "ghost", size: "icon-xs" })}
+                            href={templateHref(projectTypeId, stored)}
+                            download
+                            aria-label={`Download ${stored.fileName}`}
+                            title="Download"
+                          >
+                            <DownloadIcon aria-hidden />
+                          </a>
+                          <AttachmentAction
+                            type="button"
+                            aria-label={`Remove ${stored.fileName}`}
+                            title="Remove"
+                            onClick={() => item.handleChange(null)}
+                          >
+                            <XIcon />
+                          </AttachmentAction>
+                        </AttachmentActions>
+                      </Attachment>
+                    ) : (
+                      <FileDropzone
+                        id="document-template"
+                        target="template"
+                        multiple={false}
+                        size="compact"
+                        isInvalid={uploadError !== null}
+                        describedBy={uploadError ? "document-template-error" : undefined}
+                        value={chosen}
+                        onChange={(files) => {
+                          setUploadError(null)
+                          setChosen(files)
+                        }}
+                      />
+                    )}
+                    {uploadError ? <FieldError id="document-template-error">{uploadError}</FieldError> : null}
+                  </Field>
+                )
+              }}
+            </form.Field>
             {isOwn ? (
               <form.Field name="citations">
                 {(item) => (
@@ -263,7 +355,13 @@ export function DocumentDialog({
           </FieldGroup>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit">{document ? "Save" : "Add document"}</Button>
+            <form.Subscribe selector={(state) => state.isSubmitting}>
+              {(isSubmitting) => (
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && chosen.length > 0 ? "Uploading" : submitLabel}
+                </Button>
+              )}
+            </form.Subscribe>
           </DialogFooter>
         </form>
       </DialogContent>

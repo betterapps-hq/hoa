@@ -621,7 +621,10 @@ wording so adding one back keeps it).
   repeats asked once for every item or for each, remove with undo); a question asked once says so under it.
   Changes save as they're made. "Add question" suggests what the rules check and always lets the administrator write
   their own (a "File upload" answer becomes a document requirement); "Add document" suggests what the rules require and
-  always lets them create their own (name, what it must show, required, accepted file formats, citations). The edit
+  always lets them create their own (name, what it must show, required, accepted file formats, citations). Any
+  document can give a **template** homeowners download and fill in (a form for a neighbor to sign, a contractor's
+  affidavit): PDF or Word, attached in the document's dialog, uploaded when it's saved, and shown on the document's row
+  as a link to download. The edit
   dialog is a plain form builder: nothing in it names bindings, links or how the review uses an answer, and the
   answer type is a select of every type. Each citation in the edit dialogs is a link that opens the reader in the sheet
   over the editor, beside its own remove button.
@@ -645,7 +648,8 @@ wording so adding one back keeps it).
 - **The homeowner form**: the project type as cards, a description, the sections in order (amounts in the shared
   quantity inputs by dimension, in the organization's unit system, `HoaSettings.unitSystem`), and one drop zone for
   files, each file marked as one of the documents (guessed from its name only when clear) against a checklist that
-  names what's still missing. In a section that repeats, the questions asked once for every item come first, in their
+  names what's still missing; a document with a template offers "Download the template" under its name
+  (`/files/project-types/{id}/templates/{templateId}`, anyone in the organization). In a section that repeats, the questions asked once for every item come first, in their
   own card ("Every fence run"), and each item's card holds only its own; the answer is kept on every item, a new item
   starts with it, and the review reads each item whole. Read back, an answer every item shares shows once, above the
   items (`answerSections`). Each question's info button holds its help and, quietly, why it's asked: the rules that

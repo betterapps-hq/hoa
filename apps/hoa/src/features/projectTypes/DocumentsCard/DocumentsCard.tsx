@@ -3,6 +3,7 @@ import {
   CircleCheckIcon,
   CircleDashedIcon,
   FileTextIcon,
+  PaperclipIcon,
   PencilIcon,
   PlusIcon,
   Trash2Icon
@@ -23,7 +24,7 @@ import {
   removeDocument,
   updateDocument
 } from "@/projectTypes/definition"
-import type { ProjectDocument, ProjectTypeDefinition } from "@/projectTypes/projectType"
+import type { DocumentTemplate, ProjectDocument, ProjectTypeDefinition } from "@/projectTypes/projectType"
 import type { CitedProvision } from "../../rulebook/citedProvision"
 import type { ReferencedRule } from "../../rulebook/RuleReference/RuleReference"
 import { DocumentDialog } from "../DocumentDialog/DocumentDialog"
@@ -31,10 +32,12 @@ import { PickerDialog } from "../PickerDialog/PickerDialog"
 import type { DefinitionUpdate } from "../QuestionsCard/QuestionsCard"
 import { RuleCitations } from "../RuleCitations/RuleCitations"
 import { SortableList } from "../SortableList/SortableList"
+import { templateHref } from "../uploadTemplate"
 
 // The documents a project type's form asks for (application-review.md, Project types): one list, in the order
 // homeowners see it in their checklist, each with its citations, what it must show behind an info button, and the same
-// handle and menu as the questions. "Add document" offers what the rules require that the list leaves out. The
+// handle and menu as the questions, and its template, when it gives one, as a link to download. "Add document" offers
+// what the rules require that the list leaves out. The
 // documents the application form itself provides (its answers, the description) follow, with their citations, as met
 // by the form: homeowners never upload them.
 
@@ -45,6 +48,10 @@ export type DocumentsCardProps = {
   /** The passages documents cite that the rulebook has, by provision key. */
   citations: Readonly<Record<string, CitedProvision>>
   loadProvisions: () => Promise<CitedProvision[]>
+  /** The project type, for its templates' links. */
+  projectTypeId: string
+  /** Uploads a document's new template and returns what the document keeps of it. */
+  uploadTemplate: (file: File) => Promise<DocumentTemplate>
   onUpdate: DefinitionUpdate
 }
 
@@ -64,6 +71,8 @@ export function DocumentsCard({
   rules,
   citations,
   loadProvisions,
+  projectTypeId,
+  uploadTemplate,
   onUpdate
 }: DocumentsCardProps) {
   const [isAdding, setIsAdding] = useState(false)
@@ -143,6 +152,16 @@ export function DocumentsCard({
                       </InfoTip>
                     ) : null}
                   </div>
+                  {document.template ? (
+                    <a
+                      className="flex min-w-0 items-center gap-1.5 self-start text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                      href={templateHref(projectTypeId, document.template)}
+                      download
+                    >
+                      <PaperclipIcon aria-hidden className="size-4 shrink-0" />
+                      <span className="truncate">Template: {document.template.fileName}</span>
+                    </a>
+                  ) : null}
                   <RuleCitations
                     citations={[
                       ...rulesOf(document).flatMap((rule) => rule.citations),
@@ -233,6 +252,8 @@ export function DocumentsCard({
           citations={citations}
           loadProvisions={loadProvisions}
           newKey={(label) => customKey(definition, label)}
+          projectTypeId={projectTypeId}
+          uploadTemplate={uploadTemplate}
           onOpenChange={(open) => {
             if (!open) {
               const name = edited ? sentenceCase(edited.label) : null

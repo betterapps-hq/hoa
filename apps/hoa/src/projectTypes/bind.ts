@@ -189,7 +189,15 @@ export function bindDefinition(definition: ProjectTypeDefinition, built: Project
   const documents = definition.documents.flatMap((document) => {
     const bound = built.documents.find((item) => item.documentType === document.documentType)
     if (bound) {
-      return [{ ...bound, label: document.label, isRequired: document.isRequired, accepts: document.accepts }]
+      return [
+        {
+          ...bound,
+          label: document.label,
+          isRequired: document.isRequired,
+          accepts: document.accepts,
+          template: document.template
+        }
+      ]
     }
     // The administrator's own document requirement is kept as they wrote it.
     return document.ruleKeys.length === 0 && document.documentType.startsWith("custom.") ? [document] : []

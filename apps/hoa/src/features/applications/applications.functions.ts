@@ -42,7 +42,7 @@ import type * as T from "@/schema/types"
 import { getRequestContext, requireAdministrator, type RequestContext } from "@/session/requestContext.server"
 import { applicationKeys, jobOutputPrefix, jobStepKey, rulebookKeys } from "@/storage/keys"
 import { deleteObjectsUnder, getJson, toBase64 } from "@/storage/objects"
-import { getBucket, getPresigner } from "@/storage/storage.server"
+import { getBucket, presignerOrNull } from "@/storage/storage.server"
 import { validateUpload } from "@/storage/uploadRules"
 import { offerType, type OfferedProjectType, type PublishedRules } from "../projectTypes/offeredTypes"
 import type { SourceFile } from "../rulebook/rulebook.functions"
@@ -53,14 +53,6 @@ import { reportRules, reviewTerms, type ReportRule } from "./applicationView"
 
 /** Statuses in which the homeowner can change files and run the review. */
 const editableStatuses: readonly ApplicationStatus[] = ["draft", "reviewed", "information-requested"]
-
-function presignerOrNull() {
-  try {
-    return getPresigner()
-  } catch {
-    return null
-  }
-}
 
 /** Who's asking, for what they may see: the committee sees an application once it's submitted. */
 const viewerOf = (context: RequestContext) => ({

@@ -26,6 +26,7 @@ import {
   projectTypeDefinition,
   projectTypeDetails,
   projectTypeStatuses,
+  type DocumentTemplate,
   type ProjectType,
   type ProjectTypeDefinition
 } from "@/projectTypes/projectType"
@@ -41,7 +42,10 @@ import { definitionOf, rulebookVocabulary, scopeNoteOf } from "@/review/document
 import { readRulesFile } from "@/rulebook/assemble"
 import type * as T from "@/schema/types"
 import { getRequestContext, requireAdministrator } from "@/session/requestContext.server"
-import { getBucket } from "@/storage/storage.server"
+import { projectTypeKeys } from "@/storage/keys"
+import { deleteObjectsUnder } from "@/storage/objects"
+import { getBucket, presignerOrNull } from "@/storage/storage.server"
+import { validateUpload } from "@/storage/uploadRules"
 import type { CitedProvision } from "../rulebook/citedProvision"
 import { citationIndex, citedProvision } from "../rulebook/rulebookRecords"
 import { citationsOf, citedKeys, currentType, offerType, type OfferedProjectType } from "./offeredTypes"
@@ -352,6 +356,86 @@ function checkCitations(definition: ProjectTypeDefinition, before: ProjectTypeDe
   }
 }
 
+/** The templates a form gives that the stored form didn't. */
+const newTemplates = (definition: ProjectTypeDefinition, before: ProjectTypeDefinition) => {
+  const known = new Set(before.documents.flatMap((document) => document.template?.id ?? []))
+  return definition.documents.flatMap((document) =>
+    document.template && !known.has(document.template.id) ? [document.template] : []
+  )
+}
+
+/** Refuses a form whose new templates aren't in storage as uploaded. */
+async function checkTemplates(hoaId: string, projectTypeId: string, templates: readonly DocumentTemplate[]) {
+  const keys = projectTypeKeys(hoaId, projectTypeId)
+  const stored = await Promise.all(
+    templates.map((template) => getBucket().head(keys.template(template.id, template.fileName)))
+  )
+  if (stored.some((object, index) => !object || object.size !== templates[index]?.sizeBytes)) {
+    throw new Error("A template didn't finish uploading. Choose it again.")
+  }
+}
+
+export type TemplateUpload = { template: DocumentTemplate; uploadUrl: string | null; contentType: string }
+
+/** Names a new template for one of a type's documents and returns where to upload it; the type's next save keeps it. */
+export const createTemplateUpload = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    z
+      .object({
+        projectTypeId: z.string(),
+        fileName: z.string().min(1).max(200),
+        mediaType: z.string(),
+        sizeBytes: z.number().int().positive()
+      })
+      .parse(data)
+  )
+  .handler(async ({ data }): Promise<TemplateUpload> => {
+    const context = await requireAdministrator()
+    await loadOwnType(context.hoa.id, data.projectTypeId)
+    const validation = validateUpload({ name: data.fileName, type: data.mediaType, size: data.sizeBytes }, "template")
+    if (!validation.isValid) {
+      throw new Error(validation.message)
+    }
+    const template: DocumentTemplate = {
+      id: crypto.randomUUID(),
+      fileName: data.fileName,
+      mediaType: validation.upload.mediaType,
+      sizeBytes: data.sizeBytes
+    }
+    const presigner = presignerOrNull()
+    const key = projectTypeKeys(context.hoa.id, data.projectTypeId).template(template.id, template.fileName)
+    return { template, uploadUrl: presigner ? await presigner.upload(key) : null, contentType: template.mediaType }
+  })
+
+/** Uploads a template through the Worker when the environment has no R2 API token for presigned URLs. */
+export const uploadTemplateFile = createServerFn({ method: "POST" })
+  .validator((data: unknown) => {
+    if (!(data instanceof FormData)) {
+      throw new Error("Expected form data.")
+    }
+    const file = data.get("file")
+    if (!(file instanceof File)) {
+      throw new Error("Expected a file.")
+    }
+    const ids = z
+      .object({ projectTypeId: z.string(), templateId: z.uuid() })
+      .parse({ projectTypeId: data.get("projectTypeId"), templateId: data.get("templateId") })
+    return { ...ids, file }
+  })
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    await loadOwnType(context.hoa.id, data.projectTypeId)
+    const validation = validateUpload(data.file, "template")
+    if (!validation.isValid) {
+      throw new Error(validation.message)
+    }
+    await getBucket().put(
+      projectTypeKeys(context.hoa.id, data.projectTypeId).template(data.templateId, data.file.name),
+      data.file,
+      { httpMetadata: { contentType: validation.upload.mediaType } }
+    )
+  })
+
 /**
  * Saves the label, description and form; the form is checked against the rules again: the rulebook it was built with
  * while it's out of date, so an edit never takes the published rulebook's changes unreviewed. When that rulebook can't
@@ -369,6 +453,7 @@ export const updateProjectType = createServerFn({ method: "POST" })
     ])
     const own = await ownRulesFile(context.hoa.id, type, published)
     checkCitations(data.definition, type.definition, published.rulesFile)
+    await checkTemplates(context.hoa.id, type.id, newTemplates(data.definition, type.definition))
     await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
       label: data.label,
       description: data.description || null,
@@ -397,6 +482,7 @@ export const applyProjectTypeUpdates = createServerFn({ method: "POST" })
     ])
     const built = buildDefinition(published.rulesFile, applicationRequestType, type.definition.subjects, today())
     checkCitations(data.definition, type.definition, published.rulesFile)
+    await checkTemplates(context.hoa.id, type.id, newTemplates(data.definition, type.definition))
     await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
       definition: bindDefinition(data.definition, built),
       rulebookId: published.id,
@@ -427,4 +513,5 @@ export const deleteProjectType = createServerFn({ method: "POST" })
       throw new Error("Applications use this project type, so it can be archived but not deleted.")
     }
     await deleteProjectTypeRecord(db, context.hoa.id, data.id)
+    await deleteObjectsUnder(getBucket(), projectTypeKeys(context.hoa.id, data.id).root)
   })

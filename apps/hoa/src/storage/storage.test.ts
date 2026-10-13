@@ -6,6 +6,7 @@ import {
   hoaCacheKey,
   jobOutputKey,
   jobOutputPrefix,
+  projectTypeKeys,
   rulebookBuildKeys,
   rulebookKeys
 } from "./keys"
@@ -56,6 +57,10 @@ describe("acceptedTypes and uploadHint", () => {
     expect(acceptedTypes("application")["image/png"]).toEqual([".png", ".jpg", ".jpeg"])
     expect(uploadHint("governing")).toBe("PDF or Word up to 50 MB.")
     expect(uploadHint("application")).toBe("PDF or Word up to 25 MB, JPEG or PNG up to 5 MB.")
+    expect(uploadHint("template")).toBe("PDF or Word up to 10 MB.")
+    expect(validateUpload({ name: "form.png", type: "image/png", size: 10 }, "template")).toMatchObject({
+      message: "form.png isn't a PDF or Word file. Save photos as JPEG or PNG."
+    })
   })
 })
 
@@ -88,6 +93,10 @@ describe("keys", () => {
     expect(jobOutputKey("hoa", "job", "extract", "s1")).toBe("hoas/hoa/jobs/job/extract/s1.json")
     expect(jobOutputPrefix("hoa", "job")).toBe("hoas/hoa/jobs/job/")
     expect(extensionOf("README")).toBe("bin")
+
+    const projectType = projectTypeKeys("hoa", "type")
+    expect(projectType.root).toBe("hoas/hoa/project-types/type/")
+    expect(projectType.template("t1", "Neighbor approval.DOCX")).toBe("hoas/hoa/project-types/type/templates/t1.docx")
   })
 
   it("keeps a rulebook's rules file and its build's stage outputs apart", () => {

@@ -24,7 +24,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { CitationsOpenInSheet } from "@/features/documents/ReaderSheet/ReaderSheet"
 import { useAutosave } from "@/hooks/useAutosave"
 import { bindDefinition } from "@/projectTypes/bind"
-import { projectTypeDetails, type ProjectTypeDefinition, type ProjectTypeStatus } from "@/projectTypes/projectType"
+import {
+  projectTypeDetails,
+  type DocumentTemplate,
+  type ProjectTypeDefinition,
+  type ProjectTypeStatus
+} from "@/projectTypes/projectType"
 import { applyChanges } from "@/projectTypes/updates"
 import type { CitedProvision } from "../../rulebook/citedProvision"
 import { RuleReference } from "../../rulebook/RuleReference/RuleReference"
@@ -50,6 +55,8 @@ export type ProjectTypePageProps = {
   onDelete: () => Promise<void>
   /** Every passage of the rulebook's documents, for linking one to a question. */
   loadProvisions: () => Promise<CitedProvision[]>
+  /** Uploads a document's new template and returns what the document keeps of it. */
+  uploadTemplate: (file: File) => Promise<DocumentTemplate>
 }
 
 const messageOf = (caught: unknown, fallback: string) => (caught instanceof Error ? caught.message : fallback)
@@ -151,6 +158,7 @@ function ProjectTypeEditor({
   onSetStatus,
   onDelete,
   loadProvisions,
+  uploadTemplate,
   onReset
 }: EditorProps) {
   const { projectType, applicationCount, requirements, subjectLabels, isOutdated, updates } = view
@@ -242,6 +250,8 @@ function ProjectTypeEditor({
         rules={rules}
         citations={view.citations}
         loadProvisions={loadProvisions}
+        projectTypeId={projectType.id}
+        uploadTemplate={uploadTemplate}
         onUpdate={update}
       />
       <Card>

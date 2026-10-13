@@ -238,6 +238,7 @@ hoas/{hoaId}/applications/{applicationId}/files/{fileId}/figures/{figureId}.png
 hoas/{hoaId}/applications/{applicationId}/files/{fileId}/figures/{figureId}.json
 hoas/{hoaId}/applications/{applicationId}/cache/{stage}/{key}.json        content cache for this application's stages
 hoas/{hoaId}/applications/{applicationId}/reviews/{reviewId}.json        full Review record
+hoas/{hoaId}/project-types/{projectTypeId}/templates/{templateId}.{ext}  a document's template, named in the type's form
 hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json                          per-job step outputs
 ```
 
@@ -265,6 +266,11 @@ Browsers upload directly to R2 with presigned `PUT` URLs, so large files never p
 3. The page calls `completeDocumentUpload` or `completeApplicationUpload`. The server checks the object exists with the
    expected size. For a governing document it starts DocumentIngest; application files wait for `runReview`.
 
+A document's template (application-review.md, Project types) has no record of its own: `createTemplateUpload` names it
+(a new id per file) and presigns its key, the browser `PUT`s it when the administrator saves the document, and the
+template is kept in the type's form, whose save checks every new template is stored with its size. Without a token it
+goes through `uploadTemplateFile`. Deleting the type deletes its templates.
+
 **Without an R2 API token** (`R2_*` settings unset), the create call returns no URL and the page uploads through
 `uploadDocumentFile` or `uploadApplicationFile`, which stream the file into R2, and OCR sends Layout the file inline (`base64Source`) instead of a
 presigned URL. That works at demo sizes (the largest sample is 14 MB); with a token, uploads and OCR skip the Worker.
@@ -272,7 +278,7 @@ presigned URL. That works at demo sizes (the largest sample is 14 MB); with a to
 Accepted types: PDF and DOCX for every upload, and JPEG and PNG for application files. HEIF, TIFF, BMP, WebP and GIF are
 refused with a message asking for JPEG or PNG, because the review model can't read them. Limits: 50 MB and 300 pages per governing document (OCR reads PDFs in 50-page ranges, see
 [ocr.md](ocr.md#flow); peak memory per range is measured on the 81-page CC&Rs), 25 MB per application PDF or Word file,
-and 5 MB per image. `src/storage/uploadRules.ts` holds these rules.
+and 5 MB per image; a template is PDF or Word up to 10 MB. `src/storage/uploadRules.ts` holds these rules.
 
 ## Access
 

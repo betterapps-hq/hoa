@@ -118,6 +118,18 @@ export type ProjectGroup = z.infer<typeof projectGroup>
 export const uploadFormats = ["pdf", "docx", "image"] as const
 
 /**
+ * A file the administrator gives homeowners to fill in as a document, such as a form for a neighbor to sign: stored
+ * with the project type (src/storage/keys.ts, `projectTypeKeys`), a new object for every new file.
+ */
+export const documentTemplate = z.object({
+  id: z.uuid(),
+  fileName: z.string().min(1).max(200),
+  mediaType: z.string(),
+  sizeBytes: z.number().int().positive()
+})
+export type DocumentTemplate = z.infer<typeof documentTemplate>
+
+/**
  * A document the form asks for, uploaded with what it must show: one the rules require, or one the administrator
  * asks for themselves (no rules; its own key, "custom.").
  */
@@ -131,7 +143,9 @@ export const projectDocument = z.object({
   /** The passages it cites, by provision key, for the administrator's own; a required one cites its rules'. */
   citations: z.array(z.string()).default([]),
   /** The file formats it takes; null for every format applications take. */
-  accepts: z.array(z.enum(uploadFormats)).nullable().default(null)
+  accepts: z.array(z.enum(uploadFormats)).nullable().default(null),
+  /** The form homeowners download, fill in and upload as this document; absent for none. */
+  template: documentTemplate.optional()
 })
 export type ProjectDocument = z.infer<typeof projectDocument>
 

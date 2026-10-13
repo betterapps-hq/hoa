@@ -40,6 +40,15 @@ export const jobOutputKey = (hoaId: string, jobId: string, stage: string, itemId
 
 export const jobOutputPrefix = (hoaId: string, jobId: string) => `hoas/${hoaId}/jobs/${jobId}/`
 
+/** A project type's objects: the templates its documents give homeowners to fill in. */
+export const projectTypeKeys = (hoaId: string, projectTypeId: string) => {
+  const root = `hoas/${hoaId}/project-types/${projectTypeId}/`
+  return {
+    root,
+    template: (templateId: string, fileName: string) => `${root}templates/${templateId}.${extensionOf(fileName)}`
+  }
+}
+
 /** A rulebook's objects: its published rules file, written once (encoding.md, Storage). */
 export const rulebookKeys = (hoaId: string, rulebookId: string) => {
   const root = `hoas/${hoaId}/rulebooks/${rulebookId}/`

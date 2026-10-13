@@ -3,7 +3,7 @@
 const megabyte = 1024 * 1024
 const docxType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-export type UploadTarget = "governing" | "application"
+export type UploadTarget = "governing" | "application" | "template"
 const uploadFormats = ["pdf", "docx", "image"] as const
 export type UploadFormat = (typeof uploadFormats)[number]
 
@@ -22,7 +22,9 @@ const formats: Record<
 
 const limits: Record<UploadTarget, Partial<Record<UploadFormat, number>>> = {
   governing: { pdf: 50 * megabyte, docx: 50 * megabyte },
-  application: { pdf: 25 * megabyte, docx: 25 * megabyte, image: 5 * megabyte }
+  application: { pdf: 25 * megabyte, docx: 25 * megabyte, image: 5 * megabyte },
+  /** A form a project type gives homeowners to fill in. */
+  template: { pdf: 10 * megabyte, docx: 10 * megabyte }
 }
 
 /** The media types and extensions a target accepts, as a file picker's filter: { "application/pdf": [".pdf"] }. */
@@ -65,7 +67,7 @@ export function validateUpload(
   )
   const limit = format ? limits[target][format] : undefined
   if (!format || limit === undefined) {
-    const allowed = target === "governing" ? "PDF or Word" : "PDF, Word, JPEG or PNG"
+    const allowed = target === "application" ? "PDF, Word, JPEG or PNG" : "PDF or Word"
     const imageHint =
       /^(heic|heif|tif|tiff|bmp|webp|gif)$/.test(extension) || file.type.startsWith("image/")
         ? " Save photos as JPEG or PNG."

@@ -3,12 +3,15 @@ import { toast } from "sonner"
 import { ProjectTypePage } from "@/features/projectTypes/ProjectTypePage/ProjectTypePage"
 import {
   applyProjectTypeUpdates,
+  createTemplateUpload,
   deleteProjectType,
   getProjectTypeView,
   listCitableProvisions,
   setProjectTypeStatus,
-  updateProjectType
+  updateProjectType,
+  uploadTemplateFile
 } from "@/features/projectTypes/projectTypes.functions"
+import { uploadTemplate } from "@/features/projectTypes/uploadTemplate"
 
 export const Route = createFileRoute("/project-types/$projectTypeId")({
   staticData: { title: "Project type" },
@@ -46,6 +49,16 @@ function ProjectTypeRoute() {
         await navigate({ to: "/project-types" })
       }}
       loadProvisions={() => listCitableProvisions()}
+      uploadTemplate={(file) =>
+        uploadTemplate(
+          {
+            createUpload: (data) => createTemplateUpload({ data }),
+            uploadThroughServer: (form) => uploadTemplateFile({ data: form })
+          },
+          id,
+          file
+        )
+      }
     />
   )
 }

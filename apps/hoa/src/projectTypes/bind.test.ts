@@ -110,3 +110,28 @@ describe("bindDefinition, by citations", () => {
     expect(bound({ ...asText, kind: "yes-no" })[0]?.binding).toBe("widget.lit")
   })
 })
+
+describe("bindDefinition, documents", () => {
+  it("keeps a rule document's template, as the administrator attached it", () => {
+    const plan = {
+      documentType: "plan",
+      label: "Plan",
+      mustShow: ["the widget"],
+      ruleKeys: ["widget-plan"],
+      isRequired: true,
+      citations: [],
+      accepts: null
+    }
+    const template = {
+      id: "00000000-0000-4000-8000-000000000001",
+      fileName: "plan.docx",
+      mediaType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      sizeBytes: 10
+    }
+    const rebound = bindDefinition(
+      { ...built, documents: [{ ...plan, label: "Widget plan", template }] },
+      { ...built, documents: [plan] }
+    )
+    expect(rebound.documents).toEqual([{ ...plan, label: "Widget plan", template }])
+  })
+})

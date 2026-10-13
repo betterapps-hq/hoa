@@ -601,8 +601,9 @@ export function ApplicationPage({
   const documents = definition?.documents ?? []
   const filesSection = view.canEdit ? (
     <div className="flex flex-col gap-4">
-      {documents.length > 0 ? (
+      {documents.length > 0 && application.projectTypeId ? (
         <DocumentChecklist
+          projectTypeId={application.projectTypeId}
           documents={documents}
           files={files.map(({ file }) => ({ name: file.fileName, kind: file.uploadedAs }))}
         />
