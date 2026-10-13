@@ -210,6 +210,27 @@ describe("signatures and contacts", () => {
     ])
   })
 
+  it("take a business's company name, and its website when it has one", () => {
+    const business = { ...contact, label: "Who is your contractor?", isBusiness: true }
+    const person = { name: "Pat Lee", phone: "555-0100", email: "" }
+    expect(answerErrors(business, { ...person, company: "Lee Builders", website: "" })).toEqual([])
+    expect(answerErrors(business, { ...person, company: "Lee Builders", website: "leebuilders.com" })).toEqual([])
+    expect(answerErrors(business, { ...person, company: "", website: "" })).toEqual(["Give the company's name."])
+    expect(answerErrors(business, { ...person, company: "Lee Builders", website: "lee builders" })).toEqual([
+      "Give a website such as example.com."
+    ])
+    const definition: ProjectTypeDefinition = {
+      ...emptyDefinition,
+      groups: [{ ...definitionGroup, fields: [business] }]
+    }
+    const answers = {
+      work: [{ "custom.builder": { ...person, company: "Lee Builders", website: "https://leebuilders.com" } }]
+    }
+    expect(answerLines(definition, answers)[0]!.lines.map((item) => item.line)).toEqual([
+      "Who is your contractor? Lee Builders, Pat Lee, 555-0100, https://leebuilders.com"
+    ])
+  })
+
   it("read back in words, and never as facts of a property", () => {
     const definition: ProjectTypeDefinition = {
       ...emptyDefinition,

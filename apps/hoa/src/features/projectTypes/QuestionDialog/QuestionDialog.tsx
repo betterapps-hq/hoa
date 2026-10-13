@@ -128,6 +128,7 @@ const valuesSchema = z.object({
     z.object({ id: z.string(), value: z.string(), label: z.string(), isAdded: z.boolean(), isOffered: z.boolean() })
   ),
   allowsOther: z.boolean(),
+  isBusiness: z.boolean(),
   unit: z.string(),
   fee: z.string(),
   citations: z.array(z.string())
@@ -196,6 +197,7 @@ export function QuestionDialog({
     options: custom.options,
     choices: field?.kind === "choice" ? choiceRows(field.options, listed) : [],
     allowsOther: field?.kind === "choice" ? field.allowsOther : false,
+    isBusiness: field?.kind === "contact" ? field.isBusiness === true : false,
     unit: custom.unit,
     fee: custom.fee,
     citations: field?.citations ?? []
@@ -309,6 +311,8 @@ export function QuestionDialog({
         return { ...base, kind: "text" }
       case "fee":
         return { ...base, kind: "fee", amount: dollarsOf(value.fee) }
+      case "contact":
+        return { ...base, kind: "contact", isBusiness: value.isBusiness }
       default:
         return { ...base, kind: type }
     }
@@ -437,6 +441,27 @@ export function QuestionDialog({
                           {item.state.value === "contact" ? (
                             <FieldDescription>Homeowners give a name, a phone and an email.</FieldDescription>
                           ) : null}
+                          {item.state.value === "contact" ? (
+                            <form.Field name="isBusiness">
+                              {(business) => (
+                                <Field orientation="horizontal" className="mt-1">
+                                  <Checkbox
+                                    id="question-business"
+                                    checked={business.state.value}
+                                    onCheckedChange={(checked) => business.handleChange(checked)}
+                                  />
+                                  <FieldContent>
+                                    <FieldLabel htmlFor="question-business" className="font-normal">
+                                      A business, such as a contractor
+                                    </FieldLabel>
+                                    <FieldDescription>
+                                      Also asks for its company name and, if it has one, its website.
+                                    </FieldDescription>
+                                  </FieldContent>
+                                </Field>
+                              )}
+                            </form.Field>
+                          ) : null}
                           {field &&
                           item.state.value !== field.kind &&
                           (field.kind === "choice" || field.kind === "choices" || field.kind === "number") ? (
@@ -548,7 +573,7 @@ export function QuestionDialog({
                     onCheckedChange={(checked) => item.handleChange(checked)}
                   />
                   <FieldLabel htmlFor="question-required" className="font-normal">
-                    Homeowners must answer it
+                    Answer is required
                   </FieldLabel>
                 </Field>
               )}

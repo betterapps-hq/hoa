@@ -543,6 +543,28 @@ describe("ProjectTypePage", () => {
     )
   })
 
+  it("asks a business, such as a contractor, for its company and website too", async () => {
+    const { props, user } = setup()
+    await user.click(screen.getByRole("button", { name: "Add question" }))
+    await user.click(
+      within(await screen.findByRole("dialog", { name: "Add a question" })).getByRole("button", {
+        name: /^Write your own question/
+      })
+    )
+    const dialog = await screen.findByRole("dialog", { name: "Write a question" })
+    await user.type(within(dialog).getByLabelText(/^Question/), "Who is your contractor?")
+    await user.selectOptions(within(dialog).getByLabelText("Answer"), "contact")
+    await user.click(within(dialog).getByRole("checkbox", { name: "A business, such as a contractor" }))
+    await user.click(within(dialog).getByRole("button", { name: "Add question" }))
+    await waitFor(() =>
+      expect(
+        savedDefinition(props)
+          ?.groups.flatMap((group) => group.fields)
+          .find((field) => field.label === "Who is your contractor?")
+      ).toMatchObject({ kind: "contact", isBusiness: true, binding: null })
+    )
+  })
+
   it("asks for a fee with its amount in dollars", async () => {
     const { props, user } = setup()
     await user.click(screen.getByRole("button", { name: "Add question" }))

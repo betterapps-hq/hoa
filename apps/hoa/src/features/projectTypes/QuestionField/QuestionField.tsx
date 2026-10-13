@@ -193,20 +193,27 @@ function SignatureInput({ field, id, value, onChange, onBlur, isInvalid, describ
   )
 }
 
-const contactParts = [
-  { part: "name", label: "Name", type: "text" },
-  { part: "phone", label: "Phone", type: "tel" },
-  { part: "email", label: "Email", type: "email" }
-] as const
+type ContactPart = { part: string; label: string; type: "text" | "tel" | "email" | "url"; isWide: boolean }
 
-/** A person's details: their name, then a phone and an email to reach them by. */
+/** The parts a contact asks for: a business's company first and its website last. */
+const contactParts = (isBusiness: boolean): ContactPart[] => [
+  ...(isBusiness ? [{ part: "company", label: "Company", type: "text" as const, isWide: true }] : []),
+  { part: "name", label: isBusiness ? "Contact name" : "Name", type: "text", isWide: true },
+  { part: "phone", label: "Phone", type: "tel", isWide: false },
+  { part: "email", label: "Email", type: "email", isWide: false },
+  ...(isBusiness ? [{ part: "website", label: "Website (optional)", type: "url" as const, isWide: true }] : [])
+]
+
+/** A person's details: their name, then a phone and an email to reach them by; a business's company and website too. */
 function ContactInput({ field, id, value, onChange, onBlur, isInvalid, describedBy }: InputProps<"contact">) {
   const contact = isAnswerRecord(value) ? value : {}
-  // Only the part that's wrong is marked; a missing answer marks the name, which it needs first.
+  const parts = contactParts(field.isBusiness === true)
+  const [first] = parts
+  // Only the part that's wrong is marked; a missing answer marks the first part, which it needs first.
   const wrong = isInvalid ? invalidParts(field, value) : new Set<string>()
-  const isPartInvalid = (part: string) => isInvalid && (wrong.size === 0 ? part === "name" : wrong.has(part))
+  const isPartInvalid = (part: string) => isInvalid && (wrong.size === 0 ? part === first?.part : wrong.has(part))
   const set = (part: string, text: string) => {
-    const next = { name: contact.name ?? "", phone: contact.phone ?? "", email: contact.email ?? "", [part]: text }
+    const next = { ...Object.fromEntries(parts.map((item) => [item.part, contact[item.part] ?? ""])), [part]: text }
     onChange(Object.values(next).every((item) => item.trim() === "") ? null : next)
   }
   return (
@@ -215,10 +222,10 @@ function ContactInput({ field, id, value, onChange, onBlur, isInvalid, described
       aria-describedby={describedBy}
       className="m-0 grid min-w-0 gap-3 border-0 p-0 text-foreground sm:grid-cols-2"
     >
-      {contactParts.map(({ part, label, type }) => {
-        const partId = part === "name" ? id : `${id}-${part}`
+      {parts.map(({ part, label, type, isWide }) => {
+        const partId = part === first?.part ? id : `${id}-${part}`
         return (
-          <div key={part} className={part === "name" ? "flex flex-col gap-1.5 sm:col-span-2" : "flex flex-col gap-1.5"}>
+          <div key={part} className={isWide ? "flex flex-col gap-1.5 sm:col-span-2" : "flex flex-col gap-1.5"}>
             <Label htmlFor={partId} className="text-xs font-normal text-muted-foreground">
               {label}
             </Label>
@@ -230,7 +237,7 @@ function ContactInput({ field, id, value, onChange, onBlur, isInvalid, described
               onBlur={onBlur}
               onChange={(event) => set(part, event.target.value)}
               aria-invalid={isPartInvalid(part)}
-              aria-required={part === "name" && field.isRequired}
+              aria-required={(part === "name" || part === "company") && field.isRequired}
             />
           </div>
         )

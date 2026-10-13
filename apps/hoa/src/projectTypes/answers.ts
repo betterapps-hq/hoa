@@ -32,11 +32,29 @@ const signatureSchema = z.object({
   signedOn: z.iso.date()
 })
 
-/** A person's details: a name, and a phone or email to reach them by. */
-const contactSchema = z.object({
+const person = {
   name: z.string().trim().min(1, "Give the person's name.").max(200, "Keep the name under 200 characters."),
   phone: z.string().max(40, "Keep the phone number under 40 characters."),
   email: z.union([z.literal(""), z.email("Give an email address such as name@example.com.")])
+}
+
+/** A person's details: a name, and a phone or email to reach them by. */
+const contactSchema = z.object(person)
+
+/** A business's details, such as a contractor's: its company name, a person there, and its website if it has one. */
+const businessSchema = z.object({
+  company: z.string().trim().min(1, "Give the company's name.").max(200, "Keep the company name under 200 characters."),
+  ...person,
+  website: z
+    .union([
+      z.literal(""),
+      z
+        .string()
+        .trim()
+        .max(200, "Keep the website under 200 characters.")
+        .regex(/^(https?:\/\/)?[^\s/.]+(\.[^\s/.]+)+(\/\S*)?$/i, "Give a website such as example.com.")
+    ])
+    .optional()
 })
 
 /** The schema for one answer: its kind's value, and an answer when the question is required. */
@@ -70,7 +88,7 @@ export function fieldSchema(field: ProjectField) {
     case "signature":
       return required(z.union([signatureSchema, z.null()]))
     case "contact":
-      return required(z.union([contactSchema, z.null()]))
+      return required(z.union([field.isBusiness ? businessSchema : contactSchema, z.null()]))
     case "fee":
       // Confirming is the answer: a required fee must be confirmed, an optional one may be left.
       return field.isRequired
@@ -179,7 +197,7 @@ function answerText(field: ProjectField, value: AnswerValue): string | null {
   if (isAnswerRecord(value)) {
     return field.kind === "signature"
       ? `Signed by ${value.name ?? ""}${value.signedOn ? ` on ${value.signedOn}` : ""}`
-      : [value.name, value.phone, value.email].filter(Boolean).join(", ")
+      : [value.company, value.name, value.phone, value.email, value.website].filter(Boolean).join(", ")
   }
   if (Array.isArray(value)) {
     const labels = value.map((item) =>

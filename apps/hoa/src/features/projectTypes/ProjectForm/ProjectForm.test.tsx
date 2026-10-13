@@ -252,6 +252,48 @@ describe("ProjectForm", () => {
     expect(within(builder).getByRole("textbox", { name: /Name$/ })).toHaveAttribute("aria-invalid", "false")
   })
 
+  it("asks a business for its company first and its website last", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn<(value: ProjectAnswers) => void>()
+    const contractor: ProjectTypeDefinition = {
+      ...definition,
+      groups: [
+        {
+          ...definition.groups[0]!,
+          isRepeatable: false,
+          fields: [
+            {
+              ...base,
+              binding: null,
+              isRequired: true,
+              property: "custom.contractor",
+              kind: "contact",
+              label: "Who is your contractor?",
+              isBusiness: true
+            }
+          ]
+        }
+      ]
+    }
+    render(<Form onChange={onChange} of={contractor} />)
+    const group = screen.getByRole("group", { name: "Who is your contractor?" })
+    const inputs = within(group).getAllByRole("textbox")
+    const order = [/Company$/, /Contact name$/, /Phone$/, /Email$/, /Website \(optional\)$/].map((name) =>
+      inputs.indexOf(within(group).getByRole("textbox", { name }))
+    )
+    expect(order).toEqual([0, 1, 2, 3, 4])
+    await user.type(within(group).getByRole("textbox", { name: /Company$/ }), "Lee Builders")
+    await user.type(within(group).getByRole("textbox", { name: /Website/ }), "leebuilders.com")
+    const [item] = onChange.mock.lastCall?.[0].item ?? []
+    expect(item?.["custom.contractor"]).toEqual({
+      company: "Lee Builders",
+      name: "",
+      phone: "",
+      email: "",
+      website: "leebuilders.com"
+    })
+  })
+
   it("shows a fee's amount and takes the homeowner's word they'll pay it", async () => {
     const user = userEvent.setup()
     const onChange = vi.fn<(value: ProjectAnswers) => void>()

@@ -599,7 +599,8 @@ wording so adding one back keeps it).
 
 - **Questions.** Each has its wording, help, an answer type (text, long text, an amount with its unit and dimension, a
   count, one choice, several choices, yes or no, a date, a time, a signature (the homeowner types their full name;
-  the answer keeps it with the day), contact details (a name, phone and email), a fee (an amount in dollars the homeowner confirms they'll pay; paying
+  the answer keeps it with the day), contact details (a name, phone and email; for a business, such as a contractor, its company name
+  first and its website, optional, last), a fee (an amount in dollars the homeowner confirms they'll pay; paying
   happens outside the app)), an example for text, whether it's required, in a
   section that repeats whether it's asked once for every item (`isShared`: one material for every fence run) or for
   each, and the passages it cites (`citations`). **A question's citations are what its answer is checked against.** Underneath, a
