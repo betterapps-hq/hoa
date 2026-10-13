@@ -30,7 +30,7 @@ export function publishBlockers(records: RulebookRecords) {
     ...(unreviewed > 0
       ? [`${plural(unreviewed, "rule or term still needs", "rules and terms still need")} review.`]
       : []),
-    ...(records.settings.review.status === "proposed" ? ["The settings still need review."] : []),
+    ...(records.settings.review.status === "approved" ? [] : ["The settings still need review."]),
     ...(unreviewedReasons.length > 0
       ? [
           `${plural(unreviewedReasons.length, "reason for having no rule still needs", "reasons for having no rule still need")} review.`

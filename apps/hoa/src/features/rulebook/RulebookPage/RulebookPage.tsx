@@ -1,6 +1,8 @@
-import { DownloadIcon, UploadIcon } from "lucide-react"
+import { DownloadIcon, HistoryIcon, PencilIcon, UploadIcon } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
+import { PageActions, type PageAction, type PageActionsProps } from "@/components/PageActions/PageActions"
+import type { RowAction } from "@/components/RowActions/RowActions"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,12 +23,13 @@ import {
 } from "@/features/documents/GoverningDocuments/GoverningDocuments"
 import type { DocumentDetails } from "@/features/documents/uploadDocument"
 import type { Job } from "@/jobs/job"
-import type { BuildResults } from "@/rulebook/buildResults.server"
+import type { BuildResultsPage } from "@/rulebook/buildResults"
+import type { BuildDocument } from "@/rulebook/buildResults.server"
 import type { RefusedDocument } from "@/rulebook/buildSources"
 import type { StopResult } from "@/workflows/rulebookTrigger.server"
 import { attempt } from "../attempt"
-import { BuildProgress } from "../BuildProgress/BuildProgress"
 import { DraftReview } from "../DraftReview/DraftReview"
+import { ProcessingStatus } from "../ProcessingStatus/ProcessingStatus"
 import { saveFile } from "../PublishedRulebook/PublishedRulebook.utils"
 import type { RulebookSources, RulebookView } from "../rulebook.functions"
 import { recordsOf } from "../rulebookRecords"
@@ -58,10 +61,14 @@ export type RulebookPageProps = {
   onBuild: () => Promise<void>
   /** Stops the running build. */
   onStop: () => Promise<StopResult>
-  /** What a running build has produced so far, since a cursor. */
-  loadBuildResults: (jobId: string, since: string | null) => Promise<BuildResults>
+  /** What a running build has produced since a cursor, for the reader. */
+  loadBuildResults: (jobId: string, since: string | null) => Promise<BuildResultsPage>
+  /** The documents a running build reads, with their provisions, once it has structured them. */
+  loadBuildDocuments: (jobId: string) => Promise<BuildDocument[]>
   onPublish: (rulebookId: string) => Promise<void>
   onDiscard: (rulebookId: string) => Promise<void>
+  /** Starts a draft from the published rulebook, to change it without processing the documents again. */
+  onChangePublished: () => Promise<void>
   onChanged: () => void
 }
 
@@ -70,15 +77,19 @@ const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
 /**
  * The administrator's rulebook and governing documents in one place (encoding.md, UX): the rulebook in force, the
  * documents it's built from, and one quiet line about what's happening or next. Uploading a document rebuilds the
- * draft; reviewing the draft is a focused mode that ends in publishing or discarding it.
+ * draft; reviewing the draft is a focused mode of its own (`/rules/review`) that ends in publishing or discarding it.
  */
 export function RulebookPage(props: RulebookPageProps) {
   const { draft, published, sources, source, actions, isReviewing, onReviewingChange } = props
-  const draftRecords = draft.rulebook && draft.content ? recordsOf(sources, draft.content, "draft") : null
+  const draftRecords =
+    draft.rulebook && draft.content ? recordsOf(sources, draft.rulebook, draft.content, "draft") : null
   const draftId = draft.rulebook?.id
 
   if (isReviewing && draftRecords && draftId) {
-    const publishedRecords = published.content ? recordsOf(sources, published.content, "published") : null
+    const publishedRecords =
+      published.rulebook && published.content
+        ? recordsOf(sources, published.rulebook, published.content, "published", published.filedSources)
+        : null
     return (
       <DraftReview
         records={draftRecords}
@@ -88,11 +99,12 @@ export function RulebookPage(props: RulebookPageProps) {
             : null
         }
         blockers={draft.blockers}
+        buildFailures={draft.buildFailures}
         publishedVersion={published.rulebook?.version ?? null}
         isRebuilding={draft.isBuilding}
         source={source}
         actions={actions}
-        onBack={published.rulebook ? () => onReviewingChange(false) : null}
+        onBack={() => onReviewingChange(false)}
         onPublish={async () => {
           await props.onPublish(draftId)
           onReviewingChange(false)
@@ -100,6 +112,10 @@ export function RulebookPage(props: RulebookPageProps) {
         onDiscard={async () => {
           await props.onDiscard(draftId)
           onReviewingChange(false)
+        }}
+        onRetry={async () => {
+          await props.onBuild()
+          props.onChanged()
         }}
       />
     )
@@ -116,6 +132,7 @@ function RulebookOverview(props: RulebookPageProps) {
   const status = rulebookStatus({ draft, published, uploads })
   return (
     <div className="flex flex-col gap-10">
+      <PageActions {...useOverviewActions(status, props)} />
       <StatusLine status={status} uploadDialog={uploadDialog} {...props} />
       <GoverningDocuments
         uploadDialog={uploadDialog}
@@ -125,27 +142,105 @@ function RulebookOverview(props: RulebookPageProps) {
         onUpload={props.onUpload}
         onChanged={props.onChanged}
       />
-      <RulesInForce published={published} sources={sources} source={source} loadRulesFile={props.loadRulesFile} />
+      <RulesInForce published={published} sources={sources} source={source} />
     </div>
   )
 }
 
+/**
+ * The page's actions (ux.md, Page actions): the status line's next step as the main one; changing the published
+ * rulebook when nothing else is under way, since a draft or a build would replace the change; the rules file in the
+ * menu.
+ */
+function useOverviewActions(status: RulebookStatus, props: RulebookPageProps): PageActionsProps {
+  const [busy, setBusy] = useState<"build" | "change" | "download" | null>(null)
+  const { rulebook, content, fileSha256 } = props.published
+  const build = async () => {
+    setBusy("build")
+    await attempt(props.onBuild, "Processing didn't start.")
+    setBusy(null)
+    props.onChanged()
+  }
+  const change = async () => {
+    setBusy("change")
+    const started = await attempt(async () => {
+      await props.onChangePublished()
+      return true
+    }, "The rulebook couldn't be opened for changes.")
+    setBusy(null)
+    if (started) {
+      props.onReviewingChange(true)
+    }
+  }
+  const download = async () => {
+    setBusy("download")
+    const json = await attempt(props.loadRulesFile, "The rules file couldn't be downloaded.")
+    setBusy(null)
+    if (json) {
+      saveFile(`rules-version-${rulebook?.version ?? "draft"}.json`, json)
+    }
+  }
+  const processDocuments: PageAction = {
+    label: "Process documents",
+    isBusy: busy === "build",
+    onSelect: () => void build()
+  }
+  const review = (label: string): PageAction => ({ label, onSelect: () => props.onReviewingChange(true) })
+  const more: RowAction[] =
+    rulebook && fileSha256
+      ? [
+          {
+            label: "Download the rules file",
+            icon: DownloadIcon,
+            disabled: busy === "download",
+            onSelect: () => void download()
+          }
+        ]
+      : []
+  switch (status.kind) {
+    case "draft-ready":
+      return { primary: review(status.isFirst ? "Review the draft" : "Review changes"), more }
+    case "build-stopped":
+      return {
+        primary: processDocuments,
+        secondary: status.hasDraft ? { ...review("Review the earlier draft"), icon: HistoryIcon } : null,
+        more
+      }
+    case "build-failed":
+      return { primary: status.isRetryable ? processDocuments : null, more }
+    case "documents-changed":
+    case "not-built":
+      return { primary: processDocuments, more }
+    case "none":
+      return {
+        secondary:
+          rulebook && content
+            ? {
+                label: "Change the rulebook",
+                icon: PencilIcon,
+                isBusy: busy === "change",
+                onSelect: () => void change()
+              }
+            : null,
+        more
+      }
+    case "building":
+    case "reading":
+    case "build-refused":
+      return { more }
+  }
+}
+
+/** What's happening or next, in a sentence; its action is the page's main action, at the top. */
 function StatusLine({
   status,
   uploadDialog,
   ...props
 }: { status: RulebookStatus; uploadDialog: UploadDialog } & RulebookPageProps) {
-  const [isBusy, setIsBusy] = useState(false)
-  const build = async () => {
-    setIsBusy(true)
-    await attempt(props.onBuild, "The build didn't start.")
-    setIsBusy(false)
-    props.onChanged()
-  }
   const stop = async () => {
-    const result = await attempt(props.onStop, "The build couldn’t be stopped.")
+    const result = await attempt(props.onStop, "Processing couldn’t be stopped.")
     if (result && result.status !== "stopped") {
-      toast("The build had already finished, so there was nothing to stop.")
+      toast("Processing had already finished, so there was nothing to stop.")
     }
     props.onChanged()
   }
@@ -158,24 +253,21 @@ function StatusLine({
   )
   const reading = (titles: string[]) => (titles.length === 1 ? titles[0] : `${titles.length} documents`)
   switch (status.kind) {
-    case "building":
-      return line(
-        "Updating the rulebook from your documents.",
-        <div className="flex flex-col gap-4">
-          <p>
-            You can leave this page. When it&rsquo;s done, you review what changed here before it&rsquo;s published.
-          </p>
-          {props.draft.buildJobId ? (
-            <BuildProgress
-              jobId={props.draft.buildJobId}
-              loadJob={props.loadJob}
-              onFinished={props.onChanged}
-              onStop={stop}
-              loadResults={(since) => props.loadBuildResults(props.draft.buildJobId ?? "", since)}
-            />
-          ) : null}
-        </div>
+    case "building": {
+      const jobId = props.draft.buildJobId
+      return jobId ? (
+        <ProcessingStatus
+          jobId={jobId}
+          loadJob={props.loadJob}
+          loadResults={(since) => props.loadBuildResults(jobId, since)}
+          loadDocuments={() => props.loadBuildDocuments(jobId)}
+          onFinished={props.onChanged}
+          onStop={stop}
+        />
+      ) : (
+        line("Processing your documents", "You can leave this page and come back.")
       )
+    }
     case "reading":
       return line(
         `Reading ${reading(status.reading)}.`,
@@ -184,34 +276,24 @@ function StatusLine({
     case "draft-ready":
       return line(
         status.isFirst ? "Your rulebook is ready to review." : "A new draft of the rulebook is ready to review.",
-        status.isFirst
-          ? "Nothing is published yet. Review the draft and publish it to start checking applications against it."
-          : [
-              status.builtFrom.length > 0 ? `It was built after ${status.builtFrom.join(", ")} changed.` : null,
-              status.summary ? `It ${status.summary}.` : "It has the same rules as the rulebook in force."
-            ]
-              .filter((part) => part !== null)
-              .join(" "),
-        <Button className="w-fit" onClick={() => props.onReviewingChange(true)}>
-          {status.isFirst ? "Review the draft" : "Review changes"}
-        </Button>
+        [
+          ...(status.isFirst
+            ? ["Nothing is published yet. Review the draft and publish it to start checking applications against it."]
+            : [
+                status.builtFrom.length > 0 ? `It was made after ${status.builtFrom.join(", ")} changed.` : null,
+                status.summary ? `It ${status.summary}.` : "It has the same rules as the rulebook in force."
+              ]),
+          status.skipped > 0 ? "Some parts weren’t finished. They’re listed in the review." : null
+        ]
+          .filter((part) => part !== null)
+          .join(" ")
       )
     case "build-stopped":
       return line(
-        "The last build was stopped.",
+        "Processing was stopped.",
         status.hasDraft
           ? "Work it finished is kept and reused next time. The earlier draft is still here to review."
-          : "Work it finished is kept and reused next time. Nothing was published.",
-        <div className="flex flex-wrap gap-2">
-          <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-            Build a draft
-          </Button>
-          {status.hasDraft ? (
-            <Button variant="ghost" className="w-fit" onClick={() => props.onReviewingChange(true)}>
-              Review the earlier draft
-            </Button>
-          ) : null}
-        </div>
+          : "Work it finished is kept and reused next time. Nothing was published."
       )
     case "build-refused":
       return line(
@@ -234,28 +316,17 @@ function StatusLine({
     case "build-failed":
       return line(
         "The last update of the rulebook didn’t finish.",
-        <p className="line-clamp-3 break-words">{status.error}</p>,
-        status.isRetryable ? (
-          <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-            Try again
-          </Button>
-        ) : null
+        <p className="line-clamp-3 break-words">{status.error}</p>
       )
     case "documents-changed":
       return line(
         `Your documents changed since version ${status.version ?? ""} was published.`,
-        "Build a draft from them to review what changes.",
-        <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-          Build a draft
-        </Button>
+        "Process them to see what changes."
       )
     case "not-built":
       return line(
-        "Build the rulebook from your documents.",
-        "Each provision is read and encoded as rules for you to review and publish.",
-        <Button className="w-fit" disabled={isBusy} onClick={() => void build()}>
-          Build the rulebook
-        </Button>
+        "Turn your documents into a rulebook.",
+        "Each provision is read and encoded as rules for you to review and publish."
       )
     case "none":
       return null
@@ -321,45 +392,23 @@ function RemoveDocument({
   )
 }
 
-function RulesInForce({
-  published,
-  sources,
-  source,
-  loadRulesFile
-}: Pick<RulebookPageProps, "published" | "sources" | "source" | "loadRulesFile">) {
-  const [isDownloading, setIsDownloading] = useState(false)
+function RulesInForce({ published, sources, source }: Pick<RulebookPageProps, "published" | "sources" | "source">) {
   const { rulebook, content } = published
   if (!rulebook || !content) {
     return null
   }
-  const records = recordsOf(sources, content, "published")
-  const download = async () => {
-    setIsDownloading(true)
-    const json = await attempt(loadRulesFile, "The rules file couldn't be downloaded.")
-    setIsDownloading(false)
-    if (json) {
-      saveFile(`rules-version-${rulebook.version ?? "draft"}.json`, json)
-    }
-  }
+  const records = recordsOf(sources, rulebook, content, "published", published.filedSources)
   return (
     <section aria-labelledby="rules-in-force" className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div className="flex flex-col gap-0.5">
-          <h2 id="rules-in-force" className="text-base font-semibold">
-            Rules in force
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Version {rulebook.version}
-            {rulebook.publishedAt ? `, published ${dateFormat.format(new Date(rulebook.publishedAt))}` : ""}.
-            Applications are checked against it.
-          </p>
-        </div>
-        {published.fileSha256 ? (
-          <Button size="sm" variant="ghost" disabled={isDownloading} onClick={() => void download()}>
-            <DownloadIcon />
-            {isDownloading ? "Downloading" : "Rules file"}
-          </Button>
-        ) : null}
+      <div className="flex flex-col gap-0.5">
+        <h2 id="rules-in-force" className="text-base font-semibold">
+          Rules in force
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Version {rulebook.version}
+          {rulebook.publishedAt ? `, published ${dateFormat.format(new Date(rulebook.publishedAt))}` : ""}. Applications
+          are checked against it.
+        </p>
       </div>
       <RulebookWorkspace records={records} source={source} actions={null} audience="administrator" />
     </section>

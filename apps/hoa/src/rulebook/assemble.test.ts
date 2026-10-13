@@ -2,10 +2,9 @@
 import { describe, expect, it } from "vitest"
 import type { Term } from "@/schema/types"
 import { createMemoryBucket } from "@/tests/memoryBucket"
-import { sampleRulesFile } from "@/tests/sampleRulesFile"
+import { approvedRecords, sampleRulesFile } from "@/tests/sampleRulesFile"
 import { assembleRulesFile, InvalidRulesFileError, readRulesFile, writeRulesFile } from "./assemble"
 import { sha256Hex } from "./canonical"
-import { approvedRecords } from "./seedRulebook"
 
 const organization = { id: "demo-hoa", name: "Sample community" }
 const records = approvedRecords({

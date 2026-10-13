@@ -114,11 +114,35 @@ describe("carryForward", () => {
     expect(carried.settings).toMatchObject({ policy, review: approved })
     expect(carried.questions).toEqual([{ ...question, id: "q-new", answer }])
 
-    const changedClauses = { ...settings.clauses, cure: null, deciders: [] }
+    // A clause the documents state comes from the rebuild, and a changed one needs review again.
+    const deciders = settings.clauses.deciders.map((decider) => ({ ...decider, party: "board" }))
+    expect(deciders.every((decider) => decider.citations.length > 0)).toBe(true)
+    const changedClauses = { ...settings.clauses, deciders }
     const rebuilt = await carryForward(built({ settings: { ...settings, clauses: changedClauses } }), [draft])
-    expect(rebuilt.settings).toMatchObject({ policy, review: proposed })
+    expect(rebuilt.settings).toMatchObject({ policy, review: proposed, clauses: { deciders } })
     const reworded = await carryForward(built({ questions: [{ ...question, question: "Reworded?" }] }), [draft])
     expect(reworded.questions[0]?.answer).toBeNull()
+  })
+
+  it("keeps a clause the documents don't state as the administrator set it", async () => {
+    const time = { ...settings.clauses.time, zone: "America/Denver", holidays: "us-wa", citations: [] }
+    const cure = {
+      value: 30,
+      unit: "calendar-day",
+      after: { path: ["violation.observed-on"] },
+      curedBy: null,
+      citations: []
+    }
+    const draft = built({ settings: { ...settings, clauses: { ...settings.clauses, time, cure }, review: approved } })
+    const rebuilt = built({
+      settings: {
+        ...settings,
+        clauses: { ...settings.clauses, time: { ...time, zone: "America/Los_Angeles" }, cure: null }
+      }
+    })
+    const carried = await carryForward(rebuilt, [draft])
+    expect(carried.settings.clauses).toMatchObject({ time, cure })
+    expect(carried.settings.review).toEqual(approved)
   })
 
   it("keeps nothing for new records or with no earlier rulebook", async () => {

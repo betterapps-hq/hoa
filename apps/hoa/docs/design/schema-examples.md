@@ -86,7 +86,7 @@ Units are terms, so the matcher resolves "6'" the same way it resolves any label
   "organizationId": null,
   "kind": "unit",
   "dimension": "length",
-  "perBase": "12",
+  "perBase": "304.8",
   "labels": [
     { "text": "ft", "role": "preferred" },
     { "text": "feet", "role": "alternative" },
@@ -1560,7 +1560,9 @@ any requested hearing first, except self-help.
   "clauses": {
     "precedence": {
       "order": [
-        ["statute", "ordinance"],
+        ["federal-law"],
+        ["state-law"],
+        ["county-ordinance", "city-ordinance"],
         ["declaration", "supplemental-declaration", "plat"],
         ["articles"],
         ["bylaws"],

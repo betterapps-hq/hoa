@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import { newJob } from "@/db/jobRepository"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
-import { describeBuildProblem, rulebookCounts } from "./rulebookView"
+import { buildFailuresOf, describeBuildProblem, rulebookCounts } from "./rulebookView"
 
 const sample = sampleRulesFile()
 const approved = { status: "approved" as const, by: "admin", at: "", note: null }
@@ -28,13 +28,19 @@ describe("describeBuildProblem", () => {
   const job = newJob({ hoaId: "hoa", kind: "rulebook-build", subjectId: "r", now: "" })
   const failure = { stage: "find-rules", itemId: "declaration:article-4", message: "Bad schema" }
 
-  it("explains a failed build or failed items, and nothing for a clean one", () => {
+  it("explains a failed build, and nothing for one that finished", () => {
     expect(describeBuildProblem(null)).toBeNull()
     expect(describeBuildProblem({ ...job, status: "completed" })).toBeNull()
-    expect(describeBuildProblem({ ...job, status: "failed" })).toBe("The build failed.")
-    expect(describeBuildProblem({ ...job, status: "completed-with-errors", failures: [failure, failure] })).toBe(
-      "2 items failed (find-rules): Bad schema"
-    )
+    expect(describeBuildProblem({ ...job, status: "failed" })).toBe("Processing failed.")
+    expect(describeBuildProblem({ ...job, status: "completed-with-errors", failures: [failure] })).toBeNull()
+  })
+
+  it("gives a draft the items its own build skipped", () => {
+    const skipped = { ...job, status: "completed-with-errors" as const, failures: [failure] }
+    expect(buildFailuresOf(skipped, "r")).toEqual([failure])
+    expect(buildFailuresOf(skipped, "another draft")).toEqual([])
+    expect(buildFailuresOf({ ...job, status: "completed" }, "r")).toEqual([])
+    expect(buildFailuresOf(null, null)).toEqual([])
   })
 })
 

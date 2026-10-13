@@ -57,6 +57,27 @@
       "when": 1791604714520,
       "tag": "0007_governing_document_removed",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791843858067,
+      "tag": "0008_law_kinds",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791854207537,
+      "tag": "0009_application_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791857771989,
+      "tag": "0010_activity_actors",
+      "breakpoints": true
     }
   ]
 }

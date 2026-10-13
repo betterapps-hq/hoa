@@ -3,11 +3,14 @@ import { ApplicationPage } from "@/features/applications/ApplicationPage/Applica
 import {
   completeApplicationUpload,
   createApplicationUpload,
+  deleteApplicationDraft,
   getApplicationView,
   getPacketImage,
   recordDecision,
   removeApplicationFile,
   runReview,
+  saveApplication,
+  setApplicationFileUploadedAs,
   submitApplication,
   uploadApplicationFile
 } from "@/features/applications/applications.functions"
@@ -29,18 +32,22 @@ function ApplicationRoute() {
   const applicationId = view.application.id
   return (
     <ApplicationPage
+      // Another application is another draft: nothing typed into one carries to the next.
+      key={applicationId}
       view={view}
       // An administrator reads someone else's application as the committee; their own, as its applicant.
       audience={role.id === "administrator" && !view.isOwner ? "committee" : "homeowner"}
       loadJob={(jobId) => getJobStatus({ data: { jobId } })}
       onChanged={() => void router.invalidate()}
+      onBack={() => void router.navigate({ to: "/applications" })}
       source={{
         documents: view.sourceFiles,
         loadPage: (documentId, pageIndex) => getDocumentPage({ data: { documentId, pageIndex } })
       }}
       loadImage={async (fileId) => (await getPacketImage({ data: { applicationId, fileId } })).url}
       actions={{
-        upload: (files) =>
+        save: (content) => saveApplication({ data: { applicationId, ...content } }),
+        upload: (files, uploadedAs) =>
           uploadApplicationFiles(
             {
               createUpload: (input) => createApplicationUpload({ data: input }),
@@ -48,13 +55,16 @@ function ApplicationRoute() {
               completeUpload: (fileId) => completeApplicationUpload({ data: { fileId } })
             },
             applicationId,
-            files
+            files,
+            uploadedAs
           ),
+        setUploadedAs: (fileId, uploadedAs) => setApplicationFileUploadedAs({ data: { fileId, uploadedAs } }),
         removeFile: (fileId) => removeApplicationFile({ data: { fileId } }),
         runReview: async () => {
           await runReview({ data: { applicationId } })
         },
         submit: (confirmOpenRequests) => submitApplication({ data: { applicationId, confirmOpenRequests } }),
+        deleteDraft: () => deleteApplicationDraft({ data: { applicationId } }),
         decide: (outcome, note) => recordDecision({ data: { applicationId, outcome, note } })
       }}
     />

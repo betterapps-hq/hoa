@@ -1,7 +1,7 @@
 import { Fragment } from "react"
 import { parseRuleMarkers } from "@/review/ruleMarkers"
 import type { ReviewContext } from "../reviewContext"
-import { ReviewRuleReference } from "../ReviewRuleReference/ReviewRuleReference"
+import { InlineRuleReference } from "../ReviewRuleReference/ReviewRuleReference"
 
 export type MarkedTextProps = {
   /** The writer's text, with rule markers such as {{rule:guidelines:5.4.2(i)#colors}}. */
@@ -9,7 +9,7 @@ export type MarkedTextProps = {
   context: Pick<ReviewContext, "rules" | "source">
 }
 
-/** The writer's text with every rule marker as a reference to the rule and its citation. */
+/** The writer's text with every rule marker as the rule's name, linked to its citation. */
 export function MarkedText({ text, context }: MarkedTextProps) {
   return (
     <>
@@ -18,7 +18,7 @@ export function MarkedText({ text, context }: MarkedTextProps) {
         part.type === "text" ? (
           <Fragment key={index}>{part.text}</Fragment>
         ) : (
-          <ReviewRuleReference key={index} ruleKey={part.ruleKey} context={context} />
+          <InlineRuleReference key={index} ruleKey={part.ruleKey} context={context} />
         )
       )}
     </>

@@ -16,7 +16,7 @@ import {
   sections
 } from "./schema"
 
-// The rules data reset (implementation-plan.md, 0.4): empties everything builds, the sample seed and reviews wrote, in
+// The rules data reset (implementation-plan.md, 0.4): empties everything builds and reviews wrote, in
 // every organization, so the next build starts clean. Uploaded documents and their pages, applications and their
 // files, model caches and settings stay. Applications go back to drafts, since their reviews are gone.
 

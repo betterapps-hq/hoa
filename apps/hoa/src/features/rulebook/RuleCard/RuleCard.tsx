@@ -2,7 +2,8 @@ import { useDidUpdate } from "@mantine/hooks"
 import { useRef, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { approvalBlockers } from "@/rulebook/review"
+import { Badge } from "@/components/ui/badge"
+import { approvalBlockers, termKeysOf } from "@/rulebook/review"
 import { describeRule } from "@/schema/describe"
 import type * as T from "@/schema/types"
 import type { RuleDraft } from "@/schema/zod"
@@ -16,9 +17,12 @@ import { RuleForm } from "../RuleForm/RuleForm"
 import { domainLabels, remedyLabels } from "../ruleLabels"
 import { RuleLink } from "../RuleLink/RuleLink"
 import { RulePreview } from "../RulePreview/RulePreview"
+import { RuleTermMenu } from "../RuleTermMenu/RuleTermMenu"
 import { Statement } from "../Statement/Statement"
 import { TermChip } from "../TermChip/TermChip"
+import { describeTermKind } from "../TermChip/TermChip.utils"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
+import { termUsage } from "../VocabularyTab/VocabularyTab.utils"
 import { cureLabel, kindLabel } from "./RuleCard.utils"
 
 export type RuleCardProps = { rule: T.Rule }
@@ -32,6 +36,65 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       </h3>
       {children}
     </section>
+  )
+}
+
+const reviewOrder: Record<T.Review["status"], number> = { proposed: 0, rejected: 1, approved: 2 }
+
+/**
+ * The terms a rule reads (encoding.md, UX, Rule card): what each means and how many rules share it, those still to
+ * review first. A term means the same in every rule that reads it, and approving the rule approves those still to review.
+ */
+function TermsItUses({ rule }: { rule: T.Rule }) {
+  const { records, vocabulary, actions } = useRulebookWorkspace()
+  const usage = termUsage(records.rules)
+  const keys = termKeysOf(rule)
+  const terms = records.terms
+    .filter((term) => keys.has(term.key))
+    .toSorted(
+      (a, b) =>
+        reviewOrder[a.review.status] - reviewOrder[b.review.status] ||
+        vocabulary.label(a.key).localeCompare(vocabulary.label(b.key))
+    )
+  if (terms.length === 0) {
+    return null
+  }
+  const toReview = terms.filter((term) => term.review.status === "proposed").length
+  return (
+    <Section title="Terms it uses">
+      {actions && rule.review.status === "proposed" && toReview > 0 ? (
+        <p className="text-sm text-muted-foreground">
+          Approving the rule approves {toReview === 1 ? "the one" : `the ${toReview}`} still to review. A term means the
+          same in every rule that uses it.
+        </p>
+      ) : null}
+      <ul aria-label="Terms it uses" className="flex flex-col divide-y rounded-lg border">
+        {terms.map((term) => {
+          const shared = usage.get(term.key)?.length ?? 0
+          return (
+            <li key={term.key} className="flex items-start justify-between gap-3 px-3 py-2">
+              <div className="flex min-w-0 flex-col gap-0.5">
+                <TermChip termKey={term.key} vocabulary={vocabulary} isStandalone />
+                <span className="text-sm text-muted-foreground">{describeTermKind(term, vocabulary)}</span>
+              </div>
+              <div className="flex shrink-0 items-start gap-1">
+                <div className="flex flex-col items-end gap-1 text-sm text-muted-foreground">
+                  {term.review.status === "proposed" && actions ? <Badge variant="outline">To review</Badge> : null}
+                  {term.review.status === "rejected" ? <span className="text-destructive">Rejected</span> : null}
+                  <span>{shared > 1 ? `Used in ${countOf(shared, "rule", "rules")}` : "Only this rule"}</span>
+                </div>
+                {/* Every row keeps the menu's place, so the rows line up whether a term has one or not. */}
+                {actions ? (
+                  <div className="flex w-8 shrink-0 justify-end">
+                    <RuleTermMenu rule={rule} term={term} usedBy={shared} />
+                  </div>
+                ) : null}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </Section>
   )
 }
 
@@ -141,6 +204,8 @@ export function RuleCard({ rule }: RuleCardProps) {
           <p className="text-muted-foreground">It cites no provision.</p>
         )}
       </Section>
+
+      {audience === "administrator" ? <TermsItUses rule={rule} /> : null}
 
       {hasProblems && audience === "administrator" ? (
         <Section title="Problems">

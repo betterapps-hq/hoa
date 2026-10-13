@@ -1,10 +1,18 @@
 import { cn } from "cn"
-import { FileIcon, UploadIcon, XIcon } from "lucide-react"
+import { UploadIcon, XIcon } from "lucide-react"
 import { useState } from "react"
 import { useDropzone, type FileRejection } from "react-dropzone"
-import { Button } from "@/components/ui/button"
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentTitle
+} from "@/components/ui/attachment"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { acceptedTypes, uploadHint, validateUpload, type UploadTarget } from "@/storage/uploadRules"
+import { FileTypeMedia } from "../FileTypeMedia/FileTypeMedia"
 
 // The app's one way to choose files (documents.md, Uploads): a drop zone that takes files by drag and drop or by
 // browsing (click, Enter or Space), checks them against the target's rules in src/storage, and names each file it
@@ -179,44 +187,36 @@ export function FileDropzone({
         </ul>
       ) : null}
       {value && files.length > 0 ? (
-        <ul className="flex flex-col divide-y rounded-lg border" aria-label="Chosen files">
+        <ul className="flex flex-col gap-2" aria-label="Chosen files">
           {files.map((item, index) => (
             // Two files can share a name, so a file's place in the list is part of its identity.
-            <li
-              key={`${index}-${item.file.name}-${item.file.size}`}
-              className="flex flex-col gap-2 px-3 py-2.5 text-sm"
-            >
-              <div className="flex items-center gap-3">
-                <FileIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-medium" title={item.file.name}>
-                    {item.file.name}
-                  </span>
-                  <span className="text-muted-foreground">{sizeText(item.file.size)}</span>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <Button
+            <li key={`${index}-${item.file.name}-${item.file.size}`} className="flex flex-col gap-2">
+              <Attachment className="w-full">
+                <FileTypeMedia fileName={item.file.name} mediaType={item.file.type} />
+                <AttachmentContent>
+                  <AttachmentTitle title={item.file.name}>{item.file.name}</AttachmentTitle>
+                  <AttachmentDescription>{sizeText(item.file.size)}</AttachmentDescription>
+                </AttachmentContent>
+                <AttachmentActions>
+                  <AttachmentAction
                     type="button"
-                    variant="ghost"
-                    size="sm"
+                    size="xs"
                     disabled={disabled}
                     aria-label={`Replace ${item.file.name}`}
                     onClick={() => replace(index)}
                   >
                     Replace
-                  </Button>
-                  <Button
+                  </AttachmentAction>
+                  <AttachmentAction
                     type="button"
-                    variant="ghost"
-                    size="icon-sm"
                     disabled={disabled}
                     aria-label={`Remove ${item.file.name}`}
                     onClick={() => remove(index)}
                   >
                     <XIcon />
-                  </Button>
-                </div>
-              </div>
+                  </AttachmentAction>
+                </AttachmentActions>
+              </Attachment>
               {kinds ? (
                 <NativeSelect
                   size="sm"

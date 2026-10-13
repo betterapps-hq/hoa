@@ -1,3 +1,4 @@
+import { withLawFirst } from "@/schema/law"
 import type { Review, Settings } from "@/schema/types"
 
 // What a rulebook's settings are where its documents say nothing (schema.md, Settings): the usual order of authority
@@ -8,15 +9,14 @@ const unreviewed: Review = { status: "proposed", by: null, at: null, note: null 
 
 const defaultClauses: Settings["clauses"] = {
   precedence: {
-    order: [
-      ["statute", "ordinance"],
+    order: withLawFirst([
       ["declaration", "supplemental-declaration", "plat"],
       ["articles"],
       ["bylaws"],
       ["design-guidelines"],
       ["rules", "policy", "resolution"],
       ["minutes"]
-    ],
+    ]),
     citations: []
   },
   // The demo's organization is in Washington; organizations don't record a time zone yet.

@@ -1,4 +1,4 @@
-import { and, desc, eq, max } from "drizzle-orm"
+import { and, desc, eq, isNotNull, max } from "drizzle-orm"
 import { rulebookSchema } from "@/rules/rule"
 import type { Database } from "./database"
 import { rulebooks } from "./schema"
@@ -32,6 +32,19 @@ export async function getRulebookByStatus(db: Database, hoaId: string, status: "
     .limit(1)
     .get()
   return row ? toRulebook(row) : null
+}
+
+/** Every rulebook that was published, the one in force and those it superseded, for what happened to the rulebook. */
+export function listPublishedRulebooks(db: Database, hoaId: string) {
+  return db
+    .select({
+      id: rulebooks.id,
+      version: rulebooks.version,
+      publishedBy: rulebooks.publishedBy,
+      publishedAt: rulebooks.publishedAt
+    })
+    .from(rulebooks)
+    .where(and(eq(rulebooks.hoaId, hoaId), isNotNull(rulebooks.publishedAt)))
 }
 
 export async function failRulebook(db: Database, hoaId: string, id: string, error: Rulebook["error"]) {

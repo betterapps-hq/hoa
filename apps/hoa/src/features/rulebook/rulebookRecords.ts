@@ -3,23 +3,43 @@ import type { RulebookRecords } from "@/rulebook/assemble"
 import type * as T from "@/schema/types"
 import type { Vocabulary } from "@/schema/vocabulary"
 import type { CitedProvision } from "./citedProvision"
-import type { RulebookSources } from "./rulebook.functions"
+import type { RulebookSources, RulebookView } from "./rulebook.functions"
 import type { ReferencedRule } from "./RuleReference/RuleReference"
 
 // A rulebook's records as the rules UX reads them, and the citations its rule references show.
 
 const isApproved = (record: { review: T.Review }) => record.review.status === "approved"
 
-/** A rulebook's records with the sources they cite. The published rulebook shows only what its rules file holds. */
+/**
+ * The provisions a rulebook covers: those of the documents it was built from, not every document the association has
+ * had, such as one a later upload replaced.
+ */
+export function provisionsBuiltFrom(
+  sources: Pick<RulebookSources, "provisions" | "provisionDocumentIds">,
+  sourceDocumentIds: readonly string[]
+) {
+  const builtFrom = new Set(sourceDocumentIds)
+  return sources.provisions.filter((provision) => {
+    const documentId = sources.provisionDocumentIds[provision.key]
+    return documentId !== undefined && builtFrom.has(documentId)
+  })
+}
+
+/**
+ * A rulebook's records with the sources they cite. The published rulebook shows only what its rules file holds, and
+ * cites the documents and provisions as the file holds them (`filedSources`) when there is one.
+ */
 export function recordsOf(
   sources: RulebookSources,
+  rulebook: { sourceDocumentIds: readonly string[] },
   content: RulebookContent,
-  which: "draft" | "published"
+  which: "draft" | "published",
+  filedSources: RulebookView["filedSources"] = null
 ): RulebookRecords {
   return {
     organization: sources.organization,
-    documents: sources.documents,
-    provisions: sources.provisions,
+    documents: filedSources?.documents ?? sources.documents,
+    provisions: filedSources?.provisions ?? provisionsBuiltFrom(sources, rulebook.sourceDocumentIds),
     terms: which === "draft" ? content.terms : content.terms.filter(isApproved),
     rules: which === "draft" ? content.rules : content.rules.filter(isApproved),
     settings: content.settings,

@@ -115,7 +115,7 @@ describe("references", () => {
       withRule({ ...ex.lateFee, enforces: { rules: ["declaration:6.4#annual"], documents: [], except: [] } }),
       withRule({ ...ex.fineLimit, limits: ["rules:12.1#fine"] }),
       (rulebook) => {
-        const about = { rules: ["guidelines:5.5.1(i)#height"], terms: ["fence"] }
+        const about = { rules: ["guidelines:5.5.1(i)#height"], terms: ["fence-hinge"] }
         rulebook.questions.push(questionDraft.parse({ ...ex.interpretation, about }))
       }
     )
@@ -170,7 +170,7 @@ describe("rule invariants", () => {
       issue("type-mismatch", ex.sightLines.key, "decidedBy"),
       issue("type-mismatch", ex.priorApproval.key, "check.by.0"),
       issue("type-mismatch", ex.grandfathered.key, "appliesWhen.by.0"),
-      issue("undefined-term", ex.fineSchedule.key, "imposedBy"),
+      issue("type-mismatch", ex.fineSchedule.key, "imposedBy"),
       issue("type-mismatch", ex.fineSchedule.key, "against.0")
     ])
   })

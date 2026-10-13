@@ -10,7 +10,8 @@ import { amountText } from "../rulebook/rulebookRecords"
 export const statusLabels: Record<ApplicationStatus, string> = {
   draft: "Draft",
   reviewing: "Reviewing",
-  reviewed: "Reviewed",
+  // Reviewed or not, an application is the homeowner's draft until they submit it.
+  reviewed: "Draft",
   submitted: "With the committee",
   "information-requested": "Information requested",
   decided: "Decided"
@@ -34,21 +35,7 @@ export const outcomeLabels: Record<DecisionOutcome, string> = {
   "information-requested": "Information requested"
 }
 
-/** A group of findings by outcome, as the findings list heads it. */
-export const findingLabels: Record<Outcome, string> = {
-  "not-met": "Not met",
-  "missing-information": "Missing information",
-  committee: "For the committee",
-  advisory: "Suggestions",
-  pending: "Pending",
-  met: "Met",
-  exempt: "Exempt",
-  "not-applicable": "Doesn't apply",
-  available: "Available",
-  blocked: "Blocked"
-}
-
-/** One finding's outcome, as a matrix cell names it. */
+/** One finding's outcome, as its chip names it. */
 export const cellLabels: Record<Outcome, string> = {
   "not-met": "Not met",
   "missing-information": "Missing",
@@ -83,14 +70,6 @@ export const outcomeOrder: Outcome[] = [
   "blocked"
 ]
 
-/** The outcomes that ask something of someone: a change, information, or the committee's decision. */
-export const attentionOutcomes: ReadonlySet<Outcome> = new Set([
-  "not-met",
-  "missing-information",
-  "committee",
-  "advisory"
-])
-
 /** Files the homeowner uploaded, each with the pictures taken from it. */
 export function packetFiles(files: readonly ApplicationFile[]) {
   return files
@@ -100,6 +79,24 @@ export function packetFiles(files: readonly ApplicationFile[]) {
 
 /** "Fence run" for `fence-run`: a term's label as a heading starts. */
 export const sentenceCase = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
+
+/**
+ * A term's key in words, for a term the page has no record of: "review fee" for
+ * `architectural-application.review-fee`, its own part without the thing it belongs to.
+ */
+export const termKeyLabel = (termKey: string) => (termKey.split(".").at(-1) ?? termKey).replaceAll("-", " ")
+
+/** The provision a rule's key names: `guidelines:3.4.2` for `guidelines:3.4.2#photos`; null for a key without one. */
+export function ruleKeyProvision(ruleKey: string) {
+  const provision = ruleKey.slice(0, Math.max(0, ruleKey.indexOf("#")))
+  return provision.includes(":") ? provision : null
+}
+
+/** A rule's key in words, for a rule the page has no record of: "Photos" for `guidelines:3.4.2#photos`. */
+export function ruleKeyLabel(ruleKey: string) {
+  const name = ruleKey.slice(ruleKey.indexOf("#") + 1)
+  return ruleKeyProvision(ruleKey) && name ? sentenceCase(name.replaceAll("-", " ")) : ruleKey
+}
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" })
 const dateTimeFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" })

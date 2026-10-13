@@ -3,7 +3,7 @@ import type { GoverningDocumentKind } from "../src/documents/governingDocument.t
 
 // The sample organization's governing documents as the build reads them (encoding.md, Structure 4): the Declaration,
 // whose Exhibit C is the use restrictions, a document of its own, and the Residential Design Guidelines, keyed
-// `guidelines`. Shared by the evaluation runner and the script that sets them on local uploads.
+// `guidelines`. Shared by the evaluation runners.
 
 export type SampleDocument = {
   /** The upload kind, and the folder of its cached page records under .fixtures/ocr/. */

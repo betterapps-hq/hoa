@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes"
 import { useState, type ReactNode } from "react"
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary"
 import { AppSidebar } from "@/components/app-sidebar"
+import { PageActionsProvider } from "@/components/PageActions/PageActions"
 import { UnitSystemProvider } from "@/components/QuantityInput/QuantityInput"
 import { SiteHeader } from "@/components/site-header"
 import { Button } from "@/components/ui/button"
@@ -73,19 +74,22 @@ function RootLayout() {
           <TooltipProvider>
             <SidebarProvider style={layoutStyle}>
               <AppSidebar variant="inset" />
-              <SidebarInset>
-                <SiteHeader />
-                <div className="flex flex-1 flex-col">
-                  <div className="@container/main flex flex-1 flex-col gap-2">
-                    <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-                      <ErrorBoundary FallbackComponent={AppError}>
-                        <UnitSystemProvider value={session.unitSystem}>
-                          <Outlet />
-                        </UnitSystemProvider>
-                      </ErrorBoundary>
+              {/* min-w-0 lets the page narrow beside the small-screen rail instead of running past the edge. */}
+              <SidebarInset className="min-w-0">
+                <PageActionsProvider>
+                  <SiteHeader />
+                  <div className="flex flex-1 flex-col">
+                    <div className="@container/main flex flex-1 flex-col gap-2">
+                      <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+                        <ErrorBoundary FallbackComponent={AppError}>
+                          <UnitSystemProvider value={session.unitSystem}>
+                            <Outlet />
+                          </UnitSystemProvider>
+                        </ErrorBoundary>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </PageActionsProvider>
               </SidebarInset>
             </SidebarProvider>
             <Toaster />

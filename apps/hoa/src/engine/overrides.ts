@@ -1,4 +1,5 @@
 import { match } from "ts-pattern"
+import { isLaw } from "@/schema/law"
 import type * as T from "@/schema/types"
 import { appliesOn, documentKeyOf, isConsidered, mainProvision } from "./applicability"
 import { toDay } from "./calendar"
@@ -21,8 +22,6 @@ export type Rulebook = {
   /** The rules a rule overrides, before any per-subject condition. */
   targetsOf: (rule: T.Rule) => T.Rule[]
 }
-
-const law = new Set<T.DocumentKind>(["statute", "ordinance"])
 
 type OverridingRule = T.NormRule | T.DiscretionRule
 const isOverriding = (rule: T.Rule): rule is OverridingRule => rule.kind === "norm" || rule.kind === "discretion"
@@ -73,11 +72,11 @@ export function indexRulebook(file: T.RulesFile): Rulebook {
   }
   const isValid = (overrider: T.Rule, target: T.Rule) => {
     const kind = kindOf(overrider)
-    const isLaw = kind !== undefined && law.has(kind)
+    const isLawRule = kind !== undefined && isLaw(kind)
     return (
       overrider.key !== target.key &&
       rank(overrider) <= rank(target) &&
-      (target.kind !== "norm" || !target.noExceptions || isLaw)
+      (target.kind !== "norm" || !target.noExceptions || isLawRule)
     )
   }
 

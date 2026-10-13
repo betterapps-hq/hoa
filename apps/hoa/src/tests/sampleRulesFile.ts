@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import type { RulesFile, Term } from "@/schema/types"
+import type { RulebookRecords } from "@/rulebook/assemble"
+import type { Id, Review, RulesFile, Term } from "@/schema/types"
 import { rulesFile } from "@/schema/zod"
 
 // The committed golden encoding of the sample organization's documents (samples/declaration/rules.json): the
@@ -14,6 +15,37 @@ export function sampleRulesFile(): RulesFile {
     JSON.parse(readFileSync(join(import.meta.dirname, "../../samples/declaration/rules.json"), "utf8"))
   )
   return structuredClone(parsed)
+}
+
+/** A rules file's records, every one approved, and belonging to the organization. */
+export function approvedRecords({
+  file,
+  organization,
+  approvedBy,
+  now
+}: {
+  file: RulesFile
+  organization: { id: Id; name: string }
+  approvedBy: Id
+  now: string
+}): RulebookRecords {
+  const review: Review = { status: "approved", by: approvedBy, at: now, note: null }
+  return {
+    organization,
+    documents: file.documents,
+    provisions: file.provisions.map((provision) => ({
+      ...provision,
+      noRule: provision.noRule && { ...provision.noRule, review }
+    })),
+    terms: [...file.terms, ...file.proposedCore].map((term) => ({
+      ...term,
+      organizationId: term.organizationId === null ? null : organization.id,
+      review
+    })),
+    rules: file.rules.map((rule) => ({ ...rule, review })),
+    settings: { ...file.settings, review },
+    questions: file.questions
+  }
 }
 
 /**

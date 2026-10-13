@@ -8,6 +8,7 @@ import {
   citationLabel,
   citedProvision,
   countOf,
+  provisionsBuiltFrom,
   readableLabel,
   recordsOf,
   referencedRule,
@@ -66,10 +67,56 @@ describe("recordsOf", () => {
       terms: records.terms,
       questions: []
     }
-    const sources = { organization: records.organization, documents: records.documents, provisions: [], files: [] }
-    expect(recordsOf(sources, content, "published").rules).toHaveLength(1)
-    expect(recordsOf(sources, content, "published").terms).toHaveLength(0)
-    expect(recordsOf(sources, content, "draft").rules).toHaveLength(records.rules.length)
+    const sources = {
+      organization: records.organization,
+      documents: records.documents,
+      provisions: [],
+      provisionDocumentIds: {},
+      files: []
+    }
+    const rulebook = { sourceDocumentIds: [] }
+    expect(recordsOf(sources, rulebook, content, "published").rules).toHaveLength(1)
+    expect(recordsOf(sources, rulebook, content, "published").terms).toHaveLength(0)
+    expect(recordsOf(sources, rulebook, content, "draft").rules).toHaveLength(records.rules.length)
+  })
+
+  it("cites the published rulebook's provisions as its rules file holds them", () => {
+    // A later upload's build took over the declaration's key, so the stored provisions are another document's.
+    const content: RulebookContent = {
+      settings: records.settings,
+      coverage: { provisions: 0, uncovered: [] },
+      rules: [],
+      terms: [],
+      questions: []
+    }
+    const sources = {
+      organization: records.organization,
+      documents: [],
+      provisions: [],
+      provisionDocumentIds: {},
+      files: []
+    }
+    const filed = { documents: records.documents, provisions: records.provisions }
+    const published = recordsOf(sources, { sourceDocumentIds: ["upload"] }, content, "published", filed)
+    expect(published.provisions).toEqual(records.provisions)
+    expect(published.documents).toEqual(records.documents)
+  })
+})
+
+describe("provisionsBuiltFrom", () => {
+  it("keeps only the provisions of the documents the rulebook was built from", () => {
+    // The association's earlier documents are still stored, for the rulebook in force to cite; a new draft built from
+    // one upload covers only that upload's provisions.
+    const declaration = records.provisions.filter((provision) => provision.key.startsWith("declaration:"))
+    const sources = {
+      provisions: records.provisions,
+      provisionDocumentIds: Object.fromEntries(
+        records.provisions.map((provision) => [provision.key, declaration.includes(provision) ? "upload" : "earlier"])
+      )
+    }
+    expect(provisionsBuiltFrom(sources, ["upload"])).toEqual(declaration)
+    expect(provisionsBuiltFrom(sources, ["upload", "earlier"])).toEqual(records.provisions)
+    expect(provisionsBuiltFrom(sources, [])).toEqual([])
   })
 })
 

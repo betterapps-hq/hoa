@@ -7,6 +7,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { pickableTerms } from "@/rulebook/ruleTerms"
 import type * as T from "@/schema/types"
 import type { RuleContent, RuleDraft } from "@/schema/zod"
 import { CheckEditor } from "../CheckEditor/CheckEditor"
@@ -19,7 +20,7 @@ import { draftOf, ruleProblems } from "../ruleProblems"
 import { Statement } from "../Statement/Statement"
 import { TermListPicker } from "../TermListPicker/TermListPicker"
 import { TermPicker } from "../TermPicker/TermPicker"
-import { pickableTerms, termFilters, termOptions } from "../TermPicker/TermPicker.utils"
+import { termFilters, termOptions } from "../TermPicker/TermPicker.utils"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 import {
   domainChoices,

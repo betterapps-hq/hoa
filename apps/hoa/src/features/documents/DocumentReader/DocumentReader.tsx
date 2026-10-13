@@ -1,6 +1,16 @@
 import { useReducedMotion, useUncontrolled } from "@mantine/hooks"
 import { useQuery } from "@tanstack/react-query"
-import { ChevronLeftIcon, ChevronRightIcon, DownloadIcon, FileTextIcon, ListIcon } from "lucide-react"
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  DownloadIcon,
+  FileClockIcon,
+  FileQuestionMarkIcon,
+  FileTextIcon,
+  FileXIcon,
+  ListIcon,
+  type LucideIcon
+} from "lucide-react"
 import { Fragment, lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
@@ -8,7 +18,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Skeleton } from "@/components/ui/skeleton"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import type { DocumentReading, ReadingBlock } from "@/documents/reading"
+import { isUnavailable, type DocumentReading, type ReadingBlock, type ReadingUnavailable } from "@/documents/reading"
 import { citationTitle } from "@/features/rulebook/citedProvision"
 import { citationLabel } from "@/features/rulebook/rulebookRecords"
 import { useSearch } from "@/hooks/useSearch"
@@ -61,6 +71,47 @@ function rememberView(view: ReaderView) {
     window.localStorage.setItem(viewKey, view)
   } catch {
     // Storage can be blocked; the choice lasts for this reader only.
+  }
+}
+
+const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
+
+/** Why a document can't be read, in words, and whether trying again could help. */
+function unavailableText(reason: ReadingUnavailable): {
+  icon: LucideIcon
+  title: string
+  description: string
+  canRetry: boolean
+} {
+  switch (reason.unavailable) {
+    case "removed":
+      return {
+        icon: FileXIcon,
+        title: "This document was removed",
+        description: `${reason.title} was removed from your governing documents on ${dateFormat.format(new Date(reason.removedAt))}.`,
+        canRetry: false
+      }
+    case "missing":
+      return {
+        icon: FileQuestionMarkIcon,
+        title: "This document isn’t available",
+        description: "It isn’t one of your governing documents.",
+        canRetry: false
+      }
+    case "not-ready":
+      return reason.hasFailed
+        ? {
+            icon: FileXIcon,
+            title: "This document couldn’t be read",
+            description: `${reason.title} couldn’t be read. Upload it again from your governing documents.`,
+            canRetry: false
+          }
+        : {
+            icon: FileClockIcon,
+            title: "This document isn’t ready yet",
+            description: `${reason.title} is still being read. Try again in a few minutes.`,
+            canRetry: true
+          }
   }
 }
 
@@ -133,6 +184,8 @@ export function DocumentReader({
     queryFn: () => getDocumentReading({ data: { documentId } }),
     staleTime: 5 * 60 * 1000
   })
+  const loaded = reading.data && !isUnavailable(reading.data) ? reading.data : null
+  const unavailable = reading.data && isUnavailable(reading.data) ? unavailableText(reading.data) : null
   const locations = useQuery({
     queryKey: ["provision-locations", cites],
     queryFn: () => locateProvisions({ data: { keys: [...cites] } }),
@@ -142,15 +195,15 @@ export function DocumentReader({
 
   return (
     <div className={cn("@container/reader flex h-full min-h-0 flex-col bg-background", className)}>
-      {reading.data ? (
+      {loaded ? (
         <LoadedReader
-          key={reading.data.id}
-          reading={reading.data}
+          key={loaded.id}
+          reading={loaded}
           provision={provision}
           cites={cites}
           highlights={highlights}
           onStep={(key) => {
-            const isHere = reading.data.blocks.some((block) => block.type === "provision" && block.provisionKey === key)
+            const isHere = loaded.blocks.some((block) => block.type === "provision" && block.provisionKey === key)
             const documentOfKey = isHere ? documentId : locations.data?.[key]?.documentId
             if (documentOfKey) {
               setTarget({ documentId: documentOfKey, provision: key })
@@ -160,6 +213,24 @@ export function DocumentReader({
             Object.entries(locations.data ?? {}).map(([key, location]) => [key, location.heading])
           )}
         />
+      ) : null}
+      {unavailable ? (
+        <Empty className="flex-1">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <unavailable.icon />
+            </EmptyMedia>
+            <EmptyTitle>{unavailable.title}</EmptyTitle>
+            <EmptyDescription>{unavailable.description}</EmptyDescription>
+          </EmptyHeader>
+          {unavailable.canRetry ? (
+            <EmptyContent>
+              <Button variant="outline" onClick={() => void reading.refetch()}>
+                Try again
+              </Button>
+            </EmptyContent>
+          ) : null}
+        </Empty>
       ) : null}
       {reading.error && !reading.data ? (
         <Empty className="flex-1">
@@ -497,6 +568,12 @@ function LoadedReader({ reading, provision, cites, highlights, onStep, stepNames
           {isMissing ? (
             <p className={cn(measure, "pt-2 text-sm text-muted-foreground")}>
               The cited passage isn&rsquo;t in this version of the document.
+            </p>
+          ) : null}
+          {reading.removedAt ? (
+            <p className={cn(measure, "pt-2 text-sm text-muted-foreground")}>
+              Removed from your governing documents on {dateFormat.format(new Date(reading.removedAt))}. It shows here
+              because rules cite it.
             </p>
           ) : null}
           {reading.newerVersionId ? (

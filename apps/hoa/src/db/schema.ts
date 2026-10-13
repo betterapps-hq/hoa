@@ -43,7 +43,9 @@ export const governingDocuments = sqliteTable(
     structure: json<unknown>("structure_json"),
     // When an administrator removed the document: builds and the documents list leave it out, while what already
     // cites its pages still opens them. Null for a document in use.
-    removedAt: text("removed_at")
+    removedAt: text("removed_at"),
+    // Who removed it, for the committee's recent activity; null for one in use, or removed before this was kept.
+    removedBy: text("removed_by")
   },
   (table) => [
     uniqueIndex("governing_documents_lineage_version").on(table.lineageId, table.version),
@@ -225,6 +227,8 @@ export const projectTypes = sqliteTable(
     status: text("status").notNull(),
     rulebookId: text("rulebook_id"),
     definition: json<unknown>("definition_json").notNull(),
+    // Who added it, for the committee's recent activity; null for one added before this was kept.
+    createdBy: text("created_by"),
     createdAt: timestamp("created_at"),
     updatedAt: timestamp("updated_at")
   },
@@ -248,6 +252,8 @@ export const applications = sqliteTable(
     createdBy: text("created_by").notNull(),
     createdAt: timestamp("created_at"),
     updatedAt: timestamp("updated_at"),
+    // When the homeowner last changed what the application says: its description, answers or files.
+    revisedAt: text("revised_at"),
     status: text("status").notNull(),
     reviewId: text("review_id"),
     submittedReviewId: text("submitted_review_id"),
@@ -270,6 +276,8 @@ export const applicationFiles = sqliteTable(
     parentFileId: text("parent_file_id"),
     ordinal: integer("ordinal"),
     contextText: text("context_text"),
+    // What the homeowner said the file is: one of the project type's documents, or other.
+    uploadedAs: text("uploaded_as"),
     fileName: text("file_name").notNull(),
     mediaType: text("media_type").notNull(),
     sizeBytes: integer("size_bytes").notNull(),

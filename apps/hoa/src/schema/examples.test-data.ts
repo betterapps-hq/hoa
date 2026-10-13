@@ -1315,7 +1315,9 @@ export const settings: Omit<Settings, "review" | "issues"> = {
   clauses: {
     precedence: {
       order: [
-        ["statute", "ordinance"],
+        ["federal-law"],
+        ["state-law"],
+        ["county-ordinance", "city-ordinance"],
         ["declaration", "supplemental-declaration", "plat"],
         ["articles"],
         ["bylaws"],

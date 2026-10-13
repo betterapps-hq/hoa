@@ -631,6 +631,12 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
           (value.kind === "property" && JSON.stringify(core.valueType) === JSON.stringify(value.valueType)))
       if (!isSameType) {
         at.report("type-mismatch", "a refinement of a core term keeps its kind and value type", ["kind"])
+      } else if (
+        core.kind === "unit" &&
+        value.kind === "unit" &&
+        (core.dimension !== value.dimension || core.perBase !== value.perBase)
+      ) {
+        at.report("type-mismatch", "a refinement of a core unit keeps its dimension and conversion", ["perBase"])
       }
     }
     match(value)

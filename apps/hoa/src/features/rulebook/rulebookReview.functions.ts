@@ -7,6 +7,9 @@ import { saveRulebookChanges } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus } from "@/db/rulebookRepository"
 import { loadRulebookRecords, type RulebookRecords } from "@/rulebook/assemble"
 import { answerQuestion, resolveIssue, reviewIssues, reviewRecords, type RecordRef } from "@/rulebook/review"
+import { changeRuleTerm } from "@/rulebook/ruleTerms"
+import { addChoice, editTerm, mergeTerm } from "@/rulebook/termEdits"
+import { withLawFirst } from "@/schema/law"
 import type * as Rules from "@/schema/types"
 import { rule as ruleSchema, ruleDraft, settings as settingsSchema } from "@/schema/zod"
 import { requireAdministrator } from "@/session/requestContext.server"
@@ -119,6 +122,81 @@ export const saveRulebookRule = createServerFn({ method: "POST" })
     return issuesOf({ ...records, rules: records.rules.map((item) => (item.key === rule.key ? rule : item)) }, rule.key)
   })
 
+const termChange = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("term"), key: z.string() }),
+  z.object({ type: z.literal("copy"), label: z.string().trim().min(1), definition: note })
+])
+
+/**
+ * Changes which term one rule uses, in that rule only (encoding.md, UX, Rule card): to a term that fits where it's
+ * used, or to a new term made from a copy. The rule goes back to proposed, and a new term is proposed with it.
+ * Problems validation finds on the rule come back.
+ */
+export const changeRulebookRuleTerm = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    z.object({ ...draftInput, ruleKey: z.string(), from: z.string(), change: termChange }).parse(data)
+  )
+  .handler(async ({ data }) => {
+    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
+    const { rule, terms } = changeRuleTerm(
+      records,
+      { ruleKey: data.ruleKey, from: data.from, change: data.change },
+      { by, at }
+    )
+    await saveRulebookChanges(db, hoaId, data.rulebookId, { rules: [rule], terms })
+    const changed = {
+      ...records,
+      rules: records.rules.map((item) => (item.key === rule.key ? rule : item)),
+      terms: [...records.terms, ...terms]
+    }
+    return issuesOf(changed, rule.key)
+  })
+
+/**
+ * Saves an edit of a term (encoding.md, UX, Terms): a new name leaves its review and rules alone; a new meaning sends
+ * it, and the approved rules that read it, back to review.
+ */
+export const saveRulebookTerm = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    z
+      .object({
+        ...draftInput,
+        edit: z.object({
+          key: z.string(),
+          label: z.string().trim().min(1),
+          alternatives: z.array(z.string().trim().min(1)),
+          definition: note,
+          unit: z.string().optional(),
+          isComplete: z.boolean().optional()
+        })
+      })
+      .parse(data)
+  )
+  .handler(async ({ data }) => {
+    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
+    await saveRulebookChanges(db, hoaId, data.rulebookId, editTerm(records, data.edit, { by, at }))
+  })
+
+/** Adds a choice to a list, to review. */
+export const addRulebookChoice = createServerFn({ method: "POST" })
+  .validator((data: unknown) =>
+    z.object({ ...draftInput, listKey: z.string(), label: z.string().trim().min(1) }).parse(data)
+  )
+  .handler(async ({ data }) => {
+    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
+    await saveRulebookChanges(db, hoaId, data.rulebookId, {
+      terms: [addChoice(records, data.listKey, data.label, { by, at })]
+    })
+  })
+
+/** Merges a term into another: what used it uses the other and goes back to review, and it's rejected. */
+export const mergeRulebookTerm = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ ...draftInput, from: z.string(), into: z.string() }).parse(data))
+  .handler(async ({ data }) => {
+    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
+    await saveRulebookChanges(db, hoaId, data.rulebookId, mergeTerm(records, data.from, data.into, { by, at }))
+  })
+
 /** Answers a question: its chosen reading's rules are approved, the other candidates rejected. */
 export const answerRulebookQuestion = createServerFn({ method: "POST" })
   .validator((data: unknown) =>
@@ -133,7 +211,11 @@ export const answerRulebookQuestion = createServerFn({ method: "POST" })
       by,
       at
     })
-    await saveRulebookChanges(db, hoaId, data.rulebookId, { questions: [result.question], rules: result.rules })
+    await saveRulebookChanges(db, hoaId, data.rulebookId, {
+      questions: [result.question],
+      rules: result.rules,
+      terms: result.terms
+    })
     return { notApproved: result.notApproved }
   })
 
@@ -177,7 +259,13 @@ export const saveRulebookSettings = createServerFn({ method: "POST" })
     const { db, hoaId, records } = await openDraft(data.rulebookId)
     const settings = settingsSchema.parse({
       ...records.settings,
-      clauses: { ...records.settings.clauses, ...data.clauses },
+      clauses: {
+        ...records.settings.clauses,
+        ...data.clauses,
+        ...(data.clauses.precedence
+          ? { precedence: { ...data.clauses.precedence, order: withLawFirst(data.clauses.precedence.order) } }
+          : {})
+      },
       policy: data.policy ?? records.settings.policy,
       review: { status: "proposed", by: null, at: null, note: null }
     })

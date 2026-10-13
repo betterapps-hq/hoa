@@ -1,5 +1,14 @@
 import { ChevronDownIcon, FileTextIcon, UploadIcon } from "lucide-react"
 import { useState } from "react"
+import { FileTypeMedia } from "@/components/FileTypeMedia/FileTypeMedia"
+import {
+  Attachment,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentTitle,
+  AttachmentTrigger
+} from "@/components/ui/attachment"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import type { GoverningDocument } from "@/documents/governingDocument"
@@ -88,7 +97,7 @@ export function GoverningDocuments({
             <EmptyTitle>No documents yet</EmptyTitle>
             <EmptyDescription>
               {onUpload
-                ? "Upload the CC&Rs, design guidelines and other governing documents. The rulebook is built from them."
+                ? "Upload the CC&Rs, design guidelines and other governing documents. The rulebook is made from them."
                 : "The association hasn’t added its governing documents yet."}
             </EmptyDescription>
           </EmptyHeader>
@@ -102,9 +111,9 @@ export function GoverningDocuments({
           ) : null}
         </Empty>
       ) : (
-        <ul className="@container flex flex-col divide-y rounded-lg border">
+        <ul className="@container flex flex-col gap-2">
           {shown.map(({ latest, earlier }) => (
-            <li key={latest.lineageId} className="flex flex-col gap-1 px-4 py-3">
+            <li key={latest.lineageId} className="flex flex-col gap-1">
               <DocumentRow
                 document={latest}
                 jobId={jobs[latest.id]}
@@ -159,38 +168,51 @@ function DocumentRow({
     dateText(document.uploadedAt) ? `added ${dateText(document.uploadedAt)}` : null
   ].filter((item) => item !== null)
   return (
-    <div className="flex items-start justify-between gap-2">
-      <div className="flex min-w-0 flex-col gap-0.5">
-        {/* The title opens the document in the reader once its pages were read. */}
-        {isReadable ? (
-          <ReaderLink
-            href={citationHref(document.id)}
-            className="w-fit font-medium underline-offset-4 hover:underline focus-visible:underline"
-          >
-            {document.title}
-          </ReaderLink>
-        ) : (
-          <span className="font-medium">{document.title}</span>
-        )}
-        <span className="text-sm text-muted-foreground">{details.join(", ")}</span>
+    <Attachment className="w-full" state={documentState(document.status)}>
+      <FileTypeMedia fileName={document.fileName} mediaType={document.mediaType} />
+      <AttachmentContent className="flex flex-col gap-0.5">
+        <AttachmentTitle title={document.title}>{document.title}</AttachmentTitle>
+        <AttachmentDescription>{details.join(", ")}</AttachmentDescription>
         {document.status === "processing" && jobId ? (
           <JobProgress jobId={jobId} loadJob={loadJob} onFinished={onChanged} />
         ) : null}
         {document.status === "processing" && !jobId ? (
-          <span className="text-sm text-muted-foreground">Being read</span>
+          <span className="text-xs text-muted-foreground">Being read</span>
         ) : null}
         {document.status === "uploading" ? (
-          <span className="text-sm text-muted-foreground">The upload didn&rsquo;t finish.</span>
+          <span className="text-xs text-muted-foreground">The upload didn&rsquo;t finish.</span>
         ) : null}
         {document.status === "failed" ? (
-          <span className="text-sm text-destructive">
+          <span className="text-xs text-destructive">
             It couldn&rsquo;t be read{document.error ? `: ${document.error.message}` : "."}
           </span>
         ) : null}
-      </div>
-      {isDownloadable ? <DocumentDownload documentId={document.id} title={document.title} /> : null}
-    </div>
+      </AttachmentContent>
+      {/* The whole card opens the document in the reader once its pages were read. */}
+      {isReadable ? (
+        <AttachmentTrigger
+          render={<ReaderLink href={citationHref(document.id)} />}
+          aria-label={`Read ${document.title}`}
+        />
+      ) : null}
+      {isDownloadable ? (
+        <AttachmentActions>
+          <DocumentDownload documentId={document.id} title={document.title} />
+        </AttachmentActions>
+      ) : null}
+    </Attachment>
   )
+}
+
+/** A document's state as an attachment shows it: read, being read, an upload that didn't finish, or not readable. */
+function documentState(status: GoverningDocument["status"]) {
+  if (status === "failed") {
+    return "error"
+  }
+  if (status === "uploading") {
+    return "idle"
+  }
+  return status === "processing" ? "processing" : "done"
 }
 
 function EarlierVersions({ versions }: { versions: GoverningDocument[] }) {
@@ -208,16 +230,24 @@ function EarlierVersions({ versions }: { versions: GoverningDocument[] }) {
         {versions.length === 1 ? "1 earlier version" : `${versions.length} earlier versions`}
       </Button>
       {isOpen ? (
-        <ul className="flex flex-col gap-1 border-l pl-3">
+        <ul className="flex flex-col gap-2">
           {versions.map((version) => (
-            <li key={version.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-              <span className="text-muted-foreground">
-                Version {version.version}
-                {dateText(version.uploadedAt) ? `, added ${dateText(version.uploadedAt)}` : ""}
-              </span>
-              {version.status === "uploading" ? null : (
-                <DocumentDownload documentId={version.id} title={`${version.title}, version ${version.version}`} />
-              )}
+            <li key={version.id}>
+              <Attachment size="sm" className="w-full" state={version.status === "uploading" ? "idle" : "done"}>
+                <FileTypeMedia fileName={version.fileName} mediaType={version.mediaType} />
+                <AttachmentContent>
+                  <AttachmentTitle>Version {version.version}</AttachmentTitle>
+                  <AttachmentDescription title={version.fileName}>
+                    {dateText(version.uploadedAt) ? `Added ${dateText(version.uploadedAt)}, ` : ""}
+                    {version.fileName}
+                  </AttachmentDescription>
+                </AttachmentContent>
+                {version.status === "uploading" ? null : (
+                  <AttachmentActions>
+                    <DocumentDownload documentId={version.id} title={`${version.title}, version ${version.version}`} />
+                  </AttachmentActions>
+                )}
+              </Attachment>
             </li>
           ))}
         </ul>

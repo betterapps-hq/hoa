@@ -43,7 +43,7 @@ describe("EntityHeader", () => {
     )
     expect(await screen.findByText("Fence run")).toBeInTheDocument()
     expect(screen.getByText("Identified from")).toBeInTheDocument()
-    expect(screen.getByText("application-form.pdf, page 2")).toBeInTheDocument()
+    expect(screen.getByTitle("application-form.pdf").parentElement).toHaveTextContent("application-form.pdf, page 2")
     expect(screen.getByText("“rear property line along open space”")).toBeInTheDocument()
   })
 

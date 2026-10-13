@@ -1,0 +1,179 @@
+import { describe, expect, it } from "vitest"
+import { rulebookBuildStages } from "@/encoding/stages"
+import { advanceProgress, finishProgress, startProgress, type JobProgress } from "@/jobs/progress"
+import type { BuildResult } from "@/rulebook/buildResults"
+import { simulatedBuildSeconds, simulatedResults } from "@/tests/simulatedBuild"
+import {
+  buildSteps,
+  elapsedText,
+  estimateBuild,
+  findingCounts,
+  startingSteps,
+  summaryText,
+  timeLeftText
+} from "./DocumentEncodingSteps.utils"
+
+const start = Date.parse("2026-10-09T12:00:00.000Z")
+const at = (minutes: number) => new Date(start + minutes * 60_000).toISOString()
+
+/** A build that has reported each of `reports` at its minute. */
+function progressOf(reports: [stage: string, done: number, total: number, minute: number][]) {
+  return reports.reduce<JobProgress>(
+    (progress, [stage, done, total, minute]) => advanceProgress(progress, { stage, done, total }, at(minute)),
+    startProgress(rulebookBuildStages, { concurrency: 16, documents: 2 })
+  )
+}
+
+const job = (progress: JobProgress) => ({ createdAt: at(0), progress })
+
+describe("buildSteps", () => {
+  it("shows every step up front in plain words, done, current or upcoming", () => {
+    const steps = buildSteps(
+      progressOf([
+        ["structure", 0, 2, 0],
+        ["defined-terms", 1, 2, 1],
+        ["find-rules", 47, 64, 9]
+      ])
+    )
+    expect(steps.map((step) => [step.label, step.status])).toEqual([
+      ["Reading documents", "done"],
+      ["Finding defined terms", "done"],
+      ["Finding rules", "current"],
+      ["Building the vocabulary", "upcoming"],
+      ["Drafting rules", "upcoming"],
+      ["Combining and checking for conflicts", "upcoming"],
+      ["Saving the draft", "upcoming"]
+    ])
+    expect(steps[3]).toMatchObject({ isOptional: false })
+  })
+
+  it("lists every step, none started, before the build reports any", () => {
+    expect(startingSteps().map((step) => [step.label, step.status])).toEqual([
+      ["Reading documents", "upcoming"],
+      ["Finding defined terms", "upcoming"],
+      ["Finding rules", "upcoming"],
+      ["Building the vocabulary", "upcoming"],
+      ["Drafting rules", "upcoming"],
+      ["Combining and checking for conflicts", "upcoming"],
+      ["Saving the draft", "upcoming"]
+    ])
+  })
+
+  it("skips merging the vocabulary when it has nothing to decide", () => {
+    const progress = progressOf([
+      ["find-rules", 64, 64, 9],
+      ["vocabulary", 12, 12, 20],
+      ["vocabulary-merge", 0, 0, 25],
+      ["structure-rules", 3, 20, 26]
+    ])
+    expect(progress.steps.find((step) => step.stage === "vocabulary-merge")?.status).toBe("skipped")
+    const steps = buildSteps(progress)
+    expect(steps.find((step) => step.label === "Building the vocabulary")?.status).toBe("done")
+    expect(steps.find((step) => step.label === "Drafting rules")).toMatchObject({ status: "current" })
+  })
+})
+
+describe("findingCounts", () => {
+  const rule = (key: string) => ({ key, title: key, provisionKey: null })
+  const results: BuildResult[] = [
+    { id: "t", at: at(1), kind: "terms", documentKey: "declaration", labels: ["Lot", "Owner"] },
+    { id: "o1", at: at(2), kind: "outlines", unitId: "a", rules: [rule("a#1")], provisions: [], isRerun: false },
+    {
+      id: "o2",
+      at: at(3),
+      kind: "outlines",
+      unitId: "b",
+      rules: [rule("b#1"), rule("b#2")],
+      provisions: [],
+      isRerun: false
+    },
+    {
+      id: "o3",
+      at: at(4),
+      kind: "outlines",
+      unitId: "a",
+      rules: [rule("a#1"), rule("a#2")],
+      provisions: [],
+      isRerun: true
+    },
+    { id: "v", at: at(5), kind: "vocabulary", unitId: "a", labels: ["Height", "Fence", "Material"] },
+    { id: "v2", at: at(6), kind: "vocabulary", unitId: "a", labels: ["Height", "Fence"] },
+    { id: "r1", at: at(6), kind: "rules", batchId: "a#1", rules: [rule("a#1"), rule("a#2")], round: 0 },
+    { id: "r2", at: at(7), kind: "rules", batchId: "a#1", rules: [rule("a#2")], round: 1 }
+  ]
+
+  it("counts every find once for the picture of what's been found, whichever steps named it", () => {
+    expect(findingCounts(results)).toEqual({ terms: 5, rulesFound: 4, rulesDrafted: 2 })
+    expect(findingCounts([])).toEqual({ terms: 0, rulesFound: 0, rulesDrafted: 0 })
+    // Sudden Valley's build: 18 defined terms, overlapping vocabulary groups, 95 rules all drafted.
+    expect(findingCounts(simulatedResults(simulatedBuildSeconds))).toEqual({
+      terms: 182,
+      rulesFound: 95,
+      rulesDrafted: 95
+    })
+  })
+})
+
+describe("estimateBuild", () => {
+  it("waits for finding the rules to know how many sections there are", () => {
+    const estimate = estimateBuild(job(progressOf([["defined-terms", 0, 2, 1]])), start + 2 * 60_000)
+    expect(estimate.remaining).toBeNull()
+    expect(timeLeftText(estimate.remaining)).toBe("Estimating time left")
+  })
+
+  it("starts from the sections, then follows the build's own pace", () => {
+    const planned = estimateBuild(job(progressOf([["find-rules", 0, 64, 6]])), start + 6 * 60_000)
+    // 64 sections, 16 at a time, 1 to 3 minutes a call with a round of reruns; then the vocabulary, the batches of rules
+    // with their retries and consolidation.
+    expect(planned.remaining?.low).toBeGreaterThan(10)
+    expect(planned.remaining?.high).toBeLessThan(90)
+
+    // Half the sections in 10 minutes: finding the rules has about 10 minutes left at that pace.
+    const halfway = estimateBuild(job(progressOf([["find-rules", 32, 64, 6]])), start + 16 * 60_000)
+    expect(halfway.remaining?.low).toBeGreaterThanOrEqual(8)
+
+    // A slower pace makes the later model stages longer too.
+    const slow = estimateBuild(job(progressOf([["find-rules", 8, 64, 6]])), start + 26 * 60_000)
+    expect(slow.remaining?.low).toBeGreaterThan(halfway.remaining?.low ?? 0)
+
+    // Once drafting has a pace, it sets the pace of what's left.
+    const drafting = estimateBuild(
+      job(
+        progressOf([
+          ["find-rules", 64, 64, 6],
+          ["structure-rules", 10, 20, 20]
+        ])
+      ),
+      start + 25 * 60_000
+    )
+    expect(drafting.remaining?.low).toBeGreaterThan(0)
+    expect(drafting.remaining?.high).toBeLessThan(halfway.remaining?.high ?? 0)
+  })
+
+  it("never reads complete before the build ends, even with nothing left but saving", () => {
+    const saving = progressOf([
+      ["find-rules", 64, 64, 6],
+      ["save-draft", 0, 1, 40]
+    ])
+    const late = estimateBuild(job(saving), start + 300 * 60_000)
+    expect(late.fraction).toBeLessThanOrEqual(0.95)
+    expect(estimateBuild(job(finishProgress(saving, at(41))), start + 41 * 60_000).fraction).toBeLessThanOrEqual(0.95)
+    expect(estimateBuild(job(progressOf([])), start).fraction).toBe(0)
+  })
+})
+
+describe("text", () => {
+  it("says the time left as a rounded range, the time so far, and the build in one line, briefly", () => {
+    expect(timeLeftText({ low: 33, high: 48 })).toBe("30–50 min left")
+    expect(timeLeftText({ low: 3.2, high: 6.1 })).toBe("3–7 min left")
+    expect(timeLeftText({ low: 0.2, high: 1.5 })).toBe("1–2 min left")
+    expect(timeLeftText({ low: 5, high: 5 })).toBe("About 5 min left")
+    expect(elapsedText(0.4)).toBe("Just started")
+    expect(elapsedText(12.7)).toBe("12 min in")
+    expect(elapsedText(65)).toBe("1 hr 5 min in")
+    expect(elapsedText(120)).toBe("2 hr in")
+    const steps = buildSteps(progressOf([["find-rules", 47, 64, 9]]))
+    expect(summaryText(steps, { low: 35, high: 50 })).toBe("Finding rules, 35–50 min left")
+    expect(summaryText([], { low: 0.5, high: 1 })).toBe("Finishing, 1–2 min left")
+  })
+})

@@ -12,7 +12,7 @@ import { factStateLabels, factText, percent, sentenceCase } from "../application
 import { EvidenceList } from "../EvidenceList/EvidenceList"
 import { stepTitle } from "../NextSteps/NextSteps.utils"
 import { OutcomeChip } from "../OutcomeChip/OutcomeChip"
-import { actionItemFor, entityLabel, type ReviewContext } from "../reviewContext"
+import { actionItemFor, entityLabel, ruleName, type ReviewContext } from "../reviewContext"
 import { ReviewRuleReference } from "../ReviewRuleReference/ReviewRuleReference"
 import {
   effectLabels,
@@ -111,7 +111,7 @@ function FindingDetail({ context, finding, onShowActionItem, titleRef }: Finding
     <>
       <SheetHeader className="pr-12">
         <SheetTitle ref={titleRef} tabIndex={-1} className="outline-none">
-          {rule?.title ?? finding.ruleKey}
+          {ruleName(context.rules, finding.ruleKey)}
         </SheetTitle>
         <SheetDescription className="flex flex-wrap items-center gap-2">
           <span>{entityLabel(context, finding.entity)}</span>
@@ -143,7 +143,7 @@ function FindingDetail({ context, finding, onShowActionItem, titleRef }: Finding
               onClick={() => onShowActionItem?.(action.item)}
             >
               {stepTitle(action.key, review, audience)}:{" "}
-              {renderRuleMarkers(action.item.text, (key) => context.rules.get(key)?.title ?? key)}
+              {renderRuleMarkers(action.item.text, (key) => ruleName(context.rules, key))}
             </Button>
           ) : null}
         </Section>

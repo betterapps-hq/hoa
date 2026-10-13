@@ -15,7 +15,8 @@ const dimensionLabels: Record<T.Dimension, string> = {
   ratio: "ratio",
   "elapsed-time": "elapsed time",
   "calendar-period": "calendar time",
-  "business-time": "business days"
+  "business-time": "business days",
+  "sound-level": "sound level"
 }
 
 /** A unit spelled out, as its longest label in letters: "inches" rather than "in"; its plural label without one. */

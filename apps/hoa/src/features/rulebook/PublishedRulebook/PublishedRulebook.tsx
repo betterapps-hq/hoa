@@ -28,10 +28,9 @@ export function PublishedRulebook({ published, sources, uploads, source, loadJob
   return (
     <div className="flex flex-col gap-10">
       <header className="flex flex-col gap-1">
-        <h2 className="text-xl font-semibold">The rules of {sources.organization.name}</h2>
+        <h2 className="text-xl font-semibold">{sources.organization.name} rules</h2>
         <p className="max-w-prose text-muted-foreground">
-          These are the rules your projects are checked against. Each one comes from the association&rsquo;s governing
-          documents: open its citation to read the passage it&rsquo;s drawn from.
+          The rules in your association&rsquo;s governing documents. Open a citation to read the original wording.
         </p>
       </header>
       {rulebook && content ? (
@@ -47,7 +46,7 @@ export function PublishedRulebook({ published, sources, uploads, source, loadJob
             ) : null}
           </div>
           <RulebookWorkspace
-            records={recordsOf(sources, content, "published")}
+            records={recordsOf(sources, rulebook, content, "published", published.filedSources)}
             source={source}
             actions={null}
             audience="member"

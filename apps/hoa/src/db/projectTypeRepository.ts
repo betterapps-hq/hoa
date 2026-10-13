@@ -22,9 +22,13 @@ export async function getProjectType(db: Database, hoaId: string, id: string): P
   return row ? projectTypeSchema.parse(row) : null
 }
 
+/** Adds a project type, keeping who added it for the committee's recent activity. */
 export async function insertProjectType(
   db: Database,
-  input: Pick<ProjectType, "hoaId" | "label" | "description" | "rulebookId" | "definition"> & { now: string }
+  input: Pick<ProjectType, "hoaId" | "label" | "description" | "rulebookId" | "definition"> & {
+    createdBy: string
+    now: string
+  }
 ): Promise<ProjectType> {
   const type: ProjectType = projectTypeSchema.parse({
     id: crypto.randomUUID(),
@@ -37,8 +41,21 @@ export async function insertProjectType(
     createdAt: input.now,
     updatedAt: input.now
   })
-  await db.insert(projectTypes).values(type)
+  await db.insert(projectTypes).values({ ...type, createdBy: input.createdBy })
   return type
+}
+
+/** When each project type was added and who added it, archived ones too, for what happened to the project types. */
+export function listProjectTypeAdditions(db: Database, hoaId: string) {
+  return db
+    .select({
+      id: projectTypes.id,
+      label: projectTypes.label,
+      createdBy: projectTypes.createdBy,
+      createdAt: projectTypes.createdAt
+    })
+    .from(projectTypes)
+    .where(eq(projectTypes.hoaId, hoaId))
 }
 
 export async function updateProjectType(

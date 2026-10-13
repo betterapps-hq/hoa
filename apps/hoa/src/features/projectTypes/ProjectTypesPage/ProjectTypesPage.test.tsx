@@ -6,6 +6,15 @@ import type { ProjectTypeSuggestion } from "@/projectTypes/suggest"
 import type { ProjectTypesOverview } from "../projectTypes.functions"
 import { ProjectTypesPage, type NewProjectType, type ProjectTypesPageProps } from "./ProjectTypesPage"
 
+vi.mock("@tanstack/react-router", () => ({
+  useRouter: () => undefined,
+  Link: ({ to, children, ...props }: { to: string; children?: React.ReactNode }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  )
+}))
+
 const definition: ProjectTypeDefinition = {
   subjects: ["structure"],
   groups: [
@@ -92,8 +101,9 @@ function setup(overrides: Partial<ProjectTypesPageProps> = {}) {
 describe("ProjectTypesPage", () => {
   it("lists the organization's project types with what each asks, and opens one", async () => {
     const { props, user } = setup()
-    expect(screen.getByText("1 question and 1 document")).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Garden structure" }))
+    const type = within(screen.getByRole("list", { name: "Project types" }))
+    expect(type.getByRole("list", { name: "What it asks" })).toHaveTextContent("1 question1 document0 applications")
+    await user.click(type.getByRole("button", { name: "Garden structure" }))
     expect(props.onOpen).toHaveBeenCalledWith("type-1")
   })
 
@@ -184,6 +194,24 @@ describe("ProjectTypesPage", () => {
     expect(screen.queryByText("Plantings")).not.toBeInTheDocument()
   })
 
+  it("shows the suggestions being read, then each to add or dismiss", async () => {
+    let finish = (_: ProjectTypeSuggestion[]) => undefined as void
+    const { user } = setup({
+      onSuggest: vi.fn<() => Promise<ProjectTypeSuggestion[]>>(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve
+          })
+      )
+    })
+    await user.click(screen.getByRole("button", { name: "Suggest project types" }))
+    expect(screen.getByRole("status", { name: "Reading your rulebook" })).toBeInTheDocument()
+    finish([suggestion])
+    expect(await screen.findByRole("button", { name: "Add Plantings" })).toBeInTheDocument()
+    await user.click(screen.getByRole("button", { name: "Close suggestions" }))
+    expect(screen.queryByRole("region", { name: "Suggested from your governing documents" })).not.toBeInTheDocument()
+  })
+
   it("dismisses a suggestion and says when there's nothing new", async () => {
     const { user } = setup()
     await user.click(screen.getByRole("button", { name: "Suggest project types" }))
@@ -191,11 +219,18 @@ describe("ProjectTypesPage", () => {
     expect(screen.getByText("Nothing new to suggest.")).toBeInTheDocument()
   })
 
-  it("asks for a published rulebook before anything can be added", () => {
-    setup({ overview: { ...overview, projectTypes: [], hasPublishedRulebook: false } })
-    expect(screen.getByText("Publish the rulebook first")).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "Add project type" })).toBeDisabled()
-    expect(screen.getByRole("button", { name: "Suggest project types" })).toBeDisabled()
+  it("says plainly when there are no project types yet", () => {
+    setup({ overview: { ...overview, projectTypes: [] } })
     expect(screen.getByText("No project types yet")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Add project type" })).toBeEnabled()
+  })
+
+  it("says only to publish the rulebook first while nothing is published", () => {
+    setup({ overview: { ...overview, hasPublishedRulebook: false } })
+    expect(screen.getByText("Publish your rulebook first")).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "Go to the rulebook" })).toHaveAttribute("href", "/rules")
+    expect(screen.queryByText("Garden structure")).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Add project type" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Suggest project types" })).not.toBeInTheDocument()
   })
 })

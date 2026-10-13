@@ -16,6 +16,7 @@ vi.mock("../documents.functions", () => ({
     pageCount: 1,
     isStructured: true,
     newerVersionId: null,
+    removedAt: null,
     original: null,
     files: [{ id: "upload-1", title: "Community Rules" }],
     pages: [{ fileId: "upload-1", page: 1, label: null }],

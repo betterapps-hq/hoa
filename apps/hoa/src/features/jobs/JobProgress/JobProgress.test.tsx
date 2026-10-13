@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { render, screen } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { describe, expect, it, vi } from "vitest"
-import { buildStages } from "@/encoding/build"
+import { rulebookBuildStages } from "@/encoding/stages"
 import type { Job } from "@/jobs/job"
 import { JobProgress } from "./JobProgress"
 import { stageLabel } from "./JobProgress.utils"
@@ -83,6 +83,6 @@ describe("JobProgress", () => {
   })
 
   it("names every rulebook build stage", () => {
-    expect(["resolve-prompts", ...buildStages, "save-draft"].map(stageLabel)).not.toContain("Working")
+    expect(rulebookBuildStages.map(({ stage }) => stageLabel(stage))).not.toContain("Working")
   })
 })

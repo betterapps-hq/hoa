@@ -2,6 +2,7 @@ import type { Database } from "@/db/database"
 import { listDocumentRecords, listProvisions } from "@/db/documentRepository"
 import { getHoa } from "@/db/hoaRepository"
 import { getRulebookContent, type RulesFileRef } from "@/db/rulebookContentRepository"
+import { getRulebook } from "@/db/rulebookRepository"
 import type { Review, RulesFile } from "@/schema/types"
 import { validateRulebook, type RulebookIssue } from "@/schema/validate"
 import { rulesFile } from "@/schema/zod"
@@ -63,24 +64,24 @@ export async function assembleRulesFile(records: RulebookRecords) {
   return { file, json, sha256: await sha256Hex(json) }
 }
 
-/** A rulebook's records from D1: the organization's keyed documents and their provisions, and the rulebook's own. */
+/**
+ * A rulebook's records from D1: the organization's keyed documents, the provisions of the documents the rulebook was
+ * built from (it covers only those), and the rulebook's own.
+ */
 export async function loadRulebookRecords(db: Database, hoaId: string, rulebookId: string): Promise<RulebookRecords> {
-  const [hoa, documents, content] = await Promise.all([
+  const [hoa, documents, rulebook, content] = await Promise.all([
     getHoa(db, hoaId),
     listDocumentRecords(db, hoaId),
+    getRulebook(db, hoaId, rulebookId),
     getRulebookContent(db, hoaId, rulebookId)
   ])
-  if (!hoa || !content) {
+  if (!hoa || !rulebook || !content) {
     throw new Error(`Rulebook ${rulebookId} has no records to publish.`)
   }
   return {
     organization: { id: hoa.id, name: hoa.name },
     documents: documents.map((record) => record.document),
-    provisions: await listProvisions(
-      db,
-      hoaId,
-      documents.map((record) => record.id)
-    ),
+    provisions: await listProvisions(db, hoaId, rulebook.sourceDocumentIds),
     terms: content.terms,
     rules: content.rules,
     settings: content.settings,

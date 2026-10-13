@@ -9,7 +9,11 @@ function CurrentRole() {
   return (
     <>
       <p>
-        {role.name}: {role.navigation.map((item) => item.title).join(", ")}
+        {role.name}:{" "}
+        {role.navigation
+          .flatMap((section) => section.items)
+          .map((item) => item.title)
+          .join(", ")}
       </p>
       <button type="button" onClick={() => setRole(role.id === "homeowner" ? "administrator" : "homeowner")}>
         Switch

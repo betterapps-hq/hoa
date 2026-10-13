@@ -168,7 +168,8 @@ runs) in process on each case with the real models, scores it in code against th
 each case's `review.json`, `scores.json` and `writer.md`, plus `report.md`, to `.fixtures/eval/review/<run id>/`. Model
 results are cached, so a rerun pays only for what changed; `--sample <n>` reads and writes its own cache, so the same
 configuration can be measured on fresh model answers, and `--config` overrides a prompt version's model and effort for
-an experiment without a new Langfuse version. The rules file is the one `pnpm db:seed:sample --review` publishes.
+an experiment without a new Langfuse version. The rules file is `scripts/reviewRulesFile.ts`: the sample Declaration
+with the fence fixture's stand-in for the Design Guidelines.
 
 The cases are the synthetic garage enclosure packets committed under `samples/garage-enclosure/` (`baseline`,
 `replacement-plans`, `attic`, `fee-not-paid`:

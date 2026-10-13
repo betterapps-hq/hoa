@@ -147,14 +147,13 @@ describe("normalizeFacts", () => {
     expect(unverified.corrections[0]).toMatchObject({ problems: ["no-quote"], result: { state: "uncertain" } })
   })
 
-  it("holds both values when the words verify the model's and the grammar's differently", () => {
-    // The numerals agree with 6 inches as well as 6 feet; the grammar reads the unit the words name.
+  it("rejects a model's unit the words don't name, and takes the grammar's", () => {
+    // "6 ft" names feet, so 6 inches doesn't verify: a numeral counts only in a unit the words name.
     const { facts, corrections } = normalize(
       answer({ property: "fence-run.height", stated: "6 ft", reading: { value: 6, unit: "inch" } })
     )
-    expect(facts[0]).toMatchObject({ state: "uncertain", value: null })
-    expect(facts[0]?.candidates).toHaveLength(2)
-    expect(corrections[0]).toMatchObject({ kind: "check-disagrees", problems: [] })
+    expect(facts[0]).toMatchObject({ state: "known", value: { value: 6, unit: "foot" } })
+    expect(corrections[0]).toMatchObject({ kind: "verifier-rejected", problems: ["numeral-disagrees"] })
   })
 
   it("takes the model's date when its words verify it", () => {

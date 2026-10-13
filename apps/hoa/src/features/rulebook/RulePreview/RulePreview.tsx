@@ -3,11 +3,12 @@ import { match, P } from "ts-pattern"
 import { Badge } from "@/components/ui/badge"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { pickableTerms } from "@/rulebook/ruleTerms"
 import type * as T from "@/schema/types"
 import { ChoiceSelect } from "../ChoiceSelect/ChoiceSelect"
 import { relatedRules } from "../rulebookRecords"
 import { TermPicker } from "../TermPicker/TermPicker"
-import { pickableTerms, termFilters, termOptions } from "../TermPicker/TermPicker.utils"
+import { termFilters, termOptions } from "../TermPicker/TermPicker.utils"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 import {
   factValue,

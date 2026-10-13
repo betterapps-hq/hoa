@@ -22,9 +22,13 @@ describe("RulebookWorkspace", () => {
     await user.click(screen.getByRole("button", { name: "Each occupied Unit has someone 55 or older" }))
     const sheet = await screen.findByRole("dialog", { name: "Each occupied Unit has someone 55 or older" })
     expect(within(sheet).getByRole("region", { name: "Statement" })).toBeInTheDocument()
-    expect(within(sheet).getByRole("button", { name: "Approve" })).toBeInTheDocument()
+    expect(within(sheet).getByRole("button", { name: /^Approve, with its \d+ terms$/ })).toBeInTheDocument()
+    expect(within(sheet).getByRole("list", { name: "Terms it uses" })).toBeInTheDocument()
     await user.keyboard("{Escape}")
-    await user.click(screen.getByRole("tab", { name: "Questions" }))
+    // Each tab says what it has left to decide.
+    expect(screen.getByRole("tab", { name: "Questions 15" })).toBeInTheDocument()
+    expect(screen.getByRole("tab", { name: "Settings to review" })).toBeInTheDocument()
+    await user.click(screen.getByRole("tab", { name: "Questions 15" }))
     expect(screen.getByText(/15 of 15 to answer/)).toBeInTheDocument()
   })
 

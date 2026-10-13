@@ -9,9 +9,10 @@ import { listDocumentRecords, listProvisions } from "@/db/documentRepository"
 import { getJob, reportJobProgress, updateJob } from "@/db/jobRepository"
 import { getRulebookContent } from "@/db/rulebookContentRepository"
 import { failRulebook, getRulebook, getRulebookByStatus } from "@/db/rulebookRepository"
-import { buildRulebook, buildStages, optionalBuildStages } from "@/encoding/build"
+import { buildRulebook } from "@/encoding/build"
 import { buildScores } from "@/encoding/buildScores"
 import { SourcesRejectedError } from "@/encoding/sourceCheck"
+import { rulebookBuildStages } from "@/encoding/stages"
 import { finishProgress, startProgress } from "@/jobs/progress"
 import type { StepRunner } from "@/jobs/steps"
 import { loadBuildSources } from "@/rulebook/buildSources"
@@ -126,12 +127,8 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
 
       // Every step the build works through, up front, so the page shows the whole build and where it is.
       await step.do("progress:start", storageStep, async () => {
-        const stages = ["resolve-prompts", ...buildStages, "save-draft"].map((stage) => ({
-          stage,
-          isOptional: optionalBuildStages.some((optional) => optional === stage)
-        }))
         const workload = { concurrency: ai.encodingConcurrency, documents: loaded.sources.length }
-        await updateJob(db, hoaId, jobId, { progress: startProgress(stages, workload), now: now() })
+        await updateJob(db, hoaId, jobId, { progress: startProgress(rulebookBuildStages, workload), now: now() })
       })
       await progress("resolve-prompts", 0, 0)
       const promptVersions = await step.do("resolve-prompts", storageStep, async () => {

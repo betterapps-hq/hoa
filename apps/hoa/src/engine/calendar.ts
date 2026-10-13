@@ -98,8 +98,20 @@ const usFederal: HolidayCalendar = (year) => {
   ])
 }
 
-export const holidayCalendar = (name: string): HolidayCalendar =>
-  name === "us-federal" ? usFederal : () => new Set<number>()
+// Washington's legal holidays (RCW 1.16.050): the federal ones without Columbus Day, and with Native American
+// Heritage Day, the Friday after Thanksgiving.
+const washington: HolidayCalendar = (year) => {
+  const federal = usFederal(year)
+  federal.delete(nthWeekday(year, 10, 1, 2))
+  return federal.add(nthWeekday(year, 11, 4, 4) + 1)
+}
+
+/** The holiday calendars evaluation knows, by the name settings give; `none` is weekends only. */
+export const holidayCalendars = ["us-federal", "us-wa", "none"] as const
+
+const calendars: Record<string, HolidayCalendar> = { "us-federal": usFederal, "us-wa": washington }
+
+export const holidayCalendar = (name: string): HolidayCalendar => calendars[name] ?? (() => new Set<number>())
 
 export function isBusinessDay(day: number, holidays: HolidayCalendar) {
   const weekday = weekdayOf(day)

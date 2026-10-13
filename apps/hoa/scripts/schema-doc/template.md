@@ -74,7 +74,7 @@ __TYPES:Sources__
 - **A governing document** is the Declaration, the guidelines, the By-Laws, one decision letter. Its `edition` is the
   text the file holds: when it was adopted and took effect, and the files it came from. `adoptedBy` cites the
   resolution or minutes that adopted it, when the organization has them.
-- **Kinds:** `statute` and `ordinance` are state and local law. `declaration` is the recorded covenants (CC&Rs);
+- **Kinds:** `federal-law`, `state-law`, `county-ordinance` and `city-ordinance` are law. `declaration` is the recorded covenants (CC&Rs);
   `supplemental-declaration` adds to them for part of the community, which its `governs` condition names; `plat` is the
   recorded subdivision map. `articles` are the articles of incorporation; `bylaws` say how the organization governs
   itself. `rules`, `policy`, `design-guidelines` and `resolution` are adopted by the board or a committee. `minutes` count only where they record a binding decision; `decision` is a decision on
@@ -337,7 +337,9 @@ naming the facts that rule needs.
 
 - **Rank.** A rule's rank is the position of its main citation's document kind in the organization's precedence. A
   decision rule ranks as the document of its `authority`, the
-  provision granting the power it used. "Law" means `statute` and `ordinance`.
+  provision granting the power it used. "Law" means federal law, state law and county and city ordinances. Every
+  order of authority starts with law, each a rank of its own: federal, then state, then county and city ordinances
+  equal. A document can't rank itself above law, so a build and a save put law first whatever order they're given.
 - **Valid overrides.** An override is valid only when the overriding rule ranks at or above the rule it overrides, and
   only law overrides a rule with `noExceptions`. Overrides can't form a cycle. Selectors are checked on what they
   resolve to. Anything else is `override-not-allowed`.
@@ -514,7 +516,8 @@ __TYPES:Questions__
 - **Settings** hold two things. `clauses` are what the documents and law say about how rules work, each cited:
   `precedence` (from the conflicts clause and state law; decisions take their rank as described above),
   `time` (what an unqualified "days" means, whether a deadline on a weekend or holiday rolls to the next business day,
-  the holiday calendar and the time zone), `liability` (who answers for whom: an owner for a tenant or a guest, a seller
+  the holiday calendar (`us-federal`, `us-wa` for Washington's legal holidays, or `none`, weekends only) and the IANA
+  time zone), `liability` (who answers for whom: an owner for a tenant or a guest, a seller
   until the board receives notice of the sale, with the sanctions it doesn't reach), `deciders` (who decides each request type: the committee decides architectural applications), the default `cure`
   period (none when it's null) and `sanctionPreconditions`, the procedures sanctions need first (notice, and a hearing if one was
   requested), each for some request types and with the sanctions it exempts, so none is copied into each sanction. `policy` is the organization's own operating choices: the decision policy for applications

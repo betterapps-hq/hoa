@@ -1,6 +1,6 @@
 import { ArchiveIcon, ArchiveRestoreIcon, PencilIcon, SquareArrowOutUpRightIcon, Trash2Icon } from "lucide-react"
-import { useState } from "react"
-import { RowActions } from "@/components/RowActions/RowActions"
+import { useState, type ReactNode } from "react"
+import { RowActions, type RowAction } from "@/components/RowActions/RowActions"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,10 +13,10 @@ import {
 } from "@/components/ui/alert-dialog"
 import type { ProjectTypeStatus } from "@/projectTypes/projectType"
 
-// The administrator's actions on a project type (application-review.md, Project types), on the list and on the type's
-// own page: open or edit it, archive it (hidden from new applications, kept for the ones that use it) or unarchive it,
-// and delete it. Deleting asks first, naming the type; when applications use it, the confirmation says so and offers
-// archiving instead.
+// The administrator's actions on a project type (application-review.md, Project types), on the list's cards and in the
+// type's own page actions: open or edit it, archive it (hidden from new applications, kept for the ones that use it) or
+// unarchive it, and delete it. Deleting asks first, naming the type; when applications use it, the confirmation says
+// so and offers archiving instead.
 
 export type ProjectTypeMenuProps = {
   label: string
@@ -45,7 +45,8 @@ function deleteText(applicationCount: number, isArchived: boolean) {
   return `${applicationsUsing(applicationCount)} it. Archive it instead: it's hidden from new applications and kept for the ones that use it.`
 }
 
-export function ProjectTypeMenu({
+/** The type's actions, and the confirmation deleting opens, to render beside them. */
+export function useProjectTypeActions({
   label,
   status,
   applicationCount,
@@ -54,7 +55,7 @@ export function ProjectTypeMenu({
   onSetStatus,
   onDelete,
   onError
-}: ProjectTypeMenuProps) {
+}: ProjectTypeMenuProps): { actions: RowAction[]; confirmation: ReactNode } {
   const [isConfirming, setIsConfirming] = useState(false)
   const isArchived = status === "archived"
   const isUsed = applicationCount > 0
@@ -66,46 +67,53 @@ export function ProjectTypeMenu({
     }
   }
   const setStatus = (next: ProjectTypeStatus) => act(() => onSetStatus(next), "The project type wasn't changed.")
+  const actions: RowAction[] = [
+    ...(onOpen ? [{ label: "Open", icon: SquareArrowOutUpRightIcon, onSelect: onOpen }] : []),
+    ...(onEdit ? [{ label: "Edit name and description", icon: PencilIcon, onSelect: onEdit }] : []),
+    isArchived
+      ? { label: "Unarchive", icon: ArchiveRestoreIcon, onSelect: () => void setStatus("active") }
+      : { label: "Archive", icon: ArchiveIcon, onSelect: () => void setStatus("archived") },
+    { label: "Delete", icon: Trash2Icon, onSelect: () => setIsConfirming(true), isDestructive: true }
+  ]
+  const confirmation = (
+    <AlertDialog open={isConfirming} onOpenChange={setIsConfirming}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{isUsed ? `${label} can't be deleted` : `Delete ${label}?`}</AlertDialogTitle>
+          <AlertDialogDescription>{deleteText(applicationCount, isArchived)}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          {isUsed && isArchived ? (
+            <AlertDialogCancel>Close</AlertDialogCancel>
+          ) : (
+            <>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              {isUsed ? (
+                <AlertDialogAction onClick={() => void setStatus("archived")}>Archive</AlertDialogAction>
+              ) : (
+                <AlertDialogAction
+                  variant="destructive"
+                  onClick={() => void act(onDelete, "The project type wasn't deleted.")}
+                >
+                  Delete
+                </AlertDialogAction>
+              )}
+            </>
+          )}
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+  return { actions, confirmation }
+}
+
+/** The type's actions behind an ellipsis, as on the list's cards. */
+export function ProjectTypeMenu(props: ProjectTypeMenuProps) {
+  const { actions, confirmation } = useProjectTypeActions(props)
   return (
     <>
-      <RowActions
-        name={label}
-        actions={[
-          ...(onOpen ? [{ label: "Open", icon: SquareArrowOutUpRightIcon, onSelect: onOpen }] : []),
-          ...(onEdit ? [{ label: "Edit name and description", icon: PencilIcon, onSelect: onEdit }] : []),
-          isArchived
-            ? { label: "Unarchive", icon: ArchiveRestoreIcon, onSelect: () => void setStatus("active") }
-            : { label: "Archive", icon: ArchiveIcon, onSelect: () => void setStatus("archived") },
-          { label: "Delete", icon: Trash2Icon, onSelect: () => setIsConfirming(true), isDestructive: true }
-        ]}
-      />
-      <AlertDialog open={isConfirming} onOpenChange={setIsConfirming}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{isUsed ? `${label} can't be deleted` : `Delete ${label}?`}</AlertDialogTitle>
-            <AlertDialogDescription>{deleteText(applicationCount, isArchived)}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            {isUsed && isArchived ? (
-              <AlertDialogCancel>Close</AlertDialogCancel>
-            ) : (
-              <>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                {isUsed ? (
-                  <AlertDialogAction onClick={() => void setStatus("archived")}>Archive</AlertDialogAction>
-                ) : (
-                  <AlertDialogAction
-                    variant="destructive"
-                    onClick={() => void act(onDelete, "The project type wasn't deleted.")}
-                  >
-                    Delete
-                  </AlertDialogAction>
-                )}
-              </>
-            )}
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <RowActions name={props.label} actions={actions} />
+      {confirmation}
     </>
   )
 }

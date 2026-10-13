@@ -15,7 +15,7 @@ import { removeDocument } from "./removeDocument"
 
 const hoaId = "demo-hoa"
 const now = "2026-10-09T00:00:00.000Z"
-const administrator = { hoa: { id: hoaId }, role: "administrator" as const }
+const administrator = { hoa: { id: hoaId }, role: "administrator" as const, user: { id: "admin" } }
 
 describe("removeDocument", () => {
   let database: TestDatabase
@@ -63,7 +63,7 @@ describe("removeDocument", () => {
       publishedBy: null,
       publishedAt: null
     })
-    await expect(removeDocument(db, administrator, newer.id, now)).rejects.toThrow("being built")
+    await expect(removeDocument(db, administrator, newer.id, now)).rejects.toThrow("being processed")
     await failRulebook(db, hoaId, "building", { stage: "check", message: "x", isRetryable: false })
 
     await removeDocument(db, administrator, newer.id, now)
@@ -78,7 +78,12 @@ describe("removeDocument", () => {
 describe("removing a document", () => {
   it("is for administrators only", async () => {
     await expect(
-      removeDocument(untouchedDatabase(), { hoa: { id: hoaId }, role: "homeowner" }, "document", now)
+      removeDocument(
+        untouchedDatabase(),
+        { hoa: { id: hoaId }, role: "homeowner", user: { id: "homeowner" } },
+        "document",
+        now
+      )
     ).rejects.toThrow("Only an administrator can do this.")
   })
 })

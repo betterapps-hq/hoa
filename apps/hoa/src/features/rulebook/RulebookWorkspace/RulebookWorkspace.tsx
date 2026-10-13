@@ -1,4 +1,6 @@
+import { CheckIcon } from "lucide-react"
 import { useState } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { RulebookRecords } from "@/rulebook/assemble"
@@ -11,7 +13,7 @@ import { RuleTable } from "../RuleTable/RuleTable"
 import { SettingsTab } from "../SettingsTab/SettingsTab"
 import { RulebookWorkspaceContext, type RulebookActions, type RulebookSource } from "../useRulebookWorkspace"
 import { VocabularyTab } from "../VocabularyTab/VocabularyTab"
-import { workspaceOf, workspaceTabs, type WorkspaceTab, type WorkspaceView } from "./RulebookWorkspace.utils"
+import { tabWork, workspaceOf, workspaceTabs, type WorkspaceTab, type WorkspaceView } from "./RulebookWorkspace.utils"
 
 export type RulebookWorkspaceProps = {
   records: RulebookRecords
@@ -39,7 +41,8 @@ const labels: Record<WorkspaceTab, string> = {
 
 /**
  * A rulebook's records in quiet tabs (encoding.md, UX): what a draft changes, rules, terms, coverage, questions and
- * settings, as the reader needs them; a rule's card opens in a side sheet from every rule link.
+ * settings, as the reader needs them; a rule's card opens in a side sheet from every rule link. In a draft each tab
+ * says how much it has left to decide, so the tabs are the review's to-do list.
  */
 export function RulebookWorkspace({
   records,
@@ -60,6 +63,7 @@ export function RulebookWorkspace({
   }
   const [openKey, setOpenKey] = useState<string | null>(null)
   const workspace = workspaceOf(records, { source, actions, openRule: setOpenKey, audience })
+  const work = actions ? tabWork(records, workspace.coverage) : null
   const open = records.rules.find((rule) => rule.key === openKey)
   // A to-do link sets a filter; each request starts the tab afresh with it.
   const filterFor = (item: WorkspaceTab) => (item === tab ? shown.filter : null)
@@ -81,6 +85,7 @@ export function RulebookWorkspace({
             {tabs.map((item) => (
               <TabsTrigger key={item} value={item}>
                 {labels[item]}
+                {work && item !== "changes" ? <TabLeft tab={item} count={work[item]} /> : null}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -106,8 +111,9 @@ export function RulebookWorkspace({
             <QuestionsTab />
           </TabsContent>
         ) : null}
+        {/* Kept mounted, so a settings draft survives a look at another tab. */}
         {tabs.includes("settings") ? (
-          <TabsContent value="settings">
+          <TabsContent value="settings" keepMounted>
             <SettingsTab />
           </TabsContent>
         ) : null}
@@ -132,5 +138,25 @@ export function RulebookWorkspace({
         </SheetContent>
       </Sheet>
     </RulebookWorkspaceContext.Provider>
+  )
+}
+
+/** How much a tab has left to decide: a count, a dot for the settings (one record), or a check once it's done. */
+function TabLeft({ tab, count }: { tab: WorkspaceTab; count: number }) {
+  if (count === 0) {
+    return <CheckIcon aria-hidden className="size-3.5 text-muted-foreground" />
+  }
+  if (tab === "settings") {
+    return (
+      <>
+        <span aria-hidden className="size-1.5 rounded-full bg-primary" />
+        <span className="sr-only">to review</span>
+      </>
+    )
+  }
+  return (
+    <Badge variant="secondary" className="h-4.5 px-1.5 tabular-nums">
+      {count}
+    </Badge>
   )
 }

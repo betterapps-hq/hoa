@@ -3,6 +3,7 @@ import type { ActionItem, Review } from "@/review/reviewModel"
 import type * as T from "@/schema/types"
 import { createVocabulary, type Vocabulary } from "@/schema/vocabulary"
 import type { CitationSource } from "../documents/DocumentViewer/DocumentViewer"
+import { ruleKeyLabel, termKeyLabel } from "./applicationDisplay"
 import type { EntityEvidence } from "./applications.functions"
 import type { ReportRule } from "./applicationView"
 
@@ -24,6 +25,8 @@ export type ReviewContext = {
   source?: CitationSource
   /** A packet photo's URL, for thumbnails. */
   loadImage?: (fileId: string) => Promise<string>
+  /** Where a packet file opens in the browser, to show evidence where it was read. */
+  fileUrl?: (fileId: string) => string
 }
 
 export type ReviewContextInput = Omit<ReviewContext, "rules" | "vocabulary" | "entityEvidence"> & {
@@ -32,11 +35,20 @@ export type ReviewContextInput = Omit<ReviewContext, "rules" | "vocabulary" | "e
   entityEvidence: readonly EntityEvidence[]
 }
 
+/** The review's vocabulary, where a term the page has no record of reads as its key in words, never as the key. */
+function reviewVocabulary(terms: readonly T.Term[]): Vocabulary {
+  const vocabulary = createVocabulary([...terms])
+  return {
+    ...vocabulary,
+    label: (key, plural) => (vocabulary.get(key) ? vocabulary.label(key, plural) : termKeyLabel(key))
+  }
+}
+
 export function createReviewContext({ rules, terms, entityEvidence, ...rest }: ReviewContextInput): ReviewContext {
   return {
     ...rest,
     rules: new Map(rules.map((rule) => [rule.key, rule])),
-    vocabulary: createVocabulary([...terms]),
+    vocabulary: reviewVocabulary(terms),
     entityEvidence: new Map(entityEvidence.map((item) => [item.entity, item.evidence]))
   }
 }
@@ -49,6 +61,10 @@ export const entityOf = (context: Pick<ReviewContext, "review">, id: string) =>
 
 /** An entity the review identified, by its label. */
 export const entityLabel = (context: Pick<ReviewContext, "review">, id: string) => entityOf(context, id)?.label ?? id
+
+/** A rule's name: its title, or its key in words when the page has no record of it. */
+export const ruleName = (rules: ReadonlyMap<T.RuleKey, { title: string }>, ruleKey: T.RuleKey) =>
+  rules.get(ruleKey)?.title ?? ruleKeyLabel(ruleKey)
 
 /** The file a piece of evidence cites; models may name a file by its id or its name. */
 export const evidenceFile = (context: Pick<ReviewContext, "files">, fileId: string) =>

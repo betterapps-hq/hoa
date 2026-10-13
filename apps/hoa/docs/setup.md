@@ -52,31 +52,30 @@ The server runs inside workerd, Cloudflare's runtime, through its Vite plugin, u
 environment: D1 is simulated on disk under `apps/hoa/.wrangler`, and R2 is the real `hoa-dev` bucket. Open
 <http://localhost:3000>.
 
-To review applications before the rules UX exists, publish the committed sample rulebook into the local database:
+Everything else goes through the app, as it would for an association: upload the governing documents on the Rulebook
+page, let the build draft the rulebook, review the draft and publish it; applications are reviewed against what's
+published. Development uses Sudden Valley's Restrictive Covenants (`.fixtures/peers/sudden-valley/SV-Cov.pdf`): six
+pages, and a build costs about $4.
 
-```sh
-pnpm --filter hoa db:seed:sample
-```
-
-It approves every record of `samples/declaration/rules.json`, publishes it as the HOA's rulebook and stores the rules
-file in Wrangler's local R2. The dev server reads R2 from the `hoa-dev` bucket, so add `--dev-bucket` to put the file
-there instead (`pnpm --filter hoa db:seed:sample --dev-bucket`).
-
-To start the rules over, empty the local rulebooks, rules, sections, provisions and reviews with their stored objects:
+To start the rules over, empty the local rulebooks, rules, sections, provisions and reviews with their stored objects
+in the `hoa-dev` bucket:
 
 ```sh
 pnpm --filter hoa db:reset:rules
 ```
 
-Uploaded documents and applications stay; applications go back to drafts. Add `--dev-bucket` to delete the objects
-from the `hoa-dev` bucket rather than Wrangler's local R2. Neither command touches the preview or demo environments.
+Uploaded documents and applications stay; applications go back to drafts. It never touches the preview or demo
+environments.
 
-Before building the rulebook from the sample documents, tell the build how they're structured (the Declaration's
-Exhibit C is the use restrictions, a document of its own):
+Components can be worked on alone in Storybook, at <http://localhost:6006>:
 
 ```sh
-pnpm --filter hoa db:structure:sample
+pnpm --filter hoa storybook
 ```
+
+A component's stories sit next to it (`DocumentEncodingSteps.stories.tsx`) and give it the data it would get on the page, so
+every state can be seen without running a build. Storybook builds with `.storybook/vite.config.ts`, the app's styles
+and React without the Worker.
 
 To run the rulebook build or one encoding step against the cached fixtures, see
 [design/evaluation.md](design/evaluation.md).

@@ -161,20 +161,13 @@ describe("CoverageTab", () => {
     })
   })
 
-  it("lists reasons to review, approves one, and approves those shown", async () => {
+  it("lists reasons to review and approves one", async () => {
     const { user, actions } = renderInWorkspace(<CoverageTab initialFilter="to-review" />)
     expect(screen.getByRole("button", { name: "Reasons to review", pressed: true })).toBeInTheDocument()
     const [item] = within(screen.getByRole("list", { name: "Provisions" })).getAllByRole("listitem")
     expect(within(item!).getByText(/^No rule: /)).toBeInTheDocument()
     await user.click(within(item!).getByRole("button", { name: "Approve the reason" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "provision", key: expect.any(String) }], "approved", null)
-    await user.click(screen.getByRole("button", { name: "Approve the 192 reasons shown" }))
-    await user.click(await screen.findByRole("button", { name: "Approve them" }))
-    expect(actions?.review).toHaveBeenLastCalledWith(
-      expect.arrayContaining([expect.objectContaining({ type: "provision" })]),
-      "approved",
-      null
-    )
   })
 
   it("searches provisions through typos and any word order, best match first, within the filter", async () => {

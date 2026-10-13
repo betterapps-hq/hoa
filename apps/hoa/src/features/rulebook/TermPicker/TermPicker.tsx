@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/combobox"
 import { InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
 import { useSearch } from "@/hooks/useSearch"
+import { cn } from "@/lib/utils"
 import { termOptionSearchSetup, type TermOption } from "./TermPicker.utils"
 
 export type TermPickerProps = {
@@ -22,6 +23,8 @@ export type TermPickerProps = {
   placeholder?: string
   isClearable?: boolean
   isInvalid?: boolean
+  /** What each option's hint is: its key, set in code type, or what it is in words. */
+  hints?: "keys" | "words"
 }
 
 /** Picks one term by its label; the list narrows as you type, best match first. */
@@ -33,7 +36,8 @@ export function TermPicker({
   onChange,
   placeholder = "Choose a term",
   isClearable = false,
-  isInvalid = false
+  isInvalid = false,
+  hints = "keys"
 }: TermPickerProps) {
   const selected =
     value === null
@@ -87,7 +91,9 @@ export function TermPicker({
             <ComboboxItem key={option.key} value={option}>
               <span className="flex min-w-0 flex-col">
                 <span className="truncate">{option.label}</span>
-                <span className="truncate font-mono text-xs text-muted-foreground">{option.hint}</span>
+                <span className={cn("truncate text-xs text-muted-foreground", hints === "keys" && "font-mono")}>
+                  {option.hint}
+                </span>
               </span>
             </ComboboxItem>
           )}

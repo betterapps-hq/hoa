@@ -55,6 +55,8 @@ export type DocumentReading = {
   isStructured: boolean
   /** A later version of the same document, when this one has been replaced. */
   newerVersionId: string | null
+  /** When the document was removed from the governing documents; its text still shows for the rules that cite it. */
+  removedAt: string | null
   blocks: ReadingBlock[]
   outline: OutlineEntry[]
   pages: ReadingPage[]
@@ -63,6 +65,18 @@ export type DocumentReading = {
   /** The uploaded PDF to show beside the text, and whether its words' positions were kept to mark passages on it. */
   original: { hasWordBoxes: boolean } | null
 }
+
+/**
+ * Why a document can't be read: it was removed from the governing documents, it isn't one of them, or it hasn't been
+ * read yet (or couldn't be).
+ */
+export type ReadingUnavailable =
+  | { unavailable: "removed"; title: string; removedAt: string }
+  | { unavailable: "missing" }
+  | { unavailable: "not-ready"; title: string; hasFailed: boolean }
+
+export const isUnavailable = (result: DocumentReading | ReadingUnavailable): result is ReadingUnavailable =>
+  "unavailable" in result
 
 const letters = (text: string) => text.toLowerCase().replaceAll(/[^\p{L}\p{N}]/gu, "")
 
@@ -160,6 +174,11 @@ function blockOf(passage: ReadingPassage): ReadingBlock {
   }
 }
 
+/** Provisions alone as the reader lays them out, with no page text: a document a running build has only structured. */
+export function provisionBlocks(provisions: readonly T.Provision[]): ReadingBlock[] {
+  return readingOrder(provisions).flatMap(({ passages }) => passages.map(blockOf))
+}
+
 export type ReadingInput = {
   upload: Pick<GoverningDocument, "id" | "title" | "version" | "effectiveDate" | "pageCount">
   /**
@@ -175,6 +194,7 @@ export type ReadingInput = {
   fileTitles: ReadonlyMap<string, string>
   original: DocumentReading["original"]
   newerVersionId: string | null
+  removedAt: string | null
 }
 
 const pageBlock = (page: Page): ReadingBlock => ({
@@ -202,6 +222,7 @@ export function documentReading({
   pages,
   fileTitles,
   newerVersionId,
+  removedAt,
   original
 }: ReadingInput): DocumentReading {
   const [record] = records
@@ -215,6 +236,7 @@ export function documentReading({
     edition: record?.edition?.label ?? uploadEdition(upload),
     pageCount: upload.pageCount ?? pages.get(upload.id)?.length ?? 0,
     newerVersionId,
+    removedAt,
     original,
     files: [upload.id, ...[...pages.keys()].filter((id) => id !== upload.id)].map((id) => ({
       id,
@@ -265,10 +287,33 @@ export function documentReading({
     ...base,
     isStructured: true,
     blocks,
-    outline: blocks.flatMap((block): OutlineEntry[] =>
-      block.type === "provision" && block.part === "main" && block.heading && block.depth <= 1
-        ? [{ key: block.key, number: block.number, title: block.heading, level: block.depth === 0 ? 1 : 2 }]
-        : []
-    )
+    outline: outlineOf(blocks)
   }
+}
+
+/** A passage's first words, for an outline entry it has no heading for: "These Restrictions shall apply to…". */
+function openingWords(text: string, count = 6) {
+  const words = text.trim().split(/\s+/)
+  const opening = words.slice(0, count).join(" ")
+  return words.length > count ? `${opening.replace(/[,;:.]+$/, "")}…` : opening
+}
+
+/**
+ * The table of contents: articles and their sections by their headings. A document of numbered paragraphs with no
+ * headings at all lists each top-level paragraph by its number and first words instead, so it can still be found.
+ */
+export function outlineOf(blocks: readonly ReadingBlock[]): OutlineEntry[] {
+  const headed = blocks.flatMap((block): OutlineEntry[] =>
+    block.type === "provision" && block.part === "main" && block.heading && block.depth <= 1
+      ? [{ key: block.key, number: block.number, title: block.heading, level: block.depth === 0 ? 1 : 2 }]
+      : []
+  )
+  if (headed.length > 0) {
+    return headed
+  }
+  return blocks.flatMap((block): OutlineEntry[] =>
+    block.type === "provision" && block.part === "main" && block.depth === 0 && block.number && block.text
+      ? [{ key: block.key, number: block.number, title: openingWords(block.text), level: 2 }]
+      : []
+  )
 }

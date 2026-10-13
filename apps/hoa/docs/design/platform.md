@@ -153,6 +153,7 @@ Each checks the role and access rules.
 | `startRulebookBuild` | Administrator | | Job id, rulebook id; refused while a document is being read or another build runs |
 | `stopRulebookBuild` | Administrator | | Whether the build was stopped or had already ended |
 | `getBuildResults` | Administrator | Job id, cursor | What the running build has produced since the cursor |
+| `getBuildDocuments` | Administrator | Job id | The documents the running build reads, with their provisions, once structured |
 | `getRulebookView` | Administrator for the draft, any for the published | `draft` or `published` | The rulebook and its records |
 | `getRulebookSources`, `getSourceText` | Any | | The documents and provisions the rules cite; page text no provision holds |
 | `reviewRulebookRecords` | Administrator | Rulebook id, record refs, `proposed`, `approved` or `rejected` | Records updated, and those skipped with why |
@@ -170,16 +171,20 @@ Each checks the role and access rules.
 | `createProjectType`, `updateProjectType`, `applyProjectTypeUpdates` | Administrator | The type's details and form | `ProjectType`; the form is checked against the rules |
 | `setProjectTypeStatus`, `deleteProjectType` | Administrator | Project type id, status | Archives, unarchives or deletes a type no application uses |
 | `countOutdatedProjectTypes` | Any (0 for homeowners) | | Active types out of date with the published rulebook |
-| `createApplication` | Any | Project type id or none, answers, description | `Application` |
-| `createApplicationUpload` | Owner | Application id, file name, type, size, context text | File id, presigned `PUT` URL (or none) |
+| `createApplication` | Any | Project type id or none | `Application` (`draft`, its form blank) |
+| `saveApplication` | Owner | Application id, description, answers | Keeps the draft as it's edited, finished or not |
+| `createApplicationUpload` | Owner | Application id, file name, type, size, what it is | File id, presigned `PUT` URL (or none) |
 | `uploadApplicationFile`, `completeApplicationUpload`, `removeApplicationFile` | Owner | File id (and the file as form data) | Stores, confirms or removes a file |
-| `runReview` | Owner | Application id | Job id; allowed in `draft`, `reviewed` and `information-requested` |
-| `submitApplication` | Owner | Application id, confirmation when the latest review requests information | `Application` (`submitted`) |
-| `listApplications`, `listDashboardApplications` | Homeowner (their own), administrator (all) | | Applications with their latest recommendation |
-| `getApplicationView` | Owner or administrator | Application id | Application, files, latest review and earlier reviews, and what the viewer can do |
-| `getPacketImage` | Owner or administrator | Application id, file id | A presigned `GET` URL for a photo, or the image inline |
+| `setApplicationFileUploadedAs` | Owner | File id, what it is | Says which of the type's documents a file is, or other |
+| `runReview` | Owner | Application id | Job id; allowed in `draft`, `reviewed` and `information-requested` once the required questions are answered |
+| `submitApplication` | Owner | Application id, confirmation when the latest review requests information | `Application` (`submitted`); refused when it changed after the review |
+| `deleteApplicationDraft` | Owner | Application id | Deletes a draft never submitted, with everything stored for it |
+| `listApplications`, `listDashboardApplications` | Homeowner (their own), administrator (submitted ones, and their own) | | Applications with their latest recommendation |
+| `getApplicationView` | Owner, or administrator once submitted | Application id | Application, its project type's form, files, latest review and earlier reviews, and what the viewer can do |
+| `getPacketImage` | Owner, or administrator once submitted | Application id, file id | A presigned `GET` URL for a photo, or the image inline |
 | `recordDecision` | Administrator | Application id, outcome, note | `Application` |
 | `getDashboardSummary`, `getNextRulebook` | Any | | The dashboard's numbers; the coming rulebook, for administrators |
+| `listRecentActivity` | Any | | What happened lately, newest first, with who did it: across the HOA's areas for administrators; a homeowner's applications and the rules for a homeowner ([dashboard.md](../dashboard.md)) |
 | `getSession`, `setDemoRole` | Any | Role, to switch | The user, role and HOA |
 
 Job progress polls `getJobStatus` every 2 seconds with TanStack Query's `refetchInterval` until the job ends. A
@@ -254,18 +259,14 @@ to the real services. `vite.config.ts` sets `process.env.CLOUDFLARE_ENV ??= "dev
 `dev` environment on every platform (a `CLOUDFLARE_ENV=dev` prefix in a pnpm script doesn't work in Windows' shell). R2
 is then the real `hoa-dev` bucket through a remote binding, because presigned browser uploads and Layout's `urlSource`
 both need a real S3 endpoint; D1 and Workflows stay simulated on disk. Scripts in `apps/hoa`: `db:migrate:local`
-(`wrangler d1 migrations apply hoa-dev --local --env dev`), `db:seed:local` (the one HOA), `db:seed:sample`,
-`db:reset:rules` and `cf-typegen` (`wrangler types`).
+(`wrangler d1 migrations apply hoa-dev --local --env dev`), `db:seed:local` (the one HOA, the only seeded data),
+`db:reset:rules` and `cf-typegen` (`wrangler types`). Documents, rulebooks and applications are made through the app,
+never seeded: a seed writes states the app can't, which then pass for the app's own.
 
-- **`db:seed:sample`** publishes `samples/declaration/rules.json` as the seeded HOA's rulebook, every record approved,
-  so reviews can run before the rules UX exists. `src/rulebook/seedRulebook.ts` writes the D1 rows as SQL, which
-  `wrangler d1 execute --local` runs, and assembles the rules file from the same records, which
-  `wrangler r2 object put --local` stores. Running it again replaces the same rulebook.
 - **`db:reset:rules`** empties rulebooks, their records, provisions, referenced documents, rulebook-build
-  and review jobs and reviews, with their R2 objects, through `getPlatformProxy` (`src/db/resetRules.ts`). Uploaded
-  documents, applications (back to `draft`), model caches and settings stay.
-- Both use Wrangler's local R2 by default. `pnpm dev` binds the real `hoa-dev` bucket instead, so add `--dev-bucket`
-  to write or delete the objects there. Neither script ever reaches the preview or demo databases or buckets.
+  and review jobs and reviews, with their objects in the `hoa-dev` bucket `pnpm dev` binds, through
+  `getPlatformProxy` (`src/db/resetRules.ts`). Uploaded documents, applications (back to `draft`), model caches and
+  settings stay. It never reaches the preview or demo databases or buckets.
 
 ## Tracing on Workers
 

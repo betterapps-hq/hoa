@@ -72,6 +72,16 @@ export async function getGoverningDocument(db: Database, hoaId: string, id: stri
   return row ? toDocument(row) : null
 }
 
+/** When an upload was removed from the governing documents, with its title; null for one in use, or no upload. */
+export async function getUploadRemoval(db: Database, hoaId: string, id: string) {
+  const row = await db
+    .select({ title: governingDocuments.title, removedAt: governingDocuments.removedAt })
+    .from(governingDocuments)
+    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id), hasFile))
+    .get()
+  return row?.removedAt ? { title: row.title, removedAt: row.removedAt } : null
+}
+
 export async function listGoverningDocuments(db: Database, hoaId: string) {
   const rows = await db
     .select()
@@ -79,6 +89,24 @@ export async function listGoverningDocuments(db: Database, hoaId: string) {
     .where(and(eq(governingDocuments.hoaId, hoaId), hasFile, isInUse))
     .orderBy(asc(governingDocuments.uploadedAt))
   return rows.map(toDocument)
+}
+
+/** Every upload, removed ones too, for what happened to the governing documents. */
+export function listUploadHistory(db: Database, hoaId: string) {
+  return db
+    .select({
+      id: governingDocuments.id,
+      lineageId: governingDocuments.lineageId,
+      version: governingDocuments.version,
+      title: governingDocuments.title,
+      status: governingDocuments.status,
+      uploadedBy: governingDocuments.uploadedBy,
+      uploadedAt: governingDocuments.uploadedAt,
+      removedBy: governingDocuments.removedBy,
+      removedAt: governingDocuments.removedAt
+    })
+    .from(governingDocuments)
+    .where(and(eq(governingDocuments.hoaId, hoaId), hasFile))
 }
 
 /** Another document in the HOA with the same content, for refusing duplicate uploads. */
@@ -94,7 +122,12 @@ export async function findDocumentByHash(db: Database, hoaId: string, sha256: st
  * Removes an upload's document, every version of it, so builds and the documents list leave it out; false when it
  * wasn't one in use. What cites its pages, such as the rulebook in force, still opens them.
  */
-export async function removeGoverningDocument(db: Database, hoaId: string, id: string, now: string) {
+export async function removeGoverningDocument(
+  db: Database,
+  hoaId: string,
+  id: string,
+  removal: { now: string; userId: string }
+) {
   const document = await db
     .select({ lineageId: governingDocuments.lineageId })
     .from(governingDocuments)
@@ -105,7 +138,7 @@ export async function removeGoverningDocument(db: Database, hoaId: string, id: s
   }
   await db
     .update(governingDocuments)
-    .set({ removedAt: now })
+    .set({ removedAt: removal.now, removedBy: removal.userId })
     .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.lineageId, document.lineageId), hasFile))
   return true
 }
@@ -272,21 +305,26 @@ export async function saveProvisions(
   ])
 }
 
-/** The documents' provisions, each document's in order. */
-export async function listProvisions(
+/** The documents' provisions with the document each is in, each document's in order. */
+export async function listDocumentProvisions(
   db: Database,
   hoaId: string,
   documentIds: readonly string[]
-): Promise<Rules.Provision[]> {
+): Promise<{ documentId: string; provision: Rules.Provision }[]> {
   if (documentIds.length === 0) {
     return []
   }
   const rows = await db
-    .select({ provision: provisions.provision })
+    .select({ documentId: provisions.documentId, provision: provisions.provision })
     .from(provisions)
     .where(and(eq(provisions.hoaId, hoaId), inArray(provisions.documentId, [...documentIds])))
     .orderBy(asc(provisions.documentId), asc(provisions.ordinal))
-  return rows.map((row) => provisionSchema.parse(row.provision))
+  return rows.map((row) => ({ documentId: row.documentId, provision: provisionSchema.parse(row.provision) }))
+}
+
+/** The documents' provisions, each document's in order. */
+export async function listProvisions(db: Database, hoaId: string, documentIds: readonly string[]) {
+  return (await listDocumentProvisions(db, hoaId, documentIds)).map((row) => row.provision)
 }
 
 /** Saves provisions' review changes, such as a no-rule reason, in batches of 100 that each land whole. */
@@ -302,15 +340,6 @@ export async function updateProvisions(db: Database, hoaId: string, items: reado
   }
 }
 
-export async function getProvision(db: Database, hoaId: string, key: string): Promise<Rules.Provision | null> {
-  const row = await db
-    .select({ provision: provisions.provision })
-    .from(provisions)
-    .where(and(eq(provisions.hoaId, hoaId), eq(provisions.key, key)))
-    .get()
-  return row ? provisionSchema.parse(row.provision) : null
-}
-
 // ─── What a build writes (encoding.md, Save draft) ──────────────────────────────────────────────
 
 /** The structures set for uploads, by id; an upload without one is missing. */
@@ -323,14 +352,6 @@ export async function getDocumentStructures(db: Database, hoaId: string, ids: re
     .from(governingDocuments)
     .where(and(eq(governingDocuments.hoaId, hoaId), inArray(governingDocuments.id, [...ids])))
   return new Map(rows.flatMap((row) => (row.structure ? [[row.id, documentStructure.parse(row.structure)]] : [])))
-}
-
-/** Sets how builds structure an upload. */
-export async function setDocumentStructure(db: Database, hoaId: string, id: string, structure: DocumentStructure) {
-  await db
-    .update(governingDocuments)
-    .set({ structure: documentStructure.parse(structure) })
-    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id)))
 }
 
 /** The documents a build read: each upload's own documents (itself first, then its exhibits) with their provisions. */

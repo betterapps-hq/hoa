@@ -86,7 +86,8 @@ const dimensionNames: Record<string, string> = {
   ratio: "Percentage",
   "elapsed-time": "Duration",
   "calendar-period": "Calendar period",
-  "business-time": "Business days"
+  "business-time": "Business days",
+  "sound-level": "Sound level"
 }
 
 /** "Count" for a number with no unit. */

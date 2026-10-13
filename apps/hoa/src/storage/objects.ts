@@ -20,6 +20,17 @@ export async function getJson<T>(
   return object ? schema.parse(JSON.parse(await object.text())) : null
 }
 
+/** Deletes every object under a prefix, a page of keys at a time; R2 lists what's left after each delete. */
+export async function deleteObjectsUnder(bucket: Pick<R2Bucket, "list" | "delete">, prefix: string) {
+  for (;;) {
+    const page = await bucket.list({ prefix, limit: 1000 })
+    if (page.objects.length === 0) {
+      return
+    }
+    await bucket.delete(page.objects.map((object) => object.key))
+  }
+}
+
 /** A content cache for model results, stored as JSON under `keyFor(hash)`. */
 export function createObjectPromptCache(bucket: ObjectBucket, keyFor: (hash: string) => string): PromptCache {
   return {

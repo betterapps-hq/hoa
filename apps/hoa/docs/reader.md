@@ -18,6 +18,13 @@ Build links with `citationHref(documentId, provisionKey?, cites?)` or `citedProv
 work) that moves within the app on a plain click. The server function behind the reader checks the document belongs to
 the reader's organization; both roles can read every governing document.
 
+When there's nothing to read, the reader says why instead of showing an empty document (`ReadingUnavailable`):
+
+- **Removed:** the upload was removed from the governing documents. The reader names it and the day it was removed.
+  A removed document whose provisions a rulebook still cites shows their text, with a line saying it was removed.
+- **Not one of the governing documents:** no upload or record has that id or key.
+- **Not ready:** it's still being read (with "Try again"), or it couldn't be read and needs uploading again.
+
 ## Text
 
 The whole document, in one continuous scroll, from its provisions: articles and sections as headings with their
@@ -31,8 +38,10 @@ paper.
   quieter), covering the provision and everything under it, named "Cited passage" for screen readers, focused when the
   reader opens or steps to it, and placed near the top third of the screen.
 - **Where you are:** a line at the top names the current article and section once you scroll past them.
-- **Outline and search** share a column on wide containers and a sheet on narrow ones. Search uses the shared MiniSearch
-  helper over the document's passages; choosing a result goes to it and marks the words that matched.
+- **Outline and search** share a column on wide containers and a sheet on narrow ones. The outline lists articles and
+  sections by their headings; a document of numbered paragraphs with no headings (`outlineOf`) lists each paragraph by
+  its number and first words instead. Search uses the shared MiniSearch helper over the document's passages; choosing
+  a result goes to it and marks the words that matched.
 - Long documents stay fast: each article is a section the browser skips laying out while it's off screen
   (`content-visibility`), and jumps settle once the text above them has been laid out.
 
@@ -59,8 +68,8 @@ without a stored PDF (a referenced document, one read from a rules file) has tex
 A form or an editor with unsaved work wraps itself in `CitationsOpenInSheet`
 (`src/features/documents/ReaderSheet`). Every `ReaderLink` inside it then opens the reader in a large sheet over the
 page on a plain click, keeping the form mounted underneath, with "Open in new tab" in the sheet's header; a
-middle-click or a modifier still opens the route in a new tab. The homeowner's application form and the project type
-editor do this. The application form also keeps a draft of its answers (not its files) in session storage, restored
+middle-click or a modifier still opens the route in a new tab. The homeowner's application form, the project type
+editor and the draft rulebook's review do this. The application form also keeps a draft of its answers (not its files) in session storage, restored
 after a reload with a dismissible "We restored your answers".
 
 ## Embedding

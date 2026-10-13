@@ -13,8 +13,14 @@ import {
 // from the step outputs the build writes to storage, newest since a cursor. Nothing here is reviewable: review happens
 // in the draft. The page polls this every few seconds.
 
-/** A rule as a result lists it: its key, a title (an outline's summary until it's structured) and its main citation. */
-type RuleLine = { key: string; title: string; provisionKey: string | null }
+/**
+ * A rule as a result lists it: its key, a title (an outline's summary until it's structured) and its main citation,
+ * and once it's drafted, its statement with term links.
+ */
+type RuleLine = { key: string; title: string; provisionKey: string | null; statement?: string }
+
+/** A provision as E answered it: the settings it flags, and why it holds no rule when E gave a reason. */
+type ProvisionLine = { key: string; settings: string[]; noRule: string | null }
 
 /** One step's result, as the page shows it. `at` is when the step's output was written. */
 export type BuildResult = { id: string; at: string } & (
@@ -23,6 +29,8 @@ export type BuildResult = { id: string; at: string } & (
       kind: "outlines"
       unitId: string
       rules: RuleLine[]
+      /** Every provision of the section, in E's order, rules or not. */
+      provisions: ProvisionLine[]
       /** A second look at a section with its problems. */
       isRerun: boolean
     }
@@ -50,12 +58,20 @@ export type ResultsBucket = {
   get(key: string): Promise<{ text(): Promise<string> } | null>
 }
 
-/** E's answer read leniently, for the rules a section outlines: whatever else its format holds is left aside. */
+/**
+ * E's answer read leniently, for each provision of a section: the rules it outlines, the settings it flags and its
+ * reason for no rule. Whatever else its format holds is left aside.
+ */
 const foundRules = z.object({
   answer: z
     .object({
       provisions: z.array(
-        z.object({ key: z.string(), outlines: z.array(z.object({ aspect: z.string(), summary: z.string() })) })
+        z.object({
+          key: z.string(),
+          outlines: z.array(z.object({ aspect: z.string(), summary: z.string() })),
+          settings: z.array(z.object({ summary: z.string() })).catch([]),
+          noRule: z.object({ reason: z.string() }).nullable().catch(null)
+        })
       )
     })
     .nullable()
@@ -112,14 +128,20 @@ function resultOf(stage: string, item: string, at: string, value: unknown): Buil
         return null
       }
       const { base, value: rerun } = suffixed(item, /:(rerun)$/)
-      const rules = (parsed.data.answer?.provisions ?? []).flatMap((provision) =>
+      const answered = parsed.data.answer?.provisions ?? []
+      const rules = answered.flatMap((provision) =>
         provision.outlines.map((outline) => ({
           key: `${provision.key}#${outline.aspect}`,
           title: outline.summary,
           provisionKey: provision.key
         }))
       )
-      return { id, at, kind: "outlines", unitId: base, rules, isRerun: rerun !== null }
+      const provisions = answered.map((provision) => ({
+        key: provision.key,
+        settings: provision.settings.map((setting) => setting.summary),
+        noRule: provision.noRule?.reason ?? null
+      }))
+      return { id, at, kind: "outlines", unitId: base, rules, provisions, isRerun: rerun !== null }
     }
     case "vocabulary": {
       const parsed = groupVocabularyOutput.safeParse(value)
@@ -151,7 +173,8 @@ function resultOf(stage: string, item: string, at: string, value: unknown): Buil
       const rules = parsed.data.rules.map((rule) => ({
         key: rule.key,
         title: typeof rule.draft.title === "string" ? rule.draft.title : rule.key,
-        provisionKey: mainCitation(rule.draft)
+        provisionKey: mainCitation(rule.draft),
+        ...(typeof rule.draft.statement === "string" ? { statement: rule.draft.statement } : {})
       }))
       return { id, at, kind: "rules", batchId: base, rules, round: round === null ? 0 : Number(round) }
     }

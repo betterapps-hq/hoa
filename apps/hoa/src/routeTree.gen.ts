@@ -13,11 +13,14 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as ApplicationsIndexRouteImport } from './routes/applications.index'
 import { Route as ApplicationsApplicationIdRouteImport } from './routes/applications.$applicationId'
+import { Route as ApplicationsNewRouteImport } from './routes/applications.new'
 import { Route as DocumentsIndexRouteImport } from './routes/documents.index'
 import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$documentId'
 import { Route as ProjectTypesIndexRouteImport } from './routes/project-types.index'
 import { Route as ProjectTypesProjectTypeIdRouteImport } from './routes/project-types.$projectTypeId'
+import { Route as RulesReviewRouteImport } from './routes/rules_.review'
 import { Route as FilesGoverningDocumentIdRouteImport } from './routes/files.governing.$documentId'
+import { Route as FilesApplicationsApplicationIdFileIdRouteImport } from './routes/files.applications.$applicationId.$fileId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -40,6 +43,11 @@ const ApplicationsApplicationIdRoute =
     path: '/applications/$applicationId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApplicationsNewRoute = ApplicationsNewRouteImport.update({
+  id: '/applications/new',
+  path: '/applications/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocumentsIndexRoute = DocumentsIndexRouteImport.update({
   id: '/documents/',
   path: '/documents/',
@@ -61,10 +69,21 @@ const ProjectTypesProjectTypeIdRoute =
     path: '/project-types/$projectTypeId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const RulesReviewRoute = RulesReviewRouteImport.update({
+  id: '/rules_/review',
+  path: '/rules/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FilesGoverningDocumentIdRoute =
   FilesGoverningDocumentIdRouteImport.update({
     id: '/files/governing/$documentId',
     path: '/files/governing/$documentId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const FilesApplicationsApplicationIdFileIdRoute =
+  FilesApplicationsApplicationIdFileIdRouteImport.update({
+    id: '/files/applications/$applicationId/$fileId',
+    path: '/files/applications/$applicationId/$fileId',
     getParentRoute: () => rootRouteImport,
   } as any)
 
@@ -72,35 +91,44 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
+  '/rules/review': typeof RulesReviewRoute
   '/applications/': typeof ApplicationsIndexRoute
   '/documents/': typeof DocumentsIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
+  '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
+  '/rules/review': typeof RulesReviewRoute
   '/applications': typeof ApplicationsIndexRoute
   '/documents': typeof DocumentsIndexRoute
   '/project-types': typeof ProjectTypesIndexRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
+  '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
+  '/rules_/review': typeof RulesReviewRoute
   '/applications/': typeof ApplicationsIndexRoute
   '/documents/': typeof DocumentsIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
+  '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -108,46 +136,58 @@ export interface FileRouteTypes {
     | '/'
     | '/rules'
     | '/applications/$applicationId'
+    | '/applications/new'
     | '/documents/$documentId'
     | '/project-types/$projectTypeId'
+    | '/rules/review'
     | '/applications/'
     | '/documents/'
     | '/project-types/'
     | '/files/governing/$documentId'
+    | '/files/applications/$applicationId/$fileId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/rules'
     | '/applications/$applicationId'
+    | '/applications/new'
     | '/documents/$documentId'
     | '/project-types/$projectTypeId'
+    | '/rules/review'
     | '/applications'
     | '/documents'
     | '/project-types'
     | '/files/governing/$documentId'
+    | '/files/applications/$applicationId/$fileId'
   id:
     | '__root__'
     | '/'
     | '/rules'
     | '/applications/$applicationId'
+    | '/applications/new'
     | '/documents/$documentId'
     | '/project-types/$projectTypeId'
+    | '/rules_/review'
     | '/applications/'
     | '/documents/'
     | '/project-types/'
     | '/files/governing/$documentId'
+    | '/files/applications/$applicationId/$fileId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   RulesRoute: typeof RulesRoute
   ApplicationsApplicationIdRoute: typeof ApplicationsApplicationIdRoute
+  ApplicationsNewRoute: typeof ApplicationsNewRoute
   DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
   ProjectTypesProjectTypeIdRoute: typeof ProjectTypesProjectTypeIdRoute
+  RulesReviewRoute: typeof RulesReviewRoute
   ApplicationsIndexRoute: typeof ApplicationsIndexRoute
   DocumentsIndexRoute: typeof DocumentsIndexRoute
   ProjectTypesIndexRoute: typeof ProjectTypesIndexRoute
   FilesGoverningDocumentIdRoute: typeof FilesGoverningDocumentIdRoute
+  FilesApplicationsApplicationIdFileIdRoute: typeof FilesApplicationsApplicationIdFileIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -180,6 +220,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApplicationsApplicationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/applications/new': {
+      id: '/applications/new'
+      path: '/applications/new'
+      fullPath: '/applications/new'
+      preLoaderRoute: typeof ApplicationsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/documents/': {
       id: '/documents/'
       path: '/documents'
@@ -208,11 +255,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectTypesProjectTypeIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rules_/review': {
+      id: '/rules_/review'
+      path: '/rules/review'
+      fullPath: '/rules/review'
+      preLoaderRoute: typeof RulesReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/files/governing/$documentId': {
       id: '/files/governing/$documentId'
       path: '/files/governing/$documentId'
       fullPath: '/files/governing/$documentId'
       preLoaderRoute: typeof FilesGoverningDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/files/applications/$applicationId/$fileId': {
+      id: '/files/applications/$applicationId/$fileId'
+      path: '/files/applications/$applicationId/$fileId'
+      fullPath: '/files/applications/$applicationId/$fileId'
+      preLoaderRoute: typeof FilesApplicationsApplicationIdFileIdRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -222,12 +283,16 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   RulesRoute: RulesRoute,
   ApplicationsApplicationIdRoute: ApplicationsApplicationIdRoute,
+  ApplicationsNewRoute: ApplicationsNewRoute,
   DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
   ProjectTypesProjectTypeIdRoute: ProjectTypesProjectTypeIdRoute,
+  RulesReviewRoute: RulesReviewRoute,
   ApplicationsIndexRoute: ApplicationsIndexRoute,
   DocumentsIndexRoute: DocumentsIndexRoute,
   ProjectTypesIndexRoute: ProjectTypesIndexRoute,
   FilesGoverningDocumentIdRoute: FilesGoverningDocumentIdRoute,
+  FilesApplicationsApplicationIdFileIdRoute:
+    FilesApplicationsApplicationIdFileIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

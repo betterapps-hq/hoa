@@ -65,7 +65,7 @@ export function reviewIssues(records: RulebookRecords) {
 }
 
 // The fields of a rule whose strings, or lists of strings, are term keys.
-const termFields = new Set([
+export const termFields: ReadonlySet<string> = new Set([
   "appliesTo",
   "bearer",
   "beneficiary",
@@ -85,6 +85,34 @@ const termFields = new Set([
 ])
 const bookkeeping = new Set(["provenance", "review", "issues"])
 
+/**
+ * A copy of a record with every term key in its fields passed through `replace`: the strings, or lists of strings, in
+ * the fields that hold term keys, and the properties an aggregate's `value` lists (elsewhere `value` is a constant).
+ * Its bookkeeping, and a rule's statement, are left as they are.
+ */
+export function mapTermKeys(
+  value: unknown,
+  replace: (key: T.TermKey) => T.TermKey,
+  fields: ReadonlySet<string> = termFields,
+  field = ""
+): unknown {
+  if (typeof value === "string") {
+    return fields.has(field) ? replace(value) : value
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => mapTermKeys(item, replace, fields, field === "value" ? "term" : field))
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        bookkeeping.has(key) ? item : mapTermKeys(item, replace, fields, key)
+      ])
+    )
+  }
+  return value
+}
+
 /** Every term a rule reads: its statement's links and every term key in its fields. */
 export function termKeysOf(rule: T.Rule) {
   const keys = new Set<T.TermKey>()
@@ -93,25 +121,10 @@ export function termKeysOf(rule: T.Rule) {
       keys.add(part.key)
     }
   }
-  const visit = (value: unknown, field: string) => {
-    if (typeof value === "string") {
-      if (termFields.has(field)) {
-        keys.add(value)
-      }
-    } else if (Array.isArray(value)) {
-      // An aggregate's `value` lists the properties it reads; elsewhere `value` is a constant.
-      for (const item of value) {
-        visit(item, field === "value" ? "term" : field)
-      }
-    } else if (typeof value === "object" && value !== null) {
-      for (const [key, item] of Object.entries(value)) {
-        if (!bookkeeping.has(key)) {
-          visit(item, key)
-        }
-      }
-    }
-  }
-  visit(rule, "")
+  mapTermKeys(rule, (key) => {
+    keys.add(key)
+    return key
+  })
   return keys
 }
 
@@ -150,6 +163,11 @@ function issueBlockers(stored: T.Issue[], live: RulebookIssue[] = []) {
   ]
 }
 
+/** The terms a rule reads that are still to review: approving the rule approves them with it. */
+export function proposedTermsOf(context: ApprovalContext, rule: T.Rule) {
+  return [...termKeysOf(rule)].filter((term) => context.termStatus.get(term) === "proposed")
+}
+
 /** Why a record can't be approved yet; empty when it can. */
 export function approvalBlockers(context: ApprovalContext, ref: RecordRef): string[] {
   const { records, issues } = context
@@ -159,14 +177,15 @@ export function approvalBlockers(context: ApprovalContext, ref: RecordRef): stri
       if (!rule) {
         return ["The rule no longer exists."]
       }
-      const proposedTerms = [...termKeysOf(rule)].filter((term) => context.termStatus.get(term) === "proposed")
+      // A rule is approved with the terms it reads that are still to review, so what blocks one of them blocks it.
+      const termBlockers = proposedTermsOf(context, rule).flatMap((term) =>
+        approvalBlockers(context, { type: "term", key: term }).map(
+          (reason) => `The term “${context.vocabulary.label(term)}”: ${reason}`
+        )
+      )
       return [
         ...issueBlockers(rule.issues, issues.get(rule.key)),
-        ...(proposedTerms.length > 0
-          ? [
-              `It reads terms still to review: ${proposedTerms.map((term) => context.vocabulary.label(term)).join(", ")}.`
-            ]
-          : []),
+        ...termBlockers,
         ...(context.openQuestions.has(rule.key)
           ? ["It's a candidate reading of an open question; answer the question instead."]
           : [])
@@ -202,7 +221,8 @@ export type ReviewChanges = {
 
 /**
  * Sets the review of records. Approving checks each one's blockers; a record with blockers is skipped, not approved.
- * Rejecting and returning to proposed always apply.
+ * Approving a rule approves the terms it reads that are still to review with it. Rejecting and returning to proposed
+ * always apply, except that the settings can't be rejected: every rulebook has them, so they're edited instead.
  */
 export function reviewRecords(
   records: RulebookRecords,
@@ -212,8 +232,20 @@ export function reviewRecords(
   const context = approvalContext(records)
   const changes: ReviewChanges = { rules: [], terms: [], provisions: [], settings: null, skipped: [] }
   const next = reviewed(review.status, review.by, review.at, review.note)
+  const decidedTerms = new Set<T.TermKey>()
+  const decideTerm = (key: T.TermKey) => {
+    const term = records.terms.find((item) => item.key === key)
+    if (term && !decidedTerms.has(key)) {
+      decidedTerms.add(key)
+      changes.terms.push({ ...term, review: next })
+    }
+  }
   for (const ref of refs) {
-    const reasons = review.status === "approved" ? approvalBlockers(context, ref) : []
+    const reasons = match(review.status)
+      .with("approved", () => approvalBlockers(context, ref))
+      .with("rejected", () => (ref.type === "settings" ? ["The settings can't be rejected; change them instead."] : []))
+      .with("proposed", () => [])
+      .exhaustive()
     if (reasons.length > 0) {
       changes.skipped.push({ ref, reasons })
       continue
@@ -222,15 +254,13 @@ export function reviewRecords(
       .with({ type: "rule" }, ({ key }) => {
         const rule = records.rules.find((item) => item.key === key)
         if (rule) {
+          if (review.status === "approved") {
+            proposedTermsOf(context, rule).forEach(decideTerm)
+          }
           changes.rules.push({ ...rule, review: next })
         }
       })
-      .with({ type: "term" }, ({ key }) => {
-        const term = records.terms.find((item) => item.key === key)
-        if (term) {
-          changes.terms.push({ ...term, review: next })
-        }
-      })
+      .with({ type: "term" }, ({ key }) => decideTerm(key))
       .with({ type: "settings" }, () => {
         changes.settings = { ...records.settings, review: next }
       })
@@ -247,8 +277,9 @@ export function reviewRecords(
 
 /**
  * Answers an interpretation or conflict question (schema.md, Settings and questions): the chosen option's rules are
- * approved where nothing else blocks them, the other candidates are rejected, and a conflict's open issues on the rules
- * it's about are resolved with the answer. Gives every rule that changed.
+ * approved where nothing else blocks them, with the terms they read still to review, the other candidates are rejected,
+ * and a conflict's open issues on the rules it's about are resolved with the answer. Gives every rule and term that
+ * changed.
  */
 export function answerQuestion(
   records: RulebookRecords,
@@ -286,7 +317,7 @@ export function answerQuestion(
   const approvals = reviewRecords(withAnswer, toRefs(kept), { status: "approved", ...review })
   const rejections = reviewRecords(withAnswer, toRefs(dropped), { status: "rejected", ...review })
   const changed = new Map([...resolved, ...approvals.rules, ...rejections.rules].map((rule) => [rule.key, rule]))
-  return { question: answered, rules: [...changed.values()], notApproved: approvals.skipped }
+  return { question: answered, rules: [...changed.values()], terms: approvals.terms, notApproved: approvals.skipped }
 }
 
 /** Resolves a stored issue with a note, so it no longer blocks approval. */

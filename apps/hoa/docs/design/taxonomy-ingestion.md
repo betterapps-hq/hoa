@@ -82,6 +82,28 @@ Each step has a gate. The next step starts only when the gate is met.
 - Paid calls only when they answer the step's question: steps 1 to 5 cost cents (embeddings); step 6 is the one
   large-model comparison.
 
+## Core terms
+
+The shared catalog's universal layer is the schema's core vocabulary ([schema.md](schema.md#core-and-organization-terms)),
+grown on evidence rather than intuition, since it is easy to add a term later and hard to take one back once
+rulebooks refine it. A word joins the core when all three hold:
+
+- It appears in the rule-bearing provisions of at least 8 of the 10 organizations studied (a text match over the 1,905
+  provisions; only one organization's design guidelines are among them, so building standards are undercounted).
+- It means the same in each: a document that defines it with a meaning of its own ("Notice" as the notice that starts a
+  claim) keeps it out.
+- Its shape is settled: the sample's hand-made rulebook and independent builds model it the same way.
+
+Added on 2026-10-11: declaration, by-laws, rules, plat, amendment, declarant, managing agent, residence, common area,
+street, easement, landscaping, tree, vehicle, animal (with dog, cat, livestock and poultry, the four values both the
+sample build and Sudden Valley's build created independently), lease, lien and reserve fund; and about 45 units in
+every family the engine converts (length, area, volume, weight, speed, money, ratio, time) plus decibels. Waiting for
+more data: insurance, officer, special assessment, variance and antenna (7 of 10); mortgagee, common expense,
+mediation, hearing, articles of incorporation, quorum, late charge and fine (6 of 10); design guidelines (5 of 10,
+undercounted); and fence, wall, sign, structure and improvement, which are in nearly every organization but which the
+sample models as kinds of one exterior item while builds made them separate things. Left out: notice (often defined as
+one particular notice), nuisance (a judgment, not a term) and one developer's template terms (Class B control period,
+voting groups, neighborhoods), which suit an optional pack for the organizations whose documents define them.
 ## Tasks
 
 Runs in parallel with the defined-terms finder: GLiNER and Decide picking the paragraphs step B reads, compared with

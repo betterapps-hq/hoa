@@ -1,5 +1,6 @@
 import { ChevronDownIcon, ChevronRightIcon } from "lucide-react"
 import { useId, useState, type ReactElement } from "react"
+import { RowActions } from "@/components/RowActions/RowActions"
 import { badgeVariants } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -21,6 +22,7 @@ import { ReviewControls } from "../ReviewControls/ReviewControls"
 import { ReviewMenu } from "../ReviewMenu/ReviewMenu"
 import { RuleLink } from "../RuleLink/RuleLink"
 import { describeTermKind, describeValueType } from "../TermChip/TermChip.utils"
+import { AddChoice, useTermEditing } from "../TermEditor/TermEditor"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 import { labelWithin, subjectSummary, type TermNode, type TermSubject } from "../VocabularyTab/VocabularyTab.utils"
 
@@ -38,6 +40,11 @@ export type TermGroupProps = {
 
 /** "1 rule", "3 rules". */
 const rulesText = (count: number) => `${count} ${count === 1 ? "rule" : "rules"}`
+
+// A detail (a property) is what the rules ask about a thing, so the page calls it a question; the wording only.
+/** How a kind or detail's rules are counted: a question is asked by rules, a kind is used in them. */
+const usageText = (node: TermNode) =>
+  `${node.content?.kind === "property" ? "Asked by" : "Used in"} ${rulesText(node.usedBy.length)}`
 
 /**
  * One subject of the terms tab (encoding.md, UX, Terms): a thing, request, party, event, document, list or unit, with
@@ -78,7 +85,7 @@ export function TermGroup({ subject, shown, toApprove, found, isOpen, onOpenChan
         </CollapsibleTrigger>
         <div className="-my-1 flex shrink-0 items-center gap-2">
           <span className="text-sm whitespace-nowrap text-muted-foreground">
-            {subject.rules.length > 0 ? rulesText(subject.rules.length) : "No rule"}
+            {subject.rules.length > 0 ? `Used in ${rulesText(subject.rules.length)}` : "No rule"}
           </span>
           {/* A core term isn't reviewed here; the space keeps the counts in a column. */}
           {actions && subject.term ? <TermReview term={subject.term} name={name} /> : null}
@@ -96,7 +103,13 @@ export function TermGroup({ subject, shown, toApprove, found, isOpen, onOpenChan
             <TermRows title="Kinds" holder={subject.label} rows={shown.kinds} found={found} listedAt={listedAt} />
           ) : null}
           {shown.details.length > 0 ? (
-            <TermRows title="Details" holder={subject.label} rows={shown.details} found={found} listedAt={listedAt} />
+            <TermRows
+              title="What the rules ask about it"
+              holder={subject.label}
+              rows={shown.details}
+              found={found}
+              listedAt={listedAt}
+            />
           ) : null}
           <div className="flex flex-wrap items-start justify-between gap-3">
             <RuleDisclosure label={subject.label} rules={subject.rules} />
@@ -105,7 +118,7 @@ export function TermGroup({ subject, shown, toApprove, found, isOpen, onOpenChan
                 refs={toApprove.map((key) => ({ type: "term" as const, key }))}
                 noun="terms"
                 label={`Approve all ${toApprove.length} terms`}
-                title={`Approve the ${toApprove.length} terms for ${name}, its details and their choices?`}
+                title={`Approve the ${toApprove.length} terms for ${name}, its questions and their choices?`}
               />
             ) : null}
           </div>
@@ -143,23 +156,30 @@ function TermAbout({ node }: { node: TermNode }) {
     <div className="flex max-w-prose flex-col gap-1 text-sm">
       {content.definition ? <p>{sentenceCase(content.definition)}</p> : null}
       {content.scopeNote ? <p className="text-muted-foreground">{sentenceCase(content.scopeNote)}</p> : null}
-      {others.length > 0 ? <p className="text-muted-foreground">Also written: {others.join(", ")}</p> : null}
+      {others.length > 0 ? <p className="text-muted-foreground">Also called: {others.join(", ")}</p> : null}
     </div>
   )
 }
 
-/** A term's review in a row: its status in words and its menu. */
+/** A term's review in a row: its status in words and its menu, which edits or merges it too. */
 function TermReview({ term, name }: { term: T.Term; name: string }) {
   const { approval } = useRulebookWorkspace()
+  const editing = useTermEditing(term)
   return (
-    <ReviewMenu
-      record={{ type: "term", key: term.key }}
-      status={term.review.status}
-      name={name}
-      blockers={
-        approval && term.review.status === "proposed" ? approvalBlockers(approval, { type: "term", key: term.key }) : []
-      }
-    />
+    <>
+      <ReviewMenu
+        record={{ type: "term", key: term.key }}
+        status={term.review.status}
+        name={name}
+        blockers={
+          approval && term.review.status === "proposed"
+            ? approvalBlockers(approval, { type: "term", key: term.key })
+            : []
+        }
+        more={[editing.edit, editing.merge]}
+      />
+      {editing.dialogs}
+    </>
   )
 }
 
@@ -174,7 +194,10 @@ type TermRowsProps = Listings & { title: string; holder: string; rows: TermNode[
 /** A subject's kinds or details, under a small heading. */
 function TermRows({ title, holder, rows, found, listedAt }: TermRowsProps) {
   return (
-    <section className="flex flex-col gap-2" aria-label={`${title} of ${holder}`}>
+    <section
+      className="flex flex-col gap-2"
+      aria-label={`${title === "Kinds" ? "Kinds of" : "Questions about"} ${holder}`}
+    >
       <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
       <ul className="divide-y rounded-lg border bg-background">
         {rows.map((row) => (
@@ -234,10 +257,10 @@ function TermRow({ node, holder, found, listedAt }: TermRowProps) {
               variant="link"
               className="h-auto p-0 text-link"
               aria-expanded={isUsageOpen}
-              aria-label={`${name}: used by ${rulesText(node.usedBy.length)}`}
+              aria-label={`${name}: ${usageText(node).toLowerCase()}`}
               onClick={() => setIsUsageOpen(!isUsageOpen)}
             >
-              {rulesText(node.usedBy.length)}
+              {usageText(node)}
               <ChevronDownIcon aria-hidden className={cn("transition-transform", isUsageOpen ? "rotate-180" : null)} />
             </Button>
           )}
@@ -246,7 +269,7 @@ function TermRow({ node, holder, found, listedAt }: TermRowProps) {
       </div>
       {isUsageOpen ? <RuleList name={name} rules={node.usedBy} /> : null}
       {node.details.length > 0 ? (
-        <ul className="ml-1 flex flex-col divide-y border-l pl-3" aria-label={`Details of ${name}`}>
+        <ul className="ml-1 flex flex-col divide-y border-l pl-3" aria-label={`Questions about ${name}`}>
           {node.details.map((detail) => (
             <TermRow key={detail.key} node={detail} holder={node.label} found={found} listedAt={listedAt} />
           ))}
@@ -323,6 +346,7 @@ function ChoiceList({ list, found, many = false, sameAs = null, holder = "" }: C
       {sameAs || isComplete || list.values.length === 0 || hidden > 0 ? null : (
         <span className="text-xs text-muted-foreground">or another</span>
       )}
+      {!sameAs && list.term ? <AddChoice list={list.term} /> : null}
     </div>
   )
 }
@@ -332,39 +356,49 @@ type TermPopoverProps = { node: TermNode; trigger: ReactElement }
 /** A choice or list in a popover: what it is and means, the rules that read it, and its review. */
 function TermPopover({ node, trigger }: TermPopoverProps) {
   const { vocabulary, approval } = useRulebookWorkspace()
+  const editing = useTermEditing(node.term)
   const name = sentenceCase(node.label)
+  const more = [editing.edit, editing.merge].filter((item) => item !== null)
   return (
-    <Popover>
-      <PopoverTrigger render={trigger} />
-      <PopoverContent className="w-80 max-w-[calc(100vw-2rem)]">
-        <PopoverHeader>
-          <PopoverTitle>{name}</PopoverTitle>
-          {node.content ? <PopoverDescription>{describeTermKind(node.content, vocabulary)}</PopoverDescription> : null}
-        </PopoverHeader>
-        <TermAbout node={node} />
-        {node.usedBy.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Used by {rulesText(node.usedBy.length)}</p>
-            <RuleList name={name} rules={node.usedBy} />
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No rule uses it on its own.</p>
-        )}
-        {node.term ? (
-          <ReviewControls
-            record={{ type: "term", key: node.term.key }}
-            status={node.term.review.status}
-            name={name}
-            isCompact
-            blockers={
-              approval && node.term.review.status === "proposed"
-                ? approvalBlockers(approval, { type: "term", key: node.term.key })
-                : []
-            }
-          />
-        ) : null}
-      </PopoverContent>
-    </Popover>
+    <>
+      <Popover>
+        <PopoverTrigger render={trigger} />
+        <PopoverContent className="w-80 max-w-[calc(100vw-2rem)]">
+          <PopoverHeader>
+            <PopoverTitle>{name}</PopoverTitle>
+            {node.content ? (
+              <PopoverDescription>{describeTermKind(node.content, vocabulary)}</PopoverDescription>
+            ) : null}
+          </PopoverHeader>
+          <TermAbout node={node} />
+          {node.usedBy.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Used in {rulesText(node.usedBy.length)}</p>
+              <RuleList name={name} rules={node.usedBy} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No rule uses it on its own.</p>
+          )}
+          {node.term ? (
+            <div className="flex items-start justify-between gap-2">
+              <ReviewControls
+                record={{ type: "term", key: node.term.key }}
+                status={node.term.review.status}
+                name={name}
+                isCompact
+                blockers={
+                  approval && node.term.review.status === "proposed"
+                    ? approvalBlockers(approval, { type: "term", key: node.term.key })
+                    : []
+                }
+              />
+              {more.length > 0 ? <RowActions name={name} actions={more} /> : null}
+            </div>
+          ) : null}
+        </PopoverContent>
+      </Popover>
+      {editing.dialogs}
+    </>
   )
 }
 
@@ -385,7 +419,7 @@ function RuleList({ name, rules }: { name: string; rules: T.RuleKey[] }) {
 function RuleDisclosure({ label, rules }: { label: string; rules: T.RuleKey[] }) {
   const [isOpen, setIsOpen] = useState(false)
   if (rules.length === 0) {
-    return <p className="text-sm text-muted-foreground">No rule uses {label} or its details yet.</p>
+    return <p className="text-sm text-muted-foreground">No rule uses {label} or asks about it yet.</p>
   }
   return (
     <div className="flex min-w-0 flex-col gap-2">
@@ -395,7 +429,7 @@ function RuleDisclosure({ label, rules }: { label: string; rules: T.RuleKey[] })
         aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
       >
-        {isOpen ? "Hide" : "Show"} the {rulesText(rules.length)} that use it
+        {isOpen ? "Hide" : "Show"} the {rulesText(rules.length)}
         <ChevronDownIcon aria-hidden className={cn("transition-transform", isOpen ? "rotate-180" : null)} />
       </Button>
       {isOpen ? <RuleList name={sentenceCase(label)} rules={rules} /> : null}

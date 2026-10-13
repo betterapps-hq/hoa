@@ -86,12 +86,17 @@ export function createContext({ vocabulary, request, settings, answers, derive }
       return undefined
     }
     const whole = (value: D.Exact) => Number(D.floor(value))
+    // Elapsed time converts through its base unit (the second); a date moves by whole days of it.
+    const dayInBase = toBase(vocabulary, D.integer(1), "calendar-day")?.value
     return match(unit.dimension)
       .with("business-time", () => C.addBusinessDays(day, amount, holidays))
       .with("calendar-period", () =>
         C.addMonths(day, whole(toBase(vocabulary, D.exact(amount), unitKey)?.value ?? D.zero))
       )
-      .with("elapsed-time", () => day + whole(toBase(vocabulary, D.exact(amount), unitKey)?.value ?? D.zero))
+      .with("elapsed-time", () => {
+        const elapsed = toBase(vocabulary, D.exact(amount), unitKey)?.value
+        return elapsed && dayInBase ? day + whole(D.divide(elapsed, dayInBase)) : undefined
+      })
       .otherwise(() => undefined)
   }
 

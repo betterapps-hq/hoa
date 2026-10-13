@@ -1,23 +1,22 @@
 import type { GoverningDocument } from "@/documents/governingDocument"
+import { counted } from "@/lib/text"
 import type { RefusedDocument } from "@/rulebook/buildSources"
 import { currentDocumentIds, isSameDocumentSet } from "@/rulebook/currentDocuments"
 import type { RulebookView } from "../rulebook.functions"
 
-// What the rulebook page says first (encoding.md, UX): the one thing that's happening or next, in a sentence, with at
-// most one action.
+// What the rulebook page says first (encoding.md, UX): the one thing that's happening or next, in a sentence. Its
+// action is the page's main action, at the top of the page (ux.md, Page actions).
 
 export type RulebookStatus =
   | { kind: "building"; reading: string[] }
   | { kind: "reading"; reading: string[] }
-  | { kind: "draft-ready"; isFirst: boolean; summary: string; builtFrom: string[] }
+  | { kind: "draft-ready"; isFirst: boolean; summary: string; builtFrom: string[]; skipped: number }
   | { kind: "build-failed"; error: string; isRetryable: boolean }
   | { kind: "build-refused"; documents: RefusedDocument[] }
   | { kind: "build-stopped"; hasDraft: boolean }
   | { kind: "documents-changed"; version: number | null }
   | { kind: "not-built" }
   | { kind: "none" }
-
-const counted = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
 
 /** "adds 5 rules, changes 12 and removes 2": what a draft does to the rules, or null when it leaves them alone. */
 export function changeSummary(changes: NonNullable<RulebookView["changes"]>) {
@@ -37,11 +36,11 @@ export function changeSummary(changes: NonNullable<RulebookView["changes"]>) {
 export function refusalSentence({ title, kind, otherTitle }: RefusedDocument) {
   switch (kind) {
     case "file-missing":
-      return `“${title}” has no file, so the rulebook can’t be built from it. Upload it again, or remove it.`
+      return `“${title}” has no file, so the rulebook can’t be made from it. Upload it again, or remove it.`
     case "file-invalid":
-      return `“${title}” has no file we can read, so the rulebook can’t be built from it. Upload it again, or remove it.`
+      return `“${title}” has no file we can read, so the rulebook can’t be made from it. Upload it again, or remove it.`
     case "structure-invalid":
-      return `“${title}” is split into parts in a way the rulebook can’t be built from. Upload it again, or remove it.`
+      return `“${title}” is split into parts in a way the rulebook can’t be made from. Upload it again, or remove it.`
     case "duplicate-key":
       return otherTitle === undefined
         ? `“${title}” uses the same name as another document. Remove one of them.`
@@ -75,7 +74,8 @@ export function rulebookStatus({
       kind: "draft-ready",
       isFirst: changes?.isFirst ?? published.rulebook === null,
       summary: changes ? (changeSummary(changes) ?? "") : "",
-      builtFrom: changes?.documents.added.map((document) => document.title) ?? []
+      builtFrom: changes?.documents.added.map((document) => document.title) ?? [],
+      skipped: draft.buildFailures.length
     }
   }
   if (draft.refusedDocuments.length > 0) {

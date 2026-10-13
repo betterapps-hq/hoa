@@ -1,10 +1,10 @@
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
+import { pickableTerms } from "@/rulebook/ruleTerms"
 import type * as T from "@/schema/types"
 import { createVocabulary } from "@/schema/vocabulary"
 import { sampleRecords } from "@/tests/rulebookWorkspace"
-import { pickableTerms } from "../TermPicker/TermPicker.utils"
 import { CheckEditor } from "./CheckEditor"
 
 const records = sampleRecords()

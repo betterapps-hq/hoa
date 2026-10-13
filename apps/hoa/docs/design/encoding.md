@@ -206,10 +206,11 @@ hash decides its review, approved, rejected or still proposed, with the resoluti
 current draft decides first, then the published rulebook, so a rebuild keeps the review work on the draft and only asks
 about what changed. Rejected records stay in the draft with their status, so rejecting a record is how it's dropped,
 and stays dropped. The same goes for the settings (whose decision policy, which only the administrator sets, always
-carries), for a question asked again in the same words (its answer), and for a provision's no-rule reason: a reason
+carries, as does each clause the documents don't state, cited by no passage, so a default an administrator changed
+survives), for a question asked again in the same words (its answer), and for a provision's no-rule reason: a reason
 the build gives again for the same wording keeps its review, and a reason someone gave a provision the build leaves
-uncovered comes back. Edits don't carry: a rule, term or clause an administrator edited comes back as the build
-encodes it, proposed. The job reports counts: provisions, terms, rules by kind, uncovered provisions, issues.
+uncovered comes back. Other edits don't carry: a rule, a term, or a clause the documents state that an administrator
+edited comes back as the build encodes it, proposed. The job reports counts: provisions, terms, rules by kind, uncovered provisions, issues.
 
 ### 12. Review and 13. Publish
 
@@ -220,9 +221,21 @@ rulebook didn't, and the reverse. Nothing is deleted from a draft: Reject replac
 discarded (`discardRulebookDraft`), which deletes it and its records and leaves the published rulebook as it is.
 
 Publishing requires every record approved or rejected, every no-rule reason approved, no blocking issue, no uncovered
-provision, and approved records that make a valid rules file. Code assembles the rules file from the approved records
+provision, and approved records that make a valid rules file. A rulebook covers only the provisions of the documents
+it was built from (its `sourceDocumentIds`): a replaced document's provisions stay stored for the rulebook that cites
+them, but a draft built without it doesn't count them. Code assembles the rules file from the approved records
 (schema.md, Rules file), validates it with `rulesFile`, writes it to R2, stores its SHA-256 on the rulebook and marks
-the previous published rulebook `superseded`.
+the previous published rulebook `superseded`. The settings must be approved: they can't be rejected, since every
+rulebook has them, so they're changed instead.
+
+#### Changing a published rulebook
+
+Processing the documents again costs model calls and takes an hour, so a change that isn't about the documents (a
+setting, a rule's wording, a term) doesn't need it. "Change the rulebook", a page action on the rulebook page
+(`changePublishedRulebook`), copies the published rulebook into a new draft in one batch: its rules, terms, questions,
+settings and coverage, with their reviews, and the same documents and build job. The draft is reviewed and published
+as the next version like any other, and discarding it leaves the published rulebook as it is. It's offered only when
+nothing else is under way, since a build's draft would replace the copy.
 
 ## Storage
 
@@ -253,24 +266,28 @@ A review records the rulebook id and the file's SHA-256, so it can always be rep
 ## UX
 
 One page, `/rules` ("Rulebook" in the sidebar, for every role), holds the rulebook and the governing documents it's
-built from; `/documents` redirects to it. The page is quiet: one sentence about what's happening or next, at most one
-primary action, few counters, plain headings, and details behind a sheet, a disclosure or a secondary tab. Nothing on
+built from; `/documents` redirects to it. The page is quiet: one sentence about what's happening or next, its action
+at the top of the page with the page's other actions ([ux.md, Page actions](../ux.md#page-actions)), few counters,
+plain headings, and details behind a sheet, a disclosure or a secondary tab. Nothing on
 it names a document, organization, project type or term from a sample; lists are paged (25 to a page), so an
 organization with 2 documents or 20, 50 rules or 2,000, sees the same page.
 
 **In force (an administrator's default view).** Three parts, top to bottom:
 
-- **Status:** shown only when there's something to say, most pressing first (`rulebookStatus`): a build is running
-  (with its progress, below); a document is being read; the last build was stopped ("The last build was stopped.",
-  with **Build a draft**, and **Review the earlier draft** when there is one); a draft is ready ("A new draft of the rulebook is ready to review.
-  It was built after the Design Guidelines changed. It adds 5 rules, changes 12 rules and removes 2 rules." and
+- **Status:** shown only when there's something to say, most pressing first (`rulebookStatus`); the action each names
+  is the page's main action, at the top, and "Change the rulebook" takes its place when nothing is under way: a build is running
+  (with its progress, below); a document is being read; the last build was stopped ("Processing was stopped.",
+  with **Process documents**, and **Review the earlier draft** when there is one); a draft is ready ("A new draft of the rulebook is ready to review.
+  It was made after the Design Guidelines changed. It adds 5 rules, changes 12 rules and removes 2 rules." and
   **Review changes**); the last build was refused by its check, checked again against the documents as they are now
   (one plain sentence per document naming it and saying what to do, such as "“Declaration” has no file we can read, so
-  the rulebook can’t be built from it. Upload it again, or remove it.", with **Upload** and, per document, **Remove
+  the rulebook can’t be made from it. Upload it again, or remove it.", with **Upload** and, per document, **Remove
   document**, which confirms by name and takes every version of it out of the documents builds and the page read,
-  while what cites its pages still opens them); the last build failed (**Try again** only when the failure is
-  retryable); the documents differ from the published rulebook's and
-  there's no draft (**Build a draft**); nothing is built yet (**Build the rulebook**).
+  while what cites its pages still opens them; these stay in the status, since they fix its documents); the last
+  build failed (**Process documents** only when the failure is retryable); the documents differ from the published rulebook's and
+  there's no draft (**Process documents**); nothing is built yet (**Process documents**, under "Turn your
+  documents into a rulebook."). On screen the build is "processing": people process their documents; the code and
+  these docs keep "build".
 - **Governing documents:** each document's current version (kind, version, pages, date) with its earlier versions
   behind a disclosure. **Read** (the document viewer, page by page) shows on the row; **Download** (the original file)
   and **New version** are in its ellipsis menu (a homeowner, with nothing else to do, sees Download beside Read). One
@@ -280,53 +297,68 @@ organization with 2 documents or 20, 50 rules or 2,000, sees the same page.
   of the name's words, typos and prefixes allowed; otherwise a new document), and a row's **New version** preselects
   that row's document. Uploading builds the rulebook on its own once the file is read ([Save draft](#11-save-draft)); there's
   no separate build step.
-- **Rules in force:** the published version and date, the rules file to download, and the rulebook's records
-  read-only in quiet tabs (Rules, Terms, Coverage, Questions when there are any, Settings).
+- **Rules in force:** the published version and date, and the rulebook's records read-only in quiet tabs (Rules,
+  Terms, Coverage, Questions when there are any, Settings). The rules file downloads from the page's menu.
 
-**The build's progress** (`BuildProgress`). A build takes up to an hour, so the status shows all of it up front, not
+**The build's progress** (`DocumentEncodingSteps`). A build takes up to an hour, so the status shows all of it up front, not
 one stage's bar at a time. The job records every stage it will report when it starts (`jobs.progress_json`,
 `src/jobs/progress.ts`), and each report marks the stages before it done and its own current, with its count and
-times. The page groups the stages into steps in plain words: Reading documents, Finding defined terms, Finding rules
-("47 of 64 sections"), Building the vocabulary (merging it only if needed), Drafting rules ("3 of 20 batches of
-rules"), Combining and checking for conflicts, Saving the draft. A stage the page has no words for is
-a step of its own, so the list stays true to the build's stages. Above the list: one line ("Drafting rules, step 3 of
-7, about 35–50 minutes left"), one bar for the whole build, and the time left and so far. The estimate starts from the
+times. Until that record arrives, the page lists the same stages (`src/encoding/stages.ts`), none started. The page groups the stages into steps in plain words: Reading documents, Finding defined terms, Finding rules,
+Building the vocabulary (merging it only if needed), Drafting rules, Combining and checking for conflicts, Saving the
+draft. A stage the page has no words for is a step of its own, so the list stays true to the build's stages. Above the list, one
+row: the time left ("35–50 min left"; the list already names the current step), the time so far ("21 min in") and an
+icon button that shows or hides the steps; under it, one bar for the whole build. The estimate starts from the
 sections (each stage's calls, `concurrency` at a time, with its reruns or retries, and the time each step's call takes)
-and follows the build's own pace once finding or drafting the rules has done some of its work; it says "Working out
-how long this takes" until the sections are known. The bar never
-reads full before the build ends. The steps fold away to the one line.
+and follows the build's own pace once finding or drafting the rules has done some of its work; it says "Estimating
+time left" until the sections are known. The bar never
+reads full before the build ends. The steps fold away, and the row then names the current step too ("Drafting
+rules, 35–50 min left").
 
-**Counts as they arrive.** Each step's line counts what it has produced so far, never the items themselves: "2 terms
-found", "92 rules found" (a section looked at again replaces its first count), the vocabulary's terms, "40 of 92 rules
-drafted" (a redrafted rule counts once) and the conflicts left to decide. The current step also says how much work is
-under way ("0 of 2 sections, 2 under way": the calls in flight, at most `concurrency`) and has a thin bar of its own, so
-a step whose first calls take minutes doesn't look frozen. The counts come from `getBuildResults` (administrators, the
-organization's own builds), which lists the build's step outputs in R2 and reads only those written since the page's
-cursor; the page polls it every four seconds. Polling, not server-sent events: a stream would hold a Worker request
+**Counts as they arrive.** The steps say only where the build is: the current one has a spinner, and none counts what
+it found or the parts the build divides its work into (documents, sections, groups of sections, batches of rules).
+What the build finds belongs to the reader above the steps (`DocumentEncodingReader`, in `ProcessingStatus`), which
+shows each term, rule and draft in the document as it arrives and counts them. Its results come from
+`getBuildResults` (administrators, the organization's own builds), which lists the build's step outputs in R2 and reads
+only those written since the page's cursor, polled every four seconds; its documents from `getBuildDocuments`, the
+structure step's output with each document's title, asked for every four seconds until the step has written it and
+then kept, as it doesn't change. Polling, not server-sent events: a stream would hold a Worker request
 open for the hour a build runs and still have to poll R2 inside it, while a poll is short, survives a dropped
 connection and reads nothing twice.
 
-**Stopping a build.** While a build runs, **Stop building** (quiet, beside the progress) asks "Stop this build? Work
+**Stopping a build.** While a build runs, **Stop processing** (quiet, beside the progress) asks "Stop processing? Work
 finished so far is kept and reused next time. Nothing is published." Stopping (`stopRulebookBuild`, administrators
 only) terminates the build's Workflow instance and marks its rulebook and job `cancelled`. No draft is saved, the job
-isn't marked failed, and no follow-up build starts; the next upload, or **Build a draft**, starts one, and the model
+isn't marked failed, and no follow-up build starts; the next upload, or **Process documents**, starts one, and the model
 answers the stopped build finished come from the content cache. A build that already finished, failed or was stopped
 is reported as such, not as an error.
 
-**Reviewing a draft** is a focused mode (`/rules?review=draft`; with nothing published, it's what the page shows). It
-leads with the way back to the rules in force, what the draft changes against them, and **Discard draft**, whose
-confirmation says how many review decisions are lost and that the published version stays in force. Then the next step
-as one sentence with one action, from the draft's to-do list in the order the work goes (`draftTodos`): terms to
-review (a rule waits for the terms it reads), questions to answer, rules to review, the settings, reasons for having no
-rule, provisions with no rule and no reason, and approved rules with open problems. The rest of the list follows as
-links, each opening its tab with the matching filter. With nothing left, the sentence says so and the action is
-**Publish**, after a confirmation; anything the server still finds (`publishBlockers`, such as problems in the rules
-file) is listed instead. Below are the tabs: **Changes** (new, changed and removed rules and terms, each changed one
-beside what it said before, each with its review; unchanged records keep their review and aren't listed), then Rules,
-Terms, Coverage, Questions and Settings.
+**Reviewing a draft** is a focused page of its own (`/rules/review`; `/rules` stays the rulebook page, and offers it). It
+leads with the way back to the rules in force, one sentence on what the draft is (what it changes against them, or
+that nothing is published yet), a bar of how much is decided and a sentence that says it ("2 of 292 decided."). Its
+page actions are **Publish** and, in the menu, **Approve everything left** and **Discard draft**. Approve everything
+left first says what it approves in counts (rules, terms, the settings and reasons for having no rule) and that
+anything with a problem, or that's a reading of an open question, stays to review with why; questions still need
+answers. Discard's confirmation says how many review decisions are lost and that the published version stays in
+force. When the build
+that made the draft skipped items (a rule that still failed its checks, a section a call never answered), a notice
+("4 parts weren't finished") shows the same steps the progress did, each done or, where it skipped something, with a
+warning and the places under it in a few words, each linked to it in the documents (`skippedParts`: "Declaration 21:
+2 rules not drafted"), and offers **Try again**, which processes the documents again: what finished
+comes from the content cache, so only the skipped parts are redone. The errors themselves stay on the job, not on the
+page. The status line outside review says some parts weren't finished. A failed build is the only one the status line
+reports as not finished. The tabs are the to-do list: **Changes** (new, changed and removed rules and terms, each
+changed one beside what it said before, each with its review; unchanged records keep their review and aren't listed),
+then Rules, Terms, Coverage, Questions and Settings, each with the count it has left (`tabWork`: rules to review or
+approved with open problems, terms to review, reasons to review and provisions with neither rule nor reason,
+unanswered questions; the settings show a dot until approved) or a check when it has none. The page opens on Changes
+when there are any, otherwise on the first tab with something left. Publish is enabled once nothing is left, after a
+confirmation; anything the server still finds (`publishBlockers`, such as problems in the rules file) is listed
+instead.
 
-**Reviewing a record.** Approve is the primary action; Reject and Edit are quieter. A decided record says so in words
-("Approved", "Rejected") with **Undo**, never as a faded button. Rejecting is how a record is dropped: it stays in the
+**Reviewing a record.** Approve is the primary action; Reject and Edit are quieter. A term means the same in every
+rule that uses it, so a rule is reviewed with its terms: approving a rule approves the terms it reads that are still
+to review, and says so ("Approve, with its 2 terms"); only a term's own problem blocks the rule. A decided record says
+so in words ("Approved", "Rejected") with **Undo**, never as a faded button. Rejecting is how a record is dropped: it stays in the
 draft with its status, stops counting as coverage, and a rebuild carries the decision forward; nothing is deleted. Rows
 in the rules, terms and changes lists carry the same controls in a compact form; a row something blocks says it can't
 be approved yet, and its card says why. Rules, terms and the settings share `ReviewControls`.
@@ -338,30 +370,64 @@ list is ordered by relevance; without, in its usual order. The other filters sti
 
 - **Rules:** a search box, with the other filters (review status, kind, area, request type) behind **Filters**; the
   domain is a filter, not a column. Each row has the title, which opens the rule's card, its main citation and its
-  statement in words. "Approve the N rules shown" approves what a filter shows, skipping (and saying why) any record
-  something blocks; Terms and Coverage have the same.
+  statement in words. Approving many at once is the page's Approve everything left, not a button per tab.
 - **Rule card** (a side sheet): the review, the statement, its sources (the main citation's text, the others as
-  links), its problems when it has any, and two disclosures: "What it says, in detail" (the schema's words from
+  links), the terms it uses (each with what it is in words, "To review" while it is, and how many rules share it,
+  "Used in 42 rules" or "Only this rule"), its problems when it has any, and two disclosures: "What it says, in detail" (the schema's words from
   `describeRule`, kind, applicability, request types, bearer, remedy, cure, related rules, area and key) and "Try it
   against facts" (the engine's preview). Editing is the form (title, statement, modality, bearer, remedy, request
   types, and the structured check and condition editors with their JSON fallback). There's no whole-rule JSON editor
   and no delete.
+- **A term where the rule means something else** (`src/rulebook/ruleTerms.ts`). A term means the same in every rule
+  that uses it, so each term in the card has a menu to change which term this rule uses, in this rule only (the rule
+  goes back to review; the other rules keep the term). **Use a different term here** lists the terms that fit where
+  the rule uses it, worked out from the schema, not from names: for a thing or a kind of one, things of the same
+  nature, or only that thing's kinds when the rule also reads its details or kinds; for a detail, the same thing's
+  details holding the same kind of value (a quantity of the same dimension, a choice from the same list); for a choice,
+  the same list's other choices; for a unit, the same dimension's. **Use a new term here** makes a new term from a copy,
+  named apart from the original and with its own meaning, and copies along what the rule reads that hangs off it (a
+  thing's details and kinds, and theirs), so the rule reads the copies as it read the originals. It isn't offered for
+  a term only this rule uses, nor for a unit or a list of choices. New terms are proposed, approved with the rule.
 - **Terms:** grouped under what they describe. Each subject (a thing, request, party, event or document the
   organization's terms hang off, core ones included, then the lists of choices no detail uses and the units) is a
-  collapsed row in its section, most used first, the first eight until "Show all", saying what it holds ("37 details
-  and 3 kinds") and how many rules read it or anything under it. Open, it shows its definition and other labels, its
+  collapsed row in its section, most used first, the first eight until "Show all", saying what it holds ("37 questions
+  and 3 kinds") and how many rules read it or anything under it ("Used in 5 rules"). The page calls a
+  detail a question, since it's what the rules ask about the thing (as on the homeowner's form): "What the rules ask
+  about it", each "Asked by 1 rule"; other labels are "Also called". Open, it shows its definition and other labels, its
   kinds (categories, with their definition or criteria) and its details (properties, by the name they're shown by
   under it: "height" under gate, not "gate height"), each with what it holds in words, its definition, the rules that
   read it and its review. A choice detail shows its list's choices as chips (folded past eight; "or another" when the
   list is open), each opening what it means, the rules that read it and its review; a later detail in the same
   subject choosing from the same list refers back to it ("as for material"). Kinds and details come most used first.
   The review filter (to review by default in a draft) keeps a subject for any term under it that matches, and only
-  those kinds and details ("3 of 37 details"); "Approve all N terms" approves what an open subject keeps, its details
+  those kinds and details ("3 of 37 questions"); "Approve all N terms" approves what an open subject keeps, its details
   and their choices included. A search lists the subjects it finds best first, opened: a found subject shows all of
   itself, otherwise only the details holding a match, and a found choice is marked.
-- **Questions:** each question with its citations and readings; Answer becomes the primary action once a reading is
-  chosen.
-- **Settings:** the review, then each clause in words with its citations (edited as JSON), and the policy.
+
+  Each term's menu also edits it (`src/rulebook/termEdits.ts`), and so does the rule card's term menu, as "Edit the
+  term": its name, its other names (one to a line, since a name may hold a comma), what it means, a quantity's unit
+  (another of the same kind, which amounts convert to) and whether a list allows only its choices. A term means the
+  same in every rule that uses it, so a change to what it means sends it and the approved rules that read it back to
+  review, and the editor says so before saving; a new name alone changes no rule, since a statement shows its terms'
+  current names. A list adds a choice from under its choices. **Merge into another term** has every rule and term
+  that used a term use another of the same kind in the same place, sends what changed back to review and rejects the
+  merged term with a note naming the other. A term other terms hang off (a thing's details or kinds, a list's
+  choices) isn't merged, nor one the settings use.
+- **Questions:** the open questions one at a time (shadcn's Questionnaire, "Question 1 of 4"), each with its citations
+  and readings, each reading naming the rules it keeps. Choosing a reading and moving on saves the answer; Skip leaves
+  the question open, and finishing brings back the skipped ones as one line to answer later. Answered questions
+  follow, each with its chosen reading and a way to change it.
+- **Settings:** the review, then each clause as a card that says what it's for, a small form in plain words and the
+  passages it comes from, when the documents state it. Which document wins is a tier list: each rank (1st, 2nd) a row of
+  the documents equal in it; a document is dragged by its handle onto another rank to rank equal (before or after a chosen document there), or into a gap to
+  rank alone, and its menu does the same from the keyboard; law (federal law, state law, then county and city ordinances) is fixed at the top, each marked with a lock, since no
+  document an organization writes outranks it, so it can't be moved and nothing goes into or above it; each document is named as an owner knows it (Federal laws, Declaration (CC&Rs)); deadlines are a choice of calendar or business days, whether a deadline on a day off moves, the holidays that
+  aren't business days (US federal, Washington state, or none) and the time zone, searched from every zone, west to east
+  by its offset from UTC; the cure
+  period's length and unit; who decides each request and who answers for whom are rows of pickers, added and removed;
+  what a sanction needs first is read as sentences, removable. Conditions and exceptions the documents attach show as
+  sentences, not edited here. A cure period or a step before a sanction can be added where the documents give none: a step needs a date the request records, every time or only when another is recorded (a hearing, if one was requested). Then "Project application reviews": what to recommend when a rule
+  isn't met, by what would fix it, and how sure the review must be, in percent. Nothing is edited as JSON. Every card edits one draft over the saved settings, kept while another tab is open; a bar at the end saves it with Save and approve (editing the settings is reviewing them, so saving approves them unless something still blocks it, which a toast names) or discards it, and the review card's Approve waits until the draft is saved or discarded.
 - **Coverage:** one share for the documents the build read from their pages ("97.7% of the text of 2 documents is
   covered by a rule, a term, a setting or a reason for having no rule"), one bar and a small legend. A document whose
   provisions aren't linked to any upload's pages says it's not built yet instead of showing a share. Two views:

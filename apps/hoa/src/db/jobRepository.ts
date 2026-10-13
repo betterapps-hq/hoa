@@ -51,6 +51,15 @@ export async function getLatestJob(db: Database, hoaId: string, subjectId: strin
   return row ? jobSchema.parse(row) : null
 }
 
+/** Deletes every job for a subject, such as a deleted draft's reviews; returns their ids, for their stored outputs. */
+export async function deleteJobsOf(db: Database, hoaId: string, subjectId: string) {
+  const deleted = await db
+    .delete(jobs)
+    .where(and(eq(jobs.hoaId, hoaId), eq(jobs.subjectId, subjectId)))
+    .returning({ id: jobs.id })
+  return deleted.map((job) => job.id)
+}
+
 /** The HOA's latest job of a kind, so the rulebook page can show why the last build failed. */
 export async function getLatestJobOfKind(db: Database, hoaId: string, kind: Job["kind"]): Promise<Job | null> {
   const row = await db

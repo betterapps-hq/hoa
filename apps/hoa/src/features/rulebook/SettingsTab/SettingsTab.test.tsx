@@ -1,10 +1,16 @@
-import { fireEvent, screen, within } from "@testing-library/react"
+import { screen, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
+import type * as T from "@/schema/types"
 import { renderInWorkspace, sampleRecords } from "@/tests/rulebookWorkspace"
 import { SettingsTab } from "./SettingsTab"
+import { ordinal, percentOf, placeDocument, preconditionOf, shareOf, zoneLabel } from "./SettingsTab.utils"
 
 vi.mock("sonner", () => ({
-  toast: { error: vi.fn<(message: string) => void>(), success: vi.fn<(message: string) => void>() }
+  toast: {
+    error: vi.fn<(message: string) => void>(),
+    success: vi.fn<(message: string) => void>(),
+    warning: vi.fn<(message: string) => void>()
+  }
 }))
 
 const records = sampleRecords()
@@ -13,54 +19,266 @@ function card(title: string) {
   if (!(found instanceof HTMLElement)) {
     throw new Error(`No card is titled ${title}.`)
   }
-  return found
+  return within(found)
 }
 
 describe("SettingsTab", () => {
-  it("reads each clause in words, with its citations", () => {
+  it("reads each setting in plain words, with the passages it comes from", () => {
     renderInWorkspace(<SettingsTab />, { actions: null })
     const precedence = card("Which document wins")
-    expect(precedence).toHaveTextContent("1. statute, ordinance")
-    expect(within(precedence).getByRole("link", { name: "Declaration 1.3, paragraph 3" })).toBeInTheDocument()
-    expect(card("Who decides each request")).toHaveTextContent("The Reviewer decides applications.")
-    expect(card("Days and time")).toHaveTextContent("Holidays follow the us-federal calendar")
-    expect(screen.queryByRole("button", { name: /^Edit/ })).not.toBeInTheDocument()
+    const ranks = within(precedence.getByRole("list", { name: "Documents in order of authority" })).getAllByRole(
+      "listitem"
+    )
+    expect(ranks.slice(0, 3).map((rank) => rank.getAttribute("aria-label"))).toEqual([
+      "1st: Federal laws",
+      "2nd: State laws",
+      "3rd: County ordinances, City ordinances"
+    ])
+    expect(ranks[3]).toHaveAccessibleName(
+      "4th: Declaration (CC&Rs), Supplemental declarations, Plat (the recorded map of the lots)"
+    )
+    expect(precedence.getByRole("link", { name: "Declaration 1.3, paragraph 3" })).toBeInTheDocument()
+    expect(card("Who decides each request").getByText(/decided by the Reviewer/)).toBeInTheDocument()
+    expect(card("Deadlines").getByText("US federal holidays")).toBeInTheDocument()
+    expect(card("Deadlines").getByText(/^UTC[−+]\d{2}:\d{2} /)).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^Move/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
   })
 
-  it("approves the settings and edits a clause as JSON, checked as it's typed", async () => {
+  it("approves the settings as they are, and ranks a document on its own from its menu", async () => {
     const { user, actions } = renderInWorkspace(<SettingsTab />, { records })
     await user.click(screen.getByRole("button", { name: "Approve" }))
     expect(actions?.review).toHaveBeenCalledWith([{ type: "settings" }], "approved", null)
-
-    await user.click(screen.getByRole("button", { name: "Edit Who decides each request" }))
-    const editor = screen.getByRole("textbox", { name: "Who decides each request as JSON" })
-    const deciders = [{ requestType: "architectural-application", party: "gazebo", citations: [] }]
-    fireEvent.change(editor, { target: { value: JSON.stringify(deciders) } })
-    expect(await screen.findByText("gazebo isn't a term")).toBeInTheDocument()
-    fireEvent.change(editor, { target: { value: JSON.stringify([{ ...deciders[0], party: "board" }]) } })
-    expect(await screen.findByText("No problems found.")).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Save the clause" }))
-    expect(actions?.saveSettings).toHaveBeenCalledWith({
-      clauses: expect.objectContaining({
-        deciders: [{ requestType: "architectural-application", party: "board", citations: [] }]
-      }),
+    const precedence = card("Which document wins")
+    expect(precedence.queryByRole("button", { name: "Drag Federal laws" })).not.toBeInTheDocument()
+    expect(precedence.getAllByRole("button", { name: "Law always comes first" })).toHaveLength(3)
+    await user.click(precedence.getByRole("button", { name: "Move Declaration (CC&Rs)" }))
+    await user.click(await screen.findByRole("menuitem", { name: "Just below its rank now" }))
+    expect(actions?.saveSettings).not.toHaveBeenCalled()
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument()
+    await saveAndApprove(user)
+    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
+      clauses: {
+        precedence: expect.objectContaining({
+          order: [
+            ...records.settings.clauses.precedence.order.slice(0, 3),
+            ["supplemental-declaration", "plat"],
+            ["declaration"],
+            ...records.settings.clauses.precedence.order.slice(4)
+          ]
+        })
+      },
       policy: null
     })
+    expect(actions?.review).toHaveBeenLastCalledWith([{ type: "settings" }], "approved", null)
+    expect(screen.queryByRole("region", { name: "Unsaved settings" })).not.toBeInTheDocument()
   })
 
-  it("edits the policy", async () => {
+  it("keeps every change in one draft, saved or discarded together", async () => {
     const { user, actions } = renderInWorkspace(<SettingsTab />, { records })
     await user.selectOptions(
-      screen.getByRole("combobox", { name: "Not met, fixed by: redesign" }),
+      card("Who decides each request").getAllByRole("combobox", { name: /^Who decides/ })[0]!,
+      "board"
+    )
+    const deadlines = card("Deadlines")
+    await user.click(
+      deadlines.getByRole("checkbox", {
+        name: "A deadline that falls on a weekend or holiday moves to the next business day"
+      })
+    )
+    await user.selectOptions(deadlines.getByRole("combobox", { name: "Holidays that aren’t business days" }), "us-wa")
+    const zone = deadlines.getByRole("combobox", { name: "Dates and times are in" })
+    await user.clear(zone)
+    await user.type(zone, "Denver")
+    await user.click(await screen.findByRole("option", { name: /\(America\/Denver\)/ }))
+    const policy = card("Project application reviews")
+    await user.selectOptions(
+      policy.getByRole("combobox", { name: "If it would take a redesign" }),
       "refer-to-committee"
     )
-    await user.click(screen.getByRole("button", { name: "Save the policy" }))
-    expect(actions?.saveSettings).toHaveBeenCalledWith({
-      clauses: {},
+    const facts = policy.getByRole("spinbutton", { name: /^Use a detail read from an application/ })
+    expect(facts).toHaveValue(percentOf(records.settings.policy.thresholds.factConfidence))
+    await user.clear(facts)
+    await user.type(facts, "90")
+    expect(actions?.saveSettings).not.toHaveBeenCalled()
+
+    await user.click(within(unsaved()).getByRole("button", { name: "Discard changes" }))
+    expect(card("Deadlines").getByRole("combobox", { name: "Holidays that aren’t business days" })).toHaveValue(
+      records.settings.clauses.time.holidays
+    )
+
+    await user.selectOptions(
+      card("Deadlines").getByRole("combobox", { name: "Holidays that aren’t business days" }),
+      "us-wa"
+    )
+    await user.selectOptions(
+      card("Project application reviews").getByRole("combobox", { name: "If it would take a redesign" }),
+      "refer-to-committee"
+    )
+    await saveAndApprove(user)
+    expect(actions?.saveSettings).toHaveBeenCalledOnce()
+    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
+      clauses: { time: { ...records.settings.clauses.time, holidays: "us-wa" } },
       policy: {
         ...records.settings.policy,
         decisionPolicy: { ...records.settings.policy.decisionPolicy, redesign: "refer-to-committee" }
       }
     })
+  })
+
+  it("sets a time to fix a violation and a step before a sanction where the documents give none", async () => {
+    const bare = {
+      ...records,
+      settings: {
+        ...records.settings,
+        clauses: { ...records.settings.clauses, cure: null, sanctionPreconditions: [] }
+      }
+    }
+    const { user, actions } = renderInWorkspace(<SettingsTab />, { records: bare })
+    const cure = card("Time to fix a violation")
+    await user.click(cure.getByRole("button", { name: "Set a time to fix a violation" }))
+    await user.type(cure.getByRole("spinbutton", { name: "How many" }), "30")
+    await user.selectOptions(cure.getByRole("combobox", { name: "Counted from" }), "violation.notice-delivered-on")
+
+    const steps = card("Before a fine or other sanction")
+    await user.click(steps.getByRole("button", { name: "Add a step before a sanction" }))
+    await user.selectOptions(steps.getByRole("combobox", { name: "For which requests" }), "violation")
+    await user.selectOptions(
+      steps.getByRole("combobox", { name: "The date needed first" }),
+      "violation.hearing-held-on"
+    )
+    await user.selectOptions(
+      steps.getByRole("combobox", { name: "When it's needed" }),
+      "violation.hearing-requested-on"
+    )
+    await user.click(steps.getByRole("button", { name: "Add the step" }))
+    await saveAndApprove(user)
+    expect(actions?.saveSettings).toHaveBeenLastCalledWith({
+      clauses: {
+        cure: {
+          value: 30,
+          unit: "calendar-day",
+          after: { path: ["violation.notice-delivered-on"] },
+          curedBy: null,
+          citations: []
+        },
+        sanctionPreconditions: [
+          preconditionOf("violation", "violation.hearing-held-on", "violation.hearing-requested-on")
+        ]
+      },
+      policy: null
+    })
+  })
+})
+
+function unsaved() {
+  return screen.getByRole("region", { name: "Unsaved settings" })
+}
+
+async function saveAndApprove(user: ReturnType<typeof renderInWorkspace>["user"]) {
+  await user.click(within(unsaved()).getByRole("button", { name: "Save and approve" }))
+}
+
+describe("placeDocument", () => {
+  const order: T.DocumentKind[][] = [
+    ["state-law", "county-ordinance"],
+    ["declaration"],
+    ["rules", "policy", "resolution"]
+  ]
+
+  it("ranks a document equal to another rank's, dropping a rank it leaves empty", () => {
+    expect(placeDocument(order, "declaration", { type: "rank", index: 2 })).toEqual([
+      ["state-law", "county-ordinance"],
+      ["rules", "policy", "resolution", "declaration"]
+    ])
+  })
+
+  it("places a document before or after another, in its rank", () => {
+    expect(placeDocument(order, "declaration", { type: "beside", kind: "policy", side: "before" })).toEqual([
+      ["state-law", "county-ordinance"],
+      ["rules", "declaration", "policy", "resolution"]
+    ])
+    expect(placeDocument(order, "resolution", { type: "beside", kind: "rules", side: "after" })[2]).toEqual([
+      "rules",
+      "resolution",
+      "policy"
+    ])
+  })
+
+  it("keeps law at the top: it doesn't move, and nothing goes into or above it", () => {
+    expect(placeDocument(order, "state-law", { type: "gap", index: 2 })).toEqual(order)
+    expect(placeDocument(order, "declaration", { type: "rank", index: 0 })).toEqual(order)
+    expect(placeDocument(order, "declaration", { type: "beside", kind: "county-ordinance", side: "after" })).toEqual(
+      order
+    )
+    expect(placeDocument(order, "policy", { type: "gap", index: 0 })).toEqual(order)
+    expect(placeDocument(order, "policy", { type: "gap", index: 1 })[1]).toEqual(["policy"])
+  })
+
+  it("ranks a document on its own at a gap", () => {
+    expect(placeDocument(order, "policy", { type: "gap", index: 3 })).toEqual([
+      ["state-law", "county-ordinance"],
+      ["declaration"],
+      ["rules", "resolution"],
+      ["policy"]
+    ])
+    expect(placeDocument([["declaration"], ["bylaws"]], "bylaws", { type: "gap", index: 0 })[0]).toEqual(["bylaws"])
+  })
+})
+
+describe("ordinal", () => {
+  it("says a rank as people do", () => {
+    expect([1, 2, 3, 4, 11, 12, 13, 21, 22].map(ordinal)).toEqual([
+      "1st",
+      "2nd",
+      "3rd",
+      "4th",
+      "11th",
+      "12th",
+      "13th",
+      "21st",
+      "22nd"
+    ])
+  })
+})
+
+describe("preconditionOf", () => {
+  it("needs a date recorded every time, or only when another one is", () => {
+    expect(preconditionOf("violation", "violation.notice-delivered-on", null).condition).toEqual({
+      type: "exists",
+      from: "request",
+      path: ["violation.notice-delivered-on"]
+    })
+    expect(
+      preconditionOf("violation", "violation.hearing-held-on", "violation.hearing-requested-on").condition
+    ).toEqual({
+      type: "any",
+      of: [
+        { type: "exists", from: "request", path: ["violation.hearing-held-on"] },
+        { type: "not", of: { type: "exists", from: "request", path: ["violation.hearing-requested-on"] } }
+      ]
+    })
+  })
+})
+
+describe("zoneLabel", () => {
+  it("says a zone's offset from UTC on the day, its name and its city", () => {
+    expect(zoneLabel("America/Los_Angeles", new Date("2026-07-01T12:00:00Z"))).toBe(
+      "UTC−07:00 Pacific Time (America/Los Angeles)"
+    )
+    expect(zoneLabel("America/Los_Angeles", new Date("2026-01-01T12:00:00Z"))).toBe(
+      "UTC−08:00 Pacific Time (America/Los Angeles)"
+    )
+    expect(zoneLabel("Asia/Kolkata", new Date("2026-01-01T12:00:00Z"))).toBe(
+      "UTC+05:30 India Standard Time (Asia/Kolkata)"
+    )
+  })
+})
+
+describe("percentOf and shareOf", () => {
+  it("shows a threshold as a whole percent and keeps it between 0 and 100", () => {
+    expect(percentOf(0.8)).toBe(80)
+    expect(shareOf(90)).toBe(0.9)
+    expect(shareOf(140)).toBe(1)
   })
 })

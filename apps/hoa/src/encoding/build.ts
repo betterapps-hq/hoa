@@ -23,6 +23,7 @@ import { structureRepairVariables } from "./promptVariables"
 import { structureDocument, type StructuredDocument } from "./provisions"
 import { analyzeReferences, citedProvisions } from "./references"
 import { checkSources, sourceProblemSchema, SourcesRejectedError } from "./sourceCheck"
+import type { BuildStage } from "./stages"
 import {
   analysisOutput,
   consolidateOutput,
@@ -85,25 +86,6 @@ import { repairStructure, structureRepairAnswer } from "./structureRepair"
 // per-item work is shared with the step evaluations (steps/pipeline.ts). Everything the build needs is injected: a step
 // runner (Workflow steps in the app, plain calls in scripts and tests), the models and cache, each upload's page records
 // and structure, and the earlier review that carries forward.
-
-/** The job stages the build reports, in order (encoding.md, Stages). */
-export const buildStages = [
-  "check",
-  "structure",
-  "analyze",
-  "defined-terms",
-  "plan",
-  "find-rules",
-  "vocabulary",
-  "vocabulary-merge",
-  "structure-rules",
-  "merge",
-  "consolidate"
-] as const
-export type BuildStage = (typeof buildStages)[number]
-
-/** Stages that may have nothing to do: C-merge runs only when the vocabulary has clusters to decide. */
-export const optionalBuildStages: readonly BuildStage[] = ["vocabulary-merge"]
 
 /** What the build's model calls need: the prompt loader, models, versions pinned in resolve-prompts and the cache. */
 export type BuildAi = StepAi
@@ -721,7 +703,8 @@ export async function buildRulebook(input: BuildInput) {
   batches.forEach((batch, index) => {
     const result = firstPasses[index]
     if (result?.status !== "fulfilled") {
-      failures.push({ stage: "structure-rules", itemId: batch.id, message: messageOf(result?.reason) })
+      // A batch's id is its first rule's key: the suffix tells the whole batch from that one rule, as a retry's does.
+      failures.push({ stage: "structure-rules", itemId: `${batch.id}:first-pass`, message: messageOf(result?.reason) })
       return
     }
     calls.push(...result.value.calls)

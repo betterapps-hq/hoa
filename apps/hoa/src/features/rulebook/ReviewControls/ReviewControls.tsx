@@ -7,6 +7,7 @@ import type { RecordRef } from "@/rulebook/review"
 import type * as T from "@/schema/types"
 import { reviewRecord } from "../attempt"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
+import { approveLabel } from "./ReviewControls.utils"
 
 export type ReviewControlsProps = {
   /** The record reviewed. */
@@ -26,7 +27,8 @@ export type ReviewControlsProps = {
 /**
  * The review of one record (encoding.md, UX): Approve, then Reject and Edit as quieter actions. A decided record says
  * so in words, with Undo to send it back to review. Rejecting is how a record is dropped: it stays in the draft with
- * its status, and a rebuild carries the decision forward.
+ * its status, and a rebuild carries the decision forward. The settings can't be dropped, so they have no Reject. A
+ * rule is approved with the terms it reads that are still to review, and its Approve says how many.
  */
 export function ReviewControls({
   record,
@@ -37,11 +39,12 @@ export function ReviewControls({
   isCompact = false,
   className
 }: ReviewControlsProps) {
-  const { actions } = useRulebookWorkspace()
+  const { actions, approval, records } = useRulebookWorkspace()
   const [isBusy, setIsBusy] = useState(false)
   if (!actions) {
     return null
   }
+  const approve = approveLabel(approval, records, record)
   const review = async (next: T.Review["status"]) => {
     setIsBusy(true)
     const result = await reviewRecord(actions, record, next)
@@ -106,22 +109,24 @@ export function ReviewControls({
             size={size}
             variant={isCompact ? "outline" : "default"}
             disabled={isBusy || blockers.length > 0}
-            aria-label={named("Approve")}
+            aria-label={name ? approveLabel(approval, records, record, name) : undefined}
             onClick={() => void review("approved")}
           >
             <CheckIcon />
-            Approve
+            {approve}
           </Button>
         )}
-        <Button
-          size={size}
-          variant="ghost"
-          disabled={isBusy}
-          aria-label={named("Reject")}
-          onClick={() => void review("rejected")}
-        >
-          Reject
-        </Button>
+        {record.type === "settings" ? null : (
+          <Button
+            size={size}
+            variant="ghost"
+            disabled={isBusy}
+            aria-label={named("Reject")}
+            onClick={() => void review("rejected")}
+          >
+            Reject
+          </Button>
+        )}
         {edit}
       </div>
     </div>

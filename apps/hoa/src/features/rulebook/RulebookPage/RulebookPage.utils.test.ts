@@ -43,9 +43,11 @@ const view = (overrides: Partial<RulebookView> = {}): RulebookView => ({
   rulebook: null,
   content: null,
   fileSha256: null,
+  filedSources: null,
   buildJobId: null,
   isBuilding: false,
   lastBuildError: null,
+  buildFailures: [],
   isLastBuildRetryable: true,
   refusedDocuments: [],
   isLastBuildStopped: false,
@@ -122,10 +124,10 @@ describe("refusalSentence", () => {
     const refused = (kind: Parameters<typeof refusalSentence>[0]["kind"], otherTitle?: string) =>
       refusalSentence({ documentId: "a", title: "Declaration (sample pages)", kind, otherTitle })
     expect(refused("file-invalid")).toBe(
-      "“Declaration (sample pages)” has no file we can read, so the rulebook can’t be built from it. Upload it again, or remove it."
+      "“Declaration (sample pages)” has no file we can read, so the rulebook can’t be made from it. Upload it again, or remove it."
     )
     expect(refused("file-missing")).toBe(
-      "“Declaration (sample pages)” has no file, so the rulebook can’t be built from it. Upload it again, or remove it."
+      "“Declaration (sample pages)” has no file, so the rulebook can’t be made from it. Upload it again, or remove it."
     )
     expect(refused("structure-invalid")).toMatch(/^“Declaration \(sample pages\)” is split into parts/)
     expect(refused("duplicate-key", "Declaration")).toBe(

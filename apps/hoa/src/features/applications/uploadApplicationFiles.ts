@@ -7,8 +7,8 @@ export type ApplicationUploadApi = {
     fileName: string
     mediaType: string
     sizeBytes: number
-    /** What the homeowner uploaded it as, such as a document the rules require; the review reads it with the file. */
-    contextText?: string
+    /** What the homeowner says it is: one of the project type's documents, or other (src/applications/uploadedAs.ts). */
+    uploadedAs?: string
   }) => Promise<CreateFileUploadResult>
   uploadThroughServer: (form: FormData) => Promise<void>
   completeUpload: (fileId: string) => Promise<void>
@@ -34,7 +34,7 @@ export async function uploadApplicationFiles(
   api: ApplicationUploadApi,
   applicationId: string,
   files: readonly File[],
-  purposes: ReadonlyMap<File, string> = new Map()
+  uploadedAs: ReadonlyMap<File, string> = new Map()
 ) {
   const problem = uploadProblem(files)
   if (problem) {
@@ -46,7 +46,7 @@ export async function uploadApplicationFiles(
       fileName: file.name,
       mediaType: file.type,
       sizeBytes: file.size,
-      ...(purposes.has(file) ? { contextText: purposes.get(file) } : {})
+      ...(uploadedAs.has(file) ? { uploadedAs: uploadedAs.get(file) } : {})
     })
     if (created.uploadUrl) {
       const response = await (api.fetch ?? fetch)(created.uploadUrl, {

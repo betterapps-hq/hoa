@@ -3,17 +3,20 @@ import { env as bindings } from "cloudflare:workers"
 import { z } from "zod"
 import { getDb } from "@/db/client.server"
 import type { Database } from "@/db/database"
-import { listDocumentRecords, listGoverningDocuments, listProvisions } from "@/db/documentRepository"
+import { listDocumentProvisions, listDocumentRecords, listGoverningDocuments } from "@/db/documentRepository"
 import { getLatestJobOfKind } from "@/db/jobRepository"
 import {
+  copyToDraft,
   discardDraftRulebook,
   getPublishedRulesFile,
   getRulebookContent,
   type RulebookContent
 } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus } from "@/db/rulebookRepository"
-import { readRulesFileJson } from "@/rulebook/assemble"
-import { loadBuildResults, type BuildResults } from "@/rulebook/buildResults.server"
+import type { JobFailure } from "@/jobs/job"
+import { readRulesFile, readRulesFileJson } from "@/rulebook/assemble"
+import type { BuildResultsPage } from "@/rulebook/buildResults"
+import { loadBuildDocuments, loadBuildResults, type BuildDocument } from "@/rulebook/buildResults.server"
 import { checkCurrentSources, isRefusedBuild, type RefusedDocument } from "@/rulebook/buildSources"
 import { rulebookChanges, type RulebookChanges } from "@/rulebook/changes"
 import { textOutsideProvisions, type SourceText } from "@/rulebook/coverage"
@@ -32,7 +35,8 @@ import {
   stopRulebookBuild as stopBuild,
   type StopResult
 } from "@/workflows/rulebookTrigger.server"
-import { describeBuildProblem } from "./rulebookView"
+import { provisionsBuiltFrom } from "./rulebookRecords"
+import { buildFailuresOf, describeBuildProblem } from "./rulebookView"
 
 type Rulebook = z.infer<typeof rulebookSchema>
 
@@ -42,11 +46,18 @@ export type RulebookView = {
   content: RulebookContent | null
   /** The published rules file's SHA-256. */
   fileSha256: string | null
+  /**
+   * The documents and provisions the published rules file holds, which its rules cite as they were published; null
+   * for a draft. The stored ones can change under it: a new upload's build takes over its document's key.
+   */
+  filedSources: Pick<RulebookSources, "documents" | "provisions"> | null
   /** The latest build, so the page can follow one in progress. */
   buildJobId: string | null
   isBuilding: boolean
-  /** Why the latest build failed or skipped items, when it did; null when it was refused (see `refusedDocuments`). */
+  /** Why the latest build failed, when it did; null when it was refused (see `refusedDocuments`). */
   lastBuildError: string | null
+  /** What the build that made this rulebook skipped (a rule it couldn't draft, a section it couldn't read). */
+  buildFailures: JobFailure[]
   /** Whether building again can get past the latest build's failure, so the page offers to try again. */
   isLastBuildRetryable: boolean
   /** The documents the latest build refused before spending anything, while they still would be; empty otherwise. */
@@ -67,19 +78,23 @@ export type RulebookSources = {
   organization: { id: string; name: string }
   documents: Rules.GoverningDocument[]
   provisions: Rules.Provision[]
+  /** The document each provision is in, by provision key: a rulebook covers only the documents it was built from. */
+  provisionDocumentIds: Record<string, string>
   files: SourceFile[]
 }
 
 async function loadSources(db: Database, hoa: { id: string; name: string }): Promise<RulebookSources> {
   const [records, uploads] = await Promise.all([listDocumentRecords(db, hoa.id), listGoverningDocuments(db, hoa.id)])
+  const rows = await listDocumentProvisions(
+    db,
+    hoa.id,
+    records.map((record) => record.id)
+  )
   return {
     organization: { id: hoa.id, name: hoa.name },
     documents: records.map((record) => record.document),
-    provisions: await listProvisions(
-      db,
-      hoa.id,
-      records.map((record) => record.id)
-    ),
+    provisions: rows.map((row) => row.provision),
+    provisionDocumentIds: Object.fromEntries(rows.map((row) => [row.provision.key, row.documentId])),
     files: uploads.flatMap((upload) =>
       upload.status === "ready" && upload.pageCount
         ? [{ id: upload.id, title: upload.title, pageCount: upload.pageCount }]
@@ -116,11 +131,38 @@ export const getSourceText = createServerFn({ method: "GET" }).handler(async ():
   )
 })
 
+/**
+ * Starts a draft from the published rulebook, to change its settings, rules or terms without processing the documents
+ * again (encoding.md, UX, Changing a published rulebook). Refused while a draft is open or a build is running.
+ */
+export const changePublishedRulebook = createServerFn({ method: "POST" }).handler(async () => {
+  const context = await requireAdministrator()
+  const db = getDb()
+  const hoaId = context.hoa.id
+  const [published, draft, building] = await Promise.all([
+    getRulebookByStatus(db, hoaId, "published"),
+    getRulebookByStatus(db, hoaId, "draft"),
+    getRulebookByStatus(db, hoaId, "building")
+  ])
+  if (!published) {
+    throw new Error("Nothing is published yet.")
+  }
+  if (building) {
+    throw new Error("Your documents are being processed. Change the rulebook once its new draft is ready.")
+  }
+  if (draft) {
+    throw new Error("A draft is already open. Review it, or discard it first.")
+  }
+  const id = crypto.randomUUID()
+  await copyToDraft(db, hoaId, published, { id, now: new Date().toISOString() })
+  return { rulebookId: id }
+})
+
 const skippedBuild = {
-  processing: "A document is still being read. The rulebook builds when it finishes.",
-  building: "A rulebook is already being built.",
+  processing: "A document is still being read. Processing starts when it finishes.",
+  building: "Your documents are already being processed.",
   "no-documents": "Upload a governing document first.",
-  unchanged: "The rulebook is already built from the current documents."
+  unchanged: "The current documents are already processed."
 } as const
 
 /**
@@ -160,9 +202,17 @@ export const stopRulebookBuild = createServerFn({ method: "POST" }).handler(asyn
  */
 export const getBuildResults = createServerFn({ method: "GET" })
   .validator((data: unknown) => z.object({ jobId: z.string(), since: z.string().nullable() }).parse(data))
-  .handler(async ({ data }): Promise<BuildResults> => {
+  .handler(async ({ data }): Promise<BuildResultsPage> => {
     const context = await requireAdministrator()
     return loadBuildResults(getDb(), getBucket(), context.hoa.id, data)
+  })
+
+/** The documents the running build reads, with their provisions, once it has structured them; none before. */
+export const getBuildDocuments = createServerFn({ method: "GET" })
+  .validator((data: unknown) => z.object({ jobId: z.string() }).parse(data))
+  .handler(async ({ data }): Promise<BuildDocument[]> => {
+    const context = await requireAdministrator()
+    return loadBuildDocuments(getDb(), getBucket(), context.hoa.id, data.jobId)
   })
 
 /** Deletes the draft rulebook and its records; the published rulebook stays as it is. */
@@ -192,6 +242,9 @@ export const getRulebookView = createServerFn({ method: "GET" })
     ])
     const content = rulebook ? await getRulebookContent(db, hoaId, rulebook.id) : null
     const file = data.which === "published" ? await getPublishedRulesFile(db, hoaId) : null
+    // A rules file that can't be read leaves the stored documents and provisions standing in; downloading it says why.
+    const filed =
+      file && file.rulebookId === rulebook?.id ? await readRulesFile(getBucket(), file).catch(() => null) : null
     const review =
       rulebook && data.which === "draft" && content ? await draftReview(db, context.hoa, rulebook, content) : null
     // A refused build is checked again against the documents as they are now, so removing or replacing the one at
@@ -205,9 +258,11 @@ export const getRulebookView = createServerFn({ method: "GET" })
       rulebook,
       content,
       fileSha256: file?.rulebookId === rulebook?.id ? (file?.fileSha256 ?? null) : null,
+      filedSources: filed ? { documents: filed.documents, provisions: filed.provisions } : null,
       buildJobId: latestBuild?.id ?? null,
       isBuilding: building !== null,
       lastBuildError: isRefused ? null : describeBuildProblem(latestBuild),
+      buildFailures: buildFailuresOf(latestBuild, rulebook?.id ?? null),
       isLastBuildRetryable: latestBuild?.status !== "failed" || (latestBuild.error?.isRetryable ?? true),
       refusedDocuments,
       isLastBuildStopped: latestBuild?.status === "cancelled",
@@ -234,7 +289,14 @@ async function draftReview(
     published && publishedContent ? { ...publishedContent, sourceDocumentIds: published.sourceDocumentIds } : null,
     uploads
   )
-  return { blockers: publishBlockers({ ...sources, ...content }), changes }
+  return {
+    blockers: publishBlockers({
+      ...sources,
+      provisions: provisionsBuiltFrom(sources, draft.sourceDocumentIds),
+      ...content
+    }),
+    changes
+  }
 }
 
 /** Publishes the draft: assembles the rules file, writes it to storage with its hash and supersedes the previous one. */
