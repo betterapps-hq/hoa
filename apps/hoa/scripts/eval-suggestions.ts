@@ -135,6 +135,5 @@ for (const path of rulebooks) {
   })
 }
 await writeJson(join(fixtures, "eval/suggestions", runId, "summary.json"), summary)
-process.stdout.write(`${JSON.stringify(summary, null, 2)}
-`)
+process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`)
 await ai.flush()
