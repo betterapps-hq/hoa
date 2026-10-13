@@ -1,6 +1,6 @@
 {
   "private": true,
-  "name": "hoa",
+  "name": "hoa-workspace",
   "license": "MIT",
   "engines": {
     "node": ">=26.0.0",
