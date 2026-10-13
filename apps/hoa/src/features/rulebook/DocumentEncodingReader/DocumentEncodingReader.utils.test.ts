@@ -8,6 +8,7 @@ import {
   beatMs,
   beatPlan,
   countsOf,
+  termWidths,
   nextSpot,
   paceOf,
   readerDocuments,
@@ -142,7 +143,8 @@ describe("readerEvents", () => {
     for (const seconds of [15.8, 150, 600, 900, simulatedBuildSeconds]) {
       const results = readingResults(seconds)
       const progress = findingCounts(results)
-      expect(countsOf(readerEvents(results, documents))).toEqual({
+      const counts = countsOf(readerEvents(results, documents))
+      expect({ terms: counts.terms + counts.vocabulary, rules: counts.rules, drafted: counts.drafted }).toEqual({
         terms: progress.terms,
         rules: progress.rulesFound,
         drafted: progress.rulesDrafted
@@ -185,37 +187,51 @@ describe("statementPieces", () => {
 
 describe("readerLayout", () => {
   it("puts the window between the piles, each pile under its count and standing level with the window's foot", () => {
-    // 576 × 0.46 is a 265 window; (576 − 265 − 2 × 20) / 2 = 135.5 for each pile.
-    const layout = readerLayout(576, { terms: 63, rules: 37 })
+    // 724 × 0.46 is a 333 window; (724 − 333 − 2 × 20) / 2 = 175.5 for each side. Of the left side, less the 12 between
+    // its grids, the defined terms take a third and the vocabulary, beside the window, the rest.
+    const layout = readerLayout(724, { terms: 12, vocabulary: 51, rules: 37 })
     expect(layout).toMatchObject({
       isStacked: false,
-      window: { x: 155.5, y: 0, width: 265, height: 288 },
+      window: { x: 195.5, y: 0, width: 333, height: 288 },
       pitch: 10,
       gridBottom: 288,
       height: 288,
       ceiling: 62
     })
-    expect(layout.terms).toEqual({ inner: 135.5, side: -1, columns: 13 })
-    expect(layout.rules).toEqual({ inner: 440.5, side: 1, columns: 13 })
-    expect(layout.counts.rules.x).toBe(440.5)
-    expect(slotCenter(layout, "terms", 0)).toEqual({ x: 130.5, y: 283 })
+    expect(layout.terms).toEqual({ inner: 54.5, side: -1, columns: 5 })
+    expect(layout.vocabulary).toEqual({ inner: 175.5, side: -1, columns: 10 })
+    expect(layout.rules).toEqual({ inner: 548.5, side: 1, columns: 17 })
+    // The defined terms' count at the outer end of the left side, the vocabulary's at the window's end.
+    expect(layout.counts.terms).toMatchObject({ x: 0, width: 87.75 })
+    expect(layout.counts.vocabulary).toMatchObject({ x: 87.75, width: 87.75 })
+    expect(layout.counts.rules.x).toBe(548.5)
+    expect(slotCenter(layout, "terms", 0)).toEqual({ x: 49.5, y: 283 })
+    expect(slotCenter(layout, "vocabulary", 0)).toEqual({ x: 170.5, y: 283 })
+  })
+
+  it("splits the left side by how many of each it holds, but gives neither less than a third, even before it has any", () => {
+    expect(termWidths(312, { terms: 100, vocabulary: 200, rules: 0 })).toEqual({ terms: 100, vocabulary: 200 })
+    expect(termWidths(312, { terms: 1, vocabulary: 299, rules: 0 })).toEqual({ terms: 100, vocabulary: 200 })
+    // The vocabulary keeps its place before the build adds its entries.
+    expect(termWidths(312, { terms: 12, vocabulary: 0, rules: 0 })).toEqual({ terms: 200, vocabulary: 100 })
+    expect(termWidths(312, { terms: 0, vocabulary: 0, rules: 0 })).toEqual({ terms: 150, vocabulary: 150 })
   })
 
   it("on a phone, puts the window over the piles, and their counts under them", () => {
-    const layout = readerLayout(343, { terms: 63, rules: 37 })
+    const layout = readerLayout(343, { terms: 12, vocabulary: 51, rules: 37 })
     expect(layout).toMatchObject({
       isStacked: true,
       window: { x: 0, y: 0, width: 343, height: 288 },
-      gridBottom: 360,
-      height: 426,
       ceiling: 0
     })
     expect(layout.counts.terms.y).toBeGreaterThan(layout.gridBottom)
-    expect(layout.rules.inner - layout.terms.inner).toBe(20)
+    expect(layout.counts.vocabulary.x).toBe(80.75)
+    expect(layout.rules.inner - layout.vocabulary.inner).toBe(20)
+    expect(layout.vocabulary.inner - layout.terms.inner).toBeGreaterThan(12)
   })
 
   it("keeps its usual height before it's measured", () => {
-    expect(readerLayout(0, { terms: 892, rules: 617 }).height).toBe(288)
+    expect(readerLayout(0, { terms: 892, vocabulary: 0, rules: 617 }).height).toBe(288)
   })
 })
 

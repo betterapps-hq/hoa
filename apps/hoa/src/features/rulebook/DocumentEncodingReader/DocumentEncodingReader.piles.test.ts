@@ -9,15 +9,18 @@ import {
 } from "./DocumentEncodingReader.piles"
 
 describe("slotCenter", () => {
-  it("piles each kind's dots up from the bottom, every row starting beside the window", () => {
+  it("piles each kind's dots up from the bottom, every row starting on the window's side", () => {
     const layout = {
       pitch: 10,
       gridBottom: 130,
-      terms: { inner: 238, side: -1, columns: 23 },
+      terms: { inner: 118, side: -1, columns: 11 },
+      vocabulary: { inner: 238, side: -1, columns: 11 },
       rules: { inner: 338, side: 1, columns: 23 }
     } satisfies PilesLayout
-    expect(slotCenter(layout, "terms", 0)).toEqual({ x: 233, y: 125 })
-    expect(slotCenter(layout, "terms", 1)).toEqual({ x: 223, y: 125 })
+    expect(slotCenter(layout, "terms", 0)).toEqual({ x: 113, y: 125 })
+    expect(slotCenter(layout, "terms", 1)).toEqual({ x: 103, y: 125 })
+    expect(slotCenter(layout, "vocabulary", 0)).toEqual({ x: 233, y: 125 })
+    expect(slotCenter(layout, "vocabulary", 11)).toEqual({ x: 233, y: 115 })
     expect(slotCenter(layout, "rules", 0)).toEqual({ x: 343, y: 125 })
     expect(slotCenter(layout, "rules", 22)).toEqual({ x: 563, y: 125 })
     expect(slotCenter(layout, "rules", 23)).toEqual({ x: 343, y: 115 })

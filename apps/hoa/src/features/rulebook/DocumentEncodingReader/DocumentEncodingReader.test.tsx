@@ -33,12 +33,14 @@ describe("DocumentEncodingReader", () => {
     const { container } = render(
       <DocumentEncodingReader results={readingResults(simulatedBuildSeconds)} documents={documents} isRunning={false} />
     )
-    // 12 terms the documents define, then the 51 entries the vocabulary adds, in one pile.
+    // 12 terms the documents define, and the 51 entries the vocabulary adds, each in its own pile.
     expect(countOf("Defined terms")).toBe("12")
-    expect(screen.getByText("51 vocabulary entries")).toBeInTheDocument()
+    expect(countOf("Vocabulary")).toBe("51")
     expect(countOf("Rules found")).toBe("37")
     expect(screen.getByText("37 drafted")).toBeInTheDocument()
-    expect(container.querySelectorAll("circle")).toHaveLength(63 + 37)
+    expect(container.querySelectorAll("circle")).toHaveLength(12 + 51 + 37)
+    expect(container.querySelectorAll('circle[class~="fill-coverage-term"]')).toHaveLength(12)
+    expect(container.querySelectorAll('circle[class~="fill-vocabulary"]')).toHaveLength(51)
     expect(container.querySelectorAll('circle[class~="fill-coverage-rule"]')).toHaveLength(37)
     // The roofing rule, drafted again, at its passage.
     expect(captionOf(container)).toBe(
@@ -76,7 +78,7 @@ describe("DocumentEncodingReader", () => {
     expect(container.querySelector("svg")).toBeNull()
     expect(container.querySelector("[data-block]")).toBeNull()
     expect(countOf("Defined terms")).toBe("12")
-    expect(screen.getByText("22 vocabulary entries")).toBeInTheDocument()
+    expect(countOf("Vocabulary")).toBe("22")
   })
 
   it("gets to a term's passage, marks the term green there, then counts it once it lands", async () => {

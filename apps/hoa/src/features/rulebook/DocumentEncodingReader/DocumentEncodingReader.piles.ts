@@ -1,13 +1,14 @@
-// The reader's piles of finds (DocumentEncodingReader): a grid of dots on each side of the window, terms to the left
-// and rules to the right, one dot per find, each piling up from the bottom with every row starting beside the window,
-// so a find flies over neither the other kind's grid nor the dots already landed in its own; and each find's flight
-// into its dot. Coordinates are CSS pixels from the picture's top left.
+// The reader's piles of finds (DocumentEncodingReader): a grid of dots for each kind, the defined terms and the
+// vocabulary's entries side by side to the left of the window and the rules to the right, one dot per find, each piling
+// up from the bottom with every row starting on the window's side, so a find never flies over the dots already landed
+// in its own grid; and each find's flight into its dot. Coordinates are CSS pixels from the picture's top left.
 
 export type Point = { x: number; y: number }
 export type Box = { x: number; y: number; width: number; height: number }
 
-/** The kinds of find, each with its own grid. */
-export type FindKind = "terms" | "rules"
+/** The kinds of find, each with its own grid: terms the documents define, entries the vocabulary adds, and rules. */
+export type FindKind = "terms" | "vocabulary" | "rules"
+export const findKinds: readonly FindKind[] = ["terms", "vocabulary", "rules"]
 
 /** Distances between dot centers, largest first. */
 const pitches = [10, 8, 7, 6, 5, 4]
@@ -22,20 +23,26 @@ export type GridLayout = {
 }
 
 /** The piles' part of the picture's layout: the distance between dot centers, what they stand on, and each grid. */
-export type PilesLayout = { pitch: number; gridBottom: number; terms: GridLayout; rules: GridLayout }
+export type PilesLayout = { pitch: number; gridBottom: number } & Record<FindKind, GridLayout>
 
 /**
- * The largest dots that keep this many finds of each kind in two grids `gridWidth` wide within `gridHeight`, with the
- * grids' height: dots shrink to keep every find in it, and only the smallest let it grow.
+ * The largest dots that keep this many finds of each kind in grids this wide within `gridHeight`, with the grids'
+ * height: dots shrink to keep every find in it, and only the smallest let it grow.
  */
-export function gridFit(gridWidth: number, counts: Record<FindKind, number>, gridHeight: number) {
-  const columnsAt = (pitch: number) => Math.max(1, Math.floor(gridWidth / pitch))
+export function gridFit(widths: Record<FindKind, number>, counts: Record<FindKind, number>, gridHeight: number) {
+  const columnsAt = (pitch: number, kind: FindKind) => Math.max(1, Math.floor(widths[kind] / pitch))
   const rowsAt = (pitch: number) =>
-    Math.max(Math.ceil(counts.terms / columnsAt(pitch)), Math.ceil(counts.rules / columnsAt(pitch)))
+    Math.max(...findKinds.map((kind) => Math.ceil(counts[kind] / columnsAt(pitch, kind))))
   const pitch = pitches.find((candidate) => rowsAt(candidate) * candidate <= gridHeight) ?? pitches.at(-1) ?? 4
   // Before the picture is measured it has no grid to fill: it keeps its usual height so nothing jumps.
-  const height = gridWidth > 0 ? Math.max(gridHeight, rowsAt(pitch) * pitch) : gridHeight
-  return { pitch, columns: columnsAt(pitch), height }
+  const isMeasured = findKinds.some((kind) => widths[kind] > 0)
+  const height = isMeasured ? Math.max(gridHeight, rowsAt(pitch) * pitch) : gridHeight
+  const columns = (kind: FindKind) => columnsAt(pitch, kind)
+  return {
+    pitch,
+    columns: { terms: columns("terms"), vocabulary: columns("vocabulary"), rules: columns("rules") },
+    height
+  }
 }
 
 /** Where the dot for a kind's `index`th find sits: row by row up from the bottom, each row from beside the window out. */
@@ -48,15 +55,17 @@ export function slotCenter(layout: PilesLayout, kind: FindKind, index: number): 
   }
 }
 
-/** What has landed in the piles: the terms, the rules, and the rules drafted. */
-export type Shown = { terms: number; rules: number; drafted: number }
+/** What has landed in the piles: the defined terms, the vocabulary's entries, the rules, and the rules drafted. */
+export type Shown = Record<FindKind, number> & { drafted: number }
 
 /**
- * In the coverage tab's colors for terms and rules (styles.css). A term is a solid dot; a rule is found as an outline
- * and filled when drafted, as the build outlines rules and then drafts them.
+ * In the coverage tab's colors for terms and rules, and the vocabulary's own, which the coverage tab never shows as no
+ * passage holds an entry (styles.css). A term or an entry is a solid dot; a rule is found as an outline and filled when
+ * drafted, as the build outlines rules and then drafts them.
  */
 export const dotClass: Record<FindKind, string> = {
   terms: "fill-coverage-term",
+  vocabulary: "fill-vocabulary",
   rules: "fill-coverage-rule/15 stroke-coverage-rule"
 }
 export const draftedClass = "fill-coverage-rule stroke-coverage-rule"

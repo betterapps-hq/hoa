@@ -217,7 +217,20 @@
   --coverage-uncovered: #e66767;
 }
 
+/*
+ * The vocabulary's entries in the build's reader (DocumentEncodingReader): words the rules read that no passage holds,
+ * so the coverage tab never shows them. A vermilion apart from every coverage kind's color, in both themes.
+ */
+:root {
+  --vocabulary: #d9601a;
+}
+
+.dark {
+  --vocabulary: #ec7a35;
+}
+
 @theme inline {
+  --color-vocabulary: var(--vocabulary);
   --color-coverage-rule: var(--coverage-rule);
   --color-coverage-term: var(--coverage-term);
   --color-coverage-settings: var(--coverage-settings);

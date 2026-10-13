@@ -17,7 +17,7 @@ import {
 } from "./DocumentEncodingReader.utils"
 
 const documents = readerDocuments([readingDocument])
-const layout = readerLayout(576, { terms: 63, rules: 37 })
+const layout = readerLayout(724, { terms: 12, vocabulary: 51, rules: 37 })
 const everything = readerEvents(readingResults(simulatedBuildSeconds), documents)
 
 const terms = everything.filter((event) => event.kind === "term")
@@ -93,11 +93,11 @@ describe("ReaderMotion", () => {
     expect(shown.at(-1)?.terms ?? 0).toBe(0)
 
     await motion.advance(1000)
-    expect(shown.at(-1)).toEqual({ terms: 1, rules: 0, drafted: 0 })
+    expect(shown.at(-1)).toEqual({ terms: 1, vocabulary: 0, rules: 0, drafted: 0 })
     // One beat at a time: the next term shows once this one is done.
     expect(momentsOf(scenes, owner)).toEqual([["found", 0]])
     await motion.advance(3000)
-    expect(shown.at(-1)).toEqual({ terms: 2, rules: 0, drafted: 0 })
+    expect(shown.at(-1)).toEqual({ terms: 2, vocabulary: 0, rules: 0, drafted: 0 })
   })
 
   it("scans a passage, then gives it its verdict and flies each rule found in it to the rules", async () => {
@@ -113,7 +113,7 @@ describe("ReaderMotion", () => {
     ])
     await motion.advance(2000)
     expect(flightsOf(motion)).toHaveLength(2)
-    expect(shown.at(-1)).toEqual({ terms: 0, rules: 2, drafted: 0 })
+    expect(shown.at(-1)).toEqual({ terms: 0, vocabulary: 0, rules: 2, drafted: 0 })
   })
 
   it("fills a drafted rule's blanks and then its dot, with a ring; a second draft shows the problem and fills nothing", async () => {
@@ -130,7 +130,7 @@ describe("ReaderMotion", () => {
     ])
     expect(momentsOf(scenes, draftedAgain)[0]).toEqual(["problem", 0])
     expect(momentsOf(scenes, draftedAgain).at(-1)?.[0]).toBe("drafted")
-    expect(shown.at(-1)).toEqual({ terms: 0, rules: 2, drafted: 1 })
+    expect(shown.at(-1)).toEqual({ terms: 0, vocabulary: 0, rules: 2, drafted: 1 })
     expect(
       motion.animations.filter((item) => item.element.getAttribute("class") === "fill-none stroke-coverage-rule")
     ).toHaveLength(1)
@@ -141,7 +141,7 @@ describe("ReaderMotion", () => {
     engine.sync(terms.slice(0, 1))
     await motion.advance(beatMs.term + 32)
     expect(flightsOf(motion)).toHaveLength(0)
-    expect(shown.at(-1)).toEqual({ terms: 1, rules: 0, drafted: 0 })
+    expect(shown.at(-1)).toEqual({ terms: 1, vocabulary: 0, rules: 0, drafted: 0 })
   })
 
   it("takes back what the build dropped: its dots fade, and what's waiting never plays", async () => {
@@ -151,7 +151,7 @@ describe("ReaderMotion", () => {
     engine.sync([residentialUse, queued].filter((event) => event !== undefined))
     engine.sync([])
     await motion.advance(2000)
-    expect(shown.at(-1)).toEqual({ terms: 0, rules: 0, drafted: 0 })
+    expect(shown.at(-1)).toEqual({ terms: 0, vocabulary: 0, rules: 0, drafted: 0 })
     const faded = motion.animations.filter((item) => item.options.duration === 320)
     expect(faded).toHaveLength(2)
     expect(momentsOf(scenes, queued)).toEqual([])

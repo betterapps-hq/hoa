@@ -1,4 +1,4 @@
-import { dotClass, type Shown } from "./DocumentEncodingReader.piles"
+import { dotClass, findKinds, type Shown } from "./DocumentEncodingReader.piles"
 import {
   flightKeyframes,
   flightPeak,
@@ -46,16 +46,17 @@ type Beat = { event: ReaderEvent; steps: BeatStep[]; next: number; start: number
 
 const svg = "http://www.w3.org/2000/svg"
 const flightMs = 900
-const kinds: FindKind[] = ["terms", "rules"]
 /** A find in the air is as plain to see as a term's: a rule lands open, to fill once it's drafted. */
 const flightClass: Record<FindKind, string> = {
   terms: dotClass.terms,
+  vocabulary: dotClass.vocabulary,
   rules: "fill-coverage-rule/75 stroke-coverage-rule"
 }
-const nothing: Shown = { terms: 0, rules: 0, drafted: 0 }
-const one = (kind: FindKind): Shown => (kind === "terms" ? { ...nothing, terms: 1 } : { ...nothing, rules: 1 })
+const nothing: Shown = { terms: 0, vocabulary: 0, rules: 0, drafted: 0 }
+const one = (kind: FindKind): Shown => ({ ...nothing, [kind]: 1 })
 const plus = (a: Shown, b: Shown): Shown => ({
   terms: a.terms + b.terms,
+  vocabulary: a.vocabulary + b.vocabulary,
   rules: a.rules + b.rules,
   drafted: a.drafted + b.drafted
 })
@@ -81,7 +82,7 @@ export class ReaderMotion {
   private readonly landed: Shown
   /** What each event's finds have added to the piles, to take back if the build drops it. */
   private readonly landedBy = new Map<string, Shown>()
-  private readonly inFlight: Record<FindKind, number> = { terms: 0, rules: 0 }
+  private readonly inFlight: Record<FindKind, number> = { terms: 0, vocabulary: 0, rules: 0 }
   private readonly flights = new Set<Flight>()
   /** Flights that have landed, kept over their dots until the dots are drawn. */
   private arrived: SVGElement[] = []
@@ -334,6 +335,7 @@ export class ReaderMotion {
   private add(eventId: string, finds: Shown) {
     this.landedBy.set(eventId, plus(this.landedBy.get(eventId) ?? nothing, finds))
     this.landed.terms += finds.terms
+    this.landed.vocabulary += finds.vocabulary
     this.landed.rules += finds.rules
     this.landed.drafted += finds.drafted
     this.requestShow()
@@ -360,7 +362,7 @@ export class ReaderMotion {
     }
     this.landedBy.delete(event.id)
     const layout = this.host.layout()
-    for (const kind of kinds) {
+    for (const kind of findKinds) {
       for (let slot = this.landed[kind] - finds[kind]; slot < this.landed[kind]; slot++) {
         const center = slotCenter(layout, kind, slot)
         this.fade(
