@@ -479,6 +479,28 @@ describe("ProjectTypePage", () => {
     )
   })
 
+  it("writes a question homeowners sign by typing their name", async () => {
+    const { props, user } = setup()
+    await user.click(screen.getByRole("button", { name: "Add question" }))
+    await user.click(
+      within(await screen.findByRole("dialog", { name: "Add a question" })).getByRole("button", {
+        name: /^Write your own question/
+      })
+    )
+    const dialog = await screen.findByRole("dialog", { name: "Write a question" })
+    await user.type(within(dialog).getByLabelText(/^Question/), "I confirm the plans are complete")
+    await user.selectOptions(within(dialog).getByLabelText("Answer"), "signature")
+    expect(within(dialog).getByText(/they sign by typing their name/)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole("button", { name: "Add question" }))
+    await waitFor(() =>
+      expect(
+        savedDefinition(props)
+          ?.groups.flatMap((group) => group.fields)
+          .find((field) => field.label === "I confirm the plans are complete")
+      ).toMatchObject({ kind: "signature", binding: null })
+    )
+  })
+
   it("puts a new question answered by a file upload in the documents, never among the questions", async () => {
     const { props, user } = setup()
     await user.click(screen.getByRole("button", { name: "Add question" }))

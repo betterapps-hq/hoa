@@ -88,6 +88,15 @@ const definition: ProjectTypeDefinition = {
   unasked: []
 }
 
+const emptyDefinition: ProjectTypeDefinition = { ...definition, groups: [] }
+const definitionGroup = {
+  subject: "work",
+  label: "The project",
+  itemLabel: "The project",
+  help: null,
+  isRepeatable: false
+}
+
 const answers = {
   work: [{ "work.replaces-existing": true, "work.starts-on": "2026-11-01" }],
   item: [
@@ -174,6 +183,54 @@ describe("answers given once for every item", () => {
       "Item 1",
       "Item 2"
     ])
+  })
+})
+
+describe("signatures and contacts", () => {
+  const own = {
+    property: "custom.question",
+    binding: null,
+    label: "I confirm the plans are complete",
+    help: null,
+    example: null,
+    isRequired: true,
+    answeredBy: "applicant" as const,
+    citations: null
+  }
+  const signature = { ...own, kind: "signature" as const }
+  const contact = { ...own, property: "custom.builder", label: "Who is building it?", kind: "contact" as const }
+
+  it("take a typed name with the day it was signed, and a person's name with a phone or email", () => {
+    expect(answerErrors(signature, { name: "Jordan Avery", signedOn: "2026-10-13" })).toEqual([])
+    expect(answerErrors(signature, null)).toEqual(["Answer this question."])
+    expect(answerErrors(contact, { name: "Pat Lee", phone: "", email: "pat@example.com" })).toEqual([])
+    expect(answerErrors(contact, { name: "", phone: "555-0100", email: "" })).toEqual(["Give the person's name."])
+    expect(answerErrors(contact, { name: "Pat Lee", phone: "", email: "pat" })).toEqual([
+      "Give an email address such as name@example.com."
+    ])
+  })
+
+  it("read back in words, and never as facts of a property", () => {
+    const definition: ProjectTypeDefinition = {
+      ...emptyDefinition,
+      groups: [{ ...definitionGroup, fields: [signature, contact] }]
+    }
+    const answers = {
+      work: [
+        {
+          "custom.question": { name: "Jordan Avery", signedOn: "2026-10-13" }
+        }
+      ]
+    }
+    expect(answerLines(definition, answers)[0]!.lines.map((item) => item.line)).toEqual([
+      "I confirm the plans are complete: Signed by Jordan Avery on 2026-10-13"
+    ])
+    const contactAnswers = { work: [{ "custom.builder": { name: "Pat Lee", phone: "555-0100", email: "" } }] }
+    const contactOnly = { ...definition, groups: [{ ...definitionGroup, fields: [contact] }] }
+    expect(answerLines(contactOnly, contactAnswers)[0]!.lines.map((item) => item.line)).toEqual([
+      "Who is building it? Pat Lee, 555-0100"
+    ])
+    expect(answerReadings(definition, answers, [{ id: "w", type: "work" }], (key) => key)).toEqual([])
   })
 })
 

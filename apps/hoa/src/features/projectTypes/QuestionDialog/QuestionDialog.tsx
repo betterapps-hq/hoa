@@ -72,6 +72,8 @@ const answerTypes = [
   { value: "number", label: "Amount" },
   { value: "date", label: "Date" },
   { value: "time", label: "Time of day" },
+  { value: "signature", label: "Signature" },
+  { value: "contact", label: "Contact details" },
   { value: "file", label: "File upload" }
 ] as const
 type AnswerType = (typeof answerTypes)[number]["value"]
@@ -414,6 +416,14 @@ export function QuestionDialog({
                           </NativeSelect>
                           {item.state.value === "file" ? (
                             <FieldDescription>It goes in the documents, with the other uploads.</FieldDescription>
+                          ) : null}
+                          {item.state.value === "signature" ? (
+                            <FieldDescription>
+                              Write what homeowners sign as the question; they sign by typing their name.
+                            </FieldDescription>
+                          ) : null}
+                          {item.state.value === "contact" ? (
+                            <FieldDescription>Homeowners give a name, a phone and an email.</FieldDescription>
                           ) : null}
                           {field &&
                           item.state.value !== field.kind &&

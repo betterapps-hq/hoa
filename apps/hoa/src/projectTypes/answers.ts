@@ -14,8 +14,29 @@ import type { AnswerValue, ProjectAnswers, ProjectField, ProjectGroup, ProjectTy
 /** The file id of the answers page in the packet. */
 export const answersFileId = "form-answers"
 
+/** An answer of named parts: a signature's name and day, a contact's name, phone and email. */
+export const isAnswerRecord = (value: AnswerValue | undefined): value is Record<string, string> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
 const isBlank = (value: AnswerValue | undefined) =>
-  value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)
+  value === null ||
+  value === undefined ||
+  value === "" ||
+  (Array.isArray(value) && value.length === 0) ||
+  (isAnswerRecord(value) && Object.values(value).every((part) => part.trim() === ""))
+
+/** A signature: the name the homeowner typed and the day they typed it. */
+const signatureSchema = z.object({
+  name: z.string().trim().min(1, "Type your full name to sign.").max(200, "Keep the name under 200 characters."),
+  signedOn: z.iso.date()
+})
+
+/** A person's details: a name, and a phone or email to reach them by. */
+const contactSchema = z.object({
+  name: z.string().trim().min(1, "Give the person's name.").max(200, "Keep the name under 200 characters."),
+  phone: z.string().max(40, "Keep the phone number under 40 characters."),
+  email: z.union([z.literal(""), z.email("Give an email address such as name@example.com.")])
+})
 
 /** The schema for one answer: its kind's value, and an answer when the question is required. */
 export function fieldSchema(field: ProjectField) {
@@ -45,6 +66,10 @@ export function fieldSchema(field: ProjectField) {
       return required(z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Give a date."), z.literal(""), z.null()]))
     case "time":
       return required(z.union([z.string().regex(/^\d{2}:\d{2}$/, "Give a time."), z.literal(""), z.null()]))
+    case "signature":
+      return required(z.union([signatureSchema, z.null()]))
+    case "contact":
+      return required(z.union([contactSchema, z.null()]))
     default:
       return required(z.union([z.string().max(4000), z.null()]))
   }
@@ -54,6 +79,12 @@ export function fieldSchema(field: ProjectField) {
 export function answerErrors(field: ProjectField, value: AnswerValue | undefined): string[] {
   const parsed = fieldSchema(field).safeParse(value ?? null)
   return parsed.success ? [] : [...new Set(parsed.error.issues.map((issue) => issue.message))]
+}
+
+/** The parts of a record answer (a contact's email) that are wrong; empty when the answer as a whole is. */
+export function invalidParts(field: ProjectField, value: AnswerValue | undefined): ReadonlySet<string> {
+  const parsed = fieldSchema(field).safeParse(value ?? null)
+  return new Set(parsed.success ? [] : parsed.error.issues.flatMap((issue) => issue.path.slice(0, 1).map(String)))
 }
 
 /** The Zod schema for a definition's answers: each group's items, each field's value. */
@@ -110,6 +141,11 @@ function answerText(field: ProjectField, value: AnswerValue): string | null {
   if (field.kind === "choice") {
     const option = field.options.find((item) => item.value === value)
     return option ? option.label : `Other: ${String(value)}`
+  }
+  if (isAnswerRecord(value)) {
+    return field.kind === "signature"
+      ? `Signed by ${value.name ?? ""}${value.signedOn ? ` on ${value.signedOn}` : ""}`
+      : [value.name, value.phone, value.email].filter(Boolean).join(", ")
   }
   if (Array.isArray(value)) {
     const labels = value.map((item) =>
@@ -268,7 +304,7 @@ export function answerReadings(
     // Only bound questions are facts; the administrator's own are context on the answers page.
     return section.lines.flatMap(({ field, line }) => {
       const value = answers[section.group.subject]?.[section.index]?.[field.property] ?? null
-      if (field.binding === null || Array.isArray(value)) {
+      if (field.binding === null || Array.isArray(value) || isAnswerRecord(value)) {
         return []
       }
       const answer: FactAnswer = {

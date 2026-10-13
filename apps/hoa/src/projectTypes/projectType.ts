@@ -89,7 +89,14 @@ const fieldKinds = z.discriminatedUnion("kind", [
   z.object({ ...fieldBase, kind: z.literal("choices"), options: choiceOptions }),
   z.object({ ...fieldBase, kind: z.literal("yes-no") }),
   z.object({ ...fieldBase, kind: z.literal("date") }),
-  z.object({ ...fieldBase, kind: z.literal("time") })
+  z.object({ ...fieldBase, kind: z.literal("time") }),
+  /**
+   * The homeowner signs what the question states by typing their full name; the answer keeps the name and the day it
+   * was signed. Only the administrator's own questions ask this way.
+   */
+  z.object({ ...fieldBase, kind: z.literal("signature") }),
+  /** A person's name, phone and email (a contractor, a neighbor); only the administrator's own questions ask this way. */
+  z.object({ ...fieldBase, kind: z.literal("contact") })
 ])
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -193,7 +200,10 @@ export const projectTypeDetails = z.object({
   description: z.string().trim().max(1000, "Keep the description under 1,000 characters.")
 })
 
-export const answerValue = z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]).nullable()
+/** An answer: text, an amount, yes or no, several choices, or a record of named parts (a signature, a contact). */
+export const answerValue = z
+  .union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.record(z.string(), z.string())])
+  .nullable()
 export type AnswerValue = z.infer<typeof answerValue>
 
 /** The homeowner's answers: per group (by subject), one record per item, keyed by property. */

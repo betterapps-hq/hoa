@@ -213,6 +213,45 @@ describe("ProjectForm", () => {
     expect(screen.getAllByRole("textbox", { name: "What do you call it?" })).toHaveLength(3)
   })
 
+  it("takes a signature as a typed name, and a person's name, phone and email", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn<(value: ProjectAnswers) => void>()
+    const own = { ...base, binding: null, isRequired: true }
+    const people: ProjectTypeDefinition = {
+      ...definition,
+      groups: [
+        {
+          ...definition.groups[0]!,
+          isRepeatable: false,
+          fields: [
+            { ...own, property: "custom.signed", kind: "signature", label: "I confirm the plans are complete" },
+            { ...own, property: "custom.builder", kind: "contact", label: "Who is building it?" }
+          ]
+        }
+      ]
+    }
+    render(<Form onChange={onChange} of={people} />)
+    expect(screen.getByText("Typing your name signs it.")).toBeInTheDocument()
+    await user.type(screen.getByRole("textbox", { name: "I confirm the plans are complete" }), "Jordan Avery")
+    expect(screen.getByText(/^Signed /)).toBeInTheDocument()
+    const builder = screen.getByRole("group", { name: "Who is building it?" })
+    await user.type(within(builder).getByRole("textbox", { name: /Name$/ }), "Pat Lee")
+    await user.type(within(builder).getByRole("textbox", { name: "Email" }), "pat@example.com")
+    const [item] = onChange.mock.lastCall?.[0].item ?? []
+    expect(item?.["custom.signed"]).toEqual({
+      name: "Jordan Avery",
+      signedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
+    })
+    expect(item?.["custom.builder"]).toEqual({ name: "Pat Lee", phone: "", email: "pat@example.com" })
+    // A wrong email marks only the email.
+    await user.clear(within(builder).getByRole("textbox", { name: "Email" }))
+    await user.type(within(builder).getByRole("textbox", { name: "Email" }), "pat")
+    await user.tab()
+    expect(screen.getByText("Give an email address such as name@example.com.")).toBeInTheDocument()
+    expect(within(builder).getByRole("textbox", { name: "Email" })).toHaveAttribute("aria-invalid", "true")
+    expect(within(builder).getByRole("textbox", { name: /Name$/ })).toHaveAttribute("aria-invalid", "false")
+  })
+
   it("says what's wrong once a question is left, or all at once after a submit", async () => {
     const user = userEvent.setup()
     const { rerender } = render(<Form onChange={vi.fn<(value: ProjectAnswers) => void>()} />)

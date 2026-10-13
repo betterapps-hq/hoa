@@ -579,7 +579,8 @@ asks for in checklist order, the documents the form itself provides (`formDocume
 wording so adding one back keeps it).
 
 - **Questions.** Each has its wording, help, an answer type (text, long text, an amount with its unit and dimension, a
-  count, one choice, several choices, yes or no, a date, a time), an example for text, whether it's required, in a
+  count, one choice, several choices, yes or no, a date, a time, a signature (the homeowner types their full name;
+  the answer keeps it with the day), contact details (a name, phone and email)), an example for text, whether it's required, in a
   section that repeats whether it's asked once for every item (`isShared`: one material for every fence run) or for
   each, and the passages it cites (`citations`). **A question's citations are what its answer is checked against.** Underneath, a
   question is bound (`binding`: the property a rule tests, its answer type and values from the vocabulary) or not

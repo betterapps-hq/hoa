@@ -38,6 +38,8 @@ const answerTypeNames: Record<ProjectField["kind"], string> = {
   choice: "one choice",
   choices: "several choices",
   "yes-no": "yes or no",
+  signature: "a signature",
+  contact: "contact details",
   date: "a date",
   time: "a time of day"
 }
