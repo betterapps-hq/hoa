@@ -234,6 +234,31 @@ describe("signatures and contacts", () => {
   })
 })
 
+describe("fees", () => {
+  const fee = {
+    property: "custom.filing-fee",
+    binding: null,
+    label: "Filing fee",
+    help: "Pay by check to the association.",
+    example: null,
+    isRequired: true,
+    answeredBy: "applicant" as const,
+    citations: null,
+    kind: "fee" as const,
+    amount: 50
+  }
+
+  it("must be confirmed when required, and read back with the amount", () => {
+    expect(answerErrors(fee, true)).toEqual([])
+    expect(answerErrors(fee, null)).toEqual(["Confirm you'll pay this fee."])
+    expect(answerErrors({ ...fee, isRequired: false }, null)).toEqual([])
+    const definition: ProjectTypeDefinition = { ...emptyDefinition, groups: [{ ...definitionGroup, fields: [fee] }] }
+    expect(
+      answerLines(definition, { work: [{ "custom.filing-fee": true }] })[0]!.lines.map((item) => item.line)
+    ).toEqual(["Filing fee: $50.00, will pay it"])
+  })
+})
+
 describe("answersSchema", () => {
   it("accepts answers that fit the form and names what's missing or wrong by path", () => {
     expect(answersSchema(definition).safeParse(answers).success).toBe(true)

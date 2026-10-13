@@ -74,6 +74,7 @@ const answerTypes = [
   { value: "time", label: "Time of day" },
   { value: "signature", label: "Signature" },
   { value: "contact", label: "Contact details" },
+  { value: "fee", label: "Fee" },
   { value: "file", label: "File upload" }
 ] as const
 type AnswerType = (typeof answerTypes)[number]["value"]
@@ -92,6 +93,9 @@ const dimensionNames: Record<string, string> = {
   "business-time": "Business days",
   "sound-level": "Sound level"
 }
+
+/** Dollars from what the administrator typed ("$1,250.50"); NaN when it isn't an amount. */
+const dollarsOf = (text: string) => (/\d/.test(text) ? Number(text.replaceAll(/[$,\s]/g, "")) : Number.NaN)
 
 /** "Count" for a number with no unit. */
 const countUnit = "(count)"
@@ -125,6 +129,7 @@ const valuesSchema = z.object({
   ),
   allowsOther: z.boolean(),
   unit: z.string(),
+  fee: z.string(),
   citations: z.array(z.string())
 })
 type Values = z.infer<typeof valuesSchema>
@@ -132,13 +137,14 @@ type Values = z.infer<typeof valuesSchema>
 /** What a custom question's form starts from. */
 function customValues(field: ProjectField | null) {
   if (!field) {
-    return { answerType: "text", options: "", unit: countUnit }
+    return { answerType: "text", options: "", unit: countUnit, fee: "" }
   }
   const options = field.kind === "choice" || field.kind === "choices" ? field.options.map((option) => option.label) : []
   return {
     answerType: field.kind,
     options: options.join("\n"),
-    unit: field.kind === "number" ? (field.unit?.key ?? countUnit) : countUnit
+    unit: field.kind === "number" ? (field.unit?.key ?? countUnit) : countUnit,
+    fee: field.kind === "fee" ? String(field.amount) : ""
   }
 }
 
@@ -191,6 +197,7 @@ export function QuestionDialog({
     choices: field?.kind === "choice" ? choiceRows(field.options, listed) : [],
     allowsOther: field?.kind === "choice" ? field.allowsOther : false,
     unit: custom.unit,
+    fee: custom.fee,
     citations: field?.citations ?? []
   }
   const form = useForm({
@@ -207,6 +214,9 @@ export function QuestionDialog({
         }
         if ((value.answerType === "choice" || value.answerType === "choices") && linesOf(value.options).length < 2) {
           context.addIssue({ code: "custom", path: ["options"], message: "Write at least two choices, one per line." })
+        }
+        if (value.answerType === "fee" && !(dollarsOf(value.fee) > 0)) {
+          context.addIssue({ code: "custom", path: ["fee"], message: "Give the fee in dollars, such as 50." })
         }
       })
     },
@@ -297,6 +307,8 @@ export function QuestionDialog({
         return { ...base, kind: "choices", options: options() }
       case "file":
         return { ...base, kind: "text" }
+      case "fee":
+        return { ...base, kind: "fee", amount: dollarsOf(value.fee) }
       default:
         return { ...base, kind: type }
     }
@@ -480,6 +492,27 @@ export function QuestionDialog({
                             <FieldDescription>
                               Homeowners answer in boxes for its kind, such as feet and inches.
                             </FieldDescription>
+                          </Field>
+                        )}
+                      </form.Field>
+                    ) : null}
+                    {isOwn && answerType === "fee" ? (
+                      <form.Field name="fee">
+                        {(item) => (
+                          <Field data-invalid={item.state.meta.errors.length > 0}>
+                            <FieldLabel htmlFor="question-fee">Amount</FieldLabel>
+                            <Input
+                              id="question-fee"
+                              inputMode="decimal"
+                              className="max-w-40"
+                              placeholder="$0.00"
+                              value={item.state.value}
+                              onBlur={item.handleBlur}
+                              onChange={(event) => item.handleChange(event.target.value)}
+                              aria-invalid={item.state.meta.errors.length > 0}
+                            />
+                            <FieldDescription>Say how to pay in the help.</FieldDescription>
+                            <FieldError errors={item.state.meta.errors} />
                           </Field>
                         )}
                       </form.Field>

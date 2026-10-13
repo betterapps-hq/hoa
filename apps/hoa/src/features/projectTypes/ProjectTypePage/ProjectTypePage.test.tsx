@@ -501,6 +501,30 @@ describe("ProjectTypePage", () => {
     )
   })
 
+  it("asks for a fee with its amount in dollars", async () => {
+    const { props, user } = setup()
+    await user.click(screen.getByRole("button", { name: "Add question" }))
+    await user.click(
+      within(await screen.findByRole("dialog", { name: "Add a question" })).getByRole("button", {
+        name: /^Write your own question/
+      })
+    )
+    const dialog = await screen.findByRole("dialog", { name: "Write a question" })
+    await user.type(within(dialog).getByLabelText(/^Question/), "Filing fee")
+    await user.selectOptions(within(dialog).getByLabelText("Answer"), "fee")
+    await user.click(within(dialog).getByRole("button", { name: "Add question" }))
+    expect(within(dialog).getByText("Give the fee in dollars, such as 50.")).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText("Amount"), "$1,250.50")
+    await user.click(within(dialog).getByRole("button", { name: "Add question" }))
+    await waitFor(() =>
+      expect(
+        savedDefinition(props)
+          ?.groups.flatMap((group) => group.fields)
+          .find((field) => field.label === "Filing fee")
+      ).toMatchObject({ kind: "fee", amount: 1250.5, binding: null })
+    )
+  })
+
   it("puts a new question answered by a file upload in the documents, never among the questions", async () => {
     const { props, user } = setup()
     await user.click(screen.getByRole("button", { name: "Add question" }))

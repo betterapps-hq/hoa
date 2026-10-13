@@ -96,7 +96,17 @@ const fieldKinds = z.discriminatedUnion("kind", [
    */
   z.object({ ...fieldBase, kind: z.literal("signature") }),
   /** A person's name, phone and email (a contractor, a neighbor); only the administrator's own questions ask this way. */
-  z.object({ ...fieldBase, kind: z.literal("contact") })
+  z.object({ ...fieldBase, kind: z.literal("contact") }),
+  /**
+   * A fee the homeowner pays with the application, such as a filing fee: the form shows the amount, with the help
+   * saying how to pay, and the homeowner confirms they'll pay it. Paying happens outside the app.
+   */
+  z.object({
+    ...fieldBase,
+    kind: z.literal("fee"),
+    /** In dollars. */
+    amount: z.number().positive()
+  })
 ])
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

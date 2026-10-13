@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { citedProvisionHref } from "@/features/documents/citationLink"
 import { ReaderLink } from "@/features/documents/ReaderLink/ReaderLink"
-import { sentenceCase } from "@/lib/text"
+import { moneyText, sentenceCase } from "@/lib/text"
 import { invalidParts, isAnswerRecord } from "@/projectTypes/answers"
 import type { AnswerValue, ProjectField } from "@/projectTypes/projectType"
 import { asSentence, exampleOf } from "@/projectTypes/wording"
@@ -239,6 +239,29 @@ function ContactInput({ field, id, value, onChange, onBlur, isInvalid, described
   )
 }
 
+/** A fee: its amount, and a box the homeowner checks to confirm they'll pay it. */
+function FeeInput({ field, id, value, onChange, onBlur, isInvalid, describedBy }: InputProps<"fee">) {
+  return (
+    <div id={id} className="flex flex-col gap-2.5">
+      <p className="text-lg font-semibold tabular-nums">{moneyText(field.amount)}</p>
+      <Field orientation="horizontal" className="text-foreground">
+        <Checkbox
+          id={`${id}-confirm`}
+          checked={value === true}
+          onBlur={onBlur}
+          onCheckedChange={(checked) => onChange(checked ? true : null)}
+          aria-invalid={isInvalid}
+          aria-describedby={describedBy}
+          aria-required={field.isRequired}
+        />
+        <Label htmlFor={`${id}-confirm`} className="font-normal">
+          I&apos;ll pay this fee
+        </Label>
+      </Field>
+    </div>
+  )
+}
+
 /** A yes-or-no answer as the radio group's value: "" before an answer. */
 function yesNoValue(value: AnswerValue) {
   if (value === null || Array.isArray(value)) {
@@ -281,6 +304,8 @@ function QuestionInput(props: InputProps) {
       return <SignatureInput {...props} field={field} />
     case "contact":
       return <ContactInput {...props} field={field} />
+    case "fee":
+      return <FeeInput {...props} field={field} />
     case "yes-no":
       return (
         <RadioGroup

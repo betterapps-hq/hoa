@@ -25,3 +25,8 @@ export function fileSizeText(bytes: number) {
   }
   return `${sizeFormat.format(bytes / (1024 * 1024))} MB`
 }
+
+const moneyFormat = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
+
+/** An amount of dollars as people read it: "$50.00". */
+export const moneyText = (dollars: number) => moneyFormat.format(dollars)

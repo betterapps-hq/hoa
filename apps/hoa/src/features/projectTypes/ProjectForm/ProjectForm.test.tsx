@@ -252,6 +252,38 @@ describe("ProjectForm", () => {
     expect(within(builder).getByRole("textbox", { name: /Name$/ })).toHaveAttribute("aria-invalid", "false")
   })
 
+  it("shows a fee's amount and takes the homeowner's word they'll pay it", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn<(value: ProjectAnswers) => void>()
+    const fees: ProjectTypeDefinition = {
+      ...definition,
+      groups: [
+        {
+          ...definition.groups[0]!,
+          isRepeatable: false,
+          fields: [
+            {
+              ...base,
+              property: "custom.filing-fee",
+              binding: null,
+              kind: "fee",
+              label: "Filing fee",
+              isRequired: true,
+              amount: 1250.5
+            }
+          ]
+        }
+      ]
+    }
+    const { rerender } = render(<Form onChange={onChange} of={fees} showsAllErrors />)
+    expect(screen.getByText("$1,250.50")).toBeInTheDocument()
+    expect(screen.getByText("Confirm you'll pay this fee.")).toBeInTheDocument()
+    await user.click(screen.getByRole("checkbox", { name: "I'll pay this fee" }))
+    expect(onChange).toHaveBeenLastCalledWith({ item: [{ "custom.filing-fee": true }] })
+    rerender(<Form onChange={onChange} of={fees} showsAllErrors />)
+    expect(screen.queryByText("Confirm you'll pay this fee.")).not.toBeInTheDocument()
+  })
+
   it("says what's wrong once a question is left, or all at once after a submit", async () => {
     const user = userEvent.setup()
     const { rerender } = render(<Form onChange={vi.fn<(value: ProjectAnswers) => void>()} />)

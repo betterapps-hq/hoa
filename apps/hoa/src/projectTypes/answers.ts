@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { moneyText } from "@/lib/text"
 import { normalizeForMatching } from "@/ocr/page"
 import { planFacts, type FactPlan } from "@/review/factPlan"
 import type { FactAnswer } from "@/review/factSchema"
@@ -70,6 +71,11 @@ export function fieldSchema(field: ProjectField) {
       return required(z.union([signatureSchema, z.null()]))
     case "contact":
       return required(z.union([contactSchema, z.null()]))
+    case "fee":
+      // Confirming is the answer: a required fee must be confirmed, an optional one may be left.
+      return field.isRequired
+        ? z.literal(true, { error: () => "Confirm you'll pay this fee." })
+        : z.union([z.literal(true), z.null()])
     default:
       return required(z.union([z.string().max(4000), z.null()]))
   }
@@ -134,6 +140,9 @@ function answerText(field: ProjectField, value: AnswerValue): string | null {
   }
   if (field.kind === "yes-no") {
     return value ? "Yes" : "No"
+  }
+  if (field.kind === "fee") {
+    return `${moneyText(field.amount)}, ${value ? "will pay it" : "not confirmed"}`
   }
   if (field.kind === "number") {
     return field.unit ? `${String(value)} ${field.unit.label}` : String(value)
