@@ -111,8 +111,8 @@ export const listDashboardApplications = createServerFn({ method: "GET" }).handl
 )
 
 /**
- * What happened lately, newest first: across the HOA's areas for the committee, each naming who did it; for a homeowner,
- * what happened to their applications and the rules, the committee's doing named as the committee's.
+ * What happened lately, newest first, each naming the person who did it: across the HOA's areas for the committee; for a
+ * homeowner, what happened to their applications and the rules.
  */
 export const listRecentActivity = createServerFn({ method: "GET" }).handler(async (): Promise<ActivityEvent[]> => {
   const context = await getRequestContext()
@@ -136,8 +136,6 @@ export const listRecentActivity = createServerFn({ method: "GET" }).handler(asyn
     projectTypes: isCommittee ? projectTypes : [],
     rulebooks,
     documents,
-    nameOf: isCommittee
-      ? (userId) => userOf(userId).name
-      : (userId) => (userId === context.user.id ? null : "the committee")
+    nameOf: (userId) => userOf(userId).name
   })
 })

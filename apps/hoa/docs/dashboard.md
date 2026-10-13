@@ -48,8 +48,8 @@ The same three parts, for one home, with **Start an application** as the page's 
   committee and 1 is decided."), opening the applications; the rules in force, opening the rulebook once one is
   published; then the sample areas.
 - **Recent activity:** what happened to their applications and the rules: an application submitted or decided, a
-  rulebook version published. Their own doings name no one; the committee's are the committee's ("Approved by the
-  committee"), never one member's. The board's sample announcements are among them.
+  rulebook version published, each naming the person who did it, as the committee's does ("Approved by Sam
+  Rivera"). The board's sample announcements are among them.
 
 ## Recent activity
 

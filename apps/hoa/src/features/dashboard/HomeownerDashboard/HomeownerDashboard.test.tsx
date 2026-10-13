@@ -60,16 +60,16 @@ const activity: ActivityEvent[] = [
   {
     id: "deck-asked",
     at: "2026-10-07T15:00:00.000Z",
-    by: "the committee",
+    by: "Sam Rivera",
     type: "application-decided",
     application: { id: "deck", projectTypeLabel: "Deck", description: "A deck behind the house." },
     outcome: "information-requested"
   },
-  { id: "published", at: "2026-10-07T12:00:00.000Z", by: "the committee", type: "rulebook-published", version: 3 },
+  { id: "published", at: "2026-10-07T12:00:00.000Z", by: "Sam Rivera", type: "rulebook-published", version: 3 },
   {
     id: "paint-submitted",
     at: "2026-10-05T15:00:00.000Z",
-    by: null,
+    by: "Jordan Avery",
     type: "application-submitted",
     application: { id: "paint", projectTypeLabel: null, description: "Repaint the trim." },
     again: false
@@ -110,19 +110,18 @@ describe("HomeownerDashboard", () => {
     expect(samples[0]).toHaveTextContent("Paid through Oct 31. The next assessment, $350, is due Nov 1.")
   })
 
-  it("lists what happened to the homeowner's applications and the rules among the board's sample announcements", () => {
+  it("lists what happened to the homeowner's applications and the rules, naming who did each", () => {
     render(<HomeownerDashboard summary={published} applications={applications} activity={activity} asOf={asOf} />)
 
     const lines = rows("Recent activity")
     expect(lines.map((line) => line.textContent)).toEqual([
-      expect.stringContaining("Information requested by the committeeArchitectural review"),
-      expect.stringContaining("Published by the committeeRulebook"),
-      expect.stringMatching(/^Landscaping in the common areas.*AnnouncementsSample/),
-      expect.stringContaining("Submitted to the committeeArchitectural review"),
+      expect.stringContaining("Information requested by Sam RiveraArchitectural review"),
+      expect.stringContaining("Published by Sam RiveraRulebook"),
+      expect.stringMatching(/^Landscaping in the common areas.*Posted by Morgan Lee for the boardAnnouncementsSample/),
+      expect.stringContaining("Submitted to the committee by Jordan AveryArchitectural review"),
       expect.stringMatching(/^Board meeting minutes.*AnnouncementsSample/)
     ])
     expect(within(lines[0]!).getByRole("link")).toHaveAttribute("href", "/applications/deck")
-    expect(lines[3]).not.toHaveTextContent("Submitted to the committee by")
   })
 
   it("offers one way to start an application, and says so quietly when there's nothing yet", () => {

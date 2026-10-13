@@ -103,7 +103,7 @@ export function sampleActivity(asOf: string): SampleEvent[] {
       at: daysFrom(asOf, -2),
       subject: "Landscaping in the common areas",
       detail: "Crews are working on weekdays through the end of the month.",
-      note: "Posted by the board"
+      note: "Posted by Morgan Lee for the board"
     },
     {
       id: "sample-minutes",
@@ -111,7 +111,7 @@ export function sampleActivity(asOf: string): SampleEvent[] {
       at: daysFrom(asOf, -6),
       subject: "Board meeting minutes",
       detail: "The minutes from the last board meeting are ready to read.",
-      note: "Posted by the board"
+      note: "Posted by Morgan Lee for the board"
     }
   ]
 }

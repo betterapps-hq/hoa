@@ -18,7 +18,7 @@ export type ActivityEvent = {
   /** Unique among the events. */
   id: string
   at: string
-  /** Who did it, by name; null when the record doesn't say, or it was the reader. */
+  /** Who did it, by name; null when the record doesn't say. */
   by: string | null
 } & (
   | { type: "application-submitted"; application: EventApplication; again: boolean }
@@ -63,8 +63,8 @@ export type ActivitySources = {
   rulebooks: readonly { id: string; version: number | null; publishedBy: string | null; publishedAt: string | null }[]
   /** Every governing document upload, removed ones too. */
   documents: readonly DocumentUpload[]
-  /** A person's name, from the user id a record keeps; null for the reader, who needs no naming. */
-  nameOf: (userId: string) => string | null
+  /** A person's name, from the user id a record keeps. */
+  nameOf: (userId: string) => string
 }
 
 /** Who did something, by name, from the id its record keeps; null when it keeps none. */
