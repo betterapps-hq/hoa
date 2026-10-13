@@ -52,8 +52,15 @@ import { projectRequirements, type RequirementGroup } from "./requirements"
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-/** The published rulebook's id, rules file and publish date; null before the organization publishes one. */
-async function publishedRulebook(hoaId: string) {
+/**
+ * The published rulebook's id, rules file and publish date; null before the organization publishes one. Written out
+ * rather than read off `publishedRulebook`: a `typeof` of a server-only helper keeps it, and its storage import, in the
+ * browser bundle, which the build refuses.
+ */
+type Published = { id: string; publishedAt: string | null; rulesFile: T.RulesFile } | null
+
+/** Reads the published rulebook, or null before the organization publishes one. */
+async function publishedRulebook(hoaId: string): Promise<Published> {
   const published = await getPublishedRulesFile(getDb(), hoaId)
   return published
     ? {
@@ -63,8 +70,6 @@ async function publishedRulebook(hoaId: string) {
       }
     : null
 }
-
-type Published = Awaited<ReturnType<typeof publishedRulebook>>
 
 /** Whether a type was built against an earlier rulebook than the published one. */
 const isOutdatedType = (type: ProjectType, published: Published) =>
