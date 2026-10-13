@@ -4,7 +4,7 @@ import type { Recommendation } from "@/review/reviewModel"
 /** An application as the dashboards list it: the record's own fields, its reviews and what the latest one asks for. */
 export type DashboardApplication = Pick<
   Application,
-  "id" | "description" | "status" | "createdAt" | "updatedAt" | "submittedAt"
+  "id" | "description" | "status" | "createdAt" | "updatedAt" | "revisedAt" | "submittedAt"
 > & {
   /** The organization's project type; null for "Something else". */
   projectTypeLabel: string | null

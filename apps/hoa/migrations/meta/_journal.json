@@ -64,6 +64,13 @@
       "when": 1791843858067,
       "tag": "0008_law_kinds",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791854207537,
+      "tag": "0009_application_drafts",
+      "breakpoints": true
     }
   ]
 }

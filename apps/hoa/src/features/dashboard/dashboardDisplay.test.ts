@@ -6,12 +6,13 @@ import {
   awaitingHomeowner,
   daysBetween,
   daysText,
-  groupForHomeowner,
+  elsewhereText,
   nextStepText,
   recentActivity,
   recommendationText,
   standingDateText,
   standingText,
+  waitingOnHomeowner,
   waitingSince
 } from "./dashboardDisplay"
 
@@ -22,13 +23,24 @@ const reviewed = (recommendation: "approve" | "deny" | "request-information") =>
 
 describe("nextStepText", () => {
   it("tells the homeowner what to do while the application is theirs", () => {
-    expect(nextStepText(application({ status: "draft" }))).toBe("Add your plans and run the review.")
+    expect(nextStepText(application({ status: "draft" }))).toBe("Finish your draft and run the review.")
     expect(nextStepText(application({ status: "reviewed", reviews: reviewed("approve") }))).toBe(
       "The review found no problems. Submit it to the committee."
     )
     expect(nextStepText(application({ status: "reviewed", reviews: reviewed("deny") }))).toBe(
       "Check what the review found, then submit it to the committee."
     )
+  })
+
+  it("asks for the review again once the homeowner changes the application after it", () => {
+    const changed = application({
+      status: "reviewed",
+      reviews: reviewed("request-information"),
+      revisedAt: "2026-10-04T00:00:00.000Z",
+      missingInformation: ["A plan."]
+    })
+    expect(nextStepText(changed)).toBe("You changed it after the review. Run the review again, then submit it.")
+    expect(standingText(changed)).toBe("Draft")
   })
 
   it("asks for what the review's action items ask for", () => {
@@ -88,16 +100,29 @@ describe("standing", () => {
 })
 
 describe("grouping", () => {
-  it("puts what waits on the homeowner first and leaves out empty groups", () => {
-    const groups = groupForHomeowner([
+  it("keeps what waits on the homeowner, what the committee asked for first", () => {
+    const waiting = waitingOnHomeowner([
       application({ id: "decided", status: "decided" }),
       application({ id: "draft", status: "draft" }),
-      application({ id: "asked", status: "information-requested" })
+      application({ id: "reviewed", status: "reviewed" }),
+      application({ id: "asked", status: "information-requested" }),
+      application({ id: "submitted", status: "submitted" })
     ])
-    expect(groups.map((group) => [group.title, group.applications.map((item) => item.id)])).toEqual([
-      ["Waiting on you", ["asked", "draft"]],
-      ["Decided", ["decided"]]
-    ])
+    expect(waiting.map((item) => item.id)).toEqual(["asked", "reviewed", "draft"])
+  })
+
+  it("says where the homeowner's other applications stand", () => {
+    const elsewhere = [
+      application({ status: "reviewing" }),
+      application({ status: "submitted" }),
+      application({ status: "decided" }),
+      application({ status: "decided" })
+    ]
+    expect(elsewhereText([application(), ...elsewhere])).toBe(
+      "Of your other applications, 1 is being reviewed, 1 is with the committee and 2 are decided."
+    )
+    expect(elsewhereText(elsewhere.slice(1, 2))).toBe("Of your applications, 1 is with the committee.")
+    expect(elsewhereText([application()])).toBeNull()
   })
 
   it("orders the committee's queues by how long each has waited", () => {

@@ -146,6 +146,7 @@ type Application = {
   createdBy: string
   createdAt: string
   updatedAt: string
+  revisedAt: string | null // when the homeowner last changed the description, answers or files
   status: "draft" | "reviewing" | "reviewed" | "submitted" | "information-requested" | "decided"
   reviewId: string | null // the latest review
   submittedReviewId: string | null // the review the committee sees, fixed at submission
@@ -162,14 +163,19 @@ type Application = {
 
 | Status | Means | Homeowner can |
 | --- | --- | --- |
-| `draft` | Created, files being added | Upload files, run the review |
+| `draft` | Started, not reviewed yet | Change the description, answers and files; run the review; delete it |
 | `reviewing` | A review is running | Wait |
-| `reviewed` | The latest review is ready | Change files and run it again, or submit, even with open requests |
+| `reviewed` | The latest review is ready | Change it and run the review again, or submit, even with open requests; delete it |
 | `submitted` | With the committee | Nothing until the committee decides |
 | `information-requested` | The committee asked for more | Change files, run the review again, resubmit |
 | `decided` | Approved, approved in part or disapproved | Nothing; a new project is a new application |
 
 A failed review doesn't change the status: the job holds the error, and the homeowner can run the review again.
+
+The homeowner sees `draft` and `reviewed` alike as a draft, and the committee sees neither: an application reaches the
+committee once it's submitted (`canSee`). A review covers the application while nothing changed after it
+(`reviewCoversLatest`: `revisedAt` before the review's `createdAt`, since nothing changes while one runs); one that
+doesn't can't be submitted.
 
 `deleteAfter` is set to `updatedAt + draftRetentionDays` while the application has never been submitted, and to
 `decidedAt + retentionDays` once the committee records any decision. It's cleared while the application is submitted
@@ -181,7 +187,8 @@ type ApplicationFile = {
   applicationId: string
   parentFileId: string | null // set for images extracted from a Word file
   ordinal: number | null // position of an extracted image in its Word file
-  contextText: string | null // the paragraph before an extracted image
+  contextText: string | null // the paragraph before an extracted image, or the document an uploaded file is
+  uploadedAs: string | null // what the homeowner said it is: one of the project type's documents, or "(other)"
   fileName: string
   mediaType: string
   sizeBytes: number
@@ -249,7 +256,8 @@ Duplicates are caught by hash instead of being cached:
 
 Browsers upload directly to R2 with presigned `PUT` URLs, so large files never pass through a Worker:
 
-1. The page calls `createDocumentUpload` or `createApplicationUpload` with the file name, size and type. The server checks the type and size, creates the
+1. The page calls `createDocumentUpload` or `createApplicationUpload` with the file name, size and type (and for an
+   application file, what it is). The server checks the type and size, creates the
    record with status `uploading`, and returns a presigned URL signed with `aws4fetch` against R2's S3 API. The URL
    expires after 15 minutes; the complete call then checks the stored object's size, since the URL can't bind it.
 2. The browser `PUT`s the file. The bucket's CORS rule allows `PUT` with the `Content-Type` header from
@@ -269,8 +277,8 @@ and 5 MB per image. `src/storage/uploadRules.ts` holds these rules.
 ## Access
 
 - Governing documents, their pages and the published rulebook are readable by every member of the HOA.
-- Application files, their pages and reviews are readable only by the homeowner who created the application and by the
-  HOA's administrators (the Administrator role).
+- Application files, their pages and reviews are readable only by the homeowner who created the application and, once
+  it's submitted, by the HOA's administrators (the Administrator role). A draft is the homeowner's own.
 - Files are never public. A server function checks access, then returns a presigned `GET` URL that expires after
   5 minutes, or the file inline where the environment has no R2 token (`getPacketImage`, for a packet's photos). A governing document's original file is served through the app instead, at
   `/files/governing/{documentId}`, which finds the document only in the requester's organization
@@ -287,6 +295,9 @@ including page text from application packets, reach Langfuse in full through the
   deletes `jobs/{jobId}/` and the Langfuse traces for every job whose subject is the application (listing them by
   session id through Langfuse's API, then deleting them); deletes the application's file and page rows; and clears
   `applications.description`. Azure keeps each analyze result for up to 24 hours after OCR, then deletes it.
+- **Deleting a draft.** The homeowner can delete an application that was never submitted (`deleteApplicationDraft`):
+  its row, its files', pages' and reviews' rows, its review jobs, and everything under `applications/{applicationId}/`
+  and `jobs/{jobId}/`. Its Langfuse traces stay, as they do until the sweep above is built.
 - **Model providers.** Every model call denies data collection, so OpenRouter never routes to providers that train on
   prompts ([ai.md](../ai.md)). That doesn't limit how long a provider retains requests.
 - **Before real HOAs onboard:** application stages record summaries instead of content, and the hosted OpenRouter

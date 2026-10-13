@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, lte } from "drizzle-orm"
+import { and, desc, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm"
 import { z } from "zod"
 import {
   applicationFileSchema,
@@ -33,6 +33,7 @@ export async function createApplication(
     createdBy: input.createdBy,
     createdAt: input.now,
     updatedAt: input.now,
+    revisedAt: input.now,
     status: "draft",
     reviewId: null,
     submittedReviewId: null,
@@ -78,6 +79,8 @@ export type ApplicationPatch = Partial<
   Pick<
     Application,
     | "description"
+    | "answers"
+    | "revisedAt"
     | "status"
     | "reviewId"
     | "submittedReviewId"
@@ -138,10 +141,35 @@ export async function deleteApplication(db: Database, hoaId: string, id: string)
   ])
 }
 
+/**
+ * Deletes a draft its homeowner no longer wants, with its files, pages and reviews: only one that was never submitted
+ * and isn't being reviewed, checked in the same statement. False when it isn't such a draft.
+ */
+export async function deleteDraftApplication(db: Database, hoaId: string, id: string) {
+  const [deleted] = await db
+    .delete(applications)
+    .where(
+      and(
+        eq(applications.hoaId, hoaId),
+        eq(applications.id, id),
+        inArray(applications.status, ["draft", "reviewed"]),
+        isNull(applications.submittedAt)
+      )
+    )
+    .returning({ id: applications.id })
+  if (!deleted) {
+    return false
+  }
+  await deleteApplication(db, hoaId, id)
+  return true
+}
+
 export async function createApplicationFile(
   db: Database,
   input: Pick<ApplicationFile, "hoaId" | "applicationId" | "fileName" | "mediaType" | "sizeBytes"> &
-    Partial<Pick<ApplicationFile, "id" | "parentFileId" | "ordinal" | "contextText" | "status">> & { now: string }
+    Partial<Pick<ApplicationFile, "id" | "parentFileId" | "ordinal" | "contextText" | "uploadedAs" | "status">> & {
+      now: string
+    }
 ): Promise<ApplicationFile> {
   const file: ApplicationFile = {
     id: input.id ?? crypto.randomUUID(),
@@ -150,6 +178,7 @@ export async function createApplicationFile(
     parentFileId: input.parentFileId ?? null,
     ordinal: input.ordinal ?? null,
     contextText: input.contextText ?? null,
+    uploadedAs: input.uploadedAs ?? null,
     fileName: input.fileName,
     mediaType: input.mediaType,
     sizeBytes: input.sizeBytes,
@@ -191,7 +220,9 @@ export async function updateApplicationFile(
   db: Database,
   hoaId: string,
   id: string,
-  patch: Partial<Pick<ApplicationFile, "status" | "error" | "sha256" | "pageCount" | "kind">>
+  patch: Partial<
+    Pick<ApplicationFile, "status" | "error" | "sha256" | "pageCount" | "kind" | "uploadedAs" | "contextText">
+  >
 ) {
   await db
     .update(applicationFiles)

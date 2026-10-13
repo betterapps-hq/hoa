@@ -22,6 +22,7 @@ const file = (id: string, fileName: string, mediaType: string): ApplicationFile 
   parentFileId: null,
   ordinal: null,
   contextText: null,
+  uploadedAs: null,
   fileName,
   mediaType,
   sizeBytes: 10,

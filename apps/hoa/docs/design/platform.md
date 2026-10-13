@@ -171,14 +171,17 @@ Each checks the role and access rules.
 | `createProjectType`, `updateProjectType`, `applyProjectTypeUpdates` | Administrator | The type's details and form | `ProjectType`; the form is checked against the rules |
 | `setProjectTypeStatus`, `deleteProjectType` | Administrator | Project type id, status | Archives, unarchives or deletes a type no application uses |
 | `countOutdatedProjectTypes` | Any (0 for homeowners) | | Active types out of date with the published rulebook |
-| `createApplication` | Any | Project type id or none, answers, description | `Application` |
-| `createApplicationUpload` | Owner | Application id, file name, type, size, context text | File id, presigned `PUT` URL (or none) |
+| `createApplication` | Any | Project type id or none | `Application` (`draft`, its form blank) |
+| `saveApplication` | Owner | Application id, description, answers | Keeps the draft as it's edited, finished or not |
+| `createApplicationUpload` | Owner | Application id, file name, type, size, what it is | File id, presigned `PUT` URL (or none) |
 | `uploadApplicationFile`, `completeApplicationUpload`, `removeApplicationFile` | Owner | File id (and the file as form data) | Stores, confirms or removes a file |
-| `runReview` | Owner | Application id | Job id; allowed in `draft`, `reviewed` and `information-requested` |
-| `submitApplication` | Owner | Application id, confirmation when the latest review requests information | `Application` (`submitted`) |
-| `listApplications`, `listDashboardApplications` | Homeowner (their own), administrator (all) | | Applications with their latest recommendation |
-| `getApplicationView` | Owner or administrator | Application id | Application, files, latest review and earlier reviews, and what the viewer can do |
-| `getPacketImage` | Owner or administrator | Application id, file id | A presigned `GET` URL for a photo, or the image inline |
+| `setApplicationFileUploadedAs` | Owner | File id, what it is | Says which of the type's documents a file is, or other |
+| `runReview` | Owner | Application id | Job id; allowed in `draft`, `reviewed` and `information-requested` once the required questions are answered |
+| `submitApplication` | Owner | Application id, confirmation when the latest review requests information | `Application` (`submitted`); refused when it changed after the review |
+| `deleteApplicationDraft` | Owner | Application id | Deletes a draft never submitted, with everything stored for it |
+| `listApplications`, `listDashboardApplications` | Homeowner (their own), administrator (submitted ones, and their own) | | Applications with their latest recommendation |
+| `getApplicationView` | Owner, or administrator once submitted | Application id | Application, its project type's form, files, latest review and earlier reviews, and what the viewer can do |
+| `getPacketImage` | Owner, or administrator once submitted | Application id, file id | A presigned `GET` URL for a photo, or the image inline |
 | `recordDecision` | Administrator | Application id, outcome, note | `Application` |
 | `getDashboardSummary`, `getNextRulebook` | Any | | The dashboard's numbers; the coming rulebook, for administrators |
 | `getSession`, `setDemoRole` | Any | Role, to switch | The user, role and HOA |

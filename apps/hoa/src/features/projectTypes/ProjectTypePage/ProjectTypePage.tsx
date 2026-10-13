@@ -1,9 +1,9 @@
-import { useWindowEvent } from "@mantine/hooks"
 import { useForm } from "@tanstack/react-form"
 import { Link } from "@tanstack/react-router"
-import { ArrowLeftIcon, CheckIcon, ChevronDownIcon, CircleCheckIcon } from "lucide-react"
-import { useRef, useState } from "react"
+import { ArrowLeftIcon, ChevronDownIcon, CircleCheckIcon } from "lucide-react"
+import { useState } from "react"
 import { PageActions } from "@/components/PageActions/PageActions"
+import { SaveStatus } from "@/components/SaveStatus/SaveStatus"
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { CitationsOpenInSheet } from "@/features/documents/ReaderSheet/ReaderSheet"
+import { useAutosave } from "@/hooks/useAutosave"
 import { bindDefinition } from "@/projectTypes/bind"
 import { projectTypeDetails, type ProjectTypeDefinition, type ProjectTypeStatus } from "@/projectTypes/projectType"
 import { applyChanges } from "@/projectTypes/updates"
@@ -52,84 +53,6 @@ export type ProjectTypePageProps = {
 }
 
 const messageOf = (caught: unknown, fallback: string) => (caught instanceof Error ? caught.message : fallback)
-
-type SaveState = "idle" | "saving" | "saved" | "failed"
-
-/**
- * The definition as the administrator edits it, saved after every change: one save at a time, then the latest
- * change, so the stored form always ends as the screen shows it.
- */
-function useAutosave(initial: ProjectTypeDefinition, save: (definition: ProjectTypeDefinition) => Promise<void>) {
-  const [definition, setDefinition] = useState(initial)
-  const [state, setState] = useState<SaveState>("idle")
-  const latest = useRef(initial)
-  const queue = useRef<{ pending: ProjectTypeDefinition | null; isRunning: boolean }>({
-    pending: null,
-    isRunning: false
-  })
-  const flush = async () => {
-    if (queue.current.isRunning) {
-      return
-    }
-    queue.current.isRunning = true
-    setState("saving")
-    try {
-      for (let next = queue.current.pending; next !== null; next = queue.current.pending) {
-        queue.current.pending = null
-        await save(next)
-      }
-      setState("saved")
-    } catch {
-      setState("failed")
-    } finally {
-      queue.current.isRunning = false
-    }
-  }
-  const update: DefinitionUpdate = (change) => {
-    const next = change(latest.current)
-    latest.current = next
-    setDefinition(next)
-    queue.current.pending = next
-    void flush()
-  }
-  const retry = () => {
-    queue.current.pending = latest.current
-    void flush()
-  }
-  useWindowEvent("beforeunload", (event) => {
-    if (state === "saving" || state === "failed") {
-      event.preventDefault()
-    }
-  })
-  return { definition, latest, state, update, retry }
-}
-
-function SaveStatus({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
-  return (
-    <output className="flex items-center gap-1.5 text-sm text-muted-foreground">
-      {state === "saving" ? (
-        <>
-          <Spinner className="size-3.5" />
-          Saving
-        </>
-      ) : null}
-      {state === "saved" ? (
-        <>
-          <CheckIcon className="size-3.5" aria-hidden />
-          Saved
-        </>
-      ) : null}
-      {state === "failed" ? (
-        <>
-          <span className="text-destructive">Not saved</span>
-          <Button variant="link" size="sm" className="h-auto p-0 text-link" onClick={onRetry}>
-            Try again
-          </Button>
-        </>
-      ) : null}
-    </output>
-  )
-}
 
 type DetailsDialogProps = {
   label: string
@@ -305,7 +228,7 @@ function ProjectTypeEditor({
         </p>
       ) : null}
       <QuestionsCard
-        definition={editor.definition}
+        definition={editor.value}
         available={view.available}
         info={view.questionInfo}
         citations={view.citations}
@@ -314,7 +237,7 @@ function ProjectTypeEditor({
         onUpdate={update}
       />
       <DocumentsCard
-        definition={editor.definition}
+        definition={editor.value}
         available={view.available}
         rules={rules}
         citations={view.citations}

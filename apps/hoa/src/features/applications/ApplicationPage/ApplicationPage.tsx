@@ -1,14 +1,19 @@
 import { useForm } from "@tanstack/react-form"
-import { ArrowLeftIcon, DownloadIcon, RotateCwIcon, SendIcon, Trash2Icon } from "lucide-react"
+import { ArrowLeftIcon, RotateCwIcon, SendIcon, Trash2Icon } from "lucide-react"
 import { useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
-import { decisionOutcomes, type Application, type ApplicationStatus } from "@/applications/application"
+import {
+  decisionOutcomes,
+  reviewCoversLatest,
+  type Application,
+  type ApplicationFile,
+  type ApplicationStatus
+} from "@/applications/application"
 import { FileDropzone } from "@/components/FileDropzone/FileDropzone"
-import { FileTypeMedia } from "@/components/FileTypeMedia/FileTypeMedia"
-import { ImageViewer } from "@/components/ImageViewer/ImageViewer"
 import { PageActions, type PageAction } from "@/components/PageActions/PageActions"
 import type { RowAction } from "@/components/RowActions/RowActions"
+import { SaveStatus } from "@/components/SaveStatus/SaveStatus"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import {
   AlertDialog,
@@ -20,17 +25,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from "@/components/ui/alert-dialog"
-import {
-  Attachment,
-  AttachmentAction,
-  AttachmentActions,
-  AttachmentContent,
-  AttachmentDescription,
-  AttachmentTitle,
-  AttachmentTrigger
-} from "@/components/ui/attachment"
 import { Badge } from "@/components/ui/badge"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Field,
@@ -48,30 +44,42 @@ import { Textarea } from "@/components/ui/textarea"
 import type { CitationSource } from "@/features/documents/DocumentViewer/DocumentViewer"
 import { CitationsOpenInSheet } from "@/features/documents/ReaderSheet/ReaderSheet"
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
+import { useAutosave } from "@/hooks/useAutosave"
 import type { Job } from "@/jobs/job"
 import { cn } from "@/lib/utils"
+import { answersSchema } from "@/projectTypes/answers"
 import { hasOpenRequests, type Review } from "@/review/reviewModel"
 import { renderRuleMarkers } from "@/review/ruleMarkers"
 import {
-  fileStatusLabels,
   outcomeLabels,
   packetFiles,
   recommendationLabels,
   statusLabels,
   type DecisionOutcome
 } from "../applicationDisplay"
-import { applicationFileUrl, opensInBrowser } from "../applicationFile"
+import { applicationFileUrl } from "../applicationFile"
+import { ApplicationAnswers, ApplicationForm, type DraftContent } from "../ApplicationForm/ApplicationForm"
 import type { ApplicationView } from "../applications.functions"
+import { DocumentChecklist } from "../DocumentChecklist/DocumentChecklist"
+import { guessKind, kindProblem, kindsOf } from "../fileKinds"
+import { PacketFiles } from "../PacketFiles/PacketFiles"
 import { createReviewContext, ruleName, type ReviewAudience } from "../reviewContext"
 import { ReviewReport, type ReportTab } from "../ReviewReport/ReviewReport"
 import { verdictTones } from "../ReviewVerdict/ReviewVerdict"
 import { decisionTones, suggestedDecisions } from "../ReviewVerdict/ReviewVerdict.utils"
 
 export type ApplicationActions = {
-  upload: (files: File[]) => Promise<void>
+  /** Keeps what the homeowner has written so far. */
+  save: (content: DraftContent) => Promise<void>
+  /** Uploads files, each with what it was guessed to be. */
+  upload: (files: File[], uploadedAs: ReadonlyMap<File, string>) => Promise<void>
+  /** Says what a file is: one of the project type's documents, other, or nothing yet (null). */
+  setUploadedAs: (fileId: string, uploadedAs: string | null) => Promise<void>
   removeFile: (fileId: string) => Promise<void>
   runReview: () => Promise<void>
   submit: (confirmOpenRequests: boolean) => Promise<void>
+  /** Deletes a draft that was never submitted. */
+  deleteDraft: () => Promise<void>
   decide: (outcome: DecisionOutcome, note: string | null) => Promise<void>
 }
 
@@ -91,6 +99,9 @@ export type ApplicationPageProps = {
 }
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" })
+
+/** How long typing waits for a pause before the draft is saved, in milliseconds. */
+const saveDelay = 800
 
 async function attempt(action: () => Promise<void>, fallback: string) {
   try {
@@ -249,7 +260,7 @@ type AddFilesProps = {
   onAdd: (files: File[]) => void
 }
 
-/** Takes files by drop or browse; they upload and the review runs again. Files it can't take are named with why. */
+/** Takes files by drop or browse, and they upload to the application. Files it can't take are named with why. */
 function AddFiles({ id, size = "default", disabled, onAdd }: AddFilesProps) {
   return (
     <FileDropzone
@@ -261,116 +272,6 @@ function AddFiles({ id, size = "default", disabled, onAdd }: AddFilesProps) {
       prompt={size === "compact" ? "Add files" : undefined}
       className="w-full"
     />
-  )
-}
-
-type PacketFileListProps = {
-  view: ApplicationView
-  isBusy: boolean
-  onRemove: (fileId: string) => void
-}
-
-/** A packet file's state as an attachment shows it: read, being read, still uploading, or not readable. */
-function fileState(status: ApplicationView["files"][number]["status"], isReading: boolean) {
-  if (status === "unreadable") {
-    return "error"
-  }
-  if (status === "uploading") {
-    return "uploading"
-  }
-  return isReading ? "processing" : "done"
-}
-
-/** The files the homeowner uploaded, each with what the review made of it; each opens, and saves. */
-function PacketFileList({ view, isBusy, onRemove }: PacketFileListProps) {
-  const files = packetFiles(view.files)
-  const isReviewing = view.application.status === "reviewing"
-  // A photo opens in the viewer over the page; the last one shown stays named while the viewer closes.
-  const [viewed, setViewed] = useState<{ id: string; fileName: string } | null>(null)
-  const [isViewerOpen, setIsViewerOpen] = useState(false)
-  if (files.length === 0) {
-    return <p className="text-sm text-muted-foreground">No files yet.</p>
-  }
-  return (
-    <>
-      <ul className="flex flex-col gap-2">
-        {files.map(({ file, pictures }) => {
-          const isReading = isReviewing && file.status === "processing"
-          // A photo opens in the viewer; any other file in a new tab, or the browser saves it.
-          const trigger =
-            file.mediaType.startsWith("image/") && opensInBrowser(file.mediaType) ? (
-              <AttachmentTrigger
-                aria-label={`View ${file.fileName}`}
-                className="cursor-zoom-in"
-                onClick={() => {
-                  setViewed(file)
-                  setIsViewerOpen(true)
-                }}
-              />
-            ) : (
-              <AttachmentTrigger
-                render={
-                  <a
-                    href={applicationFileUrl(view.application.id, file.id)}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`Open ${file.fileName}`}
-                  />
-                }
-              />
-            )
-          return (
-            <li key={file.id}>
-              <Attachment className="w-full" state={fileState(file.status, isReading)}>
-                <FileTypeMedia fileName={file.fileName} mediaType={file.mediaType} />
-                <AttachmentContent>
-                  <AttachmentTitle title={file.fileName}>{file.fileName}</AttachmentTitle>
-                  {/* What the review made of it, whole: a reason it couldn't be read is worth reading. */}
-                  <AttachmentDescription className="whitespace-normal">
-                    {isReading ? "Reading" : fileStatusLabels[file.status]}
-                    {file.pageCount ? `, ${file.pageCount} ${file.pageCount === 1 ? "page" : "pages"}` : ""}
-                    {pictures.length > 0
-                      ? `, ${pictures.length} ${pictures.length === 1 ? "picture" : "pictures"}`
-                      : ""}
-                    {file.error ? `: ${file.error.message}` : ""}
-                  </AttachmentDescription>
-                </AttachmentContent>
-                {file.status === "uploading" ? null : trigger}
-                <AttachmentActions>
-                  {file.status === "uploading" ? null : (
-                    <a
-                      className={buttonVariants({ variant: "ghost", size: "icon-xs" })}
-                      href={applicationFileUrl(view.application.id, file.id, { download: true })}
-                      download
-                      aria-label={`Download ${file.fileName}`}
-                      title="Download"
-                    >
-                      <DownloadIcon aria-hidden />
-                    </a>
-                  )}
-                  {view.canEdit ? (
-                    <AttachmentAction
-                      aria-label={`Remove ${file.fileName}`}
-                      title="Remove"
-                      disabled={isBusy}
-                      onClick={() => onRemove(file.id)}
-                    >
-                      <Trash2Icon />
-                    </AttachmentAction>
-                  ) : null}
-                </AttachmentActions>
-              </Attachment>
-            </li>
-          )
-        })}
-      </ul>
-      <ImageViewer
-        src={viewed ? applicationFileUrl(view.application.id, viewed.id) : undefined}
-        name={viewed?.fileName ?? ""}
-        open={isViewerOpen}
-        onOpenChange={setIsViewerOpen}
-      />
-    </>
   )
 }
 
@@ -399,7 +300,7 @@ function StatusBadge({ application }: { application: Application }) {
 
 type HeaderProps = { view: ApplicationView }
 
-/** The application's name and where it stands, then the homeowner's own description. */
+/** The application's name and where it stands, then the homeowner's own description unless it's being edited below. */
 function ApplicationHeader({ view }: HeaderProps) {
   const { application } = view
   return (
@@ -408,7 +309,7 @@ function ApplicationHeader({ view }: HeaderProps) {
         <h2 className="text-2xl font-semibold tracking-tight">{view.projectTypeLabel ?? "Project"} application</h2>
         <StatusBadge application={application} />
       </div>
-      {application.description ? (
+      {application.description && !view.canEdit ? (
         <p className="max-w-3xl text-pretty whitespace-pre-line text-muted-foreground">{application.description}</p>
       ) : null}
     </header>
@@ -456,7 +357,7 @@ function ApplicationDetails({ view }: HeaderProps) {
 
 type StageProps = { title: string; description: string; children?: ReactNode }
 
-/** The application before there's a review to show: what's happening, and the packet. */
+/** A part of the application before there's a review to show: a heading, what it's for, and its content. */
 function Stage({ title, description, children }: StageProps) {
   const headingId = useId()
   return (
@@ -476,9 +377,26 @@ function Stage({ title, description, children }: StageProps) {
   )
 }
 
+/** A card beside the application with what the homeowner does next, and why. */
+function NextCard({ title, description, children }: StageProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          <h3>{title}</h3>
+        </CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      {children ? <CardContent>{children}</CardContent> : null}
+    </Card>
+  )
+}
+
 /**
  * One application, as a record page: its name and status, then the review (the recommendation with its counts, and
- * tabs from the next steps to the packet's files) beside the one thing to do now and the application's details.
+ * tabs from the next steps to the packet's files) beside the one thing to do now and the application's details. While
+ * it's a draft, the homeowner's description, answers and files are edited in place and kept as they change; the review
+ * runs when they ask for it.
  */
 export function ApplicationPage({
   view,
@@ -490,15 +408,34 @@ export function ApplicationPage({
   source,
   loadImage
 }: ApplicationPageProps) {
-  const { application, review, job } = view
+  const { application, review, job, projectType } = view
   const [isBusy, setIsBusy] = useState(false)
   const [isConfirming, setIsConfirming] = useState(false)
-  const fileCount = packetFiles(view.files).length
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showsAllErrors, setShowsAllErrors] = useState(false)
+  const [filesError, setFilesError] = useState<string | null>(null)
+  // The review shown when the homeowner last changed something here, so the page knows it no longer covers the
+  // application before the page loads again; undefined until they change something.
+  const [changedUnder, setChangedUnder] = useState<string | null | undefined>(undefined)
+  const mainId = useId()
+  const draft = useAutosave<DraftContent>(
+    { description: application.description ?? "", answers: application.answers },
+    actions.save,
+    { delay: saveDelay }
+  )
+  const definition = projectType?.definition ?? null
+  const kinds = kindsOf(definition)
+  const files = packetFiles(view.files)
+  const fileCount = files.length
   const isReviewing = application.status === "reviewing"
+  const isStale = review !== null && (!reviewCoversLatest(application, review) || changedUnder === review.id)
   const canSubmit =
     view.isOwner &&
     review !== null &&
+    !isStale &&
     (application.status === "reviewed" || application.status === "information-requested")
+  const canDelete =
+    view.isOwner && application.submittedAt === null && ["draft", "reviewed"].includes(application.status)
 
   const busy = async (action: () => Promise<void>, fallback: string) => {
     setIsBusy(true)
@@ -507,18 +444,90 @@ export function ApplicationPage({
     onChanged()
     return succeeded
   }
-  const addFiles = (files: File[]) =>
+  const changed = () => setChangedUnder(review?.id ?? null)
+  const changeContent = (next: DraftContent) => {
+    changed()
+    draft.update(() => next)
+  }
+  const addFiles = (added: File[]) =>
     void busy(async () => {
-      await actions.upload(files)
-      await actions.runReview()
+      // Each file starts as what its name says, where that's clear and its format suits.
+      const uploadedAs = new Map<File, string>()
+      for (const file of added) {
+        const guess = kinds ? guessKind(file.name, kinds) : ""
+        if (guess && !kindProblem(file, definition, guess)) {
+          uploadedAs.set(file, guess)
+        }
+      }
+      changed()
+      setFilesError(null)
+      await actions.upload(added, uploadedAs)
     }, "The files didn't upload.")
-  const runReview = () => void busy(actions.runReview, "The review didn't start.")
-  const removeFile = (fileId: string) => void busy(() => actions.removeFile(fileId), "The file wasn't removed.")
+  const chooseKind = async (file: ApplicationFile, kind: string | null) => {
+    const problem = kind
+      ? kindProblem({ name: file.fileName, type: file.mediaType, size: file.sizeBytes }, definition, kind)
+      : null
+    if (problem) {
+      toast.error(problem)
+      return false
+    }
+    changed()
+    return busy(() => actions.setUploadedAs(file.id, kind), "That wasn't saved.")
+  }
+  const removeFile = (fileId: string) =>
+    void busy(async () => {
+      changed()
+      await actions.removeFile(fileId)
+    }, "The file wasn't removed.")
+
+  /** What stops the review from running, shown where it is; null when the application is ready. */
+  const problemBeforeReview = () => {
+    if (definition && !answersSchema(definition).safeParse(draft.value.answers ?? {}).success) {
+      setShowsAllErrors(true)
+      // Once the errors show, take the homeowner to the first one.
+      setTimeout(() => {
+        document
+          .getElementById(mainId)
+          ?.querySelector<HTMLElement>('[aria-invalid="true"]:is(input, textarea, select, [role="button"])')
+          ?.focus()
+      }, 0)
+      return "Answer the questions marked as required first."
+    }
+    if (fileCount === 0) {
+      setFilesError("Add your application packet.")
+      return "Add your application packet first."
+    }
+    if (files.some(({ file }) => file.status === "uploading")) {
+      return "Wait for every file to finish uploading."
+    }
+    return null
+  }
+  const runReview = () =>
+    void busy(async () => {
+      const problem = problemBeforeReview()
+      if (problem) {
+        throw new Error(problem)
+      }
+      if (!(await draft.flush())) {
+        throw new Error("Your latest changes aren't saved yet. Try again.")
+      }
+      await actions.runReview()
+    }, "The review didn't start.")
   const submit = (confirmOpenRequests: boolean) =>
     busy(async () => {
       await actions.submit(confirmOpenRequests)
       toast.success("Submitted to the committee.")
     }, "The application wasn't submitted.")
+  const deleteDraft = async () => {
+    setIsBusy(true)
+    draft.discard()
+    if (await attempt(actions.deleteDraft, "The draft wasn't deleted.")) {
+      toast.success("Draft deleted.")
+      onBack()
+    } else {
+      setIsBusy(false)
+    }
+  }
 
   const failed =
     !isReviewing && job?.status === "failed" ? (
@@ -537,40 +546,113 @@ export function ApplicationPage({
 
   const isOpen = review !== null && hasOpenRequests(review)
   const isSubmitFirst = canSubmit && !isOpen
-  // The page's actions (ux.md, Page actions): running the review while there's none, submitting once nothing is open;
-  // running it again, and submitting with requests open, in the menu.
-  const canRunReview = view.canEdit && !isReviewing && fileCount > 0
-  const firstReview: PageAction | null =
-    canRunReview && !review ? { label: "Run review", isBusy, onSelect: runReview } : null
+  // The page's actions (ux.md, Page actions): running the review while there's none or it's out of date, submitting
+  // once nothing is open; running it again, submitting with requests open, and deleting a draft, in the menu.
+  const canRunReview = view.canEdit && !isReviewing
+  const reviewAction: PageAction | null =
+    canRunReview && (!review || isStale)
+      ? { label: review ? "Run review again" : "Run review", isBusy, onSelect: runReview }
+      : null
   const submitFirst: PageAction | null = isSubmitFirst
     ? { label: "Submit to the committee", isBusy, onSelect: () => void submit(false) }
     : null
   const more: RowAction[] = [
-    ...(canRunReview && review
+    ...(canRunReview && review && !isStale
       ? [{ label: "Run review again", icon: RotateCwIcon, disabled: isBusy, onSelect: runReview }]
       : []),
     ...(canSubmit && isOpen
       ? [{ label: "Submit anyway", icon: SendIcon, disabled: isBusy, onSelect: () => setIsConfirming(true) }]
+      : []),
+    ...(canDelete
+      ? [
+          {
+            label: "Delete the draft",
+            icon: Trash2Icon,
+            isDestructive: true,
+            disabled: isBusy,
+            onSelect: () => setIsDeleting(true)
+          }
+        ]
       : [])
   ]
-  const homeownerAction =
-    review && view.canEdit ? (
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <h3>{isSubmitFirst ? "Ready to submit" : "Add what’s missing"}</h3>
-          </CardTitle>
-          <CardDescription>
-            {isOpen
-              ? "Add pages that show what’s missing, and the review runs again on the whole packet."
-              : "The committee sees this review with your packet, and decides."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <AddFiles id="add-files" size={isSubmitFirst ? "compact" : "default"} disabled={isBusy} onAdd={addFiles} />
-        </CardContent>
-      </Card>
-    ) : null
+
+  const content = view.canEdit ? (
+    <ApplicationForm
+      projectType={projectType}
+      value={draft.value}
+      onChange={changeContent}
+      showsAllErrors={showsAllErrors}
+    />
+  ) : (
+    <ApplicationAnswers projectType={projectType} description={application.description} answers={application.answers} />
+  )
+  const packet = (
+    <PacketFiles
+      applicationId={application.id}
+      files={view.files}
+      isReviewing={isReviewing}
+      canEdit={view.canEdit}
+      isBusy={isBusy}
+      onRemove={removeFile}
+      kinds={kinds}
+      onChooseKind={chooseKind}
+    />
+  )
+  const documents = definition?.documents ?? []
+  const filesSection = view.canEdit ? (
+    <div className="flex flex-col gap-4">
+      {documents.length > 0 ? (
+        <DocumentChecklist
+          documents={documents}
+          files={files.map(({ file }) => ({ name: file.fileName, kind: file.uploadedAs }))}
+        />
+      ) : null}
+      {packet}
+      <AddFiles id="add-files" size={fileCount > 0 ? "compact" : "default"} disabled={isBusy} onAdd={addFiles} />
+      {filesError ? <FieldError>{filesError}</FieldError> : null}
+    </div>
+  ) : (
+    packet
+  )
+
+  const homeownerAction = (() => {
+    if (!view.canEdit) {
+      return null
+    }
+    if (!review) {
+      return (
+        <NextCard
+          title="When you’re ready"
+          description="Your draft is saved as you go, so you can leave and come back. When it’s ready, run the review: it checks your project against the rules, so you can fix anything before you submit it to the committee."
+        />
+      )
+    }
+    if (isStale) {
+      return (
+        <NextCard
+          title="Run the review again"
+          description="You’ve changed the application since this review. Run it again to check your changes before you submit."
+        />
+      )
+    }
+    return (
+      <NextCard
+        title={isSubmitFirst ? "Ready to submit" : "Add what’s missing"}
+        description={
+          isOpen
+            ? "Add pages or answers that show what’s missing, then run the review again."
+            : "The committee sees this review with your packet, and decides."
+        }
+      >
+        <AddFiles
+          id="add-missing-files"
+          size={isSubmitFirst ? "compact" : "default"}
+          disabled={isBusy}
+          onAdd={addFiles}
+        />
+      </NextCard>
+    )
+  })()
 
   const action =
     audience === "committee" && view.canDecide && review ? (
@@ -586,12 +668,8 @@ export function ApplicationPage({
     )
 
   const tabs: ReportTab[] = [
-    {
-      value: "files",
-      label: "Files",
-      count: fileCount,
-      content: <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
-    }
+    { value: "application", label: "Application", content },
+    { value: "files", label: "Files", count: fileCount, content: filesSection }
   ]
   if (view.history.length > 1) {
     tabs.push({
@@ -622,7 +700,7 @@ export function ApplicationPage({
           description="Reading the packet and checking it against the rulebook. This takes a few minutes."
         >
           {job ? <JobProgress jobId={job.id} loadJob={loadJob} onFinished={onChanged} /> : null}
-          <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
+          {packet}
         </Stage>
       )
     }
@@ -645,15 +723,31 @@ export function ApplicationPage({
         />
       )
     }
+    if (view.canEdit) {
+      return (
+        <>
+          <Stage
+            title="Your project"
+            description="Tell the committee what you plan to do. Everything here is saved as you type."
+          >
+            {content}
+          </Stage>
+          <Stage
+            title={kinds ? "Documents" : "Files"}
+            description={
+              kinds
+                ? "Add your files, then choose what each one is."
+                : "Your application packet and anything else you’re submitting."
+            }
+          >
+            {filesSection}
+          </Stage>
+        </>
+      )
+    }
     return (
-      <Stage
-        title="Not reviewed yet"
-        description="Add the packet’s files. The review reads them and checks the project against the rulebook."
-      >
-        <PacketFileList view={view} isBusy={isBusy} onRemove={removeFile} />
-        {view.canEdit ? (
-          <AddFiles id="add-files" size={fileCount > 0 ? "compact" : "default"} disabled={isBusy} onAdd={addFiles} />
-        ) : null}
+      <Stage title="Not reviewed yet" description="The review reads the packet and checks it against the rulebook.">
+        {packet}
       </Stage>
     )
   }
@@ -662,7 +756,11 @@ export function ApplicationPage({
     // Reading a citation is a step in reading the application: it opens over the page, not in place of it.
     <CitationsOpenInSheet>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 lg:px-6">
-        <PageActions primary={firstReview ?? submitFirst} more={more} />
+        <PageActions
+          primary={reviewAction ?? submitFirst}
+          more={more}
+          status={view.canEdit ? <SaveStatus state={draft.state} onRetry={draft.retry} /> : undefined}
+        />
         <div className="flex flex-col gap-3">
           <Button variant="ghost" size="sm" className="-ml-2 w-fit text-muted-foreground" onClick={onBack}>
             <ArrowLeftIcon />
@@ -671,7 +769,7 @@ export function ApplicationPage({
           <ApplicationHeader view={view} />
         </div>
         <div className="grid items-start gap-6 @4xl/main:grid-cols-[minmax(0,1fr)_19rem] @6xl/main:grid-cols-[minmax(0,1fr)_21rem]">
-          <div className="flex min-w-0 flex-col gap-6">
+          <div id={mainId} className="flex min-w-0 flex-col gap-6">
             {failed}
             {body()}
           </div>
@@ -697,6 +795,28 @@ export function ApplicationPage({
                 }}
               >
                 Submit anyway
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog open={isDeleting} onOpenChange={setIsDeleting}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Its answers, files and reviews are deleted for good. This can’t be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep the draft</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => {
+                  setIsDeleting(false)
+                  void deleteDraft()
+                }}
+              >
+                Delete the draft
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

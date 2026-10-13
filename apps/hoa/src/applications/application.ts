@@ -43,6 +43,8 @@ export const applicationSchema = z.object({
   createdBy: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  /** When the homeowner last changed what it says (its description, answers or files); null if never since created. */
+  revisedAt: z.string().nullable(),
   status: z.enum(applicationStatuses),
   reviewId: z.string().nullable(),
   submittedReviewId: z.string().nullable(),
@@ -59,6 +61,8 @@ export const applicationFileSchema = z.object({
   parentFileId: z.string().nullable(),
   ordinal: z.number().int().nullable(),
   contextText: z.string().nullable(),
+  /** What the homeowner said it is (src/applications/uploadedAs.ts); null until they say. */
+  uploadedAs: z.string().nullable(),
   fileName: z.string(),
   mediaType: z.string(),
   sizeBytes: z.number().int(),
@@ -71,6 +75,22 @@ export const applicationFileSchema = z.object({
   createdAt: z.string()
 })
 export type ApplicationFile = z.infer<typeof applicationFileSchema>
+
+/**
+ * Whether someone may see an application: its homeowner always, and the committee once it's been submitted. Until then
+ * it's the homeowner's draft.
+ */
+export const canSee = (
+  application: Pick<Application, "createdBy" | "submittedAt">,
+  viewer: { userId: string; isCommittee: boolean }
+) => application.createdBy === viewer.userId || (viewer.isCommittee && application.submittedAt !== null)
+
+/**
+ * Whether a review covers the application as it is: nothing in it changed after the review ran. The homeowner can't
+ * change an application while it's being reviewed, so a change is either before the review started or after it ended.
+ */
+export const reviewCoversLatest = (application: Pick<Application, "revisedAt">, review: { createdAt: string }) =>
+  application.revisedAt === null || Date.parse(application.revisedAt) <= Date.parse(review.createdAt)
 
 const day = 24 * 60 * 60 * 1000
 

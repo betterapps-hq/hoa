@@ -56,25 +56,35 @@ const applications = [
 ]
 
 describe("HomeownerDashboard", () => {
-  it("lists what waits on the homeowner first, each linking to its application", () => {
+  it("lists what waits on the homeowner, each linking to its application, and says where the rest stand", () => {
     render(<HomeownerDashboard summary={published} applications={applications} asOf={asOf} />)
 
-    const sections = screen.getAllByRole("region").map((section) => section.getAttribute("aria-label"))
-    expect(sections).toEqual(["Waiting on you", "In review", "Decided"])
-    const [asked] = within(screen.getByRole("region", { name: "Waiting on you" })).getAllByRole("listitem")
+    expect(screen.getByRole("heading", { name: "Waiting on you" })).toBeInTheDocument()
+    const items = screen.getAllByRole("listitem")
+    expect(items).toHaveLength(1)
+    const [asked] = items
     expect(asked).toHaveTextContent("Information requested")
     expect(asked).toHaveTextContent("Send the railing color. Asked 2 days ago.")
-    expect(within(asked).getByRole("link")).toHaveAttribute("href", "/applications/deck")
-    expect(screen.getByRole("region", { name: "In review" })).toHaveTextContent(
-      "Something elseWith the committeeRepaint the trim.With the committee for a decision. Submitted Oct 5."
-    )
-    expect(screen.getByRole("region", { name: "Decided" })).toHaveTextContent("Decided Oct 2.")
+    expect(within(asked!).getByRole("link")).toHaveAttribute("href", "/applications/deck")
+    expect(screen.queryByText("Repaint the trim.")).not.toBeInTheDocument()
+    expect(
+      screen.getByText("Of your other applications, 1 is with the committee and 1 is decided.")
+    ).toBeInTheDocument()
+    expect(screen.getByRole("link", { name: "All applications" })).toHaveAttribute("href", "/applications")
+  })
+
+  it("says nothing needs the homeowner when nothing does", () => {
+    render(<HomeownerDashboard summary={published} applications={applications.slice(0, 2)} asOf={asOf} />)
+
+    expect(screen.getByText("Nothing needs you right now.")).toBeInTheDocument()
+    expect(screen.queryByRole("listitem")).not.toBeInTheDocument()
+    expect(screen.getByText("Of your applications, 1 is with the committee and 1 is decided.")).toBeInTheDocument()
   })
 
   it("offers one way to start an application and a quiet way into the rules", () => {
     render(<HomeownerDashboard summary={published} applications={applications} asOf={asOf} />)
 
-    expect(screen.getByRole("link", { name: "Start an application" })).toHaveAttribute("href", "/applications")
+    expect(screen.getByRole("link", { name: "Start an application" })).toHaveAttribute("href", "/applications/new")
     expect(screen.getByRole("link", { name: "Browse the rules" })).toHaveAttribute("href", "/rules")
     expect(screen.getByText("42 rules from 2 governing documents, in force since Oct 7.")).toBeInTheDocument()
     expect(screen.queryByText(/meeting/i)).not.toBeInTheDocument()
@@ -91,7 +101,7 @@ describe("HomeownerDashboard", () => {
 
     expect(screen.getByText("You haven't started an application yet.")).toBeInTheDocument()
     expect(screen.getByRole("link", { name: "Start an application" })).toBeInTheDocument()
-    expect(screen.queryByRole("link", { name: "Open your applications" })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: "All applications" })).not.toBeInTheDocument()
     expect(screen.getByText("The HOA hasn't published its rules yet.")).toBeInTheDocument()
     expect(screen.queryByRole("link", { name: "Browse the rules" })).not.toBeInTheDocument()
   })

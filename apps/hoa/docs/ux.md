@@ -46,6 +46,14 @@ feedback; follow them everywhere, and fix a violation when you touch the code ar
 - **Validate inline and kindly**: errors appear on submit or after a field is left, next to the field, saying how to fix
   it.
 
+## Saving as you go
+
+- **An editor or a draft keeps each change as it's made** (`useAutosave`), with no Save button: one save at a time,
+  then the latest change, so what's stored ends as the screen shows it. Typing saves at its pauses.
+- **Whether it's saved is a status beside the page actions** (`SaveStatus`): Saving, Saved, or Not saved with Try
+  again. Closing the page with a change not saved yet asks first; going to another page of the app saves it.
+- **A step that reads the saved work saves what's waiting first,** such as running an application's review.
+
 ## Menus and lists
 
 - **Row actions live in an ellipsis menu** with an icon on each item. Destructive items come last and confirm or offer

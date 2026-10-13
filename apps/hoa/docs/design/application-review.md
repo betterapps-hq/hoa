@@ -411,17 +411,31 @@ the page has no record of reads as its key in words, unlinked, since nothing say
 `guidelines:3.4.2#photos`), and a term as its key in words ("review fee" for `architectural-application.review-fee`).
 A value shown on its own starts with a capital.
 
-- **Start an application:** the project type picker lists the organization's active project types
-  ([Project types](#project-types)) and "Something else". Choosing one renders its form (its questions, repeatable
-  groups for several items of a kind, and an upload per document the rules require, with what each must show) above
-  the general file upload. The application stores the type's id and the answers.
+- **Start an application,** the page action on the applications list and the homeowner's dashboard, opens a page of
+  its own: the organization's active project types ([Project types](#project-types)) and "Something else", one to
+  choose. **Start the application** makes a draft of that type, its form blank, and opens it in the page's place, so
+  going back doesn't start another.
+- **A draft** is the homeowner's until they submit it: the committee doesn't see it, its files included. Its page
+  holds what the homeowner says about the project: a description, the type's form (its questions, repeatable groups
+  for several items of a kind) and the documents, a checklist of those the type asks for with what each must show,
+  the files uploaded and a drop zone. Every change is kept as it's made
+  ([ux.md, Saving as you go](../ux.md#saving-as-you-go)), so the homeowner can leave and come back. Files upload as
+  they're added, each starting as the document its name points to where that's clear and its format suits; the
+  homeowner says what each one is under it, and the review reads it as that document. Nothing is reviewed until the
+  homeowner runs the review, which first checks that the required questions are answered and a file is added.
+- **Reviewed or not, an application is a draft until it's submitted,** and its status says so. Changing it after a
+  review (its description, answers or files) means the review no longer covers it: the page says to run it again, and
+  it can't be submitted until it has. A draft that was never submitted can be deleted, with everything stored for it.
+- **The homeowner's dashboard** lists what waits on them (what the committee asked for, then drafts), each with its
+  next step, and says in a sentence where their other applications stand. Every application is on the applications
+  page, which the dashboard links to.
 - **The application page** (`ApplicationPage`, `ReviewReport`) is a record page: what's needed to act up front, the
   rest a tab away. The reader is the homeowner, or the committee when an administrator opens someone else's
   application (the role switcher's role), and every heading and sentence is worded for that reader. On a wide screen
   the review fills the main column and a side column holds the one thing to do now and the application's details;
   on a narrow one the side column follows the review. From the top:
   - **Back to the applications**, then the **header:** the application type, its status as a badge with a colored dot
-    (a decision takes its outcome's color), and the homeowner's description.
+    (a decision takes its outcome's color), and the homeowner's description once it can't change.
   - **Verdict card:** the recommendation in plain words beside a tinted icon ("More information needed" for the
     homeowner, "Request more information" for the committee), then why: the review's written summary (the feedback for
     the homeowner, the assessment for the committee), each rule it names linked. It's at most three sentences, so it
@@ -433,7 +447,8 @@ A value shown on its own starts with a capital.
     rule results). Once the committee decides, its decision and note take the recommendation's place, with the
     recommendation and the review's summary in muted lines.
   - **Tabs:** Overview, Rules (the rule results), Facts (what the review read from the packet: a card per entity, each fact with its value,
-    confidence, and the words it was read from, so a misread can be corrected before submitting), Files and History
+    confidence, and the words it was read from, so a misread can be corrected before submitting), Application (the
+    description and answers, edited in place while it's a draft, as given once submitted), Files and History
     (every review, the latest marked), each with its count. Each piece of evidence is the quote and, under it, its file
     and page, spaced apart from the next. The file and page open a PDF at that page in a new tab (a Word file, which the
     browser can't show, isn't linked); a photo's thumbnail opens it at full size in a viewer over the page.
@@ -443,18 +458,20 @@ A value shown on its own starts with a capital.
     writer's words, the rules it marks as links; opening the line shows its rule as a `RuleReference` and the parts it
     covers, each opening the finding sheet. A group shows its first five items and "Show N more"; suggestions, which
     don't affect the decision, start hidden. With nothing to do, the page says so.
-  - **The page's actions** ([ux.md, Page actions](../ux.md#page-actions)): **Run review** while the packet has files
-    and no review, **Submit to the committee** once nothing is open, and in the menu **Run review again** and, while
-    information is missing, **Submit anyway**, which asks for confirmation.
-  - **One thing to do now,** in the side column: the homeowner adds files (while information is missing, the review
-    runs again on the whole packet); the committee records its decision, each outcome a choice card, the one that follows the recommendation marked "Recommended by the review"
+  - **The page's actions** ([ux.md, Page actions](../ux.md#page-actions)): **Run review** while there's none, **Run
+    review again** once the application changed after it, **Submit to the committee** once nothing is open, and in
+    the menu **Run review again**, **Submit anyway** while information is missing (it asks for confirmation) and
+    **Delete the draft** (it asks too). Beside them, whether the draft is saved.
+  - **One thing to do now,** in the side column: before the first review, that the draft keeps everything until the
+    homeowner is ready; after one, adding what's missing and running the review again, or running it again after a
+    change; the committee records its decision, each outcome a choice card, the one that follows the recommendation marked "Recommended by the review"
     and preselected (none for a referral), with "Start from the review's next steps" to draft the note. Under it, the
     details: project type, started, submitted, reviewed (provisional or not), decided, and the number of files.
   - **Files:** each packet file as an attachment with what the review made of it. A photo opens in the viewer; any
     other file opens in a new tab (a PDF shows in the browser; anything else is saved). Each saves from its download
     action, both served by
-    `/files/applications/$applicationId/$fileId` to the homeowner who made the application and to administrators. The
-    homeowner can remove a file and run the review again.
+    `/files/applications/$applicationId/$fileId` to the homeowner who made the application and to administrators once
+    it's submitted. While it's a draft, the homeowner says what each file is, removes one and adds more.
 - **Rule results** (`RuleResults`), under the Rules tab: how each rule was checked. A rule applies to few parts of a
   project, usually one, so a grid of rules against parts is mostly "doesn't apply"; the results are a list instead.
   - **Rows** are the checks that apply: the rule (its title as the link to its citation), the part of the project it

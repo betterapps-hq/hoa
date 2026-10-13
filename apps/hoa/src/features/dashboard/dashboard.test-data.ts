@@ -8,6 +8,7 @@ export const dashboardApplication = (overrides: Partial<DashboardApplication> = 
   status: "draft",
   createdAt: "2026-10-01T15:00:00.000Z",
   updatedAt: "2026-10-01T15:00:00.000Z",
+  revisedAt: "2026-10-01T15:00:00.000Z",
   submittedAt: null,
   decision: null,
   reviews: [],

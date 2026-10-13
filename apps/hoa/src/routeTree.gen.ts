@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as ApplicationsIndexRouteImport } from './routes/applications.index'
 import { Route as ApplicationsApplicationIdRouteImport } from './routes/applications.$applicationId'
+import { Route as ApplicationsNewRouteImport } from './routes/applications.new'
 import { Route as DocumentsIndexRouteImport } from './routes/documents.index'
 import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$documentId'
 import { Route as ProjectTypesIndexRouteImport } from './routes/project-types.index'
@@ -42,6 +43,11 @@ const ApplicationsApplicationIdRoute =
     path: '/applications/$applicationId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApplicationsNewRoute = ApplicationsNewRouteImport.update({
+  id: '/applications/new',
+  path: '/applications/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DocumentsIndexRoute = DocumentsIndexRouteImport.update({
   id: '/documents/',
   path: '/documents/',
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules/review': typeof RulesReviewRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules/review': typeof RulesReviewRoute
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/rules': typeof RulesRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
+  '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules_/review': typeof RulesReviewRoute
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/'
     | '/rules'
     | '/applications/$applicationId'
+    | '/applications/new'
     | '/documents/$documentId'
     | '/project-types/$projectTypeId'
     | '/rules/review'
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/'
     | '/rules'
     | '/applications/$applicationId'
+    | '/applications/new'
     | '/documents/$documentId'
     | '/project-types/$projectTypeId'
     | '/rules/review'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/'
     | '/rules'
     | '/applications/$applicationId'
+    | '/applications/new'
     | '/documents/$documentId'
     | '/project-types/$projectTypeId'
     | '/rules_/review'
@@ -167,6 +179,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   RulesRoute: typeof RulesRoute
   ApplicationsApplicationIdRoute: typeof ApplicationsApplicationIdRoute
+  ApplicationsNewRoute: typeof ApplicationsNewRoute
   DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
   ProjectTypesProjectTypeIdRoute: typeof ProjectTypesProjectTypeIdRoute
   RulesReviewRoute: typeof RulesReviewRoute
@@ -205,6 +218,13 @@ declare module '@tanstack/react-router' {
       path: '/applications/$applicationId'
       fullPath: '/applications/$applicationId'
       preLoaderRoute: typeof ApplicationsApplicationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/applications/new': {
+      id: '/applications/new'
+      path: '/applications/new'
+      fullPath: '/applications/new'
+      preLoaderRoute: typeof ApplicationsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/documents/': {
@@ -263,6 +283,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   RulesRoute: RulesRoute,
   ApplicationsApplicationIdRoute: ApplicationsApplicationIdRoute,
+  ApplicationsNewRoute: ApplicationsNewRoute,
   DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
   ProjectTypesProjectTypeIdRoute: ProjectTypesProjectTypeIdRoute,
   RulesReviewRoute: RulesReviewRoute,

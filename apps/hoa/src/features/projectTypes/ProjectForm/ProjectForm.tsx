@@ -5,7 +5,7 @@ import { FieldDescription, FieldGroup, FieldLegend, FieldSet } from "@/component
 import { sentenceCase } from "@/lib/text"
 import { answerErrors, blankItem } from "@/projectTypes/answers"
 import type { AnswerValue, ProjectAnswers, ProjectGroup, ProjectTypeDefinition } from "@/projectTypes/projectType"
-import type { QuestionReasons } from "../projectTypes.functions"
+import type { QuestionReasons } from "../offeredTypes"
 import { QuestionField } from "../QuestionField/QuestionField"
 
 // The form a project type defines (application-review.md, Project types), rendered from its definition: a section per

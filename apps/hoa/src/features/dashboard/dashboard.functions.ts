@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start"
-import type { Application } from "@/applications/application"
+import { canSee, type Application } from "@/applications/application"
 import { listApplications, listReviewSummaries } from "@/db/applicationRepository"
 import { getDb } from "@/db/client.server"
 import { listProjectTypes } from "@/db/projectTypeRepository"
@@ -70,34 +70,39 @@ export const listDashboardApplications = createServerFn({ method: "GET" }).handl
       listApplications(db, context.hoa.id, context.role === "administrator" ? {} : { createdBy: context.user.id }),
       listProjectTypes(db, context.hoa.id)
     ])
+    // A draft is its homeowner's own: the committee sees an application once it's submitted.
+    const viewer = { userId: context.user.id, isCommittee: context.role === "administrator" }
     return Promise.all(
-      applications.map(async (application) => {
-        const [reviews, missing] = await Promise.all([
-          listReviewSummaries(db, context.hoa.id, application.id),
-          missingInformation(context.hoa.id, application)
-        ])
-        return {
-          id: application.id,
-          description: application.description,
-          status: application.status,
-          createdAt: application.createdAt,
-          updatedAt: application.updatedAt,
-          submittedAt: application.submittedAt,
-          projectTypeLabel:
-            application.projectTypeId === null
-              ? null
-              : (types.find((type) => type.id === application.projectTypeId)?.label ?? null),
-          decision: application.decision
-            ? {
-                outcome: application.decision.outcome,
-                note: application.decision.note,
-                decidedAt: application.decision.decidedAt
-              }
-            : null,
-          reviews: reviews.map(({ recommendation, createdAt }) => ({ recommendation, createdAt })),
-          missingInformation: missing
-        }
-      })
+      applications
+        .filter((application) => canSee(application, viewer))
+        .map(async (application) => {
+          const [reviews, missing] = await Promise.all([
+            listReviewSummaries(db, context.hoa.id, application.id),
+            missingInformation(context.hoa.id, application)
+          ])
+          return {
+            id: application.id,
+            description: application.description,
+            status: application.status,
+            createdAt: application.createdAt,
+            updatedAt: application.updatedAt,
+            revisedAt: application.revisedAt,
+            submittedAt: application.submittedAt,
+            projectTypeLabel:
+              application.projectTypeId === null
+                ? null
+                : (types.find((type) => type.id === application.projectTypeId)?.label ?? null),
+            decision: application.decision
+              ? {
+                  outcome: application.decision.outcome,
+                  note: application.decision.note,
+                  decidedAt: application.decision.decidedAt
+                }
+              : null,
+            reviews: reviews.map(({ recommendation, createdAt }) => ({ recommendation, createdAt })),
+            missingInformation: missing
+          }
+        })
     )
   }
 )

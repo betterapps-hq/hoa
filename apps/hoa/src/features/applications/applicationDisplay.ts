@@ -10,7 +10,8 @@ import { amountText } from "../rulebook/rulebookRecords"
 export const statusLabels: Record<ApplicationStatus, string> = {
   draft: "Draft",
   reviewing: "Reviewing",
-  reviewed: "Reviewed",
+  // Reviewed or not, an application is the homeowner's draft until they submit it.
+  reviewed: "Draft",
   submitted: "With the committee",
   "information-requested": "Information requested",
   decided: "Decided"

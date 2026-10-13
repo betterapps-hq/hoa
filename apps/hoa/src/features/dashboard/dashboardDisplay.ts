@@ -1,6 +1,7 @@
 import { match } from "ts-pattern"
-import type { ApplicationStatus } from "@/applications/application"
+import { reviewCoversLatest, type ApplicationStatus } from "@/applications/application"
 import { outcomeLabels, recommendationLabels, statusLabels } from "@/features/applications/applicationDisplay"
+import { listNames } from "@/lib/text"
 import type { ActivityEvent, DashboardApplication } from "./dashboardData"
 
 // Labels, groupings and date phrasing for the dashboards. Dates format in UTC so the server's render and the
@@ -60,6 +61,12 @@ export const recommendationText = (application: DashboardApplication) => {
   return recommendation ? reviewText(recommendation) : "Not reviewed"
 }
 
+/** Whether the homeowner changed the application after its latest review. */
+const isChangedSinceReview = (application: DashboardApplication) => {
+  const [latest] = application.reviews
+  return latest !== undefined && !reviewCoversLatest(application, latest)
+}
+
 /** "Add the 2 things the review asks for": what the latest review's missing information asks of the homeowner. */
 const addMissing = (count: number) => `Add the ${count === 1 ? "one thing" : `${count} things`} the review asks for`
 
@@ -67,10 +74,14 @@ const addMissing = (count: number) => `Add the ${count === 1 ? "one thing" : `${
 export function nextStepText(application: DashboardApplication) {
   const missing = application.missingInformation.length
   return match(application.status)
-    .with("draft", () => "Add your plans and run the review.")
+    .with("draft", () => "Finish your draft and run the review.")
     .with("reviewing", () => "The review is running. It takes a few minutes.")
     .with("reviewed", () =>
       match({ missing, recommendation: latestRecommendation(application) })
+        .when(
+          () => isChangedSinceReview(application),
+          () => "You changed it after the review. Run the review again, then submit it."
+        )
         .when(
           ({ missing: count }) => count > 0,
           () => `${addMissing(missing)}, then submit it to the committee.`
@@ -113,18 +124,31 @@ export function standingDateText(application: DashboardApplication, asOf: string
     .exhaustive()
 }
 
-const homeownerGroups = [
-  { title: "Waiting on you", statuses: ["information-requested", "reviewed", "draft"] },
-  { title: "In review", statuses: ["reviewing", "submitted"] },
-  { title: "Decided", statuses: ["decided"] }
-] as const satisfies { title: string; statuses: readonly ApplicationStatus[] }[]
+/** Where the next step is the homeowner's: what the committee asked for, then a reviewed draft, then a new one. */
+const waitingStatuses = ["information-requested", "reviewed", "draft"] as const satisfies readonly ApplicationStatus[]
 
-/** A homeowner's applications, what waits on them first; groups with no applications are left out. */
-export function groupForHomeowner(applications: readonly DashboardApplication[]) {
-  return homeownerGroups.flatMap(({ title, statuses }) => {
-    const group = statuses.flatMap((status) => applications.filter((application) => application.status === status))
-    return group.length > 0 ? [{ title, applications: group }] : []
-  })
+/** A homeowner's applications whose next step is theirs, what the committee asked for first. */
+export const waitingOnHomeowner = (applications: readonly DashboardApplication[]) =>
+  waitingStatuses.flatMap((status) => applications.filter((application) => application.status === status))
+
+/**
+ * "Of your other applications, 1 is with the committee and 2 are decided.": where the homeowner's applications that
+ * don't wait on them stand; null when there are none.
+ */
+export function elsewhereText(applications: readonly DashboardApplication[]) {
+  const phrase = (status: ApplicationStatus, where: string) => {
+    const count = applications.filter((application) => application.status === status).length
+    return count === 0 ? [] : [`${count} ${count === 1 ? "is" : "are"} ${where}`]
+  }
+  const parts = [
+    ...phrase("reviewing", "being reviewed"),
+    ...phrase("submitted", "with the committee"),
+    ...phrase("decided", "decided")
+  ]
+  if (parts.length === 0) {
+    return null
+  }
+  return `Of your ${waitingOnHomeowner(applications).length > 0 ? "other " : ""}applications, ${listNames(parts)}.`
 }
 
 /** When the application started waiting where it is now. */

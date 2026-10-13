@@ -110,6 +110,10 @@ export function PageActions({ primary, secondary, more = [], status }: PageActio
   const slot = use(SlotContext)
   const isPhone = useMediaQuery("(max-width: 639px)") ?? false
   const menu = secondary && isPhone ? [menuItem(secondary), ...more] : more
+  // A page with nothing to do now, such as while a review runs, leaves the header empty.
+  if (!status && menu.length === 0 && !secondary && !primary) {
+    return null
+  }
   const actions = (
     <fieldset aria-label="Page actions" className="flex min-w-0 items-center gap-2">
       {status ? <div className="text-sm text-muted-foreground">{status}</div> : null}
