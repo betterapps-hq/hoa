@@ -13,6 +13,7 @@ import {
   createApplicationFile,
   getApplication,
   listApplicationFiles,
+  listReviewSummaries,
   saveReviewSummary,
   setPageKinds,
   transitionApplication,
@@ -22,7 +23,7 @@ import { createDatabase } from "@/db/database"
 import { getHoa } from "@/db/hoaRepository"
 import { getJob, updateJob } from "@/db/jobRepository"
 import { getProjectType } from "@/db/projectTypeRepository"
-import { getPublishedRulesFile } from "@/db/rulebookContentRepository"
+import { getPublishedRulesFile, getRulesFileOf } from "@/db/rulebookContentRepository"
 import { env } from "@/env.server"
 import type { StepRunner } from "@/jobs/steps"
 import { createLayoutClient } from "@/ocr/layoutClient"
@@ -115,14 +116,25 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
         return versions
       })
 
-      // 2. Load: the application and its type, the published rules file and the settings.
+      // 2. Load: the application and its type, its rules file and the settings. An application already submitted stays
+      // under the rulebook it was submitted with (application-review.md, Rulebook versions); otherwise the published
+      // one applies.
       await progress("load")
       const loaded = await step.do("load", storageStep, async () => {
         const application = await getApplication(db, hoaId, applicationId)
         if (!application) {
           throw new NonRetryableError("The application no longer exists.")
         }
-        const rulesFile = await getPublishedRulesFile(db, hoaId)
+        const submitted = application.submittedReviewId
+          ? (await listReviewSummaries(db, hoaId, applicationId)).find(
+              (summary) => summary.id === application.submittedReviewId
+            )
+          : undefined
+        const pinned = submitted ? await getRulesFileOf(db, hoaId, submitted.rulebookId) : null
+        const rulesFile =
+          submitted && pinned
+            ? { ...pinned, rulebookId: submitted.rulebookId, publishedAt: null }
+            : await getPublishedRulesFile(db, hoaId)
         if (!rulesFile) {
           throw new NonRetryableError("The HOA hasn't published a rulebook yet.")
         }

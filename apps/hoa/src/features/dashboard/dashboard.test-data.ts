@@ -13,6 +13,7 @@ export const dashboardApplication = (overrides: Partial<DashboardApplication> = 
   decision: null,
   reviews: [],
   missingInformation: [],
+  rulesChanged: false,
   ...overrides
 })
 

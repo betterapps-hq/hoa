@@ -36,6 +36,7 @@ import { answersSchema, emptyAnswers } from "@/projectTypes/answers"
 import { projectAnswers, type ProjectType } from "@/projectTypes/projectType"
 import { toEvidence } from "@/review/factSchema"
 import { hasOpenRequests, reviewSchema, type Recommendation, type Review } from "@/review/reviewModel"
+import type { RulesUpdate } from "@/review/ruleChanges"
 import { subjectsAnswerSchema } from "@/review/subjects"
 import { readRulesFile } from "@/rulebook/assemble"
 import type * as T from "@/schema/types"
@@ -47,6 +48,7 @@ import { validateUpload } from "@/storage/uploadRules"
 import { offerType, type OfferedProjectType, type PublishedRules } from "../projectTypes/offeredTypes"
 import type { SourceFile } from "../rulebook/rulebook.functions"
 import { reportRules, reviewTerms, type ReportRule } from "./applicationView"
+import { rulebookVersions, rulesUpdateOf } from "./rulesUpdate.server"
 
 // Applications (docs/design/platform.md, "Server functions"): the homeowner starts one as a draft, which keeps their
 // answers and files as they go, runs the review as often as they like and submits; the committee decides.
@@ -370,6 +372,12 @@ export const submitApplication = createServerFn({ method: "POST" })
     if (!reviewCoversLatest(application, review)) {
       throw new Error("You changed the application after the review. Run the review again before submitting.")
     }
+    const type = application.projectTypeId
+      ? await getProjectType(getDb(), context.hoa.id, application.projectTypeId)
+      : null
+    if (await rulesUpdateOf(context.hoa.id, application, review, type?.definition ?? null)) {
+      throw new Error("The rules changed since your review. Run the review again before submitting.")
+    }
     if (hasOpenRequests(review) && !data.confirmOpenRequests) {
       throw new Error("Confirm that you're submitting with open requests.")
     }
@@ -528,6 +536,10 @@ export type ApplicationView = {
    */
   projectType: OfferedProjectType | null
   history: Pick<ReviewSummary, "id" | "recommendation" | "createdAt">[]
+  /** The rulebook the shown review read: its version, and whether it's still the one in force. */
+  reviewRulebook: { version: number | null; isInForce: boolean } | null
+  /** For the homeowner: what a newer rulebook changes about the rules their review applied, which needs it run again. */
+  rulesUpdate: RulesUpdate | null
   /** The latest review job, so the page can follow one in progress or show why it failed. */
   job: Job | null
   isOwner: boolean
@@ -553,11 +565,15 @@ export const getApplicationView = createServerFn({ method: "GET" })
       loadSourceFiles(context.hoa.id),
       application.projectTypeId ? getProjectType(db, context.hoa.id, application.projectTypeId) : null
     ])
-    const [rulesFile, entityEvidence, published] = await Promise.all([
+    const [rulesFile, entityEvidence, published, versions, rulesUpdate] = await Promise.all([
       review ? reviewRulesFile(context.hoa.id, review) : null,
       review ? loadEntityEvidence(context.hoa.id, review) : [],
-      canEdit && type ? loadPublishedRules(context.hoa.id) : null
+      canEdit && type ? loadPublishedRules(context.hoa.id) : null,
+      review ? rulebookVersions(context.hoa.id) : new Map<string, number | null>(),
+      canEdit ? rulesUpdateOf(context.hoa.id, application, review, type?.definition ?? null) : null
     ])
+    const latestVersion = Math.max(0, ...[...versions.values()].map((version) => version ?? 0))
+    const reviewVersion = review ? (versions.get(review.rulebookId) ?? null) : null
     const rules = review && rulesFile ? reportRules(rulesFile, review.selected) : []
     return {
       application,
@@ -570,6 +586,8 @@ export const getApplicationView = createServerFn({ method: "GET" })
       projectTypeLabel: type?.label ?? null,
       projectType: type ? offerType(type, published, today()) : null,
       history: history.map(({ id, recommendation, createdAt }) => ({ id, recommendation, createdAt })),
+      reviewRulebook: review ? { version: reviewVersion, isInForce: reviewVersion === latestVersion } : null,
+      rulesUpdate,
       job,
       isOwner,
       canEdit,

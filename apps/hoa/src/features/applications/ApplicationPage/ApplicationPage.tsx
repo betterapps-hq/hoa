@@ -46,6 +46,7 @@ import { CitationsOpenInSheet } from "@/features/documents/ReaderSheet/ReaderShe
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import { useAutosave } from "@/hooks/useAutosave"
 import type { Job } from "@/jobs/job"
+import { sentenceCase } from "@/lib/text"
 import { cn } from "@/lib/utils"
 import { answersSchema } from "@/projectTypes/answers"
 import { hasOpenRequests, type Review } from "@/review/reviewModel"
@@ -316,6 +317,32 @@ function ApplicationHeader({ view }: HeaderProps) {
   )
 }
 
+/** How many of a newer rulebook's changed rules the card names before saying how many more there are. */
+const namedChanges = 3
+
+/** A newer rulebook changed rules the review applied: which, and that the review must run again before submitting. */
+function RulesChangedCard({ update }: { update: NonNullable<ApplicationView["rulesUpdate"]> }) {
+  const titles = [...new Set(update.changes.map((change) => change.title))]
+  const named = titles.slice(0, namedChanges)
+  const rest = titles.length - named.length
+  const which = update.version ? `Version ${update.version} of the rulebook` : "A newer rulebook"
+  const when = update.publishedAt ? `, published ${dateFormat.format(new Date(update.publishedAt))},` : ""
+  const count = titles.length === 1 ? "a rule" : `${titles.length} rules`
+  return (
+    <NextCard
+      title="The rules changed"
+      description={`${which}${when} changes ${count} your review applied. Run the review again to check your project against the rules now in force, then submit it.`}
+    >
+      <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted-foreground">
+        {named.map((title) => (
+          <li key={title}>{sentenceCase(title)}</li>
+        ))}
+        {rest > 0 ? <li>{rest === 1 ? "1 more" : `${rest} more`}</li> : null}
+      </ul>
+    </NextCard>
+  )
+}
+
 /** The application's facts beside the review: its kind, its dates and its files. */
 function ApplicationDetails({ view }: HeaderProps) {
   const { application, review } = view
@@ -329,6 +356,13 @@ function ApplicationDetails({ view }: HeaderProps) {
   }
   if (review) {
     rows.push({ term: "Reviewed", value: `${date(review.createdAt)}${review.provisional ? ", provisional" : ""}` })
+  }
+  // The rulebook the review read; an application keeps it once submitted, even after a newer one is published.
+  if (view.reviewRulebook?.version) {
+    rows.push({
+      term: "Rulebook",
+      value: `Version ${view.reviewRulebook.version}${view.reviewRulebook.isInForce ? "" : ", since replaced"}`
+    })
   }
   if (application.decision) {
     rows.push({ term: "Decided", value: date(application.decision.decidedAt) })
@@ -428,7 +462,10 @@ export function ApplicationPage({
   const files = packetFiles(view.files)
   const fileCount = files.length
   const isReviewing = application.status === "reviewing"
-  const isStale = review !== null && (!reviewCoversLatest(application, review) || changedUnder === review.id)
+  // Out of date when the homeowner changed something since, or a newer rulebook changes the rules it applied.
+  const isStale =
+    review !== null &&
+    (!reviewCoversLatest(application, review) || changedUnder === review.id || view.rulesUpdate !== null)
   const canSubmit =
     view.isOwner &&
     review !== null &&
@@ -627,6 +664,9 @@ export function ApplicationPage({
           description="Your draft is saved as you go, so you can leave and come back. When it’s ready, run the review: it checks your project against the rules, so you can fix anything before you submit it to the committee."
         />
       )
+    }
+    if (view.rulesUpdate) {
+      return <RulesChangedCard update={view.rulesUpdate} />
     }
     if (isStale) {
       return (

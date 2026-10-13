@@ -44,7 +44,8 @@ Model results are cached per application, so re-running after adding one file pa
 ### 2. Load
 
 The application's organization must have a published rulebook. `load` reads its rules file from R2, checks the SHA-256
-against D1, and parses it with `rulesFile`. A 2 MB file parses in milliseconds; nothing is preloaded.
+against D1, and parses it with `rulesFile`. A 2 MB file parses in milliseconds; nothing is preloaded. A submitted
+application is reviewed against the rulebook it was submitted with, not a newer one ([Rulebook versions](#rulebook-versions)).
 
 **The request.** An application is an `architectural-application` request. Its governing date is the submission date
 (the request type's `governingDate`, `architectural-application.submitted-on`). A review before submission uses the
@@ -302,6 +303,24 @@ type Review = {
 type ActionItem = { id: string; ruleKey: RuleKey; entities: string[]; text: string }
 ```
 
+## Rulebook versions
+
+Published rulebooks never change, and each keeps its own rules file, so a review always reads back against the rulebook
+it read (`rulebookId`), whatever was published since. The application page names it in the details ("Rulebook:
+Version 1", and ", since replaced" once a newer one is published).
+
+- **Submitted applications** stay under the rulebook they were submitted with. The committee sees that review, and a
+  review run again for a submitted application reads the same rulebook.
+- **Drafts** follow the rulebook in force. When a newer rulebook is published, code compares the rules the latest
+  review applied (`selected`) with the rules the newer rulebook selects for the same request (its entities, the
+  form's cited passages, today), by key and content (`src/review/ruleChanges.ts`, `ruleChangesSince`). Nothing runs
+  on publish and no model reads anything; the comparison runs when the application or dashboard is read. A kind of
+  thing the review never identified can't be matched, so a newer rulebook's rules about it show once the review runs
+  again.
+- When rules changed, the homeowner's page leads with "The rules changed", naming up to three of them, the dashboard's
+  next step says to run the review again, and submitting is refused until it does. A newer rulebook that changes
+  nothing the review applied asks for nothing.
+
 ## Engine
 
 `src/engine/` implements [schema.md, Expressions](schema.md#3-expressions) and
@@ -386,7 +405,7 @@ units, and every organization's rulebook supplies its own labels and units.
 | `hoa-document-review` | `document-review` | `anthropic/claude-sonnet-5.5` (the prompt's `config.model`) | `requirements`, `parties`, `pages` | `{ documents: DocumentResult[] }` |
 | `hoa-judgment-check` | `judgment-check` | `anthropic/claude-haiku-5.5` (`config.model`) | `statement`, `question`, `subject`, `facts`, `evidencePages` | `{ answer, confidence, rationale, evidence }` |
 | `hoa-review-summary` | `review-summary` | `anthropic/claude-haiku-5.5` (`config.model`) | `recommendation`, `findings`, `actionItems`, `suggestions` | `{ assessment, feedback, items: { id, text }[] }` |
-| `hoa-project-type-suggestion` | `project-type-suggestion` | `anthropic/claude-sonnet-5.5` (`config.model`) | `rulebook`, `projectTypes` | project types with subjects, fields and documents, checked by code ([Project types](#project-types)) |
+| `hoa-project-type-suggestion` | `project-type-suggestion` | `anthropic/claude-haiku-5.5`, medium effort (`config.model`, `config.effort`) | `rulebook`, `projectTypes` | project types with subjects, fields and documents, checked by code ([Project types](#project-types)) |
 
 `projectKind` carries the chosen project type's label and description ("not given" for Something else). Every prompt
 is generic: it names no organization's terms, project type, product, place or sample case. What a stage needs to know

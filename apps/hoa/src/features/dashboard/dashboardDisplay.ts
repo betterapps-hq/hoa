@@ -90,6 +90,10 @@ export function nextStepText(application: DashboardApplication) {
     .with("reviewed", () =>
       match({ missing, recommendation: latestRecommendation(application) })
         .when(
+          () => application.rulesChanged,
+          () => "The rules changed since your review. Run the review again, then submit it."
+        )
+        .when(
           () => isChangedSinceReview(application),
           () => "You changed it after the review. Run the review again, then submit it."
         )

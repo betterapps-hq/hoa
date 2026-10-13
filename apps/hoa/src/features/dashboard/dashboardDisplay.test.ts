@@ -51,6 +51,11 @@ describe("nextStepText", () => {
     expect(standingText(changed)).toBe("Draft")
   })
 
+  it("asks for the review again once a newer rulebook changes the rules it applied", () => {
+    const outdated = application({ status: "reviewed", reviews: reviewed("approve"), rulesChanged: true })
+    expect(nextStepText(outdated)).toBe("The rules changed since your review. Run the review again, then submit it.")
+  })
+
   it("asks for what the review's action items ask for", () => {
     expect(
       nextStepText(

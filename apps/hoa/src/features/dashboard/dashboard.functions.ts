@@ -1,11 +1,13 @@
 import { createServerFn } from "@tanstack/react-start"
 import { canSee, type Application } from "@/applications/application"
-import { listApplications, listReviewSummaries } from "@/db/applicationRepository"
+import { listApplications, listReviewSummaries, type ReviewSummary } from "@/db/applicationRepository"
 import { getDb } from "@/db/client.server"
 import { listUploadHistory } from "@/db/documentRepository"
 import { listProjectTypeAdditions, listProjectTypes } from "@/db/projectTypeRepository"
-import { getRulebookContent } from "@/db/rulebookContentRepository"
+import { getPublishedRulesFile, getRulebookContent } from "@/db/rulebookContentRepository"
 import { getRulebookByStatus, listPublishedRulebooks } from "@/db/rulebookRepository"
+import { rulesUpdateOf } from "@/features/applications/rulesUpdate.server"
+import type { ProjectTypeDefinition } from "@/projectTypes/projectType"
 import { reviewSchema } from "@/review/reviewModel"
 import { getRequestContext } from "@/session/requestContext.server"
 import { userOf } from "@/session/users"
@@ -64,14 +66,44 @@ async function missingInformation(hoaId: string, application: Application): Prom
   }
 }
 
+/**
+ * Whether a newer rulebook changes the rules a draft's latest review applied (application-review.md, Rulebook
+ * versions): read only for a reviewed draft never submitted whose review read an earlier rulebook than the published one.
+ */
+async function rulesChanged(
+  hoaId: string,
+  application: Application,
+  latest: ReviewSummary | undefined,
+  publishedId: string | null,
+  definition: ProjectTypeDefinition | null
+) {
+  if (
+    application.status !== "reviewed" ||
+    application.submittedReviewId !== null ||
+    !latest ||
+    publishedId === null ||
+    latest.rulebookId === publishedId
+  ) {
+    return false
+  }
+  try {
+    const review = await getJson(getBucket(), applicationKeys(hoaId, application.id).review(latest.id), reviewSchema)
+    return (await rulesUpdateOf(hoaId, application, review, definition)) !== null
+  } catch (error) {
+    console.error(error)
+    return false
+  }
+}
+
 /** A homeowner's own applications, or every application for the committee, as the dashboards list them. */
 export const listDashboardApplications = createServerFn({ method: "GET" }).handler(
   async (): Promise<DashboardApplication[]> => {
     const context = await getRequestContext()
     const db = getDb()
-    const [applications, types] = await Promise.all([
+    const [applications, types, published] = await Promise.all([
       listApplications(db, context.hoa.id, context.role === "administrator" ? {} : { createdBy: context.user.id }),
-      listProjectTypes(db, context.hoa.id)
+      listProjectTypes(db, context.hoa.id),
+      getPublishedRulesFile(db, context.hoa.id)
     ])
     // A draft is its homeowner's own: the committee sees an application once it's submitted.
     const viewer = { userId: context.user.id, isCommittee: context.role === "administrator" }
@@ -79,10 +111,18 @@ export const listDashboardApplications = createServerFn({ method: "GET" }).handl
       applications
         .filter((application) => canSee(application, viewer))
         .map(async (application) => {
+          const type = types.find((item) => item.id === application.projectTypeId)
           const [reviews, missing] = await Promise.all([
             listReviewSummaries(db, context.hoa.id, application.id),
             missingInformation(context.hoa.id, application)
           ])
+          const changed = await rulesChanged(
+            context.hoa.id,
+            application,
+            reviews[0],
+            published?.rulebookId ?? null,
+            type?.definition ?? null
+          )
           return {
             id: application.id,
             description: application.description,
@@ -91,10 +131,7 @@ export const listDashboardApplications = createServerFn({ method: "GET" }).handl
             updatedAt: application.updatedAt,
             revisedAt: application.revisedAt,
             submittedAt: application.submittedAt,
-            projectTypeLabel:
-              application.projectTypeId === null
-                ? null
-                : (types.find((type) => type.id === application.projectTypeId)?.label ?? null),
+            projectTypeLabel: application.projectTypeId === null ? null : (type?.label ?? null),
             decision: application.decision
               ? {
                   outcome: application.decision.outcome,
@@ -103,7 +140,8 @@ export const listDashboardApplications = createServerFn({ method: "GET" }).handl
                 }
               : null,
             reviews: reviews.map(({ recommendation, createdAt }) => ({ recommendation, createdAt })),
-            missingInformation: missing
+            missingInformation: missing,
+            rulesChanged: changed
           }
         })
     )

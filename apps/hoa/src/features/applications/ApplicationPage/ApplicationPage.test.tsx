@@ -86,6 +86,8 @@ const view: ApplicationView = {
     { id: "r2", recommendation: "request-information", createdAt: "2026-10-08T11:00:00.000Z" },
     { id: "r1", recommendation: "deny", createdAt: "2026-10-08T10:30:00.000Z" }
   ],
+  reviewRulebook: { version: 1, isInForce: true },
+  rulesUpdate: null,
   job: null,
   isOwner: true,
   canEdit: true,
@@ -251,6 +253,33 @@ describe("ApplicationPage", () => {
     expect(screen.getByRole("heading", { name: "Run the review again" })).toBeInTheDocument()
     expect(pageActions().getByRole("button", { name: "Run review again" })).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Submit to the committee" })).not.toBeInTheDocument()
+  })
+
+  it("names the rules a newer rulebook changed, and asks for the review again before submitting", () => {
+    const change = (title: string) => ({ key: title, title, change: "changed" as const })
+    setup({
+      review: { ...review, recommendation: "approve-with-conditions", missingInformation: [] },
+      reviewRulebook: { version: 1, isInForce: false },
+      rulesUpdate: {
+        version: 2,
+        publishedAt: "2026-10-12T12:00:00.000Z",
+        changes: ["fence height", "fence materials", "setbacks", "colors"].map(change)
+      }
+    })
+    const card = screen.getByRole("heading", { name: "The rules changed" }).closest("[data-slot=card]")
+    if (!(card instanceof HTMLElement)) {
+      throw new Error("No card")
+    }
+    expect(card).toHaveTextContent(/Version 2 of the rulebook, published Oct 12, 2026, changes 4 rules your review/)
+    expect(
+      within(card)
+        .getAllByRole("listitem")
+        .map((item) => item.textContent)
+    ).toEqual(["Fence height", "Fence materials", "Setbacks", "1 more"])
+    expect(pageActions().getByRole("button", { name: "Run review again" })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Submit to the committee" })).not.toBeInTheDocument()
+    const details = within(screen.getByRole("complementary", { name: "About this application" }))
+    expect(details.getByText("Rulebook").nextElementSibling).toHaveTextContent("Version 1, since replaced")
   })
 
   it("follows a running review", () => {
