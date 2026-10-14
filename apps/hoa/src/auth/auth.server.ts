@@ -7,6 +7,7 @@ import { emailOTP } from "better-auth/plugins/email-otp"
 import { tanstackStartCookies } from "better-auth/tanstack-start"
 import { and, eq } from "drizzle-orm"
 import { getDb } from "@/db/client.server"
+import { invitationDays } from "@/db/membershipRepository"
 import {
   accounts,
   invitations,
@@ -71,8 +72,25 @@ function safeguards() {
   ]
 }
 
-/** How long an invitation to join an organization lasts. */
-const invitationDays = 14
+/** Emails an invitation to join an organization, greeting the person on its roll it's for by name. */
+export async function emailInvitation({
+  email,
+  role,
+  organization: invitedTo
+}: {
+  email: string
+  role: string | null
+  organization: { id: string; name: string }
+}) {
+  const person = await getDb()
+    .select({ name: people.name })
+    .from(people)
+    .where(and(eq(people.organizationId, invitedTo.id), eq(people.email, email)))
+    .get()
+  // The request that invited them, when no URL is set: a call from the server doesn't give Better Auth one.
+  const origin = env.BETTER_AUTH_URL ?? new URL(getRequestUrl()).origin
+  await sendEmail(invitationEmail(email, person?.name ?? "", invitedTo.name, `${origin}/sign-in`, role === "admin"))
+}
 
 /**
  * The associations (docs/design/people.md), as Better Auth's organization plugin: the organization, who has an account
@@ -84,19 +102,10 @@ function associations() {
     allowUserToCreateOrganization: false,
     creatorRole: "admin",
     invitationExpiresIn: invitationDays * 24 * 60 * 60,
-    // Inviting again replaces the invitation still waiting, with its role.
+    // Inviting again replaces the invitation still waiting, with its role. The app invites through `inviteToJoin`;
+    // these cover an invitation sent from Better Auth's dashboard.
     cancelPendingInvitationsOnReInvite: true,
-    sendInvitationEmail: async ({ email, role, organization: invitedTo }) => {
-      // The person on the roll it's for, to greet them by name.
-      const person = await getDb()
-        .select({ name: people.name })
-        .from(people)
-        .where(and(eq(people.organizationId, invitedTo.id), eq(people.email, email)))
-        .get()
-      // The request that invited them, when no URL is set: a call from the server doesn't give the plugin one.
-      const origin = env.BETTER_AUTH_URL ?? new URL(getRequestUrl()).origin
-      await sendEmail(invitationEmail(email, person?.name ?? "", invitedTo.name, `${origin}/sign-in`, role === "admin"))
-    }
+    sendInvitationEmail: emailInvitation
   })
 }
 

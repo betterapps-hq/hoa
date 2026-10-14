@@ -4,6 +4,7 @@ import {
   HomeIcon,
   EyeIcon,
   MailIcon,
+  MailXIcon,
   ShieldCheckIcon,
   PencilIcon,
   SearchIcon,
@@ -67,6 +68,7 @@ export type PeopleActions = {
   savePerson: (id: string | null, person: PersonSave["person"]) => Promise<Person>
   removePerson: (id: string) => Promise<void>
   invite: (id: string, access: Access) => Promise<void>
+  cancelInvite: (id: string) => Promise<void>
   saveUnit: (id: string | null, unit: { label: string; address: string; lot: string }) => Promise<void>
   removeUnit: (id: string) => Promise<void>
   addToUnit: (link: { unitId: string; personId: string; relation: UnitRelation; startedOn: string }) => Promise<void>
@@ -194,6 +196,8 @@ export function PeoplePage({
                       void attempt(() => actions.invite(person.id, access), `Invited ${person.name}.`).catch(
                         () => undefined
                       ),
+                    onCancelInvite: (person) =>
+                      void attempt(() => actions.cancelInvite(person.id), "Invite canceled.").catch(() => undefined),
                     viewerId,
                     onViewAs: actions.viewAs
                       ? (userId) =>
@@ -500,6 +504,7 @@ const personColumn = dataTableColumns<PersonRow>()
 type PersonRowActions = {
   onEdit: (person: Person) => void
   onInvite: (person: Person, access: Access) => void
+  onCancelInvite: (person: Person) => void
   /** For the platform's operators: views the app as someone else who's joined. */
   onViewAs: ((userId: string) => void) | null
   viewerId: string | null
@@ -580,8 +585,8 @@ function personColumns(actions: PersonRowActions | null) {
       meta: { isRowHeader: true, cellClassName: "min-w-56" }
     }),
     personColumn.accessor((row) => row.units.map(({ unit }) => unit.label).join(", "), {
-      id: "home",
-      header: "Home",
+      id: "unit",
+      header: "Unit",
       sortFn: "text",
       cell: ({ row }) =>
         row.original.units.length === 0 ? (
@@ -643,7 +648,7 @@ function personColumns(actions: PersonRowActions | null) {
   ])
 }
 
-function personActionsColumn({ onEdit, onInvite, onViewAs, viewerId, onRemove }: PersonRowActions) {
+function personActionsColumn({ onEdit, onInvite, onCancelInvite, onViewAs, viewerId, onRemove }: PersonRowActions) {
   return personColumn.display({
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
@@ -674,7 +679,10 @@ function personActionsColumn({ onEdit, onInvite, onViewAs, viewerId, onRemove }:
                           icon: ShieldCheckIcon,
                           onSelect: () => onInvite(person, "administrator")
                         }
-                      ])
+                      ]),
+                  ...(isInvited
+                    ? [{ label: "Cancel invite", icon: MailXIcon, onSelect: () => onCancelInvite(person) }]
+                    : [])
                 ]
               : []),
             { label: "Remove", icon: Trash2Icon, isDestructive: true, onSelect: () => onRemove(person) }

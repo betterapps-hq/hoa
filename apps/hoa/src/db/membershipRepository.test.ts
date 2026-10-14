@@ -2,7 +2,7 @@
 import { eq } from "drizzle-orm"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
-import { joinRolls } from "./membershipRepository"
+import { inviteToJoin, joinRolls } from "./membershipRepository"
 import { invitations, organizations, users } from "./schema"
 
 // The rules joining keeps in the database: an account joins each roll it's on once, with the access its invitation
@@ -63,5 +63,21 @@ describe("joinRolls", () => {
   it("joins a roll once, however often the account signs in", async () => {
     await joinRolls(database.db, account, [{ organizationId: "maple" }], now)
     expect(await joinRolls(database.db, account, [{ organizationId: "maple" }], now)).toHaveLength(1)
+  })
+
+  it("replaces the invitation still waiting when someone is invited again", async () => {
+    const invitation = { organizationId: "maple", email: account.email, inviterId: "user-sam" }
+    await inviteToJoin(database.db, { ...invitation, access: "member" }, now)
+    await inviteToJoin(database.db, { ...invitation, access: "administrator" }, now)
+    const rows = await database.db.select().from(invitations).where(eq(invitations.organizationId, "maple"))
+    expect(
+      rows.map(({ role, status }) => ({ role, status })).toSorted((a, b) => a.status.localeCompare(b.status))
+    ).toEqual([
+      { role: "member", status: "canceled" },
+      { role: "admin", status: "pending" }
+    ])
+    expect(await joinRolls(database.db, account, [{ organizationId: "maple" }], now)).toEqual([
+      { organizationId: "maple", access: "administrator" }
+    ])
   })
 })

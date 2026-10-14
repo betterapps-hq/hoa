@@ -14,6 +14,7 @@ import {
   type UnitRelation
 } from "@/people/people"
 import type { Database } from "./database"
+import { cancelingInvitations } from "./membershipRepository"
 import { committeeMembers, committees, invitations, members, people, unitPeople, units, users } from "./schema"
 
 // The association's roll (docs/design/people.md). Removing someone or something keeps the row, marked removed, so the
@@ -219,20 +220,7 @@ export async function removePerson(db: Database, person: Person, now: string) {
       .set({ removedAt: now, userId: null, updatedAt: now })
       .where(and(eq(people.organizationId, organizationId), eq(people.id, id))),
     ...(person.userId ? [leaving(db, organizationId, person.userId)] : []),
-    ...(person.email
-      ? [
-          db
-            .update(invitations)
-            .set({ status: "canceled" })
-            .where(
-              and(
-                eq(invitations.organizationId, organizationId),
-                eq(invitations.email, person.email),
-                eq(invitations.status, "pending")
-              )
-            )
-        ]
-      : []),
+    ...(person.email ? [cancelingInvitations(db, organizationId, person.email)] : []),
     db
       .update(unitPeople)
       .set({ endedOn: today })

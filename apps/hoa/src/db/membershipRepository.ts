@@ -81,6 +81,48 @@ export async function joinRolls(
   return membershipsOf(db, account.id)
 }
 
+/** How long an invitation to join an organization lasts. */
+export const invitationDays = 14
+
+/** The update that cancels the invitations still waiting for an email to join an organization. */
+export const cancelingInvitations = (db: Database, organizationId: string, email: string) =>
+  db
+    .update(invitations)
+    .set({ status: "canceled" })
+    .where(
+      and(
+        eq(invitations.organizationId, organizationId),
+        eq(invitations.email, email),
+        eq(invitations.status, "pending")
+      )
+    )
+
+/**
+ * Invites an email to join an organization with an access, in place of any invitation still waiting for it. Signing
+ * in with the email accepts it (`joinRolls`). Written here rather than through Better Auth's plugin, which lets only
+ * the organization's members invite, so the platform's operators can too.
+ */
+export async function inviteToJoin(
+  db: Database,
+  invitation: { organizationId: string; email: string; access: Access; inviterId: string },
+  now: Date
+) {
+  const { organizationId, email, access, inviterId } = invitation
+  await db.batch([
+    cancelingInvitations(db, organizationId, email),
+    db.insert(invitations).values({
+      id: crypto.randomUUID(),
+      organizationId,
+      email,
+      role: memberRoles[access],
+      status: "pending",
+      expiresAt: new Date(now.getTime() + invitationDays * 24 * 60 * 60 * 1000),
+      createdAt: now,
+      inviterId
+    })
+  ])
+}
+
 /** Gives a member of an organization another access. */
 export async function setMemberAccess(db: Database, organizationId: string, userId: string, access: Access) {
   await db

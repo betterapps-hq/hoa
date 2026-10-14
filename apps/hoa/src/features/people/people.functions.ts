@@ -1,9 +1,8 @@
 import { createServerFn } from "@tanstack/react-start"
-import { getRequestHeaders } from "@tanstack/react-start/server"
 import { z } from "zod"
-import { getAuth } from "@/auth/auth.server"
+import { emailInvitation } from "@/auth/auth.server"
 import { getDb } from "@/db/client.server"
-import { setMemberAccess } from "@/db/membershipRepository"
+import { cancelingInvitations, inviteToJoin, setMemberAccess } from "@/db/membershipRepository"
 import {
   endCommitteeMember,
   endUnitLink,
@@ -116,8 +115,8 @@ export const removeFromRoll = createServerFn({ method: "POST" })
   })
 
 /**
- * Invites someone on the roll to join, with the access they'll have: through Better Auth's organization plugin, which
- * keeps the invitation, replaces one still waiting, and emails it. Signing in with the email joins.
+ * Invites someone on the roll to join, with the access they'll have, in place of an invitation still waiting, and
+ * emails it. Signing in with the email joins.
  */
 export const invitePerson = createServerFn({ method: "POST" })
   .validator(parse(z.object({ id: z.string().min(1), access: z.enum(accessLevels) })))
@@ -130,10 +129,25 @@ export const invitePerson = createServerFn({ method: "POST" })
     if (person.userId) {
       throw new Error(`${person.name} has joined already.`)
     }
-    await getAuth().api.createInvitation({
-      body: { email: person.email, role: memberRoles[data.access], organizationId: context.organization.id },
-      headers: getRequestHeaders()
-    })
+    await inviteToJoin(
+      getDb(),
+      { organizationId: context.organization.id, email: person.email, access: data.access, inviterId: context.user.id },
+      new Date()
+    )
+    await emailInvitation({ email: person.email, role: memberRoles[data.access], organization: context.organization })
+  })
+
+/** Cancels the invitation waiting for someone on the roll; they stay on it. */
+export const cancelInvite = createServerFn({ method: "POST" })
+  .validator(parse(idSchema))
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    const db = getDb()
+    const person = await getPerson(db, context.organization.id, data.id)
+    if (!person?.email) {
+      throw new Error("That person isn't on the roll.")
+    }
+    await cancelingInvitations(db, context.organization.id, person.email)
   })
 
 /** Adds a unit or edits one. */

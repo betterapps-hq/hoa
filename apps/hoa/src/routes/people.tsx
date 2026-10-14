@@ -6,6 +6,7 @@ import {
   addToUnit,
   dissolveCommittee,
   getPeopleRoll,
+  cancelInvite,
   invitePerson,
   leaveCommittee,
   leaveUnit,
@@ -47,6 +48,7 @@ function PeopleRoute() {
         savePerson: change((id, person) => savePerson({ data: { id, person } })),
         removePerson: change((id) => removeFromRoll({ data: { id } })),
         invite: change((id, access) => invitePerson({ data: { id, access } })),
+        cancelInvite: change((id) => cancelInvite({ data: { id } })),
         saveUnit: change(async (id, unit) => {
           await saveUnit({ data: { id, unit } })
         }),
