@@ -141,6 +141,13 @@
       "when": 1791983701099,
       "tag": "0019_assessment_schedules",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1791984039325,
+      "tag": "0020_mailing_addresses",
+      "breakpoints": true
     }
   ]
 }

@@ -38,6 +38,25 @@ export const addressInputSchema = z.object({
 
 export type AddressInput = z.input<typeof addressInputSchema>
 
+/** Whether an address has nothing in it. */
+export const isEmptyAddress = (address: Omit<Address, "place"> | AddressInput) =>
+  ![address.street, address.unitNumber, address.city, address.state, address.postalCode].some((part) => part?.trim())
+
+/** An address someone may leave out, such as a mailing address: null when its form has nothing in it. */
+export const optionalAddressSchema = addressInputSchema.transform((address) =>
+  isEmptyAddress(address) ? null : address
+)
+
+/** An address as a JSON column keeps it. */
+export const storedAddressSchema = z.object({
+  street: z.string().nullable(),
+  unitNumber: z.string().nullable(),
+  city: z.string().nullable(),
+  state: z.string().nullable(),
+  postalCode: z.string().nullable(),
+  place: z.object({ id: z.string(), latitude: z.number(), longitude: z.number() }).nullable()
+})
+
 /** A form's start for an address: the one kept, or a new one from the street typed so far. */
 export const addressValues = (address: Address | null, street = ""): AddressInput => ({
   street: address?.street ?? street,

@@ -12,7 +12,7 @@ import { accounts, sessions } from "@/db/schema"
 import { addDays } from "@/lib/days"
 import { myDetailsSchema, type Access, type CommitteeRole, type UnitRelation } from "@/people/people"
 import { personRows, resignationProblem, unitRows } from "@/people/roll"
-import { addressLine } from "@/places/address"
+import { addressLine, type Address } from "@/places/address"
 import { accountOf, getMembership, type SignedInAccount } from "@/session/requestContext.server"
 import { deviceOf, type DeviceKind } from "./devices"
 
@@ -41,7 +41,7 @@ export type AccountMembership = {
   association: string
   access: Access
   phone: string | null
-  mailingAddress: string | null
+  mailingAddress: Address | null
   homes: { id: string; label: string; relation: UnitRelation; since: string | null }[]
   /** Their seats, by the seat's id, with when the term is due to end and the day they leave once it's set. */
   committees: {

@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm"
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
+import type { Address } from "@/places/address"
 
 // The D1 tables from docs/design/documents.md. JSON columns hold domain objects; repositories validate them with the
 // domain's Zod schemas when they read them.
@@ -506,8 +507,8 @@ export const people = sqliteTable(
     // Lowercased; how an account finds its person when it signs in. Null for someone with no email on file.
     email: text("email"),
     phone: text("phone"),
-    // Where mail reaches them, when it isn't their unit.
-    mailingAddress: text("mailing_address"),
+    // Where mail reaches them, when it isn't their unit: an Address.
+    mailingAddress: json<Address>("mailing_address_json"),
     // The account that signed in with their email; null until they do. Their role is on its membership (members).
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at"),

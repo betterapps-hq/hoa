@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { AddressFields } from "@/features/people/AddressFields/AddressFields"
+import { AddressFields } from "@/features/places/AddressFields/AddressFields"
 import { ChoiceSelect } from "@/features/rulebook/ChoiceSelect/ChoiceSelect"
 import { attempt } from "@/lib/attempt"
 import { useAppForm } from "@/lib/form"
@@ -107,7 +107,7 @@ function DetailsCard({ association, actions }: { association: SettingsData; acti
                 </Field>
               )}
             </form.Field>
-            <AddressFields form={form} fields="address" idPrefix="association" onAddressChange={(change) => change()} />
+            <AddressFields form={form} fields="address" idPrefix="association" legend="Mailing address" />
           </FieldGroup>
         </CardContent>
         <SaveFooter>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest"
+import { addressValues } from "@/places/address"
 import { accessOf, emailKey, isCurrent, peopleOfAccount, personInputSchema, roleOf, type Person } from "./people"
 import {
   accountOf,
@@ -192,7 +193,13 @@ describe("accounts and people", () => {
     expect(emailKey(" Pat@Example.COM ")).toBe("pat@example.com")
     expect(emailKey("  ")).toBeNull()
     expect(
-      personInputSchema.parse({ name: " Pat ", email: "", phone: " ", mailingAddress: "", access: "member" })
+      personInputSchema.parse({
+        name: " Pat ",
+        email: "",
+        phone: " ",
+        mailingAddress: addressValues(null),
+        access: "member"
+      })
     ).toEqual({ name: "Pat", email: null, phone: null, mailingAddress: null, access: "member" })
   })
 

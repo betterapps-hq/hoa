@@ -1,3 +1,4 @@
+import { cn } from "cn"
 import type { ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,6 +18,8 @@ export type DialogFormProps = {
   description?: ReactNode
   submitLabel: string
   isDestructive?: boolean
+  /** Room for fields side by side, such as an address's city, state and ZIP code. */
+  isWide?: boolean
   isSubmitting: boolean
   onSubmit: () => void
   onOpenChange: (open: boolean) => void
@@ -29,6 +32,7 @@ export function DialogForm({
   description,
   submitLabel,
   isDestructive = false,
+  isWide = false,
   isSubmitting,
   onSubmit,
   onOpenChange,
@@ -36,7 +40,9 @@ export function DialogForm({
 }: DialogFormProps) {
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className={cn("max-h-[calc(100dvh-2rem)] overflow-y-auto", isWide ? "sm:max-w-lg" : "sm:max-w-md")}
+      >
         <form
           noValidate
           className="flex flex-col gap-6"

@@ -1,10 +1,10 @@
 import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { AddressFields, addressFieldMap } from "@/features/places/AddressFields/AddressFields"
 import { withFieldGroup } from "@/lib/form"
 import type { Unit, UnitInput } from "@/people/people"
 import { addressValues, unitNameFrom } from "@/places/address"
-import { AddressFields, addressFieldMap } from "../AddressFields/AddressFields"
 
 /** A form's start for a unit: the one to edit, or a new one from the street typed so far. */
 export const unitValues = (unit: Unit | null, street = ""): UnitInput => ({
