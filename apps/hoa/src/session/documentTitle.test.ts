@@ -21,7 +21,9 @@ describe("documentTitle", () => {
   })
 
   it("names just the page before someone joins an association", () => {
-    expect(documentTitle("Sign in", { status: "signed-out", isGoogleConfigured: false })).toBe("Sign in")
+    expect(documentTitle("Sign in", { status: "signed-out", isGoogleConfigured: false, turnstileSiteKey: null })).toBe(
+      "Sign in"
+    )
     expect(documentTitle("Welcome", { status: "unaffiliated", user })).toBe("Welcome")
   })
 })

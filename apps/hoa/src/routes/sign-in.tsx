@@ -2,7 +2,7 @@ import { createFileRoute, redirect, useRouter } from "@tanstack/react-router"
 import { z } from "zod"
 import { authClient } from "@/auth/authClient"
 import { safeRedirect, throwIfFailed } from "@/auth/authErrors"
-import { SignInPage } from "@/features/account/SignInPage/SignInPage"
+import { SignInPage, type Captcha } from "@/features/account/SignInPage/SignInPage"
 
 export const Route = createFileRoute("/sign-in")({
   validateSearch: z.object({ redirect: z.string().optional() }),
@@ -16,6 +16,9 @@ export const Route = createFileRoute("/sign-in")({
   component: SignInRoute
 })
 
+/** The bot check's token, as Better Auth's captcha plugin reads it, when there is one. */
+const guarded = (captcha: Captcha) => (captcha ? { fetchOptions: { headers: { "x-captcha-response": captcha } } } : {})
+
 function SignInRoute() {
   const { redirect } = Route.useSearch()
   const { session } = Route.useRouteContext()
@@ -27,24 +30,25 @@ function SignInRoute() {
   }
   return (
     <SignInPage
+      captchaSiteKey={session.status === "signed-out" ? session.turnstileSiteKey : null}
       actions={{
-        sendCode: async (email) => {
-          throwIfFailed(await authClient.emailOtp.sendVerificationOtp({ email, type: "sign-in" }))
+        sendCode: async (email, captcha) => {
+          throwIfFailed(await authClient.emailOtp.sendVerificationOtp({ email, type: "sign-in", ...guarded(captcha) }))
         },
         signInWithCode: async (email, code) => {
           throwIfFailed(await authClient.signIn.emailOtp({ email, otp: code }))
           await signedIn()
         },
-        signInWithPassword: async (email, password) => {
-          throwIfFailed(await authClient.signIn.email({ email, password }))
+        signInWithPassword: async (email, password, captcha) => {
+          throwIfFailed(await authClient.signIn.email({ email, password, ...guarded(captcha) }))
           await signedIn()
         },
-        sendResetCode: async (email) => {
-          throwIfFailed(await authClient.emailOtp.requestPasswordReset({ email }))
+        sendResetCode: async (email, captcha) => {
+          throwIfFailed(await authClient.emailOtp.requestPasswordReset({ email, ...guarded(captcha) }))
         },
-        resetPassword: async (email, code, password) => {
+        resetPassword: async (email, code, password, captcha) => {
           throwIfFailed(await authClient.emailOtp.resetPassword({ email, otp: code, password }))
-          throwIfFailed(await authClient.signIn.email({ email, password }))
+          throwIfFailed(await authClient.signIn.email({ email, password, ...guarded(captcha) }))
           await signedIn()
         },
         continueWithGoogle:

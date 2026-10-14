@@ -1,6 +1,7 @@
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile"
 import { useForm } from "@tanstack/react-form"
 import { REGEXP_ONLY_DIGITS } from "input-otp"
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,14 +9,27 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldSepar
 import { Input } from "@/components/ui/input"
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp"
 
+/** A Turnstile token for a request the bot check guards; undefined when the check is off. */
+export type Captcha = string | undefined
+
 /** Signing in, each throwing an Error that says what went wrong in words someone can act on. */
 export type SignInActions = {
+  sendCode: (email: string, captcha: Captcha) => Promise<void>
+  signInWithCode: (email: string, code: string) => Promise<void>
+  signInWithPassword: (email: string, password: string, captcha: Captcha) => Promise<void>
+  sendResetCode: (email: string, captcha: Captcha) => Promise<void>
+  resetPassword: (email: string, code: string, password: string, captcha: Captcha) => Promise<void>
+  /** Null when Google isn't set up here. */
+  continueWithGoogle: (() => Promise<void>) | null
+}
+
+/** The actions as the steps call them, the bot check's token already added. */
+type StepActions = {
   sendCode: (email: string) => Promise<void>
   signInWithCode: (email: string, code: string) => Promise<void>
   signInWithPassword: (email: string, password: string) => Promise<void>
   sendResetCode: (email: string) => Promise<void>
   resetPassword: (email: string, code: string, password: string) => Promise<void>
-  /** Null when Google isn't set up here. */
   continueWithGoogle: (() => Promise<void>) | null
 }
 
@@ -43,16 +57,41 @@ const focusOnMount = (element: HTMLInputElement | null) => element?.focus()
  * Signing in (docs/design/people.md): an email and a code sent to it by default, a password for those who set one, and
  * Google when it's set up. A first sign-in with a code makes the account.
  */
-export function SignInPage({ actions }: { actions: SignInActions }) {
+export function SignInPage({ actions, captchaSiteKey }: { actions: SignInActions; captchaSiteKey: string | null }) {
   const [step, setStep] = useState<Step>("email")
   const [email, setEmail] = useState("")
+  const turnstile = useRef<TurnstileInstance>(undefined)
+  // Each guarded request spends one token, so the widget resets after every request.
+  const withCaptcha = async (run: (captcha: Captcha) => Promise<void>) => {
+    if (!captchaSiteKey) {
+      return run(undefined)
+    }
+    try {
+      const token = await turnstile.current?.getResponsePromise().catch(() => {
+        throw new Error("We couldn't check that you're a person. Reload the page and try again.")
+      })
+      await run(token)
+    } finally {
+      turnstile.current?.reset()
+    }
+  }
+  const steps: StepActions = {
+    sendCode: (address) => withCaptcha((captcha) => actions.sendCode(address, captcha)),
+    signInWithCode: actions.signInWithCode,
+    signInWithPassword: (address, password) =>
+      withCaptcha((captcha) => actions.signInWithPassword(address, password, captcha)),
+    sendResetCode: (address) => withCaptcha((captcha) => actions.sendResetCode(address, captcha)),
+    resetPassword: (address, code, password) =>
+      withCaptcha((captcha) => actions.resetPassword(address, code, password, captcha)),
+    continueWithGoogle: actions.continueWithGoogle
+  }
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-muted p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
         {step === "email" ? (
           <EmailStep
             email={email}
-            actions={actions}
+            actions={steps}
             onCodeSent={(next) => {
               setEmail(next)
               setStep("code")
@@ -63,11 +102,11 @@ export function SignInPage({ actions }: { actions: SignInActions }) {
             }}
           />
         ) : null}
-        {step === "code" ? <CodeStep email={email} actions={actions} onBack={() => setStep("email")} /> : null}
+        {step === "code" ? <CodeStep email={email} actions={steps} onBack={() => setStep("email")} /> : null}
         {step === "password" ? (
           <PasswordStep
             email={email}
-            actions={actions}
+            actions={steps}
             onCode={(next) => {
               setEmail(next)
               setStep("email")
@@ -78,7 +117,15 @@ export function SignInPage({ actions }: { actions: SignInActions }) {
             }}
           />
         ) : null}
-        {step === "reset" ? <ResetStep email={email} actions={actions} onBack={() => setStep("password")} /> : null}
+        {step === "reset" ? <ResetStep email={email} actions={steps} onBack={() => setStep("password")} /> : null}
+        {captchaSiteKey ? (
+          // Shows only when Cloudflare wants the visitor to check a box.
+          <Turnstile
+            ref={turnstile}
+            siteKey={captchaSiteKey}
+            options={{ appearance: "interaction-only", size: "flexible", theme: "auto" }}
+          />
+        ) : null}
       </div>
     </div>
   )
@@ -105,7 +152,7 @@ function EmailStep({
   onPassword
 }: {
   email: string
-  actions: SignInActions
+  actions: StepActions
   onCodeSent: (email: string) => void
   onPassword: (email: string) => void
 }) {
@@ -193,7 +240,7 @@ function EmailStep({
   )
 }
 
-function CodeStep({ email, actions, onBack }: { email: string; actions: SignInActions; onBack: () => void }) {
+function CodeStep({ email, actions, onBack }: { email: string; actions: StepActions; onBack: () => void }) {
   const [code, setCode] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -296,7 +343,7 @@ function PasswordStep({
   onForgot
 }: {
   email: string
-  actions: SignInActions
+  actions: StepActions
   onCode: (email: string) => void
   onForgot: (email: string) => void
 }) {
@@ -406,7 +453,7 @@ function PasswordStep({
   )
 }
 
-function ResetStep({ email, actions, onBack }: { email: string; actions: SignInActions; onBack: () => void }) {
+function ResetStep({ email, actions, onBack }: { email: string; actions: StepActions; onBack: () => void }) {
   const [error, setError] = useState<string | null>(null)
   const form = useForm({
     defaultValues: { code: "", password: "" },

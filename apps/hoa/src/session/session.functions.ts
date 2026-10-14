@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start"
-import { isGoogleConfigured } from "@/auth/auth.server"
+import { isGoogleConfigured, turnstileSiteKey } from "@/auth/auth.server"
 import type { RoleId } from "@/features/role/roles"
 import type { HoaSettings } from "@/hoa/hoa"
 import { roleOf } from "@/people/people"
@@ -12,7 +12,7 @@ export type SessionUser = { name: string; email: string }
  * their role in it.
  */
 export type Session =
-  | { status: "signed-out"; isGoogleConfigured: boolean }
+  | { status: "signed-out"; isGoogleConfigured: boolean; turnstileSiteKey: string | null }
   | { status: "unaffiliated"; user: SessionUser }
   | {
       status: "member"
@@ -27,7 +27,7 @@ export type Session =
 export const getSession = createServerFn({ method: "GET" }).handler(async (): Promise<Session> => {
   const account = await getSignedInAccount()
   if (!account) {
-    return { status: "signed-out", isGoogleConfigured: isGoogleConfigured() }
+    return { status: "signed-out", isGoogleConfigured: isGoogleConfigured(), turnstileSiteKey: turnstileSiteKey() }
   }
   const membership = await getMembership(account)
   if (!membership) {

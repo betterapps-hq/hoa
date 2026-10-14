@@ -331,7 +331,13 @@ export const users = sqliteTable("users", {
   emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
   image: text("image"),
   createdAt: authDate("created_at").notNull(),
-  updatedAt: authDate("updated_at").notNull()
+  updatedAt: authDate("updated_at").notNull(),
+  // Better Auth's admin plugin, for the platform's operators rather than an association's: "admin" for an operator,
+  // "user" for everyone else. An association's administrators are on its roll (people.access).
+  role: text("role"),
+  banned: integer("banned", { mode: "boolean" }).default(false),
+  banReason: text("ban_reason"),
+  banExpires: authDate("ban_expires")
 })
 
 export const sessions = sqliteTable(
@@ -346,7 +352,9 @@ export const sessions = sqliteTable(
     userAgent: text("user_agent"),
     userId: text("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" })
+      .references(() => users.id, { onDelete: "cascade" }),
+    // The operator signed in as this user, when they are; null otherwise.
+    impersonatedBy: text("impersonated_by")
   },
   (table) => [index("sessions_user").on(table.userId)]
 )
@@ -385,6 +393,14 @@ export const verifications = sqliteTable(
   },
   (table) => [index("verifications_identifier").on(table.identifier)]
 )
+
+// Better Auth's request counts per visitor and endpoint, kept in D1 because a Worker isolate's memory isn't shared.
+export const rateLimits = sqliteTable("rate_limits", {
+  id: text("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  count: integer("count").notNull(),
+  lastRequest: integer("last_request").notNull()
+})
 
 // The association's people (docs/design/people.md): everyone on its roll, with or without an account, the units they
 // own or live in, and the board and committees they sit on.
