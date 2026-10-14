@@ -3,6 +3,7 @@ import { ArrowLeftRightIcon, CopyPlusIcon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { RowActions } from "@/components/RowActions/RowActions"
 import { Button } from "@/components/ui/button"
 import {
@@ -215,9 +216,7 @@ function CopyForm({ label, definition, along, note, onCopy }: CopyFormProps) {
             <Field data-invalid={field.state.meta.errors.length > 0}>
               <FieldLabel htmlFor="rule-term-copy-label">
                 Name
-                <span aria-hidden className="ml-0.5 text-destructive">
-                  *
-                </span>
+                <RequiredMark />
               </FieldLabel>
               <Input
                 id="rule-term-copy-label"

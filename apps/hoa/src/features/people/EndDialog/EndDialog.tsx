@@ -1,5 +1,6 @@
 import { useForm } from "@tanstack/react-form"
 import { z } from "zod"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -15,12 +16,6 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-
-const required = (
-  <span aria-hidden className="ml-0.5 text-destructive">
-    *
-  </span>
-)
 
 /** One of the things the dialog can end: someone's time at a home, or a seat on a committee. */
 export type EndChoice = { id: string; title: string; subtitle: string }
@@ -75,7 +70,7 @@ export function EndDialog({ title, legend, choices, today, onEnd, onOpenChange }
                 <FieldSet data-invalid={field.state.meta.errors.length > 0}>
                   <FieldLegend variant="label">
                     {legend}
-                    {required}
+                    <RequiredMark />
                   </FieldLegend>
                   <RadioGroup className="gap-2" value={field.state.value} onValueChange={field.handleChange}>
                     {choices.map((choice) => (
@@ -99,7 +94,7 @@ export function EndDialog({ title, legend, choices, today, onEnd, onOpenChange }
                 <Field data-invalid={field.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="end-day">
                     Ends on
-                    {required}
+                    <RequiredMark />
                   </FieldLabel>
                   <Input
                     id="end-day"

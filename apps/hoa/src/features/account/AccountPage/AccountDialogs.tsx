@@ -1,6 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { toast } from "sonner"
 import { z } from "zod"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -19,12 +20,6 @@ import { myDetailsSchema } from "@/people/people"
 
 /** Someone's own details as the dialog edits them; empty text for none. */
 export type Details = { name: string; phone: string; mailingAddress: string }
-
-const required = (
-  <span aria-hidden className="ml-0.5 text-destructive">
-    *
-  </span>
-)
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : "That didn't work. Try again.")
 
@@ -72,7 +67,7 @@ export function DetailsDialog({ details, hasContact, onSave, onOpenChange }: Det
                 <Field data-invalid={field.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="details-name">
                     Name
-                    {required}
+                    <RequiredMark />
                   </FieldLabel>
                   <Input
                     id="details-name"
@@ -185,7 +180,7 @@ export function ClaimHomeDialog({ homes, onClaim, onOpenChange }: ClaimHomeDialo
               <Field data-invalid={field.state.meta.errors.length > 0}>
                 <FieldLabel htmlFor="claim-home">
                   Your home
-                  {required}
+                  <RequiredMark />
                 </FieldLabel>
                 <RollPicker
                   id="claim-home"
@@ -269,7 +264,7 @@ export function PasswordDialog({ hasPassword, onSave, onOpenChange }: PasswordDi
                   <Field data-invalid={field.state.meta.errors.length > 0}>
                     <FieldLabel htmlFor="current-password">
                       Current password
-                      {required}
+                      <RequiredMark />
                     </FieldLabel>
                     <Input
                       id="current-password"
@@ -291,7 +286,7 @@ export function PasswordDialog({ hasPassword, onSave, onOpenChange }: PasswordDi
                 <Field data-invalid={field.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="next-password">
                     {hasPassword ? "New password" : "Password"}
-                    {required}
+                    <RequiredMark />
                   </FieldLabel>
                   <Input
                     id="next-password"

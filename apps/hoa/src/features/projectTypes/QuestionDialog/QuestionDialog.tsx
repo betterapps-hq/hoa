@@ -2,6 +2,7 @@ import { useForm } from "@tanstack/react-form"
 import { PlusIcon, XIcon } from "lucide-react"
 import { useState } from "react"
 import { z } from "zod"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -351,9 +352,7 @@ export function QuestionDialog({
                 <Field data-invalid={item.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="question-label">
                     Question
-                    <span aria-hidden className="ml-0.5 text-destructive">
-                      *
-                    </span>
+                    <RequiredMark />
                   </FieldLabel>
                   <Input
                     id="question-label"

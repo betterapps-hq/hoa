@@ -3,6 +3,7 @@ import { MergeIcon, PencilIcon, PlusIcon } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import type { RowAction } from "@/components/RowActions/RowActions"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -147,9 +148,7 @@ function EditForm({ term, onSaved }: { term: T.Term; onSaved: () => void }) {
             <Field data-invalid={field.state.meta.errors.length > 0}>
               <FieldLabel htmlFor="term-edit-label">
                 Name
-                <span aria-hidden className="ml-0.5 text-destructive">
-                  *
-                </span>
+                <RequiredMark />
               </FieldLabel>
               <Input
                 id="term-edit-label"
@@ -377,9 +376,7 @@ export function AddChoice({ list }: { list: T.Term }) {
                 <Field data-invalid={field.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="add-choice-label">
                     Name
-                    <span aria-hidden className="ml-0.5 text-destructive">
-                      *
-                    </span>
+                    <RequiredMark />
                   </FieldLabel>
                   <Input
                     id="add-choice-label"
