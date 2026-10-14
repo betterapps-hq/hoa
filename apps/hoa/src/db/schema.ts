@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm"
+import { relations, sql } from "drizzle-orm"
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 
 // The D1 tables from docs/design/documents.md. JSON columns hold domain objects; repositories validate them with the
@@ -380,6 +380,15 @@ export const accounts = sqliteTable(
   },
   (table) => [index("accounts_user").on(table.userId)]
 )
+
+// How Better Auth's tables join, so it reads a session with its user, or a user with their accounts, in one query.
+export const userRelations = relations(users, ({ many }) => ({ sessions: many(sessions), accounts: many(accounts) }))
+export const sessionRelations = relations(sessions, ({ one }) => ({
+  user: one(users, { fields: [sessions.userId], references: [users.id] })
+}))
+export const accountRelations = relations(accounts, ({ one }) => ({
+  user: one(users, { fields: [accounts.userId], references: [users.id] })
+}))
 
 export const verifications = sqliteTable(
   "verifications",

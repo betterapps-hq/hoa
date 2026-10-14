@@ -88,7 +88,11 @@ function createAuth() {
         "/get-session": false
       }
     },
-    advanced: { ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] } },
+    advanced: {
+      ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
+      // A session and its user in one query, through the schema's relations, instead of one query each.
+      database: { joins: true }
+    },
     // Accounts start from an email code or Google, which both prove the email; a password is added afterward, from the
     // account page, by those who want one.
     emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: 10 },
@@ -98,7 +102,8 @@ function createAuth() {
     session: {
       expiresIn: 60 * 60 * 24 * 30,
       updateAge: 60 * 60 * 24,
-      cookieCache: { enabled: true, maxAge: 5 * 60 }
+      // Encrypted, not only signed, so the cookie doesn't show the account's details to whoever holds it.
+      cookieCache: { enabled: true, maxAge: 5 * 60, strategy: "jwe" }
     },
     plugins: [
       emailOTP({

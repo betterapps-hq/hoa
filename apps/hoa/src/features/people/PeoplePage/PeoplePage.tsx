@@ -16,7 +16,7 @@ import { toast } from "sonner"
 import { DataTable } from "@/components/DataTable/DataTable"
 import { dataTableColumns } from "@/components/DataTable/DataTable.utils"
 import { PageActions } from "@/components/PageActions/PageActions"
-import { ActionsMenu, RowActions } from "@/components/RowActions/RowActions"
+import { RowActions } from "@/components/RowActions/RowActions"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,7 +49,7 @@ import { phoneText } from "@/people/phone"
 import {
   committeeViews,
   personRows,
-  signInStatusLabels,
+  accountStatusLabels,
   unitRows,
   type PersonRow,
   type RollData,
@@ -58,7 +58,7 @@ import {
 import { CommitteeDialog, MemberDialog } from "../CommitteeDialogs/CommitteeDialogs"
 import { PersonDialog, type PersonSave } from "../PersonDialog/PersonDialog"
 import type { RollChoice } from "../RollPicker/RollPicker"
-import { UnitDialog, UnitPeopleDialog } from "../UnitDialogs/UnitDialogs"
+import { RemoveFromUnitDialog, UnitDialog, UnitPeopleDialog } from "../UnitDialogs/UnitDialogs"
 
 /** The People page's changes, each throwing an Error that says what went wrong. */
 export type PeopleActions = {
@@ -86,6 +86,7 @@ type Open =
   | { kind: "person"; person: Person | null }
   | { kind: "unit"; unit: Unit | null }
   | { kind: "unit-people"; unit: Unit; mode: "add" | "sale" }
+  | { kind: "unit-remove"; row: UnitRow }
   | { kind: "committee"; committee: Committee | null }
   | { kind: "member"; committee: Committee }
   | { kind: "confirm"; title: string; description: string; confirm: string; run: () => Promise<void> }
@@ -195,14 +196,7 @@ export function PeoplePage({
             rows={units}
             onAdd={(unit) => setOpen({ kind: "unit-people", unit, mode: "add" })}
             onSale={(unit) => setOpen({ kind: "unit-people", unit, mode: "sale" })}
-            onLeave={(unit, name, linkId) =>
-              confirm(
-                `End ${name}'s time at ${unit.label}?`,
-                "It ends today. Their history stays.",
-                "End it today",
-                () => attempt(() => actions.leaveUnit(linkId, today))
-              )
-            }
+            onRemoveSomeone={(row) => setOpen({ kind: "unit-remove", row })}
             administration={
               isAdministrator
                 ? {
@@ -361,6 +355,19 @@ export function PeoplePage({
           }
         />
       ) : null}
+      {open?.kind === "unit-remove" ? (
+        <RemoveFromUnitDialog
+          unit={open.row.unit}
+          people={open.row.people.map(({ person, link }) => ({
+            linkId: link.id,
+            name: person.name,
+            relation: link.relation
+          }))}
+          today={today}
+          onOpenChange={(isOpen) => (isOpen ? undefined : close())}
+          onRemove={({ linkId, endedOn }) => attempt(() => actions.leaveUnit(linkId, endedOn), "Removed.")}
+        />
+      ) : null}
       {open?.kind === "committee" ? (
         <CommitteeDialog
           committee={open.committee}
@@ -476,7 +483,7 @@ function PeopleTable({ rows, actions }: PeopleTableProps) {
       }),
     [rows]
   )
-  const signedIn = rows.filter((row) => row.status === "signed-in").length
+  const joined = rows.filter((row) => row.status === "joined").length
   const columns = personColumns(actions)
   return (
     <DataTable
@@ -491,7 +498,7 @@ function PeopleTable({ rows, actions }: PeopleTableProps) {
       renderSummary={(shown) => (
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {shown.length === rows.length
-            ? `${rows.length === 1 ? "1 person" : `${rows.length} people`} on the roll, ${signedIn} signed in.`
+            ? `${rows.length === 1 ? "1 person" : `${rows.length} people`} on the roll, ${joined} joined.`
             : `${shown.length} of ${rows.length} people.`}
         </p>
       )}
@@ -501,14 +508,11 @@ function PeopleTable({ rows, actions }: PeopleTableProps) {
 }
 
 /** A line of a cell's list and, under it, what it is: a home and how they hold it, a committee and their seat. */
-function Titled({ title, subtitle, children }: { title: ReactNode; subtitle: string; children?: ReactNode }) {
+function Titled({ title, subtitle }: { title: ReactNode; subtitle: string }) {
   return (
-    <div className="flex items-center gap-1">
-      <div className="flex min-w-0 flex-col">
-        <span>{title}</span>
-        <span className="text-muted-foreground">{subtitle}</span>
-      </div>
-      {children}
+    <div className="flex min-w-0 flex-col">
+      <span>{title}</span>
+      <span className="text-muted-foreground">{subtitle}</span>
     </div>
   )
 }
@@ -572,12 +576,12 @@ function personColumns(actions: PersonRowActions | null) {
         ),
       meta: { label: "Board and committees", cellClassName: "min-w-48" }
     }),
-    personColumn.accessor((row) => signInStatusLabels[row.status], {
-      id: "sign-in",
-      header: "Sign-in",
+    personColumn.accessor((row) => accountStatusLabels[row.status], {
+      id: "account",
+      header: "Account",
       cell: ({ row }) => (
-        <span className={row.original.status === "signed-in" ? undefined : "text-muted-foreground"}>
-          {signInStatusLabels[row.original.status]}
+        <span className={row.original.status === "joined" ? undefined : "text-muted-foreground"}>
+          {accountStatusLabels[row.original.status]}
         </span>
       ),
       meta: { cellClassName: "whitespace-nowrap" }
@@ -628,12 +632,12 @@ type UnitsTableProps = {
   rows: readonly UnitRow[]
   onAdd: (unit: Unit) => void
   onSale: (unit: Unit) => void
-  onLeave: (unit: Unit, name: string, linkId: string) => void
+  onRemoveSomeone: (row: UnitRow) => void
   administration: UnitAdministration | null
 }
 
 /** The units table's columns; their row actions call back to the page. */
-function unitColumns({ onAdd, onSale, onLeave, administration }: Omit<UnitsTableProps, "rows">) {
+function unitColumns({ onAdd, onSale, onRemoveSomeone, administration }: Omit<UnitsTableProps, "rows">) {
   return unitColumn.columns([
     unitColumn.accessor((row) => row.unit.label, {
       id: "unit",
@@ -662,28 +666,10 @@ function unitColumns({ onAdd, onSale, onLeave, administration }: Omit<UnitsTable
         row.original.people.length === 0 ? (
           <span className="text-muted-foreground">Nobody yet</span>
         ) : (
-          <ul className="flex flex-col">
+          <ul className="flex flex-col gap-2">
             {row.original.people.map(({ person, link }) => (
               <li key={link.id}>
-                <Titled title={person.name} subtitle={relationLabels[link.relation]}>
-                  <ActionsMenu
-                    trigger={
-                      <Button
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={`Actions for ${person.name} at ${row.original.unit.label}`}
-                      />
-                    }
-                    actions={[
-                      {
-                        label: "End it",
-                        icon: UserMinusIcon,
-                        isDestructive: true,
-                        onSelect: () => onLeave(row.original.unit, person.name, link.id)
-                      }
-                    ]}
-                  />
-                </Titled>
+                <Titled title={person.name} subtitle={relationLabels[link.relation]} />
               </li>
             ))}
           </ul>
@@ -702,6 +688,9 @@ function unitColumns({ onAdd, onSale, onLeave, administration }: Omit<UnitsTable
             actions={[
               { label: "Add someone", icon: UserPlusIcon, onSelect: () => onAdd(unit) },
               { label: "Record a sale", icon: HandshakeIcon, onSelect: () => onSale(unit) },
+              ...(row.original.people.length > 0
+                ? [{ label: "Remove someone", icon: UserMinusIcon, onSelect: () => onRemoveSomeone(row.original) }]
+                : []),
               ...(administration
                 ? [
                     { label: "Edit", icon: PencilIcon, onSelect: () => administration.onEdit(unit) },
@@ -721,7 +710,7 @@ function unitColumns({ onAdd, onSale, onLeave, administration }: Omit<UnitsTable
   ])
 }
 
-function UnitsTable({ rows, onAdd, onSale, onLeave, administration }: UnitsTableProps) {
+function UnitsTable({ rows, onAdd, onSale, onRemoveSomeone, administration }: UnitsTableProps) {
   const [query, setQuery] = useState("")
   const search = useMemo(
     () =>
@@ -746,7 +735,7 @@ function UnitsTable({ rows, onAdd, onSale, onLeave, administration }: UnitsTable
       />
     )
   }
-  const columns = unitColumns({ onAdd, onSale, onLeave, administration })
+  const columns = unitColumns({ onAdd, onSale, onRemoveSomeone, administration })
   return (
     <DataTable
       data={rows}

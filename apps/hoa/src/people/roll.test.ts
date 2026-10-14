@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { emailKey, isCurrent, peopleOfAccount, personInputSchema, roleOf, type Person } from "./people"
-import { committeeViews, isLastAdministrator, personRows, signInStatusOf, unitRows, type RollData } from "./roll"
+import { committeeViews, isLastAdministrator, personRows, accountStatusOf, unitRows, type RollData } from "./roll"
 
 const person = (id: string, fields: Partial<Person> = {}): Person => ({
   id,
@@ -97,10 +97,10 @@ describe("the roll", () => {
   })
 
   it("says whether someone can sign in yet", () => {
-    expect(signInStatusOf(person("a", { userId: "user-a" }))).toBe("signed-in")
-    expect(signInStatusOf(person("a", { invitedAt: "2026-10-13T00:00:00.000Z" }))).toBe("invited")
-    expect(signInStatusOf(person("a"))).toBe("not-invited")
-    expect(signInStatusOf(person("a", { email: null }))).toBe("no-email")
+    expect(accountStatusOf(person("a", { userId: "user-a" }))).toBe("joined")
+    expect(accountStatusOf(person("a", { invitedAt: "2026-10-13T00:00:00.000Z" }))).toBe("invited")
+    expect(accountStatusOf(person("a"))).toBe("not-invited")
+    expect(accountStatusOf(person("a", { email: null }))).toBe("no-email")
   })
 
   it("keeps at least one administrator", () => {

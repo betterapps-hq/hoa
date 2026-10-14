@@ -17,19 +17,19 @@ export type RollData = {
   members: CommitteeMember[]
 }
 
-/** Whether someone can sign in yet, and whether they've been asked to. */
-export type SignInStatus = "signed-in" | "invited" | "not-invited" | "no-email"
+/** Whether someone has joined, made an account with their email, and if not, whether they've been invited to. */
+export type AccountStatus = "joined" | "invited" | "not-invited" | "no-email"
 
-export const signInStatusLabels: Record<SignInStatus, string> = {
-  "signed-in": "Signed in",
+export const accountStatusLabels: Record<AccountStatus, string> = {
+  joined: "Joined",
   invited: "Invited",
   "not-invited": "Not invited",
   "no-email": "No email"
 }
 
-export const signInStatusOf = (person: Pick<Person, "userId" | "email" | "invitedAt">): SignInStatus => {
+export const accountStatusOf = (person: Pick<Person, "userId" | "email" | "invitedAt">): AccountStatus => {
   if (person.userId) {
-    return "signed-in"
+    return "joined"
   }
   if (!person.email) {
     return "no-email"
@@ -41,7 +41,7 @@ export type PersonRow = {
   person: Person
   units: { link: UnitLink; unit: Unit }[]
   committees: { member: CommitteeMember; committee: Committee }[]
-  status: SignInStatus
+  status: AccountStatus
 }
 
 export type UnitRow = { unit: Unit; people: { link: UnitLink; person: Person }[] }
@@ -70,7 +70,7 @@ export function personRows(roll: RollData, today: string): PersonRow[] {
         const committee = committees.get(member.committeeId)
         return committee ? [{ member, committee }] : []
       }),
-    status: signInStatusOf(person)
+    status: accountStatusOf(person)
   }))
 }
 
