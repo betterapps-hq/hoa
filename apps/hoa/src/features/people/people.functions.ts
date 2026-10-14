@@ -34,9 +34,10 @@ import {
   unitLinkInputSchema
 } from "@/people/people"
 import { isLastAdministrator } from "@/people/roll"
-import { requireAdministrator } from "@/session/requestContext.server"
+import { requireAdministrator, requireWorkOf } from "@/session/requestContext.server"
 
-// The People page's reads and changes (docs/design/people.md): administrators only.
+// The People page's reads and changes (docs/design/people.md): administrators; and the board, which reads the roll,
+// adds people to it, and keeps who owns, lives in or rents each home.
 
 const idSchema = z.object({ id: z.string().min(1) })
 const day = z.iso.date("Give a date.")
@@ -48,15 +49,21 @@ const parse =
 
 /** The association's roll: everyone on it, the units and their people, and the committees. */
 export const getPeopleRoll = createServerFn({ method: "GET" }).handler(async () => {
-  const context = await requireAdministrator()
+  const context = await requireWorkOf("board")
   return getRoll(getDb(), context.hoa.id)
 })
 
-/** Adds someone to the roll or edits them, keeping one person per email and at least one administrator. */
+/**
+ * Adds someone to the roll or edits them, keeping one person per email and at least one administrator. The board adds
+ * people, such as a home's buyer, but only an administrator edits someone or makes them an administrator.
+ */
 export const savePerson = createServerFn({ method: "POST" })
   .validator(parse(z.object({ id: z.string().nullable(), person: personInputSchema })))
   .handler(async ({ data }) => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("board")
+    if (context.role !== "administrator" && (data.id || data.person.access === "administrator")) {
+      throw new Error("Only an administrator can do this.")
+    }
     const db = getDb()
     const now = new Date().toISOString()
     const fields = data.person
@@ -136,7 +143,7 @@ export const removeUnitFromRoll = createServerFn({ method: "POST" })
 export const addToUnit = createServerFn({ method: "POST" })
   .validator(parse(unitLinkInputSchema))
   .handler(async ({ data }) => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("board")
     const db = getDb()
     const [unit, person] = await Promise.all([
       getUnit(db, context.hoa.id, data.unitId),
@@ -152,7 +159,7 @@ export const addToUnit = createServerFn({ method: "POST" })
 export const leaveUnit = createServerFn({ method: "POST" })
   .validator(parse(z.object({ id: z.string().min(1), endedOn: day })))
   .handler(async ({ data }) => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("board")
     await endUnitLink(getDb(), context.hoa.id, data.id, data.endedOn)
   })
 
@@ -160,7 +167,7 @@ export const leaveUnit = createServerFn({ method: "POST" })
 export const recordSale = createServerFn({ method: "POST" })
   .validator(parse(z.object({ unitId: z.string().min(1), buyerId: z.string().min(1), soldOn: day })))
   .handler(async ({ data }) => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("board")
     const db = getDb()
     const roll = await getRoll(db, context.hoa.id)
     if (!roll.units.some((unit) => unit.id === data.unitId) || !roll.people.some((p) => p.id === data.buyerId)) {

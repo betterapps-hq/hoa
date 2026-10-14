@@ -26,7 +26,7 @@ import {
   ItemSeparator,
   ItemTitle
 } from "@/components/ui/item"
-import { relationLabels } from "@/people/people"
+import { accessLabels, relationLabels, seatLabel } from "@/people/people"
 import { phoneText } from "@/people/phone"
 import { initialsOf } from "@/session/users"
 import type { AccountDetails, AccountDevice, AccountMembership } from "../account.functions"
@@ -57,8 +57,6 @@ async function run(action: () => Promise<void>, done: string) {
     toast.error(messageOf(caught))
   }
 }
-
-const accessLabels = { administrator: "Administrator", member: "Member" } as const
 
 const monthYear = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric", timeZone: "UTC" })
 
@@ -91,11 +89,7 @@ export function AccountPage({ account, actions }: { account: AccountDetails; act
             {membership.committees.map((committee, index) => (
               <div key={committee.id}>
                 {index > 0 ? <ItemSeparator className="my-0" /> : null}
-                <Row
-                  icon={<UsersIcon />}
-                  title={committee.name}
-                  description={committee.office ?? (committee.role === "chair" ? "Chair" : "Member")}
-                />
+                <Row icon={<UsersIcon />} title={committee.name} description={seatLabel(committee)} />
               </div>
             ))}
           </RowsCard>

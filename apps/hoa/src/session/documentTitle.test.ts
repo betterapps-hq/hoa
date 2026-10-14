@@ -7,6 +7,7 @@ const member: Session = {
   status: "member",
   roleId: "administrator",
   hoaName: "Sudden Valley Community Association",
+  committees: [],
   unitSystem: "imperial",
   user
 }

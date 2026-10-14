@@ -15,6 +15,7 @@ import {
   saveUnit
 } from "@/features/people/people.functions"
 import { PeoplePage } from "@/features/people/PeoplePage/PeoplePage"
+import { useRole } from "@/features/role/RoleProvider"
 
 export const Route = createFileRoute("/people")({
   staticData: { title: "People" },
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/people")({
 
 function PeopleRoute() {
   const roll = Route.useLoaderData()
+  const { role } = useRole()
   const router = useRouter()
   /** Runs a change, then reloads the roll. */
   const change =
@@ -36,6 +38,7 @@ function PeopleRoute() {
   return (
     <PeoplePage
       roll={roll}
+      isAdministrator={role.id === "administrator"}
       actions={{
         savePerson: change((id, person) => savePerson({ data: { id, person } })),
         removePerson: change((id) => removeFromRoll({ data: { id } })),

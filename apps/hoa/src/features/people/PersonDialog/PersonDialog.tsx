@@ -28,6 +28,8 @@ type PersonDialogProps = {
   /** The person to edit; null to add someone. */
   person: Person | null
   units: readonly RollChoice[]
+  /** Whether they can make someone an administrator: administrators can, and the board can't. */
+  canGrantAccess: boolean
   onSave: (save: PersonSave) => Promise<void>
   onOpenChange: (open: boolean) => void
 }
@@ -39,7 +41,7 @@ const formSchema = personInputSchema
   .extend({ isAdministrator: z.boolean(), unitId: z.string(), relation: z.enum(unitRelations) })
 
 /** Adds someone to the roll, with the unit they live in, or edits them. */
-export function PersonDialog({ person, units, onSave, onOpenChange }: PersonDialogProps) {
+export function PersonDialog({ person, units, canGrantAccess, onSave, onOpenChange }: PersonDialogProps) {
   const form = useForm({
     defaultValues: {
       name: person?.name ?? "",
@@ -164,23 +166,25 @@ export function PersonDialog({ person, units, onSave, onOpenChange }: PersonDial
                 </form.Field>
               </div>
             ) : null}
-            <form.Field name="isAdministrator">
-              {(field) => (
-                <Field orientation="horizontal">
-                  <Checkbox
-                    id="person-administrator"
-                    checked={field.state.value}
-                    onCheckedChange={(checked) => field.handleChange(checked)}
-                  />
-                  <FieldContent>
-                    <FieldLabel htmlFor="person-administrator" className="font-normal">
-                      Administrator
-                    </FieldLabel>
-                    <FieldDescription>Manages the association here: people, rules and applications.</FieldDescription>
-                  </FieldContent>
-                </Field>
-              )}
-            </form.Field>
+            {canGrantAccess ? (
+              <form.Field name="isAdministrator">
+                {(field) => (
+                  <Field orientation="horizontal">
+                    <Checkbox
+                      id="person-administrator"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked)}
+                    />
+                    <FieldContent>
+                      <FieldLabel htmlFor="person-administrator" className="font-normal">
+                        Administrator
+                      </FieldLabel>
+                      <FieldDescription>Manages the association here: people, rules and applications.</FieldDescription>
+                    </FieldContent>
+                  </Field>
+                )}
+              </form.Field>
+            ) : null}
           </FieldGroup>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>

@@ -11,14 +11,14 @@ import { useRole } from "@/features/role/RoleProvider"
  * the full navigation over the page.
  */
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
-  const { role } = useRole()
+  const { navigation: sections } = useRole()
   const navigation = (
     <>
       <SidebarHeader>
         <AssociationHeader />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain sections={role.navigation} />
+        <NavMain sections={sections} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />

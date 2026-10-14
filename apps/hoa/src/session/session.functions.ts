@@ -1,8 +1,10 @@
 import { createServerFn } from "@tanstack/react-start"
 import { isGoogleConfigured, turnstileSiteKey } from "@/auth/auth.server"
+import { getDb } from "@/db/client.server"
+import { committeesInView } from "@/db/peopleRepository"
 import type { RoleId } from "@/features/role/roles"
 import type { HoaSettings } from "@/hoa/hoa"
-import { roleOf } from "@/people/people"
+import { roleOf, type Committee } from "@/people/people"
 import { getMembership, getSignedInAccount } from "./requestContext.server"
 
 export type SessionUser = { name: string; email: string }
@@ -18,6 +20,8 @@ export type Session =
       status: "member"
       roleId: RoleId
       hoaName: string
+      /** The committees whose work they do, for the sidebar's sections. */
+      committees: Pick<Committee, "name" | "kind">[]
       /** The units the organization's forms offer for amounts. */
       unitSystem: HoaSettings["unitSystem"]
       user: SessionUser
@@ -34,10 +38,12 @@ export const getSession = createServerFn({ method: "GET" }).handler(async (): Pr
     return { status: "unaffiliated", user: { name: account.name, email: account.email } }
   }
   const { hoa, person } = membership
+  const committees = await committeesInView(getDb(), person, new Date().toISOString().slice(0, 10))
   return {
     status: "member",
     roleId: roleOf(person),
     hoaName: hoa.name,
+    committees: committees.map(({ name, kind }) => ({ name, kind })),
     unitSystem: hoa.settings.unitSystem,
     user: { name: account.name || person.name, email: account.email }
   }

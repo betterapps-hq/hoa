@@ -3,13 +3,12 @@ import { describe, expect, it } from "vitest"
 import { RoleProvider, useRole } from "./RoleProvider"
 
 function CurrentRole() {
-  const { role, user, hoaName } = useRole()
+  const { role, user, hoaName, navigation } = useRole()
   return (
     <p>
       {role.name} at {hoaName} as {user.name}:{" "}
-      {role.navigation
-        .flatMap((section) => section.items)
-        .map((item) => item.title)
+      {navigation
+        .map((section) => `${section.label ?? "Home"} (${section.items.map((item) => item.title).join(", ")})`)
         .join(", ")}
     </p>
   )
@@ -22,13 +21,14 @@ describe("RoleProvider", () => {
         roleId="administrator"
         user={{ name: "Sam Rivera", email: "sam@example.com" }}
         hoaName="Maple Hollow"
+        committees={[{ name: "Design Review", kind: "architectural" }]}
       >
         <CurrentRole />
       </RoleProvider>
     )
     expect(
       screen.getByText(
-        "Administrator at Maple Hollow as Sam Rivera: Dashboard, Applications, Project types, Rulebook, People"
+        "Administrator at Maple Hollow as Sam Rivera: Home (Dashboard), Design Review (Applications, Project types), Organization (Rulebook, People)"
       )
     ).toBeInTheDocument()
   })

@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm"
+import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm"
 import {
   emailKey,
   peopleOfAccount,
@@ -346,6 +346,40 @@ export async function insertCommitteeMember(
   now: string
 ) {
   await db.insert(committeeMembers).values({ id: crypto.randomUUID(), hoaId, ...member, endedOn: null, createdAt: now })
+}
+
+/**
+ * The committees whose work someone does, whose pages they see: every committee for an administrator, and otherwise the
+ * ones they sit on on a day (YYYY-MM-DD). In the order they were added, as the roll lists them.
+ */
+export async function committeesInView(
+  db: Database,
+  person: Pick<Person, "id" | "hoaId" | "access">,
+  today: string
+): Promise<Committee[]> {
+  const seats = db
+    .select({ committeeId: committeeMembers.committeeId })
+    .from(committeeMembers)
+    .where(
+      and(
+        eq(committeeMembers.hoaId, person.hoaId),
+        eq(committeeMembers.personId, person.id),
+        or(isNull(committeeMembers.startedOn), lte(committeeMembers.startedOn, today)),
+        or(isNull(committeeMembers.endedOn), gt(committeeMembers.endedOn, today))
+      )
+    )
+  const rows = await db
+    .select()
+    .from(committees)
+    .where(
+      and(
+        eq(committees.hoaId, person.hoaId),
+        isNull(committees.removedAt),
+        person.access === "administrator" ? undefined : inArray(committees.id, seats)
+      )
+    )
+    .orderBy(asc(committees.createdAt))
+  return rows.map(toCommittee)
 }
 
 /** Ends someone's term on a committee on a day. */

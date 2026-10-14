@@ -142,7 +142,12 @@ export const committeeMemberInputSchema = z.object({
   startedOn: day
 })
 
+export const accessLabels: Record<Access, string> = { administrator: "Administrator", member: "Member" }
 export const relationLabels: Record<UnitRelation, string> = { owner: "Owner", resident: "Resident", tenant: "Tenant" }
+
+/** Someone's seat on a committee as people say it: their office and whether they chair it, or Member. */
+export const seatLabel = (member: Pick<CommitteeMember, "office" | "role">) =>
+  [member.office, member.role === "chair" ? "Chair" : null].filter(Boolean).join(", ") || "Member"
 export const committeeKindLabels: Record<CommitteeKind, string> = {
   board: "Board",
   architectural: "Architectural committee",

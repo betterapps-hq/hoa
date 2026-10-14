@@ -1,8 +1,15 @@
 import { createContext, use, type ReactNode } from "react"
+import type { Committee } from "@/people/people"
 import type { SessionUser } from "@/session/session.functions"
-import { roles, type Role, type RoleId } from "./roles"
+import { navigationFor, roles, type NavSection, type Role, type RoleId } from "./roles"
 
-type RoleContextValue = { role: Role; user: SessionUser; hoaName: string }
+type RoleContextValue = {
+  role: Role
+  user: SessionUser
+  hoaName: string
+  /** The sidebar's sections, from their role and the committees whose work they do. */
+  navigation: NavSection[]
+}
 
 const RoleContext = createContext<RoleContextValue | null>(null)
 
@@ -12,11 +19,16 @@ export type RoleProviderProps = {
   roleId: RoleId
   user: SessionUser
   hoaName: string
+  committees: readonly Pick<Committee, "name" | "kind">[]
 }
 
-/** The signed-in person's role, account and association, for the app shell. */
-export function RoleProvider({ children, roleId, user, hoaName }: RoleProviderProps) {
-  return <RoleContext value={{ role: roles[roleId], user, hoaName }}>{children}</RoleContext>
+/** The signed-in person's role, account, association and navigation, for the app shell. */
+export function RoleProvider({ children, roleId, user, hoaName, committees }: RoleProviderProps) {
+  return (
+    <RoleContext value={{ role: roles[roleId], user, hoaName, navigation: navigationFor(roleId, committees) }}>
+      {children}
+    </RoleContext>
+  )
 }
 
 export function useRole() {
