@@ -1,7 +1,13 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { authClient } from "@/auth/authClient"
 import { throwIfFailed } from "@/auth/authErrors"
-import { addPassword, getAccountDetails } from "@/features/account/account.functions"
+import {
+  addPassword,
+  claimHome,
+  getAccountDetails,
+  saveMyDetails,
+  signOutDevice
+} from "@/features/account/account.functions"
 import { AccountPage } from "@/features/account/AccountPage/AccountPage"
 
 export const Route = createFileRoute("/account")({
@@ -14,18 +20,17 @@ function AccountRoute() {
   const account = Route.useLoaderData()
   const { session } = Route.useRouteContext()
   const router = useRouter()
+  // Each change reloads the page's data, and the shell's, which shows the name.
+  const thenReload = async (change: Promise<unknown>) => {
+    await change
+    await router.invalidate()
+  }
   const page = (
     <AccountPage
       account={account}
       actions={{
-        rename: async (name) => {
-          throwIfFailed(await authClient.updateUser({ name }))
-          await router.invalidate()
-        },
-        addPassword: async (password) => {
-          await addPassword({ data: { password } })
-          await router.invalidate()
-        },
+        saveDetails: (details) => thenReload(saveMyDetails({ data: details })),
+        addPassword: (password) => thenReload(addPassword({ data: { password } })),
         changePassword: async (current, next) => {
           throwIfFailed(await authClient.changePassword({ currentPassword: current, newPassword: next }))
         },
@@ -36,12 +41,15 @@ function AccountRoute() {
           throwIfFailed(await authClient.unlinkAccount({ accountId }))
           await router.invalidate()
         },
+        signOutDevice: (id) => thenReload(signOutDevice({ data: { id } })),
         signOutElsewhere: async () => {
           throwIfFailed(await authClient.revokeOtherSessions())
-        }
+          await router.invalidate()
+        },
+        claimHome: (unitId) => thenReload(claimHome({ data: { unitId } }))
       }}
     />
   )
   // Without an association there's no app shell around the page.
-  return session.status === "member" ? page : <div className="mx-auto max-w-2xl py-10">{page}</div>
+  return session.status === "member" ? page : <div className="min-h-svh bg-background">{page}</div>
 }

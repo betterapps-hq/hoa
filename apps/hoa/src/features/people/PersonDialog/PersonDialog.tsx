@@ -15,6 +15,7 @@ import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLab
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { personInputSchema, relationLabels, unitRelations, type Person, type UnitRelation } from "@/people/people"
+import { phoneText } from "@/people/phone"
 import { RollPicker, type RollChoice } from "../RollPicker/RollPicker"
 
 export type PersonSave = {
@@ -43,7 +44,7 @@ export function PersonDialog({ person, units, onSave, onOpenChange }: PersonDial
     defaultValues: {
       name: person?.name ?? "",
       email: person?.email ?? "",
-      phone: person?.phone ?? "",
+      phone: person?.phone ? phoneText(person.phone) : "",
       mailingAddress: person?.mailingAddress ?? "",
       isAdministrator: person?.access === "administrator",
       unitId: "",

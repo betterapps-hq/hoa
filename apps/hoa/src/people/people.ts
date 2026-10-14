@@ -1,5 +1,6 @@
 import { z } from "zod"
 import type { RoleId } from "@/features/role/roles"
+import { optionalPhone } from "./phone"
 
 // The association's people (docs/design/people.md): everyone on its roll, with or without an account, the units they
 // own or live in, and the board and committees they sit on.
@@ -91,13 +92,20 @@ const optionalText = (max: number) =>
     .max(max)
     .transform((text) => (text === "" ? null : text))
 
+/** Someone's own details, as they edit them on their account page. */
+export const myDetailsSchema = z.object({
+  name: z.string().trim().min(1, "Give your name.").max(200, "Keep your name under 200 characters."),
+  phone: optionalPhone,
+  mailingAddress: optionalText(300)
+})
+
 /** A person as an administrator adds or edits them. */
 export const personInputSchema = z.object({
   name: z.string().trim().min(1, "Give their name.").max(200, "Keep the name under 200 characters."),
   email: z
     .union([z.literal(""), z.email("Give an email address such as name@example.com.")])
     .transform((email) => emailKey(email)),
-  phone: optionalText(40),
+  phone: optionalPhone,
   mailingAddress: optionalText(300),
   access: z.enum(accessLevels)
 })

@@ -44,6 +44,7 @@ import {
   type Unit,
   type UnitRelation
 } from "@/people/people"
+import { phoneText } from "@/people/phone"
 import {
   committeeViews,
   personRows,
@@ -424,7 +425,7 @@ function PeopleTable({ rows, onEdit, onInvite, onRemove }: PeopleTableProps) {
         fields: {
           name: { text: (row) => row.person.name, boost: 3 },
           email: { text: (row) => row.person.email ?? "" },
-          phone: { text: (row) => row.person.phone ?? "" },
+          phone: { text: (row) => (row.person.phone ? `${row.person.phone} ${phoneText(row.person.phone)}` : "") },
           units: { text: (row) => row.units.map(({ unit }) => `${unit.label} ${unit.lot ?? ""}`).join(" ") }
         }
       }),

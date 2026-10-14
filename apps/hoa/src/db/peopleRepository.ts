@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, or } from "drizzle-orm"
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm"
 import {
   emailKey,
   peopleOfAccount,
@@ -249,6 +249,32 @@ export async function insertUnitLink(
   now: string
 ) {
   await db.insert(unitPeople).values({ id: crypto.randomUUID(), hoaId, ...link, endedOn: null, createdAt: now })
+}
+
+/**
+ * Makes someone the owner of a unit that has no owner on `today`, as a homeowner claiming their home does. One
+ * statement, so two people claiming the same home at once can't both get it. False when the unit has an owner, or
+ * isn't the association's.
+ */
+export async function claimUnit(
+  db: Database,
+  hoaId: string,
+  claim: { unitId: string; personId: string },
+  today: string,
+  now: string
+) {
+  const rows = await db.all<{ id: string }>(sql`
+    INSERT INTO unit_people (id, hoa_id, unit_id, person_id, relation, started_on, ended_on, created_at)
+    SELECT ${crypto.randomUUID()}, ${hoaId}, ${claim.unitId}, ${claim.personId}, 'owner', NULL, NULL, ${now}
+    WHERE EXISTS (SELECT 1 FROM units WHERE id = ${claim.unitId} AND hoa_id = ${hoaId} AND removed_at IS NULL)
+      AND NOT EXISTS (
+        SELECT 1 FROM unit_people
+        WHERE unit_id = ${claim.unitId} AND relation = 'owner'
+          AND (started_on IS NULL OR started_on <= ${today})
+          AND (ended_on IS NULL OR ended_on > ${today})
+      )
+    RETURNING id`)
+  return rows.length > 0
 }
 
 /** Ends someone's ownership, residence or tenancy on a day, as a sale or a move-out does. */

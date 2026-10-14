@@ -43,14 +43,14 @@ export const guardedPaths = [
 /** Requests a visitor may make to each guarded path a minute: enough for a person who mistypes, not for a bot. */
 const guardedPerMinute = 5
 
+export const compromisedPasswordMessage = "That password has appeared in a data breach. Choose another."
+
 function safeguards() {
   const turnstileSecret = turnstileSiteKey() ? env.TURNSTILE_SECRET_KEY : undefined
   return [
-    // Rejects a new password that's in a known breach, checked by the first five characters of its hash only.
-    haveIBeenPwned({
-      paths: ["/change-password", "/set-password", "/email-otp/reset-password"],
-      customPasswordCompromisedMessage: "That password has appeared in a data breach. Choose another."
-    }),
+    // Rejects a new password that's in a known breach, checked by the first five characters of its hash only. It
+    // checks requests to Better Auth's endpoints; adding a password from the server checks it there.
+    haveIBeenPwned({ customPasswordCompromisedMessage: compromisedPasswordMessage }),
     // The platform's operators (users.role "admin"): sign in as someone to see what they see, ban, end sessions.
     admin(),
     ...(turnstileSecret
