@@ -35,7 +35,6 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createSearch } from "@/lib/search"
 import {
-  accessLabels,
   committeeKindLabels,
   relationLabels,
   seatLabel,
@@ -571,11 +570,11 @@ function PeopleTable({ rows, actions }: PeopleTableProps) {
 }
 
 /** A line of a cell's list and, under it, what it is: a home and how they hold it, a committee and their seat. */
-function Titled({ title, subtitle }: { title: ReactNode; subtitle: string }) {
+function Titled({ title, subtitle }: { title: ReactNode; subtitle?: string }) {
   return (
     <div className="flex min-w-0 flex-col">
       <span>{title}</span>
-      <span className="text-muted-foreground">{subtitle}</span>
+      {subtitle ? <span className="text-muted-foreground">{subtitle}</span> : null}
     </div>
   )
 }
@@ -598,12 +597,6 @@ function personColumns(actions: PersonRowActions | null) {
       },
       meta: { isRowHeader: true, cellClassName: "min-w-56" }
     }),
-    personColumn.accessor((row) => accessLabels[row.access], {
-      id: "role",
-      header: "Role",
-      sortFn: "text",
-      meta: { cellClassName: "whitespace-nowrap" }
-    }),
     personColumn.accessor((row) => row.units.map(({ unit }) => unit.label).join(", "), {
       id: "home",
       header: "Home",
@@ -622,23 +615,38 @@ function personColumns(actions: PersonRowActions | null) {
         ),
       meta: { cellClassName: "min-w-48" }
     }),
-    personColumn.accessor((row) => row.committees.map(({ committee }) => committee.name).join(", "), {
-      id: "assignments",
-      header: "Assignments",
-      sortFn: "text",
-      enableHiding: true,
-      cell: ({ row }) =>
-        row.original.committees.length === 0 ? null : (
-          <ul className="flex flex-col gap-2">
-            {row.original.committees.map(({ committee, member }) => (
-              <li key={member.id}>
-                <Titled title={committee.name} subtitle={seatLabel(member)} />
-              </li>
-            ))}
-          </ul>
-        ),
-      meta: { cellClassName: "min-w-48" }
-    }),
+    personColumn.accessor(
+      (row) =>
+        [
+          row.access === "administrator" ? "Administrator" : null,
+          ...row.committees.map(({ committee }) => committee.name)
+        ]
+          .filter(Boolean)
+          .join(", "),
+      {
+        id: "assignments",
+        header: "Assignments",
+        sortFn: "text",
+        enableHiding: true,
+        cell: ({ row }) =>
+          row.original.access === "member" && row.original.committees.length === 0 ? null : (
+            <ul className="flex flex-col gap-2">
+              {/* Administrator: who runs the association in the app, on the board or not. */}
+              {row.original.access === "administrator" ? (
+                <li>
+                  <Titled title="Administrator" />
+                </li>
+              ) : null}
+              {row.original.committees.map(({ committee, member }) => (
+                <li key={member.id}>
+                  <Titled title={committee.name} subtitle={seatLabel(member)} />
+                </li>
+              ))}
+            </ul>
+          ),
+        meta: { cellClassName: "min-w-48" }
+      }
+    ),
     personColumn.accessor((row) => accountStatusLabels[row.status], {
       id: "account",
       header: "Account",

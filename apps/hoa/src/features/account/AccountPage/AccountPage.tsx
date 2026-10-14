@@ -26,7 +26,7 @@ import {
   ItemSeparator,
   ItemTitle
 } from "@/components/ui/item"
-import { accessLabels, relationLabels, seatLabel } from "@/people/people"
+import { relationLabels, seatLabel } from "@/people/people"
 import { phoneText } from "@/people/phone"
 import { initialsOf } from "@/session/users"
 import type { AccountDetails, AccountDevice, AccountMembership } from "../account.functions"
@@ -105,6 +105,12 @@ export function AccountPage({ account, actions }: { account: AccountDetails; act
   )
 }
 
+/** How they belong to their association, as they'd say it: "Owner at Maple Hollow", or just its name without a home. */
+function homeLine({ association, homes }: NonNullable<AccountDetails["membership"]>) {
+  const [home] = homes
+  return home ? `${relationLabels[home.relation]} at ${association}` : association
+}
+
 function ProfileHeader({ account }: { account: AccountDetails }) {
   const { membership } = account
   return (
@@ -114,9 +120,7 @@ function ProfileHeader({ account }: { account: AccountDetails }) {
       </Avatar>
       <div className="flex min-w-0 flex-col gap-0.5">
         <h2 className="truncate text-xl font-semibold">{account.name || account.email}</h2>
-        <p className="text-sm text-muted-foreground">
-          {membership ? `${accessLabels[membership.access]} at ${membership.association}` : account.email}
-        </p>
+        <p className="text-sm text-muted-foreground">{membership ? homeLine(membership) : account.email}</p>
       </div>
     </div>
   )

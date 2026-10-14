@@ -146,7 +146,6 @@ export const committeeMemberInputSchema = z.object({
   startedOn: day
 })
 
-export const accessLabels: Record<Access, string> = { administrator: "Administrator", member: "Member" }
 export const relationLabels: Record<UnitRelation, string> = { owner: "Owner", resident: "Resident", tenant: "Tenant" }
 
 /** Someone's seat on a committee as people say it: their office and whether they chair it, or Member. */
