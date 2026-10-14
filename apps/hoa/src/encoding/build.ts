@@ -725,6 +725,7 @@ export async function buildRulebook(input: BuildInput) {
       const all = done().flatMap((state) => state.structured)
       return done().flatMap((state) => {
         const found = checkStructured({
+          checked: state.structured,
           structured: all,
           vocabulary: [...state.batch.vocabulary, ...state.proposed],
           provisions,

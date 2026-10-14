@@ -382,11 +382,7 @@ function withValueAt(value: unknown, path: readonly PropertyKey[], replacement: 
  * code fills in are left out, and filled before the answer is validated.
  */
 export function outputSchema<T>(schema: z.ZodType<T>, codeFields?: CodeFields, sharedDefinitions = false) {
-  const json = forModel(
-    z.toJSONSchema(schema, { target: "draft-7", io: "input", reused: sharedDefinitions ? "ref" : "inline" }),
-    new Set(codeFields?.names ?? [])
-  )
-  return jsonSchema<T>(z.record(z.string(), z.unknown()).parse(json), {
+  return jsonSchema<T>(modelJsonSchema(schema, codeFields?.names ?? [], sharedDefinitions), {
     validate: (value) => {
       const result = checkAnswer(schema, value, codeFields)
       return result.isValid
@@ -394,6 +390,29 @@ export function outputSchema<T>(schema: z.ZodType<T>, codeFields?: CodeFields, s
         : { success: false, error: new z.ZodError(result.issues) }
     }
   })
+}
+
+/**
+ * Each schema's JSON schema for the model, by the fields hidden and whether definitions are shared, converted once: a
+ * step sends the same schema on every call, and converting the rule schemas takes far longer than a cached answer.
+ */
+const modelJsonSchemas = new WeakMap<z.ZodType, Map<string, Record<string, unknown>>>()
+
+function modelJsonSchema(schema: z.ZodType, hidden: readonly string[], sharedDefinitions: boolean) {
+  const variants = modelJsonSchemas.get(schema) ?? new Map<string, Record<string, unknown>>()
+  modelJsonSchemas.set(schema, variants)
+  const variant = JSON.stringify([hidden, sharedDefinitions])
+  const cached = variants.get(variant)
+  if (cached) {
+    return cached
+  }
+  const json = forModel(
+    z.toJSONSchema(schema, { target: "draft-7", io: "input", reused: sharedDefinitions ? "ref" : "inline" }),
+    new Set(hidden)
+  )
+  const parsed = z.record(z.string(), z.unknown()).parse(json)
+  variants.set(variant, parsed)
+  return parsed
 }
 
 const respondTool = "respond"

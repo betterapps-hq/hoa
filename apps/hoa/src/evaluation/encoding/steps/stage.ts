@@ -332,8 +332,9 @@ export async function runRuleStructuring(
     ...entry.proposed
   ]
   const allStructured = () => entries().flatMap(({ entry }) => entry.structured)
-  const check = (entry: { batch: StructuringBatch; proposed: TermContent[] }) =>
+  const check = (entry: { batch: StructuringBatch; structured: Structured[]; proposed: TermContent[] }) =>
     checkStructured({
+      checked: entry.structured,
       structured: allStructured(),
       vocabulary: vocabularyOf(entry),
       provisions: context.provisions,

@@ -534,10 +534,14 @@ export async function structureFirstPass(input: Parameters<typeof structureBatch
 export type RuleProblem = { code: string; message: string; path: (string | number)[] }
 
 /**
- * The validator's problems with each structured rule, read with its batch's vocabulary, every rule structured so far
- * and other rules it may target (those of batches outside a partial run).
+ * The validator's problems with each of a batch's structured rules, read with its vocabulary, every rule structured so
+ * far and other rules it may target (those of batches outside a partial run). Only the batch's own rules are checked:
+ * each batch's check would otherwise check every rule of the run again.
  */
 export function checkStructured(input: {
+  /** The batch's rules. */
+  checked: readonly Structured[]
+  /** Every rule structured so far, the batch's included. */
   structured: readonly Structured[]
   vocabulary: readonly TermContent[]
   provisions: readonly Provision[]
@@ -547,20 +551,26 @@ export function checkStructured(input: {
   const own = input.structured.flatMap((item) => (item.rule ? [item.rule] : []))
   const keys = new Set(input.structured.map((item) => item.outline.key))
   const rules = [...own, ...(input.otherRules ?? []).filter((rule) => !keys.has(rule.key))]
-  const found = recordProblems({
-    terms: input.vocabulary,
-    rules,
-    provisions: input.provisions,
-    documents: input.documents
-  })
+  const found = Map.groupBy(
+    recordProblems({
+      terms: input.vocabulary,
+      rules,
+      provisions: input.provisions,
+      documents: input.documents,
+      about: new Set(input.checked.map((item) => item.outline.key))
+    }),
+    (problem) => problem.recordKey
+  )
   return new Map(
-    input.structured.map((item) => [
+    input.checked.map((item) => [
       item.outline.key,
       [
         ...item.issues.map((issue) => ({ code: issue.split(":")[0] ?? "zod", message: issue, path: [] })),
-        ...found
-          .filter((problem) => problem.recordKey === item.outline.key)
-          .map((problem) => ({ code: problem.code, message: problem.message, path: problem.path }))
+        ...(found.get(item.outline.key) ?? []).map((problem) => ({
+          code: problem.code,
+          message: problem.message,
+          path: problem.path
+        }))
       ]
     ])
   )
