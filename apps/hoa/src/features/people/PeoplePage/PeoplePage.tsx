@@ -585,20 +585,13 @@ function personColumns(actions: PersonRowActions | null) {
       },
       meta: { isRowHeader: true, cellClassName: "min-w-56" }
     }),
-    personColumn.accessor((row) => accessLabels[row.access], {
-      id: "role",
-      header: "Role",
-      sortFn: "text",
-      meta: { cellClassName: "whitespace-nowrap" }
-    }),
     personColumn.accessor((row) => row.units.map(({ unit }) => unit.label).join(", "), {
       id: "unit",
       header: "Unit",
       sortFn: "text",
       cell: ({ row }) =>
-        row.original.units.length === 0 ? (
-          <span className="text-muted-foreground">None</span>
-        ) : (
+        // Staff, such as a property manager, have none.
+        row.original.units.length === 0 ? null : (
           <ul className="flex flex-col gap-2">
             {row.original.units.map(({ unit, link }) => (
               <li key={link.id}>
@@ -608,6 +601,12 @@ function personColumns(actions: PersonRowActions | null) {
           </ul>
         ),
       meta: { cellClassName: "min-w-48" }
+    }),
+    personColumn.accessor((row) => accessLabels[row.access], {
+      id: "role",
+      header: "Role",
+      sortFn: "text",
+      meta: { cellClassName: "whitespace-nowrap" }
     }),
     personColumn.accessor((row) => row.committees.map(({ committee }) => committee.name).join(", "), {
       id: "assignments",
