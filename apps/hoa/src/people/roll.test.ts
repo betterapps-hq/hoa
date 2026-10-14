@@ -109,6 +109,35 @@ describe("the roll", () => {
     expect(views[1]?.members.map(({ person }) => person.id)).toEqual(["lee", "pat"])
   })
 
+  it("keeps a committee's past terms, the latest first, and its terms that start later", () => {
+    const term = (id: string, personId: string, startedOn: string, endedOn: string | null) => ({
+      id,
+      committeeId: "board",
+      personId,
+      role: "member" as const,
+      office: null,
+      startedOn,
+      termEndsOn: null,
+      endedOn
+    })
+    const history: RollData = {
+      ...roll,
+      members: [
+        term("first", "pat", "2020-01-01", "2022-01-01"),
+        term("second", "pat", "2022-01-01", "2024-01-01"),
+        term("now", "sam", "2024-01-01", "2027-01-01"),
+        term("next", "sam", "2027-01-01", null),
+        term("new", "lee", "2026-11-01", null)
+      ]
+    }
+    const [board] = committeeViews(history, "2026-10-13")
+    expect(board?.pastTerms.map(({ member }) => member.id)).toEqual(["second", "first"])
+    expect(board?.members.map(({ member, nextTerm }) => [member.id, nextTerm?.id ?? null])).toEqual([
+      ["now", "next"],
+      ["new", null]
+    ])
+  })
+
   it("says whether someone has joined, with their membership's access or the one they're invited with", () => {
     const accounts = {
       memberships: [{ userId: "user-a", access: "administrator" as const }],

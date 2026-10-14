@@ -14,7 +14,7 @@ import {
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { ChoiceSelect } from "@/features/rulebook/ChoiceSelect/ChoiceSelect"
-import { useAppForm } from "@/lib/form"
+import { saveThenClose, useAppForm } from "@/lib/form"
 import {
   relationChoices,
   unitInputSchema,
@@ -38,10 +38,11 @@ export function UnitDialog({ unit, onSave, onOpenChange }: UnitDialogProps) {
   const form = useAppForm({
     defaultValues: { unit: unitValues(unit) },
     validators: { onSubmit: z.object({ unit: unitInputSchema }) },
-    onSubmit: async ({ value }) => {
-      await onSave(value.unit)
-      onOpenChange(false)
-    }
+    onSubmit: ({ value }) =>
+      saveThenClose(
+        () => onSave(value.unit),
+        () => onOpenChange(false)
+      )
   })
   return (
     <Dialog open onOpenChange={onOpenChange}>
@@ -102,10 +103,11 @@ export function UnitPeopleDialog({ unit, mode, people, onSave, onOpenChange }: U
   const form = useForm({
     defaultValues: { personId: "", relation: "owner" as UnitRelation, day: "" },
     validators: { onSubmit: linkSchema(isSale) },
-    onSubmit: async ({ value }) => {
-      await onSave(value)
-      onOpenChange(false)
-    }
+    onSubmit: ({ value }) =>
+      saveThenClose(
+        () => onSave(value),
+        () => onOpenChange(false)
+      )
   })
   return (
     <Dialog open onOpenChange={onOpenChange}>

@@ -9,3 +9,16 @@ export const { useAppForm, withFieldGroup } = createFormHook({
   fieldComponents: {},
   formComponents: {}
 })
+
+/**
+ * Saves a dialog's form, then closes the dialog. A save that fails has already said why, in a toast, and throws to keep
+ * the dialog open for another try; its error stops here instead of going unhandled.
+ */
+export async function saveThenClose(save: () => Promise<unknown>, close: () => void) {
+  try {
+    await save()
+  } catch {
+    return
+  }
+  close()
+}

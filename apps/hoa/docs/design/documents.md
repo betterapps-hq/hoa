@@ -56,7 +56,6 @@ defined in [schema.md](schema.md) and stored as [encoding.md](encoding.md#storag
 type Organization = { id: string; name: string; slug: string; settings: OrganizationSettings }
 
 type OrganizationSettings = {
-  curableOutcome: "approve-with-conditions" | "reject" // when every unmet rule is curable; default approve-with-conditions
   retentionDays: number // days after the committee's last decision; default 365
   draftRetentionDays: number // days after the last change to an application that was never submitted; default 30
   unitSystem: "imperial" | "metric" // the units forms offer for amounts; default imperial

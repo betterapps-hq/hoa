@@ -4,6 +4,6 @@ VALUES (
   'demo-hoa',
   'Sudden Valley Community Association',
   'sudden-valley',
-  '{"curableOutcome":"approve-with-conditions","retentionDays":365,"draftRetentionDays":30}',
+  '{"retentionDays":365,"draftRetentionDays":30}',
   1791417600000
 );

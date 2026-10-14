@@ -216,13 +216,21 @@ export const nextTermStart = ({ termEndsOn }: Pick<CommitteeMember, "termEndsOn"
   termEndsOn ? addDays(termEndsOn, 1) : today
 
 /**
- * Their seat and when they hold it until: the day they leave, once it's set, or when the term is due to end, or that
- * it ended while they hold the seat on. "President, term ends May 31, 2027".
+ * Their seat and its term: the day it starts, if that's later; the day their next term starts, once one is set; the
+ * day they leave, once it's set; or when the term is due to end, or that it ended while they hold the seat on.
+ * "President, term ends May 31, 2027".
  */
 export function seatTermLabel(
-  member: Pick<CommitteeMember, "office" | "role" | "termEndsOn" | "endedOn">,
-  today: string
+  member: Pick<CommitteeMember, "office" | "role" | "startedOn" | "termEndsOn" | "endedOn">,
+  today: string,
+  nextTerm: Pick<CommitteeMember, "startedOn"> | null = null
 ) {
+  if (member.startedOn && member.startedOn > today) {
+    return `${seatLabel(member)}, starts ${dayText(member.startedOn)}`
+  }
+  if (nextTerm?.startedOn) {
+    return `${seatLabel(member)}, next term from ${dayText(nextTerm.startedOn)}`
+  }
   if (member.endedOn) {
     return `${seatLabel(member)}, leaves ${dayText(member.endedOn)}`
   }
@@ -231,6 +239,10 @@ export function seatTermLabel(
   }
   return seatLabel(member)
 }
+
+/** When a term they served ran: "Jan 1, 2023 to Jan 1, 2025", or "Until Jan 1, 2025" without its start. */
+export const servedText = ({ startedOn, endedOn }: Pick<CommitteeMember, "startedOn" | "endedOn">) =>
+  [startedOn ? `${dayText(startedOn)} to` : "Until", endedOn ? dayText(endedOn) : "now"].join(" ")
 
 /** What a resignation says it did: "You left the Board of Directors", or the day they will. */
 export const resignedText = (committee: string, endedOn: string, today: string) =>

@@ -62,7 +62,18 @@ export type PersonRow = {
 
 export type UnitRow = { unit: Unit; people: { link: UnitLink; person: Person }[] }
 
-export type CommitteeView = { committee: Committee; members: { member: CommitteeMember; person: Person }[] }
+/** A term in a seat and whose it is. */
+export type Term = { member: CommitteeMember; person: Person }
+
+/**
+ * A committee on a day: who sits on it, with each seat's next term once one is set, and anyone whose first term starts
+ * later; and the terms served before, the latest first.
+ */
+export type CommitteeView = {
+  committee: Committee
+  members: (Term & { nextTerm: CommitteeMember | null })[]
+  pastTerms: Term[]
+}
 
 /** Owners first, then residents, then tenants. */
 const relationOrder: Record<UnitRelation, number> = { owner: 0, resident: 1, tenant: 2 }
@@ -105,24 +116,44 @@ export function unitRows(roll: RollData, today: string): UnitRow[] {
   }))
 }
 
-/** Each committee, the board first, with who sits on it on a day, the chair first. */
+/** Each committee on a day (YYYY-MM-DD), the board first, its members the chair first. */
 export function committeeViews(roll: RollData, today: string): CommitteeView[] {
   const people = new Map(roll.people.map((person) => [person.id, person]))
+  const isUpcoming = (member: CommitteeMember) => member.startedOn !== null && member.startedOn > today
   return roll.committees
     .toSorted((a, b) => Number(b.kind === "board") - Number(a.kind === "board"))
-    .map((committee) => ({
-      committee,
-      members: roll.members
-        .filter((member) => member.committeeId === committee.id && isCurrent(member, today))
+    .map((committee) => {
+      const terms = roll.members
+        .filter((member) => member.committeeId === committee.id)
         .flatMap((member) => {
           const person = people.get(member.personId)
           return person ? [{ member, person }] : []
         })
-        .toSorted((a, b) => Number(b.member.role === "chair") - Number(a.member.role === "chair"))
-    }))
+      // A seat's next term starts the day the one before ends.
+      const nextOf = (member: CommitteeMember) =>
+        terms.find(
+          (term) =>
+            term.member.personId === member.personId &&
+            isUpcoming(term.member) &&
+            term.member.startedOn === member.endedOn
+        )?.member ?? null
+      const current = terms.filter((term) => isCurrent(term.member, today))
+      const following = new Set(current.flatMap((term) => nextOf(term.member)?.id ?? []))
+      return {
+        committee,
+        members: [
+          ...current.map((term) => ({ ...term, nextTerm: nextOf(term.member) })),
+          ...terms
+            .filter((term) => isUpcoming(term.member) && !following.has(term.member.id))
+            .map((term) => ({ ...term, nextTerm: null }))
+        ].toSorted((a, b) => Number(b.member.role === "chair") - Number(a.member.role === "chair")),
+        pastTerms: terms
+          .filter(({ member }) => member.endedOn !== null && member.endedOn <= today)
+          .toSorted((a, b) => (b.member.endedOn ?? "").localeCompare(a.member.endedOn ?? ""))
+      }
+    })
 }
 
-/** Whether taking `personId` off the roll, or their administrator access away, would leave nobody to manage it. */
 /**
  * Why someone can't leave their seat on a day (YYYY-MM-DD), or null: the board is never left with nobody on it. Any
  * other committee can empty.
@@ -141,6 +172,7 @@ export function resignationProblem(
     : null
 }
 
+/** Whether taking `personId` off the roll, or their administrator access away, would leave nobody to manage it. */
 export function isLastAdministrator(roll: Pick<RollData, "people" | "memberships">, personId: string) {
   const administrators = roll.memberships.filter((membership) => membership.access === "administrator")
   const userId = roll.people.find((person) => person.id === personId)?.userId

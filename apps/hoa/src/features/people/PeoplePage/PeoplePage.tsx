@@ -1,6 +1,7 @@
 import {
   BuildingIcon,
   CalendarPlusIcon,
+  ChevronDownIcon,
   HandshakeIcon,
   HomeIcon,
   EyeIcon,
@@ -32,6 +33,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -45,6 +47,7 @@ import {
   seatLabel,
   resignedText,
   seatTermLabel,
+  servedText,
   type Access,
   type Committee,
   type CommitteeMember,
@@ -302,7 +305,7 @@ export function PeoplePage({
               }
             />
           ) : (
-            committees.map(({ committee, members }) => (
+            committees.map(({ committee, members, pastTerms }) => (
               <Card key={committee.id}>
                 <CardHeader>
                   <CardTitle>
@@ -353,11 +356,13 @@ export function PeoplePage({
                     <p className="text-sm text-muted-foreground">No members yet.</p>
                   ) : (
                     <ul className="flex flex-col divide-y">
-                      {members.map(({ member, person }) => (
+                      {members.map(({ member, person, nextTerm }) => (
                         <li key={member.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
                           <div className="flex min-w-0 flex-1 flex-col">
                             <span className="truncate font-medium">{person.name}</span>
-                            <span className="text-sm text-muted-foreground">{seatTermLabel(member, today)}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {seatTermLabel(member, today, nextTerm)}
+                            </span>
                           </div>
                           {isAdministrator || person.id === viewerId ? (
                             <RowActions name={person.name} actions={seatActions(committee, member, person)} />
@@ -366,6 +371,32 @@ export function PeoplePage({
                       ))}
                     </ul>
                   )}
+                  {pastTerms.length > 0 ? (
+                    <Collapsible className="mt-3">
+                      <CollapsibleTrigger
+                        render={<Button variant="ghost" size="sm" className="group/past -ml-2 text-muted-foreground" />}
+                      >
+                        {pastTerms.length === 1 ? "1 past term" : `${pastTerms.length} past terms`}
+                        <ChevronDownIcon
+                          className="transition-transform group-aria-expanded/past:rotate-180"
+                          aria-hidden
+                        />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        <ul className="flex flex-col divide-y pt-1" aria-label={`Past terms on ${committee.name}`}>
+                          {pastTerms.map(({ member, person }) => (
+                            <li key={member.id} className="flex flex-wrap items-baseline gap-x-3 py-2 text-sm">
+                              <span className="min-w-0 flex-1">
+                                <span className="font-medium">{person.name}</span>
+                                <span className="block text-muted-foreground">{seatLabel(member)}</span>
+                              </span>
+                              <span className="text-muted-foreground tabular-nums">{servedText(member)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  ) : null}
                 </CardContent>
               </Card>
             ))

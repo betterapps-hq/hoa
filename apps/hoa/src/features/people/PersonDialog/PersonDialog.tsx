@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { ChoiceSelect } from "@/features/rulebook/ChoiceSelect/ChoiceSelect"
-import { useAppForm } from "@/lib/form"
+import { saveThenClose, useAppForm } from "@/lib/form"
 import {
   accessChoices,
   personInputSchema,
@@ -124,29 +124,31 @@ export function PersonDialog({
       adding: [] as (NewSeat & { key: string })[]
     },
     validators: { onSubmit: formSchema },
-    onSubmit: async ({ value }) => {
-      await onSave({
-        person: {
-          name: value.name,
-          email: value.email,
-          phone: value.phone,
-          mailingAddress: value.mailingAddress,
-          access: value.access
-        },
-        homes: {
-          add: value.newHomes.flatMap(({ unitId, unit, relation }) => {
-            const home = unit ?? unitId
-            return home ? [{ unit: home, relation }] : []
+    onSubmit: ({ value }) =>
+      saveThenClose(
+        () =>
+          onSave({
+            person: {
+              name: value.name,
+              email: value.email,
+              phone: value.phone,
+              mailingAddress: value.mailingAddress,
+              access: value.access
+            },
+            homes: {
+              add: value.newHomes.flatMap(({ unitId, unit, relation }) => {
+                const home = unit ?? unitId
+                return home ? [{ unit: home, relation }] : []
+              }),
+              end: value.leavingHomes
+            },
+            assignments: {
+              add: value.adding.map(({ committeeId, seat }) => ({ committeeId, seat })),
+              end: value.ending
+            }
           }),
-          end: value.leavingHomes
-        },
-        assignments: {
-          add: value.adding.map(({ committeeId, seat }) => ({ committeeId, seat })),
-          end: value.ending
-        }
-      })
-      onOpenChange(false)
-    }
+        () => onOpenChange(false)
+      )
   })
   const text = (
     name: "name" | "email" | "phone" | "mailingAddress",

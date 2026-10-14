@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { saveThenClose } from "@/lib/form"
 import { seatTermLabel, type CommitteeMember } from "@/people/people"
 
 /** One of the things the dialog can end: someone's time at a home, or a seat on a committee. */
@@ -70,10 +71,11 @@ export function EndDialog({
         endedOn: z.iso.date("Give a date.").refine((day) => !earliest || day >= earliest, "Pick today or a later day.")
       })
     },
-    onSubmit: async ({ value }) => {
-      await onEnd({ id: value.id, endedOn: value.endedOn })
-      onOpenChange(false)
-    }
+    onSubmit: ({ value }) =>
+      saveThenClose(
+        () => onEnd({ id: value.id, endedOn: value.endedOn }),
+        () => onOpenChange(false)
+      )
   })
   return (
     <Dialog open onOpenChange={onOpenChange}>
@@ -162,7 +164,7 @@ type ResignDialogProps = {
   /** The committee's name. */
   committee: string
   /** Their seat on it, by its id. */
-  seat: { id: string } & Pick<CommitteeMember, "office" | "role" | "termEndsOn" | "endedOn">
+  seat: { id: string } & Pick<CommitteeMember, "office" | "role" | "startedOn" | "termEndsOn" | "endedOn">
   today: string
   onResign: (endedOn: string) => Promise<void>
   onOpenChange: (open: boolean) => void

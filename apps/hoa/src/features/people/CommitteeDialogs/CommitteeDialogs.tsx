@@ -6,7 +6,7 @@ import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogT
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { ChoiceSelect } from "@/features/rulebook/ChoiceSelect/ChoiceSelect"
-import { useAppForm } from "@/lib/form"
+import { saveThenClose, useAppForm } from "@/lib/form"
 import {
   committeeInputSchema,
   committeeKindChoices,
@@ -31,10 +31,11 @@ export function CommitteeDialog({ committee, onSave, onOpenChange }: CommitteeDi
   const form = useForm({
     defaultValues: { name: committee?.name ?? "", kind: committee?.kind ?? ("other" as CommitteeKind) },
     validators: { onSubmit: committeeInputSchema },
-    onSubmit: async ({ value }) => {
-      await onSave(value)
-      onOpenChange(false)
-    }
+    onSubmit: ({ value }) =>
+      saveThenClose(
+        () => onSave(value),
+        () => onOpenChange(false)
+      )
   })
   return (
     <Dialog open onOpenChange={onOpenChange}>
@@ -138,10 +139,11 @@ export function MemberDialog({ committee, people, change, today, onSave, onOpenC
           : seatInputSchema
       })
     },
-    onSubmit: async ({ value }) => {
-      await onSave(value)
-      onOpenChange(false)
-    }
+    onSubmit: ({ value }) =>
+      saveThenClose(
+        () => onSave(value),
+        () => onOpenChange(false)
+      )
   })
   const title = {
     add: `Add to ${committee.name}`,

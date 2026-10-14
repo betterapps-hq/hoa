@@ -46,6 +46,7 @@ export type AccountMembership = {
     name: string
     role: CommitteeRole
     office: string | null
+    startedOn: string | null
     termEndsOn: string | null
     endedOn: string | null
   }[]
@@ -104,6 +105,7 @@ async function membershipOf(account: SignedInAccount) {
       name: committee.name,
       role: member.role,
       office: member.office,
+      startedOn: member.startedOn,
       termEndsOn: member.termEndsOn,
       endedOn: member.endedOn
     })),
