@@ -35,7 +35,20 @@ against the covenants. The window is open, but not for long.
   signatures at the end ([design/document-requirements.md](design/document-requirements.md)).
 - **Applications:** homeowners apply, upload files, and get an AI review against the rulebook; the committee decides
   ([design/application-review.md](design/application-review.md)).
+- **Owner portal:** the homeowner's dashboard ([dashboard.md](dashboard.md)): what waits on them, where their
+  applications stand, the rules in force and recent activity. It needs real accounts and the modules below.
 - **Roles:** a demo switcher between a homeowner and an administrator. There are no real accounts or memberships yet.
+
+## Priorities
+
+- **P1, needed before an association can switch from PayHOA, or where PayHOA is weak:** accounts and the owner portal,
+  units and change of ownership, importing an association's data, named roles and committees, email and text
+  messages, dues with autopay, late fees and payment plans, the QuickBooks sync, violations with fines and phone
+  inspections, owner voting, documents, online signatures and neighbor sign-off, and a mobile app.
+- **P2, wanted but rarely a reason to switch:** mailed letters, amenity bookings, resale documents, a public website,
+  message boards, a calendar, meetings and minutes, maintenance requests, WhatsApp, the AI assistants.
+- **P3:** management companies, other languages.
+- **Not planned:** see [below](#not-planned).
 
 ## Modules
 
@@ -58,8 +71,8 @@ Everything else needs to know who owns what and who may do what.
 
 One notification system every module sends through.
 
-- Email, text message, automated voice calls and WhatsApp; mailed letters (first class and certified) through a print
-  and mail service. Each person picks their channels.
+- Email and text message first; automated voice calls and WhatsApp next (P2). Each person picks their channels.
+- Mailed letters (first class and certified) through a print and mail service: P2 or P3.
 - Announcements to everyone, a committee, or a tag; templates with merge fields; scheduling.
 - A log for each owner and unit of everything sent, and whether it was delivered, opened or bounced.
 - Email from the association's own address, which PayHOA doesn't offer.
@@ -93,13 +106,11 @@ One notification system every module sends through.
 - Fines: a violation becomes a charge on the unit's ledger, citing its rule and the fine schedule.
 - Processing fees pass to whoever pays. PayHOA charges $2.45 a bank payment and 3.5% plus $0.50 a card payment, and
   its fees are a common complaint, so lower bank-payment fees are an opening.
-- **QuickBooks sync** rather than full accounting at first. PayHOA has no QuickBooks connection and builds its own
-  books instead. Its books are where its reviews are weakest (bank links that break, rigid reports, reserves by hand
-  journal entries), so the full books can come later:
-  - General ledger (cash or accrual), chart of accounts, bank feeds and reconciliation, budgets and budget against
-    actual, reports and board packets.
-  - Reserve funds, and later reserve studies.
-  - Payables: vendor bills by email read automatically, approval chains, paying vendors, 1099s.
+- **QuickBooks sync** instead of building the books. PayHOA has no QuickBooks connection and builds its own books
+  instead, and its books are where its reviews are weakest (bank links that break, rigid reports, reserves by hand
+  journal entries). QuickBooks keeps the ledger, bank feeds, reconciliation, budgets, reports and vendor bills; the
+  app sends it each unit's charges and payments.
+- Reserve funds as their own balance; reserve studies later.
 
 ### 5. Violations
 
@@ -132,8 +143,8 @@ One notification system every module sends through.
 
 ### 8. Community
 
-- **Owner portal:** balance and history, payments, applications and requests, violations and replies, documents,
-  calendar and message boards, in one place.
+- **Owner portal** (built as the homeowner's dashboard): improve it to bring balance and history, payments,
+  applications and requests, violations and replies, documents, calendar and message boards into one place.
 - **Mobile app** for owners and the board. PayHOA has none yet (it told a reviewer in March 2026 one is coming), and
   reviews name it as a drawback.
 - **Documents:** beyond the governing documents, folders for minutes, budgets and forms, shared with everyone, a
@@ -157,20 +168,28 @@ One notification system every module sends through.
 
 ### Not planned
 
-Gate and visitor access, package tracking, and short-term rental tracking: other platforms offer them, mostly for
-condominiums and gated communities, and PayHOA doesn't.
+- **Full books:** the general ledger, bank feeds and reconciliation, budgets and reports, and payables (vendor bills,
+  approval chains, paying vendors, 1099s). QuickBooks does these.
+- **Banking:** association bank accounts, paying vendors from them, and spend cards.
+- **Bookkeeping and tax filing services.** A partner, if associations ask.
+- Gate and visitor access, package tracking, and short-term rental tracking: other platforms offer them, mostly for
+  condominiums and gated communities, and PayHOA doesn't.
 
 ## Build order
 
-1. **People:** accounts, units, roles and committees. Every other module depends on it.
-2. **Notifications:** every later module sends through it.
+The P1 work, in order:
+
+1. **People:** accounts, units, roles and committees, and importing an association's data. Every other module depends
+   on it.
+2. **Notifications:** email and text; every later module sends through them.
 3. **Applications:** neighbor sign-off, online signatures and committee decisions, on the module that's built.
-4. **Money:** payments, dues and autopay, fines, then the QuickBooks sync.
-5. **Owner portal and documents,** as money and applications need somewhere for owners to see them.
-6. **Meetings and votes.**
-7. **Violations** with enforcement, and **maintenance requests.**
-8. **Community:** message boards, website, amenity bookings, resale documents, the mobile app.
-9. **Full books**, if associations want them over QuickBooks.
+4. **Money:** payments, dues and autopay, late fees and payment plans, fines, then the QuickBooks sync.
+5. **Owner portal and documents:** the homeowner's dashboard grows to show balances, payments and documents.
+6. **Violations** with enforcement and phone inspections.
+7. **Owner voting.**
+8. **Mobile app.**
+
+Then the P2 modules, as associations ask for them.
 
 ## Compared with PayHOA
 
@@ -184,12 +203,12 @@ Every PayHOA plan has every feature. What it does, and where this app stands:
 | Invoices and dues | One-time and recurring, bulk by tag, emailed or mailed | Planned: Money |
 | Payments | Stripe bank and card, autopay, lockbox, pass-through fees | Planned: Money |
 | Late fees and collections | Flat, percentage or compounding; reminders; payment plans; account lock | Planned: Money |
-| Books | Ledger, chart of accounts, bank feeds, reconciliation (with AI), budgets, 30+ reports, board packets | QuickBooks sync first; full books later |
-| Payables | Invoice inbox read automatically, approval chains, mailed checks, 1099s | Later, with full books |
+| Books | Ledger, chart of accounts, bank feeds, reconciliation (with AI), budgets, 30+ reports, board packets | Not planned: QuickBooks sync instead |
+| Payables | Invoice inbox read automatically, approval chains, mailed checks, 1099s | Not planned: QuickBooks |
 | Banking | Account with vendor bank payments and spend cards (beta) | Not planned |
-| Bookkeeping and tax filing | Paid service from $199 a month; 1120-H from $399 | Not planned (a partner, later) |
+| Bookkeeping and tax filing | Paid service from $199 a month; 1120-H from $399 | Not planned (a partner, if asked) |
 | Messages | Email, text, voice calls, delivery log, scheduling | Planned: Notifications, plus WhatsApp and the association's own email address |
-| Mail | Letters, statements and checks by post | Planned: Notifications |
+| Mail | Letters, statements and checks by post | P2 or P3: Notifications |
 | Message boards | Open, private and announcement boards | Planned: Community |
 | Website | Builder, its own address, Penny chatbot | Planned: Community and AI assistants |
 | Calendar | Events, reminders, Google Calendar | Planned: Meetings |
@@ -198,7 +217,7 @@ Every PayHOA plan has every feature. What it does, and where this app stands:
 | Documents | Unlimited folders, sharing by group or unit | Governing documents **built**; folders planned |
 | Voting and surveys | Ranked choice, paper ballots with QR codes, quorum, weighted, anonymous | Planned: Meetings and votes, plus thresholds from the documents |
 | Meetings and minutes | Minutes stored as documents only | Planned: Meetings, with AI-drafted minutes |
-| Owner portal | Balance, payments, requests, violations, documents | Planned: Community |
+| Owner portal | Balance, payments, requests, violations, documents | **Built** as the homeowner's dashboard; grows with each module |
 | Mobile app | None ("in the works") | Planned: Community |
 | Amenities | Bookings with rules, fees, waivers and approval | Planned: Community |
 | Resale documents | Through HomeWiseDocs | Planned: Community |
@@ -246,7 +265,6 @@ is $600 to $1,300, so the rulebook build and each AI review have to stay a small
 - Can a committee vote without a meeting (by email, say), or only where the documents allow it?
 - Who pays card and bank fees: the owner paying, or the association?
 - Is WhatsApp needed at launch, or after email and text?
-- Full books, or QuickBooks for good? It decides whether payables and budgets are ever built.
 
 ## Sources
 
