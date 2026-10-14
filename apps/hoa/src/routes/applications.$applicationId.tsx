@@ -19,7 +19,6 @@ import { useRole } from "@/features/role/RoleProvider"
 
 export const Route = createFileRoute("/applications/$applicationId")({
   staticData: { title: "Application" },
-  head: () => ({ meta: [{ title: "Application | HOA design review" }] }),
   loader: ({ params }) => getApplicationView({ data: { applicationId: params.applicationId } }),
   component: ApplicationRoute
 })

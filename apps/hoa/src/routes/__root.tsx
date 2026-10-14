@@ -12,18 +12,11 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { RoleProvider } from "@/features/role/RoleProvider"
+import { documentTitle } from "@/session/documentTitle"
 import { getSession, type Session } from "@/session/session.functions"
 import appCss from "../styles.css?url"
 
 export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "HOA design review" }
-    ],
-    links: [{ rel: "stylesheet", href: appCss }]
-  }),
   // Signed out, every page but sign-in goes to sign-in; signed in with an email no roll has, to the welcome page.
   beforeLoad: async ({ location }) => {
     const session = await getSession()
@@ -40,6 +33,16 @@ export const Route = createRootRoute({
     return { session }
   },
   loader: ({ context }) => context.session,
+  // After the loader, so TypeScript knows its data. The tab's title is the page's own (its staticData title), then the
+  // association's name.
+  head: ({ matches, loaderData }) => ({
+    meta: [
+      { charSet: "utf-8" },
+      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { title: documentTitle(matches.findLast((match) => match.staticData.title)?.staticData.title, loaderData) }
+    ],
+    links: [{ rel: "stylesheet", href: appCss }]
+  }),
   shellComponent: RootDocument,
   component: RootLayout
 })

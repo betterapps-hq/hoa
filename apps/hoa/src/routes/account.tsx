@@ -6,7 +6,6 @@ import { AccountPage } from "@/features/account/AccountPage/AccountPage"
 
 export const Route = createFileRoute("/account")({
   staticData: { title: "Account" },
-  head: () => ({ meta: [{ title: "Account" }] }),
   loader: () => getAccountDetails(),
   component: AccountRoute
 })

@@ -12,7 +12,7 @@ export const Route = createFileRoute("/sign-in")({
       throw redirect({ href: safeRedirect(search.redirect) })
     }
   },
-  head: () => ({ meta: [{ title: "Sign in" }] }),
+  staticData: { title: "Sign in" },
   component: SignInRoute
 })
 

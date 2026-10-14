@@ -18,7 +18,6 @@ import { PeoplePage } from "@/features/people/PeoplePage/PeoplePage"
 
 export const Route = createFileRoute("/people")({
   staticData: { title: "People" },
-  head: () => ({ meta: [{ title: "People" }] }),
   loader: () => getPeopleRoll(),
   component: PeopleRoute
 })

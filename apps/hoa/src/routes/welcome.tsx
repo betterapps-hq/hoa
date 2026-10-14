@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export const Route = createFileRoute("/welcome")({
-  head: () => ({ meta: [{ title: "Welcome" }] }),
+  staticData: { title: "Welcome" },
   component: WelcomeRoute
 })
 

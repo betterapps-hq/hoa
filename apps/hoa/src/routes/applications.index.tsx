@@ -5,7 +5,6 @@ import { useRole } from "@/features/role/RoleProvider"
 
 export const Route = createFileRoute("/applications/")({
   staticData: { title: "Applications" },
-  head: () => ({ meta: [{ title: "Applications | HOA design review" }] }),
   loader: () => listApplications(),
   component: ApplicationsRoute
 })

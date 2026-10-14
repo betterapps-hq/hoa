@@ -5,7 +5,6 @@ import { listActiveProjectTypes } from "@/features/projectTypes/projectTypes.fun
 
 export const Route = createFileRoute("/applications/new")({
   staticData: { title: "Start an application" },
-  head: () => ({ meta: [{ title: "Start an application | HOA design review" }] }),
   loader: () => listActiveProjectTypes(),
   component: StartApplicationRoute
 })
