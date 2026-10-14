@@ -28,7 +28,7 @@ describe("RoleProvider", () => {
     )
     expect(
       screen.getByText(
-        "Administrator at Maple Hollow as Sam Rivera: Home (Dashboard), Design Review (Applications, Project types), Organization (Rulebook, People)"
+        "Administrator at Maple Hollow as Sam Rivera: Home (Dashboard), Organization (Rulebook, People), Design Review (Applications, Project types)"
       )
     ).toBeInTheDocument()
   })

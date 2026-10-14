@@ -2,15 +2,7 @@ import { useForm } from "@tanstack/react-form"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog"
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
@@ -121,18 +113,16 @@ export function PersonDialog({ person, units, access, canGrantAccess, onSave, on
           }}
         >
           <DialogHeader>
-            <DialogTitle>{person ? `Edit ${person.name}` : "Add a person"}</DialogTitle>
-            <DialogDescription>
-              {person
-                ? "A new email lets go of the account the old one signed in with."
-                : "With their email on the roll, they can sign in and see their home."}
-            </DialogDescription>
+            <DialogTitle>{person ? `Edit ${person.name}` : "Add person"}</DialogTitle>
           </DialogHeader>
           <FieldGroup>
             {text("name", "Name", { required: true })}
-            {text("email", "Email", { type: "email", description: "How they sign in." })}
+            {text("email", "Email", {
+              type: "email",
+              ...(person ? { description: "Changing it unlinks their account." } : {})
+            })}
             {text("phone", "Phone", { type: "tel" })}
-            {text("mailingAddress", "Mailing address", { description: "Only when mail doesn't go to their unit." })}
+            {text("mailingAddress", "Mailing address", { description: "If not their unit." })}
             {!person && units.length > 0 ? (
               <div className="grid gap-3 sm:grid-cols-[1fr_9rem]">
                 <form.Field name="unitId">
@@ -188,7 +178,7 @@ export function PersonDialog({ person, units, access, canGrantAccess, onSave, on
                       <FieldLabel htmlFor="person-administrator" className="font-normal">
                         Administrator
                       </FieldLabel>
-                      <FieldDescription>Manages the association here: people, rules and applications.</FieldDescription>
+                      <FieldDescription>Manages everything here.</FieldDescription>
                     </FieldContent>
                   </Field>
                 )}

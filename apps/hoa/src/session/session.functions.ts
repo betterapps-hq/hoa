@@ -25,6 +25,12 @@ export type Session =
       /** The units the organization's forms offer for amounts. */
       unitSystem: OrganizationSettings["unitSystem"]
       user: SessionUser
+      /** Their person on the organization's roll. */
+      personId: string
+      /** One of the platform's operators, who can view the app as someone. */
+      isOperator: boolean
+      /** An operator is viewing the app as this account. */
+      isViewingAs: boolean
     }
 
 /** The signed-in user, their role and their HOA, for the app shell and the sign-in pages. */
@@ -45,6 +51,9 @@ export const getSession = createServerFn({ method: "GET" }).handler(async (): Pr
     organizationName: organization.name,
     committees: committees.map(({ name, kind }) => ({ name, kind })),
     unitSystem: organization.settings.unitSystem,
-    user: { name: account.name || person.name, email: account.email }
+    user: { name: account.name || person.name, email: account.email },
+    personId: person.id,
+    isOperator: account.isOperator,
+    isViewingAs: account.impersonatedBy !== null
   }
 })

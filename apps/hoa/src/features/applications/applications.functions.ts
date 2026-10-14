@@ -31,6 +31,7 @@ import { listGoverningDocuments } from "@/db/documentRepository"
 import { deleteJobsOf, getLatestJob, insertJob, newJob } from "@/db/jobRepository"
 import { getProjectType, listProjectTypes } from "@/db/projectTypeRepository"
 import { getPublishedRulesFile, type RulesFileRef } from "@/db/rulebookContentRepository"
+import { doesWorkOf } from "@/features/role/roles"
 import type { Job } from "@/jobs/job"
 import { answersSchema, emptyAnswers } from "@/projectTypes/answers"
 import { projectAnswers, type ProjectType } from "@/projectTypes/projectType"
@@ -40,7 +41,7 @@ import type { RulesUpdate } from "@/review/ruleChanges"
 import { subjectsAnswerSchema } from "@/review/subjects"
 import { readRulesFile } from "@/rulebook/assemble"
 import type * as T from "@/schema/types"
-import { getRequestContext, requireAdministrator, type RequestContext } from "@/session/requestContext.server"
+import { getRequestContext, requireWorkOf, type RequestContext } from "@/session/requestContext.server"
 import { applicationKeys, jobOutputPrefix, jobStepKey, rulebookKeys } from "@/storage/keys"
 import { deleteObjectsUnder, getJson, toBase64 } from "@/storage/objects"
 import { getBucket, presignerOrNull } from "@/storage/storage.server"
@@ -56,10 +57,13 @@ import { rulebookVersions, rulesUpdateOf } from "./rulesUpdate.server"
 /** Statuses in which the homeowner can change files and run the review. */
 const editableStatuses: readonly ApplicationStatus[] = ["draft", "reviewed", "information-requested"]
 
+/** Whether they review applications: an administrator, or someone on the architectural committee. */
+const reviewsApplications = (context: RequestContext) => doesWorkOf(context.role, context.committees, "architectural")
+
 /** Who's asking, for what they may see: the committee sees an application once it's submitted. */
 const viewerOf = (context: RequestContext) => ({
   userId: context.user.id,
-  isCommittee: context.role === "administrator"
+  isCommittee: reviewsApplications(context)
 })
 
 /** The application, if the requester may see it: its owner, or an administrator once it's been submitted. */
@@ -421,7 +425,7 @@ export const recordDecision = createServerFn({ method: "POST" })
       .parse(data)
   )
   .handler(async ({ data }) => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("architectural")
     const now = new Date().toISOString()
     const decision = { outcome: data.outcome, note: data.note || null, decidedBy: context.user.id, decidedAt: now }
     const status: ApplicationStatus = data.outcome === "information-requested" ? "information-requested" : "decided"
@@ -479,7 +483,7 @@ export const listApplications = createServerFn({ method: "GET" }).handler(async 
     await listApplicationRecords(
       db,
       context.organization.id,
-      context.role === "administrator" ? {} : { createdBy: context.user.id }
+      reviewsApplications(context) ? {} : { createdBy: context.user.id }
     )
   ).filter((application) => canSee(application, viewerOf(context)))
   const types = await listProjectTypes(db, context.organization.id)
@@ -572,7 +576,7 @@ export const getApplicationView = createServerFn({ method: "GET" })
     const application = await loadApplication(context, data.applicationId)
     const db = getDb()
     const isOwner = application.createdBy === context.user.id
-    const isCommittee = context.role === "administrator" && !isOwner
+    const isCommittee = reviewsApplications(context) && !isOwner
     const reviewId = isCommittee && application.submittedReviewId ? application.submittedReviewId : application.reviewId
     const canEdit = isOwner && editableStatuses.includes(application.status)
     const [files, review, history, job, sourceFiles, type] = await Promise.all([
@@ -609,7 +613,7 @@ export const getApplicationView = createServerFn({ method: "GET" })
       job,
       isOwner,
       canEdit,
-      canDecide: context.role === "administrator" && application.status === "submitted"
+      canDecide: reviewsApplications(context) && application.status === "submitted"
     }
   })
 

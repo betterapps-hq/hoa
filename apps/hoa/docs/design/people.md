@@ -43,11 +43,11 @@ first they joined.
 - **Committee work:** follows the seats someone holds today (`committeesInView`). The board reads the roll, adds
   people and keeps who owns, lives in or rents each home; the architectural committee works on applications and project
   types. An administrator does every committee's work.
-- **The sidebar** has a section for each committee whose work they do, named as the association names it, with that
-  committee's pages (`navigationFor`).
+- **The sidebar** has the organization's pages (People for the board), then a section for each committee whose work
+  they do that has pages of its own, named as the association names it (`navigationFor`).
 
-The platform's operators are separate: Better Auth's admin plugin, with `users.role` set to `admin`. They can sign in as
-someone to see what they see.
+The platform's operators are separate: Better Auth's admin plugin, with `users.role` set to `admin`. They can view the
+app as someone who's joined, under a yellow bar across the top with the way back.
 
 ## Homes
 

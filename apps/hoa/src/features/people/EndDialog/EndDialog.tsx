@@ -1,15 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog"
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Field,
   FieldContent,
@@ -76,7 +68,6 @@ export function EndDialog({ title, legend, choices, today, onEnd, onOpenChange }
         >
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>They stay on the roll, with their history.</DialogDescription>
           </DialogHeader>
           <FieldGroup>
             <form.Field name="id">

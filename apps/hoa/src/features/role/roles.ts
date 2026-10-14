@@ -16,45 +16,6 @@ export const roles: Record<RoleId, Role> = {
   administrator: { id: "administrator", name: "Administrator", description: "Manage the whole HOA" }
 }
 
-/** The pages each kind of committee works in, under its name in the sidebar. */
-const committeePages: Record<CommitteeKind, NavItem[]> = {
-  board: [{ title: "People", to: "/people" }],
-  architectural: [
-    { title: "Applications", to: "/applications" },
-    { title: "Project types", to: "/project-types" }
-  ],
-  other: []
-}
-
-/**
- * The sidebar's sections: the dashboard; a section for each committee whose work they do (`committeesInView`), named
- * as the association names it, with its pages; then the association's own pages. A page sits under the first committee
- * that works in it, and an administrator finds a page no committee has under the association's.
- */
-export function navigationFor(roleId: RoleId, committees: readonly Pick<Committee, "name" | "kind">[]): NavSection[] {
-  const placed = new Set<NavItem["to"]>()
-  const sections = committees.flatMap((committee) => {
-    const items = committeePages[committee.kind].filter((item) => !placed.has(item.to))
-    for (const item of items) {
-      placed.add(item.to)
-    }
-    return items.length > 0 ? [{ label: committee.name, items }] : []
-  })
-  const isAdministrator = roleId === "administrator"
-  const association: NavItem[] = [
-    // Everyone sees their own applications; the architectural committee sees everyone's.
-    { title: "Applications", to: "/applications" },
-    ...(isAdministrator ? committeePages.architectural.slice(1) : []),
-    { title: "Rulebook", to: "/rules" },
-    ...(isAdministrator ? committeePages.board : [])
-  ]
-  return [
-    { label: null, items: [{ title: "Dashboard", to: "/" }] },
-    ...sections,
-    { label: "Organization", items: association.filter((item) => !placed.has(item.to)) }
-  ]
-}
-
 /** The committees with work of their own in the app. */
 type WorkingKind = Exclude<CommitteeKind, "other">
 
@@ -72,6 +33,47 @@ export function assertWorkOf(role: RoleId, committees: readonly Pick<Committee, 
   if (!doesWorkOf(role, committees, kind)) {
     throw new Error(committeeOnly[kind])
   }
+}
+
+/** The pages each kind of committee works in, under its name in the sidebar. */
+const committeePages: Record<CommitteeKind, NavItem[]> = {
+  board: [],
+  architectural: [
+    { title: "Applications", to: "/applications" },
+    { title: "Project types", to: "/project-types" }
+  ],
+  other: []
+}
+
+/** The roll, which the board keeps. */
+const peoplePage: NavItem = { title: "People", to: "/people" }
+
+/**
+ * The sidebar's sections: the dashboard; the organization's own pages; then a section for each committee whose work
+ * they do (`committeesInView`) that has pages, named as the association names it. A page sits under the first committee
+ * that works in it, and an administrator finds a page no committee has under the organization's.
+ */
+export function navigationFor(roleId: RoleId, committees: readonly Pick<Committee, "name" | "kind">[]): NavSection[] {
+  const placed = new Set<NavItem["to"]>()
+  const sections = committees.flatMap((committee) => {
+    const items = committeePages[committee.kind].filter((item) => !placed.has(item.to))
+    for (const item of items) {
+      placed.add(item.to)
+    }
+    return items.length > 0 ? [{ label: committee.name, items }] : []
+  })
+  const organization: NavItem[] = [
+    // Everyone sees their own applications; the architectural committee sees everyone's.
+    { title: "Applications", to: "/applications" },
+    ...(roleId === "administrator" ? committeePages.architectural.slice(1) : []),
+    { title: "Rulebook", to: "/rules" },
+    ...(doesWorkOf(roleId, committees, "board") ? [peoplePage] : [])
+  ]
+  return [
+    { label: null, items: [{ title: "Dashboard", to: "/" }] },
+    { label: "Organization", items: organization.filter((item) => !placed.has(item.to)) },
+    ...sections
+  ]
 }
 
 /** Throws unless the role is the HOA's administrator: every review, build and publishing action checks it. */

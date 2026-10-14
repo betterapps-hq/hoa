@@ -26,15 +26,15 @@ export const Route = createFileRoute("/applications/$applicationId")({
 function ApplicationRoute() {
   const view = Route.useLoaderData()
   const router = useRouter()
-  const { role } = useRole()
+  const { doesWorkOf } = useRole()
   const applicationId = view.application.id
   return (
     <ApplicationPage
       // Another application is another draft: nothing typed into one carries to the next.
       key={applicationId}
       view={view}
-      // An administrator reads someone else's application as the committee; their own, as its applicant.
-      audience={role.id === "administrator" && !view.isOwner ? "committee" : "homeowner"}
+      // The committee reads someone else's application as the committee; their own, as its applicant.
+      audience={doesWorkOf("architectural") && !view.isOwner ? "committee" : "homeowner"}
       loadJob={(jobId) => getJobStatus({ data: { jobId } })}
       onChanged={() => void router.invalidate()}
       onBack={() => void router.navigate({ to: "/applications" })}

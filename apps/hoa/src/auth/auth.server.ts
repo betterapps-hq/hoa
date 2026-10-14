@@ -63,8 +63,6 @@ function safeguards() {
     // Rejects a new password that's in a known breach, checked by the first five characters of its hash only. It
     // checks requests to Better Auth's endpoints; adding a password from the server checks it there.
     haveIBeenPwned({ customPasswordCompromisedMessage: compromisedPasswordMessage }),
-    // The platform's operators (users.role "admin"): sign in as someone to see what they see, ban, end sessions.
-    admin(),
     ...(turnstileSecret
       ? [captcha({ provider: "cloudflare-turnstile", secretKey: turnstileSecret, endpoints: [...guardedPaths] })]
       : []),
@@ -156,6 +154,9 @@ function createAuth() {
         }
       }),
       associations(),
+      // The platform's operators (users.role "admin"): view the app as someone, ban, end sessions. Listed on its own so
+      // its fields reach the session's types.
+      admin(),
       ...safeguards(),
       // Last, so the cookies the others set reach the response.
       tanstackStartCookies()

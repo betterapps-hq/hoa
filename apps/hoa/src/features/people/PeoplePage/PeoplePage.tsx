@@ -2,6 +2,7 @@ import {
   BuildingIcon,
   HandshakeIcon,
   HomeIcon,
+  EyeIcon,
   MailIcon,
   ShieldCheckIcon,
   PencilIcon,
@@ -56,7 +57,7 @@ import {
   type RollData,
   type UnitRow
 } from "@/people/roll"
-import { CommitteeDialog, MemberDialog } from "../CommitteeDialogs/CommitteeDialogs"
+import { AssignmentsDialog, CommitteeDialog, MemberDialog } from "../CommitteeDialogs/CommitteeDialogs"
 import { EndDialog, type EndChoice } from "../EndDialog/EndDialog"
 import { PersonDialog, type PersonSave } from "../PersonDialog/PersonDialog"
 import type { RollChoice } from "../RollPicker/RollPicker"
@@ -82,6 +83,8 @@ export type PeopleActions = {
     startedOn: string
   }) => Promise<void>
   leaveCommittee: (memberId: string, endedOn: string) => Promise<void>
+  /** For the platform's operators: views the app as someone who's joined; null for everyone else. */
+  viewAs: ((userId: string) => Promise<void>) | null
 }
 
 type Open =
@@ -89,7 +92,8 @@ type Open =
   | { kind: "unit"; unit: Unit | null }
   | { kind: "unit-people"; unit: Unit; mode: "add" | "sale" }
   | { kind: "committee"; committee: Committee | null }
-  | { kind: "member"; seat: ComponentProps<typeof MemberDialog>["seat"] }
+  | { kind: "member"; committee: Committee }
+  | { kind: "assignments"; personId: string }
   | {
       kind: "end"
       title: string
@@ -112,11 +116,14 @@ const localToday = () => new Date().toLocaleDateString("en-CA")
 export function PeoplePage({
   roll,
   actions,
-  isAdministrator
+  isAdministrator,
+  viewerId
 }: {
   roll: RollData
   actions: PeopleActions
   isAdministrator: boolean
+  /** The signed-in person on the roll. */
+  viewerId: string | null
 }) {
   const today = localToday()
   const [tab, setTab] = useState("people")
@@ -158,9 +165,9 @@ export function PeoplePage({
     })
   // The page's main action adds what the open tab lists; the board adds people only.
   const adds = [
-    { label: "Add a person", icon: UserPlusIcon, onSelect: () => setOpen({ kind: "person", person: null }) },
-    { label: "Add a unit", icon: HomeIcon, onSelect: () => setOpen({ kind: "unit", unit: null }) },
-    { label: "Add a committee", icon: UsersIcon, onSelect: () => setOpen({ kind: "committee", committee: null }) }
+    { label: "Add person", icon: UserPlusIcon, onSelect: () => setOpen({ kind: "person", person: null }) },
+    { label: "Add unit", icon: HomeIcon, onSelect: () => setOpen({ kind: "unit", unit: null }) },
+    { label: "Add committee", icon: UsersIcon, onSelect: () => setOpen({ kind: "committee", committee: null }) }
   ]
   const addFor = (shown: string) => {
     if (!isAdministrator || shown === "people") {
@@ -176,7 +183,7 @@ export function PeoplePage({
         <TabsList variant="line" aria-label="People">
           <TabsTrigger value="people">People</TabsTrigger>
           <TabsTrigger value="units">Units</TabsTrigger>
-          <TabsTrigger value="committees">Board and committees</TabsTrigger>
+          <TabsTrigger value="committees">Committees</TabsTrigger>
         </TabsList>
         <TabsContent value="people">
           <PeopleTable
@@ -186,25 +193,23 @@ export function PeoplePage({
                 ? {
                     onEdit: (person) => setOpen({ kind: "person", person }),
                     onInvite: (person, access) =>
-                      void attempt(() => actions.invite(person.id, access), `Invited ${person.name} to join.`).catch(
+                      void attempt(() => actions.invite(person.id, access), `Invited ${person.name}.`).catch(
                         () => undefined
                       ),
-                    onSeat: (person) => setOpen({ kind: "member", seat: { person, committees: roll.committees } }),
-                    onUnseat: (row) =>
-                      endSeat(
-                        `Take ${row.person.name} off the board or a committee`,
-                        row.committees.map(({ committee, member }) => ({
-                          id: member.id,
-                          title: committee.name,
-                          subtitle: seatLabel(member)
-                        }))
-                      ),
+                    viewerId,
+                    onViewAs: actions.viewAs
+                      ? (userId) =>
+                          void attempt(async () => {
+                            await actions.viewAs?.(userId)
+                          }).catch(() => undefined)
+                      : null,
+                    onAssign: (person) => setOpen({ kind: "assignments", personId: person.id }),
                     onRemove: (person) =>
                       confirm(
-                        `Take ${person.name} off the roll?`,
-                        "They won't be able to sign in here. What they own, rent or sit on ends today; their history stays.",
-                        "Take off the roll",
-                        () => attempt(() => actions.removePerson(person.id), `${person.name} is off the roll.`)
+                        `Remove ${person.name}?`,
+                        "Their homes and assignments end today. History stays.",
+                        "Remove",
+                        () => attempt(() => actions.removePerson(person.id), `Removed ${person.name}.`)
                       )
                   }
                 : null
@@ -219,7 +224,7 @@ export function PeoplePage({
             onRemoveSomeone={(row) =>
               setOpen({
                 kind: "end",
-                title: `Remove someone from ${row.unit.label}`,
+                title: `Remove from ${row.unit.label}`,
                 legend: "Who",
                 choices: row.people.map(({ person, link }) => ({
                   id: link.id,
@@ -234,11 +239,8 @@ export function PeoplePage({
                 ? {
                     onEdit: (unit) => setOpen({ kind: "unit", unit }),
                     onRemove: (unit) =>
-                      confirm(
-                        `Take ${unit.label} off the roll?`,
-                        "Everyone's link to it ends today.",
-                        "Take off the roll",
-                        () => attempt(() => actions.removeUnit(unit.id), `${unit.label} is off the roll.`)
+                      confirm(`Remove ${unit.label}?`, "Everyone's link to it ends today.", "Remove", () =>
+                        attempt(() => actions.removeUnit(unit.id), `Removed ${unit.label}.`)
                       ),
                     onAddUnit: () => setOpen({ kind: "unit", unit: null })
                   }
@@ -250,11 +252,11 @@ export function PeoplePage({
           {committees.length === 0 ? (
             <EmptyState
               icon={<UsersIcon />}
-              title="No board or committees yet"
-              description="Add the board, then committees such as architectural review, and who sits on each."
+              title="No committees yet"
+              description="Start with the board."
               action={
                 isAdministrator ? (
-                  <Button onClick={() => setOpen({ kind: "committee", committee: null })}>Add a committee</Button>
+                  <Button onClick={() => setOpen({ kind: "committee", committee: null })}>Add committee</Button>
                 ) : null
               }
             />
@@ -265,19 +267,16 @@ export function PeoplePage({
                   <CardTitle>
                     <h2>{committee.name}</h2>
                   </CardTitle>
-                  <CardDescription>
-                    {committeeKindLabels[committee.kind]}
-                    {committee.kind === "architectural" ? ", which decides applications" : ""}
-                  </CardDescription>
+                  <CardDescription>{committeeKindLabels[committee.kind]}</CardDescription>
                   {isAdministrator ? (
                     <CardAction>
                       <RowActions
                         name={committee.name}
                         actions={[
                           {
-                            label: "Add someone",
+                            label: "Add member",
                             icon: UserPlusIcon,
-                            onSelect: () => setOpen({ kind: "member", seat: { committee, people: personChoices } })
+                            onSelect: () => setOpen({ kind: "member", committee })
                           },
                           {
                             label: "Edit",
@@ -307,7 +306,7 @@ export function PeoplePage({
                 </CardHeader>
                 <CardContent>
                   {members.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Nobody sits on it yet.</p>
+                    <p className="text-sm text-muted-foreground">No members yet.</p>
                   ) : (
                     <ul className="flex flex-col divide-y">
                       {members.map(({ member, person }) => (
@@ -321,7 +320,7 @@ export function PeoplePage({
                               name={person.name}
                               actions={[
                                 {
-                                  label: "End their term",
+                                  label: "End term",
                                   icon: UserMinusIcon,
                                   isDestructive: true,
                                   onSelect: () =>
@@ -409,9 +408,19 @@ export function PeoplePage({
       ) : null}
       {open?.kind === "member" ? (
         <MemberDialog
-          seat={open.seat}
+          committee={open.committee}
+          people={personChoices}
           onOpenChange={(isOpen) => (isOpen ? undefined : close())}
           onSave={(member) => attempt(() => actions.addToCommittee(member), "Added.")}
+        />
+      ) : null}
+      {open?.kind === "assignments" ? (
+        <AssignmentsFor
+          row={people.find((row) => row.person.id === open.personId)}
+          committees={roll.committees}
+          onOpenChange={(isOpen) => (isOpen ? undefined : close())}
+          onAdd={(member) => attempt(() => actions.addToCommittee(member), "Added.")}
+          onEnd={(memberId) => attempt(() => actions.leaveCommittee(memberId, today), "Ended.")}
         />
       ) : null}
       {open?.kind === "confirm" ? (
@@ -437,6 +446,29 @@ export function PeoplePage({
         </AlertDialog>
       ) : null}
     </div>
+  )
+}
+
+/** Someone's assignments, from their row as the roll has it now, so an add or end shows at once. */
+function AssignmentsFor({
+  row,
+  committees,
+  ...props
+}: { row: PersonRow | undefined } & Omit<ComponentProps<typeof AssignmentsDialog>, "person" | "seats">) {
+  if (!row) {
+    return null
+  }
+  return (
+    <AssignmentsDialog
+      person={row.person}
+      seats={row.committees.map(({ committee, member }) => ({
+        memberId: member.id,
+        committee: committee.name,
+        label: seatLabel(member)
+      }))}
+      committees={committees.filter((committee) => !row.committees.some((seat) => seat.committee.id === committee.id))}
+      {...props}
+    />
   )
 }
 
@@ -485,9 +517,11 @@ const personColumn = dataTableColumns<PersonRow>()
 type PersonRowActions = {
   onEdit: (person: Person) => void
   onInvite: (person: Person, access: Access) => void
-  /** Seats them on the board or a committee; and takes them off one, from the row's seats. */
-  onSeat: (person: Person) => void
-  onUnseat: (row: PersonRow) => void
+  /** For the platform's operators: views the app as someone else who's joined. */
+  onViewAs: ((userId: string) => void) | null
+  viewerId: string | null
+  /** Their seats on the board and committees, to add or end. */
+  onAssign: (person: Person) => void
   onRemove: (person: Person) => void
 }
 
@@ -589,8 +623,8 @@ function personColumns(actions: PersonRowActions | null) {
       meta: { cellClassName: "min-w-48" }
     }),
     personColumn.accessor((row) => row.committees.map(({ committee }) => committee.name).join(", "), {
-      id: "committees",
-      header: "Board and committees",
+      id: "assignments",
+      header: "Assignments",
       sortFn: "text",
       enableHiding: true,
       cell: ({ row }) =>
@@ -603,7 +637,7 @@ function personColumns(actions: PersonRowActions | null) {
             ))}
           </ul>
         ),
-      meta: { label: "Board and committees", cellClassName: "min-w-48" }
+      meta: { cellClassName: "min-w-48" }
     }),
     personColumn.accessor((row) => accountStatusLabels[row.status], {
       id: "account",
@@ -619,23 +653,26 @@ function personColumns(actions: PersonRowActions | null) {
   ])
 }
 
-function personActionsColumn({ onEdit, onInvite, onSeat, onUnseat, onRemove }: PersonRowActions) {
+function personActionsColumn({ onEdit, onInvite, onViewAs, viewerId, onAssign, onRemove }: PersonRowActions) {
   return personColumn.display({
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
     enableSorting: false,
     cell: ({ row }) => {
-      const { person, status, access, committees } = row.original
+      const { person, status, access } = row.original
       const isInvited = status === "invited"
       return (
         <RowActions
           name={person.name}
           actions={[
             { label: "Edit", icon: PencilIcon, onSelect: () => onEdit(person) },
+            ...(onViewAs && person.userId && status === "joined" && person.id !== viewerId
+              ? [{ label: "View as", icon: EyeIcon, onSelect: () => person.userId && onViewAs(person.userId) }]
+              : []),
             ...(isInvited || status === "not-invited"
               ? [
                   {
-                    label: isInvited ? "Invite again" : "Invite to join",
+                    label: isInvited ? "Resend invite" : "Invite",
                     icon: MailIcon,
                     onSelect: () => onInvite(person, isInvited ? access : "member")
                   },
@@ -643,24 +680,15 @@ function personActionsColumn({ onEdit, onInvite, onSeat, onUnseat, onRemove }: P
                     ? []
                     : [
                         {
-                          label: "Invite as administrator",
+                          label: "Invite as admin",
                           icon: ShieldCheckIcon,
                           onSelect: () => onInvite(person, "administrator")
                         }
                       ])
                 ]
               : []),
-            { label: "Add to the board or a committee", icon: UsersIcon, onSelect: () => onSeat(person) },
-            ...(committees.length > 0
-              ? [
-                  {
-                    label: "Take off the board or a committee",
-                    icon: UserMinusIcon,
-                    onSelect: () => onUnseat(row.original)
-                  }
-                ]
-              : []),
-            { label: "Take off the roll", icon: Trash2Icon, isDestructive: true, onSelect: () => onRemove(person) }
+            { label: "Assignments", icon: UsersIcon, onSelect: () => onAssign(person) },
+            { label: "Remove", icon: Trash2Icon, isDestructive: true, onSelect: () => onRemove(person) }
           ]}
         />
       )
@@ -735,16 +763,16 @@ function unitColumns({ onAdd, onSale, onRemoveSomeone, administration }: Omit<Un
           <RowActions
             name={unit.label}
             actions={[
-              { label: "Add someone", icon: UserPlusIcon, onSelect: () => onAdd(unit) },
-              { label: "Record a sale", icon: HandshakeIcon, onSelect: () => onSale(unit) },
+              { label: "Add person", icon: UserPlusIcon, onSelect: () => onAdd(unit) },
+              { label: "Record sale", icon: HandshakeIcon, onSelect: () => onSale(unit) },
               ...(row.original.people.length > 0
-                ? [{ label: "Remove someone", icon: UserMinusIcon, onSelect: () => onRemoveSomeone(row.original) }]
+                ? [{ label: "Remove person", icon: UserMinusIcon, onSelect: () => onRemoveSomeone(row.original) }]
                 : []),
               ...(administration
                 ? [
                     { label: "Edit", icon: PencilIcon, onSelect: () => administration.onEdit(unit) },
                     {
-                      label: "Take off the roll",
+                      label: "Remove unit",
                       icon: Trash2Icon,
                       isDestructive: true,
                       onSelect: () => administration.onRemove(unit)
@@ -780,7 +808,7 @@ function UnitsTable({ rows, onAdd, onSale, onRemoveSomeone, administration }: Un
         icon={<BuildingIcon />}
         title="No units yet"
         description="Add each home, lot or condominium unit, then who owns, lives in or rents it."
-        action={administration ? <Button onClick={administration.onAddUnit}>Add a unit</Button> : null}
+        action={administration ? <Button onClick={administration.onAddUnit}>Add unit</Button> : null}
       />
     )
   }

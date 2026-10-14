@@ -28,7 +28,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
   return (
     <>
       <SmallScreenRail variant={props.variant}>{navigation}</SmallScreenRail>
-      <Sidebar collapsible="icon" {...props}>
+      <Sidebar collapsible="icon" className="top-(--banner-height) h-[calc(100svh-var(--banner-height))]" {...props}>
         {navigation}
         <SidebarRail />
       </Sidebar>
@@ -60,7 +60,7 @@ function SmallScreenRail({
       <div
         data-sidebar="sidebar"
         data-slot="sidebar-inner"
-        className="sticky top-0 flex h-svh w-(--sidebar-width-icon) flex-col bg-sidebar"
+        className="sticky top-(--banner-height) flex h-[calc(100svh-var(--banner-height))] w-(--sidebar-width-icon) flex-col bg-sidebar"
       >
         {children}
       </div>

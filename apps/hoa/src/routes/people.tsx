@@ -1,4 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router"
+import { authClient } from "@/auth/authClient"
+import { throwIfFailed } from "@/auth/authErrors"
 import {
   addToCommittee,
   addToUnit,
@@ -26,6 +28,7 @@ export const Route = createFileRoute("/people")({
 function PeopleRoute() {
   const roll = Route.useLoaderData()
   const { role } = useRole()
+  const { session } = Route.useRouteContext()
   const router = useRouter()
   /** Runs a change, then reloads the roll. */
   const change =
@@ -39,6 +42,7 @@ function PeopleRoute() {
     <PeoplePage
       roll={roll}
       isAdministrator={role.id === "administrator"}
+      viewerId={session.status === "member" ? session.personId : null}
       actions={{
         savePerson: change((id, person) => savePerson({ data: { id, person } })),
         removePerson: change((id) => removeFromRoll({ data: { id } })),
@@ -55,7 +59,15 @@ function PeopleRoute() {
         }),
         dissolveCommittee: change((id) => dissolveCommittee({ data: { id } })),
         addToCommittee: change((member) => addToCommittee({ data: member })),
-        leaveCommittee: change((id, endedOn) => leaveCommittee({ data: { id, endedOn } }))
+        leaveCommittee: change((id, endedOn) => leaveCommittee({ data: { id, endedOn } })),
+        viewAs:
+          session.status === "member" && session.isOperator
+            ? async (userId) => {
+                throwIfFailed(await authClient.admin.impersonateUser({ userId }))
+                // A full load, so the whole app is theirs.
+                window.location.assign("/")
+              }
+            : null
       }}
     />
   )

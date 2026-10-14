@@ -8,6 +8,9 @@ const member: Session = {
   roleId: "administrator",
   organizationName: "Sudden Valley Community Association",
   committees: [],
+  personId: "person-sam",
+  isOperator: false,
+  isViewingAs: false,
   unitSystem: "imperial",
   user
 }

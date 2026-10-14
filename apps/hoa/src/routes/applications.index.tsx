@@ -12,11 +12,11 @@ export const Route = createFileRoute("/applications/")({
 function ApplicationsRoute() {
   const applications = Route.useLoaderData()
   const navigate = useNavigate()
-  const { role } = useRole()
+  const { doesWorkOf } = useRole()
   return (
     <ApplicationsPage
       applications={applications}
-      isCommittee={role.id === "administrator"}
+      isCommittee={doesWorkOf("architectural")}
       onOpen={(applicationId) => void navigate({ to: "/applications/$applicationId", params: { applicationId } })}
     />
   )

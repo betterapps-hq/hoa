@@ -12,6 +12,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { RoleProvider } from "@/features/role/RoleProvider"
+import { ViewingAsBanner } from "@/features/role/ViewingAsBanner"
 import { documentTitle } from "@/session/documentTitle"
 import { getSession, type Session } from "@/session/session.functions"
 import appCss from "../styles.css?url"
@@ -67,10 +68,12 @@ function RootDocument({ children }: RootDocumentProps) {
 }
 
 // Sidebar and header sizes from shadcn's dashboard-01 block.
-const layoutStyle: Record<string, string> = {
+const layoutStyle = (isViewingAs: boolean): Record<string, string> => ({
   "--sidebar-width": "calc(var(--spacing) * 72)",
-  "--header-height": "calc(var(--spacing) * 12)"
-}
+  "--header-height": "calc(var(--spacing) * 12)",
+  // The viewing-as banner's, which the sidebar and header sit below.
+  "--banner-height": isViewingAs ? "calc(var(--spacing) * 10)" : "0px"
+})
 
 /** The app's providers, and the members' shell or, for sign-in and the welcome page, the page alone. */
 function RootLayout() {
@@ -102,7 +105,8 @@ function MemberShell({ session }: { session: Extract<Session, { status: "member"
       committees={session.committees}
     >
       <TooltipProvider>
-        <SidebarProvider style={layoutStyle}>
+        <SidebarProvider style={layoutStyle(session.isViewingAs)} className="pt-(--banner-height)">
+          {session.isViewingAs ? <ViewingAsBanner name={session.user.name} /> : null}
           <AppSidebar variant="inset" />
           {/* min-w-0 lets the page narrow beside the small-screen rail instead of running past the edge. */}
           <SidebarInset className="min-w-0">

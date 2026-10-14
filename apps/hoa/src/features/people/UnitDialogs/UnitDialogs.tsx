@@ -74,8 +74,7 @@ export function UnitDialog({ unit, onSave, onOpenChange }: UnitDialogProps) {
           }}
         >
           <DialogHeader>
-            <DialogTitle>{unit ? `Edit ${unit.label}` : "Add a unit"}</DialogTitle>
-            <DialogDescription>A home, lot or condominium unit in the association.</DialogDescription>
+            <DialogTitle>{unit ? `Edit ${unit.label}` : "Add unit"}</DialogTitle>
           </DialogHeader>
           <FieldGroup>
             {text("label", "Name", "What the association calls it: a street address, or a lot or unit number.")}
@@ -104,7 +103,7 @@ const isRelation = (value: string): value is UnitRelation => unitRelations.some(
 const linkSchema = (isSale: boolean) =>
   z
     .object({
-      personId: z.string().min(1, "Pick someone on the roll."),
+      personId: z.string().min(1, "Pick someone."),
       relation: z.enum(unitRelations),
       day: z.union([z.literal(""), z.iso.date("Give a date.")])
     })
@@ -143,12 +142,8 @@ export function UnitPeopleDialog({ unit, mode, people, onSave, onOpenChange }: U
           }}
         >
           <DialogHeader>
-            <DialogTitle>{isSale ? `Record the sale of ${unit.label}` : `Add someone to ${unit.label}`}</DialogTitle>
-            <DialogDescription>
-              {isSale
-                ? "Its owners stop owning it that day, and the buyer starts. Add the buyer to the roll first."
-                : "An owner, someone who lives there, or a tenant."}
-            </DialogDescription>
+            <DialogTitle>{isSale ? `Record sale of ${unit.label}` : `Add to ${unit.label}`}</DialogTitle>
+            {isSale ? <DialogDescription>Add the buyer to the roll first.</DialogDescription> : null}
           </DialogHeader>
           <FieldGroup>
             <form.Field name="personId">
@@ -163,8 +158,8 @@ export function UnitPeopleDialog({ unit, mode, people, onSave, onOpenChange }: U
                     choices={people}
                     value={field.state.value}
                     onChange={field.handleChange}
-                    placeholder="Find someone on the roll"
-                    empty="Nobody on the roll matches."
+                    placeholder="Search people"
+                    empty="No matches."
                     isInvalid={field.state.meta.errors.length > 0}
                   />
                   <FieldError errors={field.state.meta.errors} />

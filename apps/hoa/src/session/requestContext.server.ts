@@ -25,7 +25,16 @@ type AuthSession = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>["ap
 /** The account a Better Auth session is signed in to, and the organization it's in. */
 export function accountOf({ user, session }: AuthSession) {
   const { id, name, email, emailVerified } = user
-  return { id, name, email, emailVerified, activeOrganizationId: session.activeOrganizationId ?? null }
+  return {
+    id,
+    name,
+    email,
+    emailVerified,
+    activeOrganizationId: session.activeOrganizationId ?? null,
+    // The platform's operators (Better Auth's admin plugin), and the operator viewing the app as this account.
+    isOperator: user.role === "admin",
+    impersonatedBy: session.impersonatedBy ?? null
+  }
 }
 
 /** The signed-in account, from its session cookie; null when nobody is signed in. */

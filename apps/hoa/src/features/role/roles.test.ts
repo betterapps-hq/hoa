@@ -16,12 +16,11 @@ describe("navigationFor", () => {
     ])
   })
 
-  it("gives each committee they sit on a section with its pages, and skips one without pages", () => {
+  it("gives each committee they sit on a section with its pages after the organization's, and skips one without", () => {
     expect(sectionsOf("homeowner", [social, board, design])).toEqual([
       [null, ["Dashboard"]],
-      ["Board of Directors", ["People"]],
-      ["Design Review", ["Applications", "Project types"]],
-      ["Organization", ["Rulebook"]]
+      ["Organization", ["Rulebook", "People"]],
+      ["Design Review", ["Applications", "Project types"]]
     ])
   })
 
@@ -29,8 +28,8 @@ describe("navigationFor", () => {
     const second = { name: "Landscape Review", kind: "architectural" } as const
     expect(sectionsOf("homeowner", [design, second])).toEqual([
       [null, ["Dashboard"]],
-      ["Design Review", ["Applications", "Project types"]],
-      ["Organization", ["Rulebook"]]
+      ["Organization", ["Rulebook"]],
+      ["Design Review", ["Applications", "Project types"]]
     ])
   })
 

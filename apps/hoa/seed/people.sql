@@ -2,9 +2,10 @@
 -- account, their units, the board and the architectural committee. The accounts keep the demo roles' user ids, so
 -- what those roles did before accounts still names them. Sign in with either email: the code prints in the dev
 -- server's log. Safe to run more than once.
-INSERT OR IGNORE INTO users (id, name, email, email_verified, created_at, updated_at) VALUES
-  ('demo-administrator', 'Sam Rivera', 'sam@example.com', 1, 1791936000000, 1791936000000),
-  ('demo-homeowner', 'Jordan Avery', 'jordan@example.com', 1, 1791936000000, 1791936000000);
+-- Sam is also one of the platform's operators (users.role "admin"), to try viewing the app as someone locally.
+INSERT OR IGNORE INTO users (id, name, email, email_verified, role, created_at, updated_at) VALUES
+  ('demo-administrator', 'Sam Rivera', 'sam@example.com', 1, 'admin', 1791936000000, 1791936000000),
+  ('demo-homeowner', 'Jordan Avery', 'jordan@example.com', 1, NULL, 1791936000000, 1791936000000);
 
 INSERT OR IGNORE INTO people (id, organization_id, name, email, phone, mailing_address, user_id, created_at, updated_at, removed_at) VALUES
   ('person-sam', 'demo-hoa', 'Sam Rivera', 'sam@example.com', '360-555-0101', NULL, 'demo-administrator', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
