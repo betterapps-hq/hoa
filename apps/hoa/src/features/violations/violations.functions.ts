@@ -6,14 +6,7 @@ import { sendEmail } from "@/auth/email.server"
 import { getDb } from "@/db/client.server"
 import { chargeStatements } from "@/db/ledgerRepository"
 import { getRoll } from "@/db/peopleRepository"
-import {
-  addViolationEvent,
-  getViolationRecords,
-  insertViolation,
-  insertViolationPhoto,
-  listViolationIds,
-  type NewEvent
-} from "@/db/violationRepository"
+import { addViolationEvent, insertViolation, insertViolationPhoto, type NewEvent } from "@/db/violationRepository"
 import { env } from "@/env.server"
 import type { ChargeCategory } from "@/money/ledger"
 import { relationLabels } from "@/people/people"
@@ -39,15 +32,11 @@ import {
   factInputOf,
   loadViolation,
   mainCitation,
-  managesViolations,
-  ownedUnits,
   publishedRules,
-  respondsTo,
-  rulesFiles,
   ruleViewOf,
   todayIn,
+  violationSummaries,
   violationView,
-  type LoadedViolation,
   type SanctionView
 } from "./violations.server"
 
@@ -65,80 +54,22 @@ export type ViolationListItem = {
   nextStep: string | null
 }
 
-const dayFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" })
-const day = (value: string) => dayFormat.format(new Date(`${value}T00:00:00Z`))
-
-/** What the board, or the owner, does next with an open violation. */
-function nextStepOf(
-  evaluation: Awaited<ReturnType<typeof evaluationOf>>,
-  steps: ReturnType<typeof stepDates>,
-  forBoard: boolean
-): string | null {
-  const running = evaluation.cures.filter((cure) => cure.status === "running" && cure.endsOn)
-  const cureEnds = running.map((cure) => cure.endsOn ?? "").toSorted()[0]
-  if (!forBoard) {
-    if (steps.curedOn) {
-      return null
-    }
-    return cureEnds ? `Correct it by ${day(cureEnds)}` : "Correct it"
-  }
-  if (steps.curedOn) {
-    return `Cured ${day(steps.curedOn)}`
-  }
-  if (!steps.noticeDeliveredOn) {
-    return "Send the notice"
-  }
-  if (steps.hearingRequestedOn && !steps.hearingHeldOn) {
-    return "Hold the hearing"
-  }
-  if (cureEnds) {
-    return `Time to cure ends ${day(cureEnds)}`
-  }
-  const money = ["fine", "charge", "self-help"]
-  return evaluation.sanctions.some((sanction) => sanction.outcome === "available" && money.includes(sanction.type))
-    ? "A fine can be imposed"
-    : null
-}
-
 /** The violations the requester may see: every one for the board, an owner's own once noticed. */
 export const listViolations = createServerFn({ method: "GET" }).handler(async () => {
-  const context = await getRequestContext()
-  const db = getDb()
-  const organizationId = context.organization.id
-  const canManage = managesViolations(context)
-  const [roll, published] = await Promise.all([getRoll(db, organizationId), publishedRules(organizationId)])
-  const today = todayIn(published?.rulesFile ?? null)
-  const ids = await listViolationIds(
-    db,
-    organizationId,
-    canManage ? {} : { unitIds: ownedUnits(roll, context.person?.id, today), personId: context.person?.id ?? "" }
-  )
-  const records = (await getViolationRecords(db, organizationId, ids)).filter(
-    (record) => canManage || respondsTo(record, roll, context.person?.id, today)
-  )
-  const files = rulesFiles(organizationId)
-  const units = new Map(roll.units.map((unit) => [unit.id, unit.label]))
-  const items = await Promise.all(
-    records.map(async (record): Promise<ViolationListItem> => {
-      const rulesFile = await files(record.violation.rulebookId)
-      const titles = new Map(rulesFile.rules.map((rule) => [rule.key, rule.title]))
-      const loaded: LoadedViolation = { record, roll, rulesFile, today, canManage, canRespond: !canManage }
-      const nextStep =
-        record.violation.status === "open"
-          ? nextStepOf(await evaluationOf(loaded, organizationId), stepDates(record.events), canManage)
-          : null
-      return {
-        id: record.violation.id,
-        title: record.violation.title,
-        unit: units.get(record.violation.unitId) ?? "A unit no longer on the roll",
-        observedOn: record.violation.observedOn,
-        status: record.violation.status,
-        rules: record.ruleKeys.map((key) => titles.get(key) ?? key),
-        nextStep
-      }
-    })
-  )
-  return { items, canReport: canManage, hasRulebook: published !== null }
+  const { items, canManage, hasRulebook } = await violationSummaries(await getRequestContext())
+  return {
+    items: items.map((item): ViolationListItem => ({
+      id: item.id,
+      title: item.title,
+      unit: item.unit,
+      observedOn: item.observedOn,
+      status: item.status,
+      rules: item.rules,
+      nextStep: item.nextStep?.text ?? null
+    })),
+    canReport: canManage,
+    hasRulebook
+  }
 })
 
 /** What reporting a violation picks from: the units with who lives there, and the rules a violation can break. */

@@ -1,7 +1,7 @@
 import { getDb } from "@/db/client.server"
 import { accountNames, getRoll } from "@/db/peopleRepository"
 import { getPublishedRulesFile, getRulesFileOf } from "@/db/rulebookContentRepository"
-import { getViolationRecords, violationHistory, type ViolationRecord } from "@/db/violationRepository"
+import { getViolationRecords, listViolationIds, violationHistory, type ViolationRecord } from "@/db/violationRepository"
 import type { CurePeriod, SanctionResult } from "@/engine/sanctions"
 import { doesWorkOf } from "@/features/role/roles"
 import { citationIndex, citationLabel, referencedRule } from "@/features/rulebook/rulebookRecords"
@@ -211,6 +211,115 @@ export async function loadViolation(context: RequestContext, violationId: string
 }
 
 export type LoadedViolation = NonNullable<Awaited<ReturnType<typeof loadViolation>>>
+
+/** What happens next with an open violation: which step, in words, on what day if one is set, and whose turn it is. */
+export type NextStep = {
+  step: "correct" | "cured" | "notice" | "hearing" | "cure" | "fine"
+  text: string
+  on: string | null
+  waitsOn: "board" | "owner"
+}
+
+/** What the board, or the owner, does next with an open violation; null when nothing is due of them. */
+export function nextStepOf(
+  evaluation: Awaited<ReturnType<typeof evaluationOf>>,
+  steps: ReturnType<typeof stepDates>,
+  forBoard: boolean
+): NextStep | null {
+  const running = evaluation.cures.filter((cure) => cure.status === "running" && cure.endsOn)
+  const cureEnds = running.map((cure) => cure.endsOn ?? "").toSorted()[0] ?? null
+  if (!forBoard) {
+    if (steps.curedOn) {
+      return null
+    }
+    return {
+      step: "correct",
+      text: cureEnds ? `Correct it by ${dayText(cureEnds)}` : "Correct it",
+      on: cureEnds,
+      waitsOn: "owner"
+    }
+  }
+  if (steps.curedOn) {
+    return { step: "cured", text: `Cured ${dayText(steps.curedOn)}`, on: null, waitsOn: "board" }
+  }
+  if (!steps.noticeDeliveredOn) {
+    return { step: "notice", text: "Send the notice", on: null, waitsOn: "board" }
+  }
+  if (steps.hearingRequestedOn && !steps.hearingHeldOn) {
+    return { step: "hearing", text: "Hold the hearing", on: null, waitsOn: "board" }
+  }
+  if (cureEnds) {
+    return { step: "cure", text: `Time to cure ends ${dayText(cureEnds)}`, on: cureEnds, waitsOn: "owner" }
+  }
+  const money = ["fine", "charge", "self-help"]
+  return evaluation.sanctions.some((sanction) => sanction.outcome === "available" && money.includes(sanction.type))
+    ? { step: "fine", text: "A fine can be imposed", on: null, waitsOn: "board" }
+    : null
+}
+
+/**
+ * The violations' records the requester may see, with the roll and today where the association is: every one for the
+ * board, an owner's own once noticed.
+ */
+export async function visibleViolations(context: RequestContext) {
+  const db = getDb()
+  const organizationId = context.organization.id
+  const canManage = managesViolations(context)
+  const [roll, published] = await Promise.all([getRoll(db, organizationId), publishedRules(organizationId)])
+  const today = todayIn(published?.rulesFile ?? null)
+  const ids = await listViolationIds(
+    db,
+    organizationId,
+    canManage ? {} : { unitIds: ownedUnits(roll, context.person?.id, today), personId: context.person?.id ?? "" }
+  )
+  const records = (await getViolationRecords(db, organizationId, ids)).filter(
+    (record) => canManage || respondsTo(record, roll, context.person?.id, today)
+  )
+  return { records, roll, today, canManage, hasRulebook: published !== null }
+}
+
+/** A violation as lists show it: its unit, the rules it breaks, and what happens next, with its record. */
+export type ViolationSummary = {
+  id: string
+  title: string
+  unitId: string
+  unit: string
+  observedOn: string
+  status: ViolationStatus
+  rules: string[]
+  nextStep: NextStep | null
+  record: ViolationRecord
+}
+
+/** The violations the requester may see, with what happens next: every one for the board, an owner's own once noticed. */
+export async function violationSummaries(context: RequestContext) {
+  const organizationId = context.organization.id
+  const { records, roll, today, canManage, hasRulebook } = await visibleViolations(context)
+  const files = rulesFiles(organizationId)
+  const units = new Map(roll.units.map((unit) => [unit.id, unit.label]))
+  const items = await Promise.all(
+    records.map(async (record): Promise<ViolationSummary> => {
+      const rulesFile = await files(record.violation.rulebookId)
+      const titles = new Map(rulesFile.rules.map((rule) => [rule.key, rule.title]))
+      const loaded: LoadedViolation = { record, roll, rulesFile, today, canManage, canRespond: !canManage }
+      return {
+        id: record.violation.id,
+        title: record.violation.title,
+        unitId: record.violation.unitId,
+        unit: units.get(record.violation.unitId) ?? "A unit no longer on the roll",
+        observedOn: record.violation.observedOn,
+        status: record.violation.status,
+        rules: record.ruleKeys.map((key) => titles.get(key) ?? key),
+        nextStep:
+          record.violation.status === "open"
+            ? nextStepOf(await evaluationOf(loaded, organizationId), stepDates(record.events), canManage)
+            : null,
+        record
+      }
+    })
+  )
+  return { items, today, canManage, hasRulebook }
+}
 
 /** What the documents allow for a loaded violation today, or with a step's date as given. */
 export async function evaluationOf(

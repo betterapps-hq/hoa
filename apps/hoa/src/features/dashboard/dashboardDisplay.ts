@@ -2,11 +2,16 @@ import { match } from "ts-pattern"
 import { reviewCoversLatest, type ApplicationStatus } from "@/applications/application"
 import { outcomeLabels, recommendationLabels, statusLabels } from "@/features/applications/applicationDisplay"
 import type { DashboardSummary } from "@/features/rulebook/rulebook.functions"
-import { counted, listNames } from "@/lib/text"
+import { sanctionTypeLabels } from "@/features/violations/violationDisplay"
+import { dayText } from "@/lib/days"
+import { money } from "@/lib/money"
+import { counted, listNames, sentenceCase } from "@/lib/text"
+import { paymentMethodLabels, paymentMethods } from "@/money/ledger"
 import type { ActivityEvent } from "./activity"
 import type { AreaId } from "./areas"
 import type { NextRulebook } from "./dashboard.functions"
 import type { DashboardApplication } from "./dashboardData"
+import type { DuesOverview, HomeOverview, MoneyOverview, ViolationItem } from "./overview"
 
 // Labels, groupings and date phrasing for the dashboards. Dates format in UTC so the server's render and the
 // browser's agree.
@@ -215,6 +220,9 @@ export type AttentionItem = { id: string; area: AreaId; since: string } & (
   | { kind: "decision"; application: DashboardApplication }
   | { kind: "rulebook-draft"; rulesToReview: number; openQuestions: number }
   | { kind: "project-types"; count: number }
+  | { kind: "violation"; violation: ViolationItem }
+  | { kind: "past-due"; units: number; cents: number }
+  | { kind: "no-dues" }
 )
 
 type AttentionSources = {
@@ -225,6 +233,14 @@ type AttentionSources = {
   projectTypesToUpdate: number
   /** When the rulebook in force was published, which those project types have waited since. */
   publishedAt: string | null
+  /** Open violations, the board's to act on when their next step waits on it. */
+  violations: readonly ViolationItem[]
+  /** What's owed to the association, for its units past due; null for a reader who isn't on the board. */
+  money: MoneyOverview | null
+  /** The dues the board set up; null for a reader who isn't on the board. */
+  dues: DuesOverview | null
+  /** The moment the data was read, which something waiting since now is dated by. */
+  asOf: string
 }
 
 /** What waits on the committee across the HOA's areas, longest waiting first. */
@@ -232,7 +248,11 @@ export function attentionItems({
   applications,
   nextRulebook,
   projectTypesToUpdate,
-  publishedAt
+  publishedAt,
+  violations,
+  money,
+  dues,
+  asOf
 }: AttentionSources): AttentionItem[] {
   const items: AttentionItem[] = awaitingDecision(applications).map((application) => ({
     id: `decision:${application.id}`,
@@ -261,6 +281,30 @@ export function attentionItems({
       count: projectTypesToUpdate
     })
   }
+  for (const violation of violations) {
+    if (violation.nextStep?.waitsOn === "board") {
+      items.push({
+        id: `violation:${violation.id}`,
+        area: "violations",
+        since: violation.observedOn,
+        kind: "violation",
+        violation
+      })
+    }
+  }
+  if (money && money.pastDueUnits > 0) {
+    items.push({
+      id: "past-due",
+      area: "money",
+      since: money.pastDueSince ?? asOf,
+      kind: "past-due",
+      units: money.pastDueUnits,
+      cents: money.pastDueCents
+    })
+  }
+  if (money && money.unitCount > 0 && dues && dues.next === null && dues.latest === null) {
+    items.push({ id: "no-dues", area: "money", since: asOf, kind: "no-dues" })
+  }
   return items.toSorted((a, b) => Date.parse(a.since) - Date.parse(b.since))
 }
 
@@ -287,6 +331,24 @@ export const attentionLine = (item: AttentionItem): DashboardLine =>
       subject: "Project types",
       detail: null,
       note: `${count === 1 ? "1 is" : `${count} are`} out of date with the rulebook in force.`
+    }))
+    .with({ kind: "violation" }, ({ violation }) => ({
+      subject: violation.title,
+      detail: violation.unit,
+      note:
+        violation.nextStep?.step === "cured"
+          ? `${violation.nextStep.text}. Close it once nothing more is due.`
+          : `${violation.nextStep?.text ?? "Decide what's next"}.`
+    }))
+    .with({ kind: "past-due" }, ({ units, cents }) => ({
+      subject: "Past-due balances",
+      detail: `${counted(units, "unit owes", "units owe")} ${money(cents)} past its due day.`,
+      note: "Open the ledger to follow up, or record what's been paid."
+    }))
+    .with({ kind: "no-dues" }, () => ({
+      subject: "Dues",
+      detail: null,
+      note: "Set up the association's dues, and each charge posts to every unit's ledger."
     }))
     .exhaustive()
 
@@ -323,8 +385,53 @@ export function eventLine(event: ActivityEvent): DashboardLine {
       ...documentsSubject(documents),
       happened: "Removed from the governing documents"
     }))
+    .with({ type: "payment-recorded" }, ({ unit, amountCents, method }) => ({
+      subject: unit.label,
+      detail: methodText(amountCents, method),
+      happened: "Payment recorded"
+    }))
+    .with({ type: "dues-posted" }, ({ name, dueOn, units, totalCents }) => ({
+      subject: name,
+      detail: `${money(totalCents)} for ${counted(units, "unit", "units")}, due ${dayText(dueOn)}`,
+      happened: "Posted to the ledgers"
+    }))
+    .with({ type: "violation-reported" }, ({ violation }) => ({
+      subject: violation.title,
+      detail: violation.unit,
+      happened: "Reported"
+    }))
+    .with({ type: "violation-noticed" }, ({ violation }) => ({
+      subject: violation.title,
+      detail: violation.unit,
+      happened: "Notice sent"
+    }))
+    .with({ type: "violation-sanctioned" }, ({ violation, sanction, amountCents }) => ({
+      subject: violation.title,
+      detail: violation.unit,
+      happened:
+        amountCents === null
+          ? `${sanctionLabel(sanction)} imposed`
+          : `${sanctionLabel(sanction)} of ${money(amountCents)} imposed`
+    }))
+    .with({ type: "violation-cured" }, ({ violation }) => ({
+      subject: violation.title,
+      detail: violation.unit,
+      happened: "Cured"
+    }))
     .exhaustive()
   return { subject, detail, note: event.by ? `${happened} by ${event.by}` : happened }
+}
+
+/** "Fine", "Late fee": a sanction's kind as the violation's page names it. */
+const sanctionLabel = (type: string) =>
+  Object.entries(sanctionTypeLabels).find(([key]) => key === type)?.[1] ?? sentenceCase(type)
+
+/** "$350.00 by check": a payment's amount, and how it was paid. */
+function methodText(amountCents: number, method: string | null) {
+  const known = paymentMethods.find((value) => value === method)
+  return known && known !== "other"
+    ? `${money(amountCents)} by ${paymentMethodLabels[known].toLowerCase()}`
+    : money(amountCents)
 }
 
 /** One document by its title; several by their count, their titles the detail. */
@@ -366,4 +473,61 @@ export function rulebookStandingText(summary: DashboardSummary, nextRulebook: Ne
     .with(undefined, () => (publishedVersion === null ? "Process the governing documents to make one." : null))
     .exhaustive()
   return next ? `${inForce} ${next}` : inForce
+}
+
+// Violations, dues and payments, as the HOA's card on each dashboard says where they stand.
+
+/** "2 open. 1 waits on the board, and 1 is in its time to cure.": where the association's violations stand. */
+export function violationsStandingText(items: readonly ViolationItem[]) {
+  if (items.length === 0) {
+    return "No violation is open."
+  }
+  const board = items.filter((item) => item.nextStep?.waitsOn === "board").length
+  const owners = items.filter((item) => item.nextStep?.waitsOn === "owner").length
+  const parts = [
+    ...(board > 0 ? [`${board} ${board === 1 ? "waits" : "wait"} on the board`] : []),
+    ...(owners > 0 ? [`${owners} ${owners === 1 ? "is" : "are"} in the time to cure`] : [])
+  ]
+  const open = `${items.length} open.`
+  return parts.length > 0 ? `${open} ${sentenceCase(listNames(parts))}.` : open
+}
+
+/** "1 open. Correct it by Nov 3.": where the violations at a homeowner's home stand. */
+export function yourViolationsText(items: readonly ViolationItem[]) {
+  if (items.length === 0) {
+    return "No violation is open at your home."
+  }
+  const soonest = items
+    .flatMap((item) => (item.nextStep?.on ? [item.nextStep] : []))
+    .toSorted((a, b) => (a.on ?? "").localeCompare(b.on ?? ""))
+    .at(0)
+  const open = `${items.length} open.`
+  return soonest ? `${open} ${soonest.text}.` : open
+}
+
+/** "$1,145.00 owed by 3 units, $25.00 of it past due. Monthly dues, $1,120.00, due Nov 1.": the association's money. */
+export function moneyStandingText(overview: MoneyOverview, dues: DuesOverview | null) {
+  const owed =
+    overview.owingUnits === 0
+      ? "Every unit is paid up."
+      : `${money(overview.owedCents)} owed by ${counted(overview.owingUnits, "unit", "units")}${
+          overview.pastDueCents > 0 ? `, ${money(overview.pastDueCents)} of it past due` : ""
+        }.`
+  const next = dues?.next
+  return next ? `${owed} ${next.name}, ${money(next.totalCents)}, due ${dayText(next.dueOn)}.` : owed
+}
+
+/** "You owe $445.00, $25.00 of it past due. Monthly dues, $420.00, due Nov 1.": a homeowner's money. */
+export function yourMoneyText(homes: readonly HomeOverview[]) {
+  const owed = homes.reduce((total, home) => total + home.balanceCents, 0)
+  const pastDue = homes.reduce((total, home) => total + home.pastDueCents, 0)
+  const standing =
+    owed <= 0
+      ? `You're paid up${owed < 0 ? `, with ${money(-owed)} in credit` : ""}.`
+      : `You owe ${money(owed)}${pastDue > 0 ? `, ${money(pastDue)} of it past due` : ""}.`
+  const next = homes
+    .flatMap((home) => home.next ?? [])
+    .toSorted((a, b) => a.dueOn.localeCompare(b.dueOn))
+    .at(0)
+  return next ? `${standing} ${next.name}, ${money(next.amountCents)}, due ${dayText(next.dueOn)}.` : standing
 }
