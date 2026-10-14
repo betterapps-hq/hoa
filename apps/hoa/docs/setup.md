@@ -133,7 +133,8 @@ components instead of hand-building them.
 
 After changing `src/db/schema.ts`, run `pnpm --filter hoa db:generate` and commit the new migration. Migrations must
 stay backward compatible, since every pull request preview shares one preview database: add tables and nullable
-columns, and read the generated SQL (Drizzle Kit's table rebuilds can copy columns the old table doesn't have).
+columns, and read the generated SQL (Drizzle Kit's table rebuilds can copy columns the old table doesn't have). Then
+look at the change in the [diagram](erd.md).
 
 After changing `wrangler.jsonc`, regenerate the binding types with `pnpm --filter hoa cf-typegen` and commit
 `worker-configuration.d.ts`.

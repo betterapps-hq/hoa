@@ -29,6 +29,8 @@
     "golden:skeleton": "tsx scripts/golden-skeleton.ts",
     "review:corrections": "tsx --env-file=.env scripts/export-corrections.ts",
     "docs:schema": "node scripts/build-schema-doc.ts",
+    "erd": "pnpm erd:build && vite preview erd/dist/site --outDir . --open",
+    "erd:build": "node erd/build.ts && pnpm dlx @liam-hq/cli@0.7.24 erd build --input erd/dist/tbls.json --format tbls --output-dir erd/dist/site",
     "lint": "oxlint --max-warnings=0",
     "test": "vitest run",
     "test:watch": "vitest",
