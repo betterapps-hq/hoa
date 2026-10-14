@@ -1,12 +1,13 @@
 // R2 keys (docs/design/documents.md, "Object layout"). Keys are built from record ids; every write goes to a new key.
+// They start hoas/, the prefix the stored objects already have, though the table is organizations now.
 
 export function extensionOf(fileName: string) {
   const extension = fileName.toLowerCase().split(".").pop()
   return extension && extension !== fileName.toLowerCase() ? extension : "bin"
 }
 
-export const governingKeys = (hoaId: string, documentId: string) => {
-  const root = `hoas/${hoaId}/governing/${documentId}`
+export const governingKeys = (organizationId: string, documentId: string) => {
+  const root = `hoas/${organizationId}/governing/${documentId}`
   return {
     source: (fileName: string) => `${root}/source.${extensionOf(fileName)}`,
     ocr: (engine: string, range: string) => `${root}/ocr/${engine}/${range}.json`,
@@ -18,8 +19,8 @@ export const governingKeys = (hoaId: string, documentId: string) => {
   }
 }
 
-export const applicationKeys = (hoaId: string, applicationId: string) => {
-  const root = `hoas/${hoaId}/applications/${applicationId}`
+export const applicationKeys = (organizationId: string, applicationId: string) => {
+  const root = `hoas/${organizationId}/applications/${applicationId}`
   const file = (fileId: string) => `${root}/files/${fileId}`
   return {
     root: `${root}/`,
@@ -33,16 +34,17 @@ export const applicationKeys = (hoaId: string, applicationId: string) => {
   }
 }
 
-export const hoaCacheKey = (hoaId: string, stage: string, key: string) => `hoas/${hoaId}/cache/${stage}/${key}.json`
+export const organizationCacheKey = (organizationId: string, stage: string, key: string) =>
+  `hoas/${organizationId}/cache/${stage}/${key}.json`
 
-export const jobOutputKey = (hoaId: string, jobId: string, stage: string, itemId: string) =>
-  `hoas/${hoaId}/jobs/${jobId}/${stage}/${itemId}.json`
+export const jobOutputKey = (organizationId: string, jobId: string, stage: string, itemId: string) =>
+  `hoas/${organizationId}/jobs/${jobId}/${stage}/${itemId}.json`
 
-export const jobOutputPrefix = (hoaId: string, jobId: string) => `hoas/${hoaId}/jobs/${jobId}/`
+export const jobOutputPrefix = (organizationId: string, jobId: string) => `hoas/${organizationId}/jobs/${jobId}/`
 
 /** A project type's objects: the templates its documents give homeowners to fill in. */
-export const projectTypeKeys = (hoaId: string, projectTypeId: string) => {
-  const root = `hoas/${hoaId}/project-types/${projectTypeId}/`
+export const projectTypeKeys = (organizationId: string, projectTypeId: string) => {
+  const root = `hoas/${organizationId}/project-types/${projectTypeId}/`
   return {
     root,
     template: (templateId: string, fileName: string) => `${root}templates/${templateId}.${extensionOf(fileName)}`
@@ -50,8 +52,8 @@ export const projectTypeKeys = (hoaId: string, projectTypeId: string) => {
 }
 
 /** A rulebook's objects: its published rules file, written once (encoding.md, Storage). */
-export const rulebookKeys = (hoaId: string, rulebookId: string) => {
-  const root = `hoas/${hoaId}/rulebooks/${rulebookId}/`
+export const rulebookKeys = (organizationId: string, rulebookId: string) => {
+  const root = `hoas/${organizationId}/rulebooks/${rulebookId}/`
   return { root, file: `${root}rules.json` }
 }
 
@@ -59,12 +61,12 @@ export const rulebookKeys = (hoaId: string, rulebookId: string) => {
  * A job's step output by step name: `find-rules:declaration:article-4` is `find-rules/declaration:article-4.json`, and a
  * step without an item, such as `merge`, is `merge/result.json`.
  */
-export function jobStepKey(hoaId: string, jobId: string, name: string) {
+export function jobStepKey(organizationId: string, jobId: string, name: string) {
   const [stage = name, ...item] = name.split(":")
-  return jobOutputKey(hoaId, jobId, stage, item.join(":") || "result")
+  return jobOutputKey(organizationId, jobId, stage, item.join(":") || "result")
 }
 
 /** A rulebook build's step outputs (encoding.md, Storage). */
-export const rulebookBuildKeys = (hoaId: string, jobId: string) => ({
-  step: (name: string) => jobStepKey(hoaId, jobId, name)
+export const rulebookBuildKeys = (organizationId: string, jobId: string) => ({
+  step: (name: string) => jobStepKey(organizationId, jobId, name)
 })

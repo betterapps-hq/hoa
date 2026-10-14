@@ -47,11 +47,11 @@ export const Route = createFileRoute("/files/governing/$documentId")({
     handlers: {
       GET: async ({ request, params }) => {
         const context = await getRequestContext()
-        const document = await getGoverningDocument(getDb(), context.hoa.id, params.documentId)
+        const document = await getGoverningDocument(getDb(), context.organization.id, params.documentId)
         if (!document || document.status === "uploading") {
           return new Response("Not found", { status: 404 })
         }
-        const key = governingKeys(context.hoa.id, document.id).source(document.fileName)
+        const key = governingKeys(context.organization.id, document.id).source(document.fileName)
         const range = byteRange(request.headers.get("Range"))
         const object = await getBucket().get(key, range ? { range } : {})
         if (!object) {

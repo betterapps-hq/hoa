@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest"
 import { RoleProvider, useRole } from "./RoleProvider"
 
 function CurrentRole() {
-  const { role, user, hoaName, navigation } = useRole()
+  const { role, user, organizationName, navigation } = useRole()
   return (
     <p>
-      {role.name} at {hoaName} as {user.name}:{" "}
+      {role.name} at {organizationName} as {user.name}:{" "}
       {navigation
         .map((section) => `${section.label ?? "Home"} (${section.items.map((item) => item.title).join(", ")})`)
         .join(", ")}
@@ -20,7 +20,7 @@ describe("RoleProvider", () => {
       <RoleProvider
         roleId="administrator"
         user={{ name: "Sam Rivera", email: "sam@example.com" }}
-        hoaName="Maple Hollow"
+        organizationName="Maple Hollow"
         committees={[{ name: "Design Review", kind: "architectural" }]}
       >
         <CurrentRole />

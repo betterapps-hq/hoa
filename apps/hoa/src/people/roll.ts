@@ -1,5 +1,6 @@
 import {
   isCurrent,
+  type Access,
   type Committee,
   type CommitteeMember,
   type Person,
@@ -8,13 +9,18 @@ import {
   type UnitRelation
 } from "./people"
 
-/** The roll as the repository reads it: people, units, who owns or lives in each, and the committees. */
+/**
+ * The roll as the repository reads it: people, units, who owns or lives in each, and the committees; with the accounts
+ * that have joined the organization and their access, and the invitations waiting for an answer.
+ */
 export type RollData = {
   people: Person[]
   units: Unit[]
   links: UnitLink[]
   committees: Committee[]
   members: CommitteeMember[]
+  memberships: { userId: string; access: Access }[]
+  invitations: { email: string; access: Access }[]
 }
 
 /** Whether someone has joined, made an account with their email, and if not, whether they've been invited to. */
@@ -27,14 +33,22 @@ export const accountStatusLabels: Record<AccountStatus, string> = {
   "no-email": "No email"
 }
 
-export const accountStatusOf = (person: Pick<Person, "userId" | "email" | "invitedAt">): AccountStatus => {
-  if (person.userId) {
-    return "joined"
+/** Someone's access and whether they've joined: from their membership, or the invitation waiting for them. */
+export function accountOf(
+  roll: Pick<RollData, "memberships" | "invitations">,
+  person: Pick<Person, "userId" | "email">
+) {
+  const membership = person.userId
+    ? roll.memberships.find((candidate) => candidate.userId === person.userId)
+    : undefined
+  if (membership) {
+    return { status: "joined" as const, access: membership.access }
   }
-  if (!person.email) {
-    return "no-email"
+  const invitation = person.email ? roll.invitations.find((candidate) => candidate.email === person.email) : undefined
+  if (invitation) {
+    return { status: "invited" as const, access: invitation.access }
   }
-  return person.invitedAt ? "invited" : "not-invited"
+  return { status: person.email ? ("not-invited" as const) : ("no-email" as const), access: "member" as const }
 }
 
 export type PersonRow = {
@@ -42,6 +56,8 @@ export type PersonRow = {
   units: { link: UnitLink; unit: Unit }[]
   committees: { member: CommitteeMember; committee: Committee }[]
   status: AccountStatus
+  /** Their membership's access, or the one they're invited with. */
+  access: Access
 }
 
 export type UnitRow = { unit: Unit; people: { link: UnitLink; person: Person }[] }
@@ -70,7 +86,7 @@ export function personRows(roll: RollData, today: string): PersonRow[] {
         const committee = committees.get(member.committeeId)
         return committee ? [{ member, committee }] : []
       }),
-    status: accountStatusOf(person)
+    ...accountOf(roll, person)
   }))
 }
 
@@ -107,6 +123,8 @@ export function committeeViews(roll: RollData, today: string): CommitteeView[] {
 }
 
 /** Whether taking `personId` off the roll, or their administrator access away, would leave nobody to manage it. */
-export const isLastAdministrator = (people: readonly Pick<Person, "id" | "access">[], personId: string) =>
-  people.some((person) => person.id === personId && person.access === "administrator") &&
-  people.filter((person) => person.access === "administrator").length === 1
+export function isLastAdministrator(roll: Pick<RollData, "people" | "memberships">, personId: string) {
+  const administrators = roll.memberships.filter((membership) => membership.access === "administrator")
+  const userId = roll.people.find((person) => person.id === personId)?.userId
+  return administrators.length === 1 && administrators[0]?.userId === userId
+}

@@ -4,7 +4,7 @@ import { useRole } from "@/features/role/RoleProvider"
 
 /** The association the signed-in person belongs to, and their role in it, atop the sidebar. */
 export function AssociationHeader() {
-  const { role, hoaName } = useRole()
+  const { role, organizationName } = useRole()
   const Icon = role.id === "administrator" ? ShieldCheckIcon : HomeIcon
   return (
     <SidebarMenu>
@@ -14,7 +14,7 @@ export function AssociationHeader() {
             <Icon className="size-4" />
           </div>
           <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-medium">{hoaName}</span>
+            <span className="truncate font-medium">{organizationName}</span>
             <span className="truncate text-xs">{role.name}</span>
           </div>
         </SidebarMenuButton>

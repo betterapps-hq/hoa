@@ -19,18 +19,16 @@ export type CommitteeRole = (typeof committeeRoles)[number]
 
 export type Person = {
   id: string
-  hoaId: string
+  organizationId: string
   name: string
   email: string | null
   phone: string | null
   mailingAddress: string | null
-  access: Access
-  /** The account that signed in with their email; null until they do. */
+  /** The account that signed in with their email; null until they do. Its membership holds their access. */
   userId: string | null
-  invitedAt: string | null
 }
 
-export type Unit = { id: string; hoaId: string; label: string; address: string | null; lot: string | null }
+export type Unit = { id: string; organizationId: string; label: string; address: string | null; lot: string | null }
 
 /** Someone owning, living in or renting a unit, from one day to another; `endedOn` is null while it lasts. */
 export type UnitLink = {
@@ -42,7 +40,7 @@ export type UnitLink = {
   endedOn: string | null
 }
 
-export type Committee = { id: string; hoaId: string; name: string; kind: CommitteeKind }
+export type Committee = { id: string; organizationId: string; name: string; kind: CommitteeKind }
 
 export type CommitteeMember = {
   id: string
@@ -56,8 +54,14 @@ export type CommitteeMember = {
 }
 
 /** The workspace a person signs in to: administrators manage the association, everyone else sees their own. */
-export const roleOf = (person: Pick<Person, "access">): RoleId =>
-  person.access === "administrator" ? "administrator" : "homeowner"
+export const roleOf = (access: Access): RoleId => (access === "administrator" ? "administrator" : "homeowner")
+
+/** A membership's role in Better Auth's organization plugin, for each access: "admin" manages the organization. */
+export const memberRoles: Record<Access, "admin" | "member"> = { administrator: "admin", member: "member" }
+
+/** The access a membership's role gives: the plugin's "owner" and "admin" both manage the organization. */
+export const accessOf = (role: string | null): Access =>
+  role === "admin" || role === "owner" ? "administrator" : "member"
 
 /** How emails are kept and compared: trimmed and lowercased; null for none. */
 export function emailKey(email: string | null | undefined) {
@@ -99,7 +103,7 @@ export const myDetailsSchema = z.object({
   mailingAddress: optionalText(300)
 })
 
-/** A person as an administrator adds or edits them. */
+/** A person as an administrator adds or edits them; their access changes only once they've joined. */
 export const personInputSchema = z.object({
   name: z.string().trim().min(1, "Give their name.").max(200, "Keep the name under 200 characters."),
   email: z

@@ -20,7 +20,7 @@ import { failRulebook, getRulebook, getRulebookByStatus, insertRulebook, publish
 
 // The rules the database itself enforces: unique indexes, guarded updates, cascades and D1's statement limits.
 
-const hoaId = "demo-hoa"
+const organizationId = "demo-hoa"
 const now = "2026-10-08T00:00:00.000Z"
 
 describe("repositories", () => {
@@ -50,16 +50,16 @@ describe("repositories", () => {
       endOffset: 100,
       references: ["long:1"]
     }))
-    await saveSections(db, hoaId, many)
-    await saveSections(db, hoaId, [])
-    expect(await listSections(db, hoaId, "long")).toHaveLength(30)
+    await saveSections(db, organizationId, many)
+    await saveSections(db, organizationId, [])
+    expect(await listSections(db, organizationId, "long")).toHaveLength(30)
   })
 
   it("publishes a draft as the next version, superseding the last, and allows one draft at a time", async () => {
     const { db } = database
     const rulebook = (id: string, status: "building" | "draft") => ({
       id,
-      hoaId,
+      organizationId,
       version: null,
       status,
       error: null,
@@ -72,28 +72,28 @@ describe("repositories", () => {
     })
 
     await insertRulebook(db, rulebook("first", "draft"))
-    expect((await getRulebookByStatus(db, hoaId, "draft"))?.id).toBe("first")
+    expect((await getRulebookByStatus(db, organizationId, "draft"))?.id).toBe("first")
     await expect(insertRulebook(db, rulebook("second-draft", "draft"))).rejects.toThrow("Failed query")
-    expect(await publishRulebook(db, hoaId, { rulebookId: "first", userId: "admin", now })).toBe(1)
-    expect(await getRulebookByStatus(db, hoaId, "published")).toMatchObject({
+    expect(await publishRulebook(db, organizationId, { rulebookId: "first", userId: "admin", now })).toBe(1)
+    expect(await getRulebookByStatus(db, organizationId, "published")).toMatchObject({
       id: "first",
       version: 1,
       publishedBy: "admin"
     })
 
     await insertRulebook(db, rulebook("second", "draft"))
-    expect(await publishRulebook(db, hoaId, { rulebookId: "second", userId: "admin", now })).toBe(2)
-    expect((await getRulebook(db, hoaId, "first"))?.status).toBe("superseded")
+    expect(await publishRulebook(db, organizationId, { rulebookId: "second", userId: "admin", now })).toBe(2)
+    expect((await getRulebook(db, organizationId, "first"))?.status).toBe("superseded")
 
     await insertRulebook(db, rulebook("broken", "building"))
-    await failRulebook(db, hoaId, "broken", { stage: "extract", message: "x", isRetryable: true })
-    expect((await getRulebook(db, hoaId, "broken"))?.status).toBe("failed")
+    await failRulebook(db, organizationId, "broken", { stage: "extract", message: "x", isRetryable: true })
+    expect((await getRulebook(db, organizationId, "broken"))?.status).toBe("failed")
   })
 
   it("moves an application only from the expected statuses", async () => {
     const { db } = database
     const application = await createApplication(db, {
-      hoaId,
+      organizationId,
       projectTypeId: null,
       answers: null,
       description: "New fence",
@@ -102,22 +102,27 @@ describe("repositories", () => {
       deleteAfter: "2026-11-07T00:00:00.000Z"
     })
     const start = () =>
-      transitionApplication(db, hoaId, application.id, ["draft", "reviewed"], { status: "reviewing", updatedAt: now })
+      transitionApplication(db, organizationId, application.id, ["draft", "reviewed"], {
+        status: "reviewing",
+        updatedAt: now
+      })
     expect(await start()).toHaveLength(1)
     expect(await start()).toHaveLength(0)
-    expect((await getApplication(db, hoaId, application.id))?.status).toBe("reviewing")
-    expect(await listApplications(db, hoaId, { createdBy: "demo-homeowner", statuses: ["reviewing"] })).toHaveLength(1)
-    expect(await listApplications(db, hoaId, { createdBy: "someone-else" })).toHaveLength(0)
+    expect((await getApplication(db, organizationId, application.id))?.status).toBe("reviewing")
+    expect(
+      await listApplications(db, organizationId, { createdBy: "demo-homeowner", statuses: ["reviewing"] })
+    ).toHaveLength(1)
+    expect(await listApplications(db, organizationId, { createdBy: "someone-else" })).toHaveLength(0)
     expect(await listExpiredApplications(db, "2026-12-01T00:00:00.000Z")).toHaveLength(1)
     expect(await listExpiredApplications(db, now)).toHaveLength(0)
-    await updateApplication(db, hoaId, application.id, { deleteAfter: null })
+    await updateApplication(db, organizationId, application.id, { deleteAfter: null })
     expect(await listExpiredApplications(db, "2026-12-01T00:00:00.000Z")).toHaveLength(0)
   })
 
   it("deletes a file with the files taken from it, and an application with everything in it", async () => {
     const { db } = database
     const application = await createApplication(db, {
-      hoaId,
+      organizationId,
       projectTypeId: null,
       answers: null,
       description: null,
@@ -126,7 +131,7 @@ describe("repositories", () => {
       deleteAfter: now
     })
     const word = await createApplicationFile(db, {
-      hoaId,
+      organizationId,
       applicationId: application.id,
       fileName: "appendix.docx",
       mediaType: "x",
@@ -134,7 +139,7 @@ describe("repositories", () => {
       now
     })
     const picture = await createApplicationFile(db, {
-      hoaId,
+      organizationId,
       applicationId: application.id,
       parentFileId: word.id,
       ordinal: 2,
@@ -147,7 +152,7 @@ describe("repositories", () => {
     })
     await saveReviewSummary(db, {
       id: "review-1",
-      hoaId,
+      organizationId,
       applicationId: application.id,
       jobId: "job",
       rulebookId: "rb",
@@ -158,11 +163,11 @@ describe("repositories", () => {
       createdAt: now
     })
 
-    expect(await deleteApplicationFile(db, hoaId, word.id)).toEqual([word.id, picture.id])
-    expect(await listApplicationFiles(db, hoaId, application.id)).toEqual([])
+    expect(await deleteApplicationFile(db, organizationId, word.id)).toEqual([word.id, picture.id])
+    expect(await listApplicationFiles(db, organizationId, application.id)).toEqual([])
 
-    await deleteApplication(db, hoaId, application.id)
-    expect(await getApplication(db, hoaId, application.id)).toBeNull()
-    expect(await listReviewSummaries(db, hoaId, application.id)).toEqual([])
+    await deleteApplication(db, organizationId, application.id)
+    expect(await getApplication(db, organizationId, application.id)).toBeNull()
+    expect(await listReviewSummaries(db, organizationId, application.id)).toEqual([])
   })
 })

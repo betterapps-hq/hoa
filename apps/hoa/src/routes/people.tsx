@@ -42,7 +42,7 @@ function PeopleRoute() {
       actions={{
         savePerson: change((id, person) => savePerson({ data: { id, person } })),
         removePerson: change((id) => removeFromRoll({ data: { id } })),
-        invite: change((id) => invitePerson({ data: { id } })),
+        invite: change((id, access) => invitePerson({ data: { id, access } })),
         saveUnit: change(async (id, unit) => {
           await saveUnit({ data: { id, unit } })
         }),

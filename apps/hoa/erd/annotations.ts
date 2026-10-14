@@ -13,6 +13,7 @@ export const pointsAt: Readonly<Record<string, string | null>> = {
   submitted_review_id: "reviews",
   parent_id: "self",
   parent_key: "self.key",
+  active_organization_id: "organizations",
   // A job's subject is a document, a rulebook or an application, by the job's kind.
   subject_id: null,
   // Versions of one document share it; no table holds the lineage itself.

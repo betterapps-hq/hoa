@@ -29,12 +29,12 @@ export type RulebookContent = {
 export type RulesFileRef = { fileKey: string; fileSha256: string }
 
 export async function ruleRow(
-  hoaId: string,
+  organizationId: string,
   rulebookId: string,
   rule: Rule
 ): Promise<typeof rulebookRules.$inferInsert> {
   return {
-    hoaId,
+    organizationId,
     rulebookId,
     ruleKey: rule.key,
     kind: rule.kind,
@@ -47,12 +47,12 @@ export async function ruleRow(
 }
 
 export async function termRow(
-  hoaId: string,
+  organizationId: string,
   rulebookId: string,
   term: Term
 ): Promise<typeof rulebookTerms.$inferInsert> {
   return {
-    hoaId,
+    organizationId,
     rulebookId,
     termKey: term.key,
     kind: term.kind,
@@ -63,11 +63,11 @@ export async function termRow(
 }
 
 export function questionRow(
-  hoaId: string,
+  organizationId: string,
   rulebookId: string,
   { id, answer, ...question }: Question
 ): typeof rulebookQuestions.$inferInsert {
-  return { hoaId, rulebookId, id, question, answer }
+  return { organizationId, rulebookId, id, question, answer }
 }
 
 const storedQuestion = questionSchema.omit({ id: true, answer: true })
@@ -82,30 +82,35 @@ function toQuestion(row: typeof rulebookQuestions.$inferSelect): Question {
 
 const inRulebook = <T extends typeof rulebookRules | typeof rulebookTerms | typeof rulebookQuestions>(
   table: T,
-  hoaId: string,
+  organizationId: string,
   rulebookId: string
-) => and(eq(table.hoaId, hoaId), eq(table.rulebookId, rulebookId))
+) => and(eq(table.organizationId, organizationId), eq(table.rulebookId, rulebookId))
 
 /** Writes a rulebook's records in one batch, replacing any it had, so a retried save-draft step writes them once. */
-export async function saveRulebookContent(db: Database, hoaId: string, rulebookId: string, content: RulebookContent) {
+export async function saveRulebookContent(
+  db: Database,
+  organizationId: string,
+  rulebookId: string,
+  content: RulebookContent
+) {
   const [ruleRows, termRows] = await Promise.all([
-    Promise.all(content.rules.map((rule) => ruleRow(hoaId, rulebookId, ruleSchema.parse(rule)))),
-    Promise.all(content.terms.map((term) => termRow(hoaId, rulebookId, termSchema.parse(term))))
+    Promise.all(content.rules.map((rule) => ruleRow(organizationId, rulebookId, ruleSchema.parse(rule)))),
+    Promise.all(content.terms.map((term) => termRow(organizationId, rulebookId, termSchema.parse(term))))
   ])
   const questionRows = content.questions.map((question) =>
-    questionRow(hoaId, rulebookId, questionSchema.parse(question))
+    questionRow(organizationId, rulebookId, questionSchema.parse(question))
   )
   await runBatch(db, [
-    db.delete(rulebookRules).where(inRulebook(rulebookRules, hoaId, rulebookId)),
-    db.delete(rulebookTerms).where(inRulebook(rulebookTerms, hoaId, rulebookId)),
-    db.delete(rulebookQuestions).where(inRulebook(rulebookQuestions, hoaId, rulebookId)),
+    db.delete(rulebookRules).where(inRulebook(rulebookRules, organizationId, rulebookId)),
+    db.delete(rulebookTerms).where(inRulebook(rulebookTerms, organizationId, rulebookId)),
+    db.delete(rulebookQuestions).where(inRulebook(rulebookQuestions, organizationId, rulebookId)),
     ...insertChunks(rulebookRules, ruleRows).map((rows) => db.insert(rulebookRules).values(rows)),
     ...insertChunks(rulebookTerms, termRows).map((rows) => db.insert(rulebookTerms).values(rows)),
     ...insertChunks(rulebookQuestions, questionRows).map((rows) => db.insert(rulebookQuestions).values(rows)),
     db
       .update(rulebooks)
       .set({ settings: settingsSchema.parse(content.settings), coverage: rulebookCoverage.parse(content.coverage) })
-      .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId)))
+      .where(and(eq(rulebooks.organizationId, organizationId), eq(rulebooks.id, rulebookId)))
   ])
 }
 
@@ -113,34 +118,44 @@ export async function saveRulebookContent(db: Database, hoaId: string, rulebookI
  * The statements that delete a draft rulebook and its records, for a batch. Each acts only while the rulebook is still
  * the draft, so a draft published or replaced in the meantime is left alone.
  */
-function draftDeletion(db: Database, hoaId: string, rulebookId: string) {
-  const isDraft = and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId), eq(rulebooks.status, "draft"))
+function draftDeletion(db: Database, organizationId: string, rulebookId: string) {
+  const isDraft = and(
+    eq(rulebooks.organizationId, organizationId),
+    eq(rulebooks.id, rulebookId),
+    eq(rulebooks.status, "draft")
+  )
   const draftIds = db.select({ id: rulebooks.id }).from(rulebooks).where(isDraft)
   return [
-    db.delete(rulebookRules).where(and(eq(rulebookRules.hoaId, hoaId), inArray(rulebookRules.rulebookId, draftIds))),
-    db.delete(rulebookTerms).where(and(eq(rulebookTerms.hoaId, hoaId), inArray(rulebookTerms.rulebookId, draftIds))),
+    db
+      .delete(rulebookRules)
+      .where(and(eq(rulebookRules.organizationId, organizationId), inArray(rulebookRules.rulebookId, draftIds))),
+    db
+      .delete(rulebookTerms)
+      .where(and(eq(rulebookTerms.organizationId, organizationId), inArray(rulebookTerms.rulebookId, draftIds))),
     db
       .delete(rulebookQuestions)
-      .where(and(eq(rulebookQuestions.hoaId, hoaId), inArray(rulebookQuestions.rulebookId, draftIds))),
-    db.delete(rules).where(and(eq(rules.hoaId, hoaId), inArray(rules.rulebookId, draftIds))),
+      .where(
+        and(eq(rulebookQuestions.organizationId, organizationId), inArray(rulebookQuestions.rulebookId, draftIds))
+      ),
+    db.delete(rules).where(and(eq(rules.organizationId, organizationId), inArray(rules.rulebookId, draftIds))),
     db.delete(rulebooks).where(isDraft)
   ] as const
 }
 
 /** Deletes a draft rulebook and its records in one batch; a rulebook that is no longer the draft is left alone. */
-export async function discardDraftRulebook(db: Database, hoaId: string, rulebookId: string) {
-  await runBatch(db, draftDeletion(db, hoaId, rulebookId))
+export async function discardDraftRulebook(db: Database, organizationId: string, rulebookId: string) {
+  await runBatch(db, draftDeletion(db, organizationId, rulebookId))
 }
 
 /**
  * Makes a built rulebook the organization's draft, replacing the draft it had (encoding.md, Save draft): the old draft
  * and its records go in the same batch, so there's never more than one.
  */
-export async function promoteToDraft(db: Database, hoaId: string, rulebookId: string) {
+export async function promoteToDraft(db: Database, organizationId: string, rulebookId: string) {
   const promoted = await db
     .select({ status: rulebooks.status })
     .from(rulebooks)
-    .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId)))
+    .where(and(eq(rulebooks.organizationId, organizationId), eq(rulebooks.id, rulebookId)))
     .get()
   if (promoted?.status !== "building") {
     return // Stopped, or already promoted: the earlier draft stays.
@@ -148,13 +163,21 @@ export async function promoteToDraft(db: Database, hoaId: string, rulebookId: st
   const previous = await db
     .select({ id: rulebooks.id })
     .from(rulebooks)
-    .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.status, "draft"), ne(rulebooks.id, rulebookId)))
+    .where(
+      and(eq(rulebooks.organizationId, organizationId), eq(rulebooks.status, "draft"), ne(rulebooks.id, rulebookId))
+    )
   await runBatch(db, [
-    ...previous.flatMap(({ id }) => draftDeletion(db, hoaId, id)),
+    ...previous.flatMap(({ id }) => draftDeletion(db, organizationId, id)),
     db
       .update(rulebooks)
       .set({ status: "draft" })
-      .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId), eq(rulebooks.status, "building")))
+      .where(
+        and(
+          eq(rulebooks.organizationId, organizationId),
+          eq(rulebooks.id, rulebookId),
+          eq(rulebooks.status, "building")
+        )
+      )
   ])
 }
 
@@ -165,24 +188,24 @@ export async function promoteToDraft(db: Database, hoaId: string, rulebookId: st
  */
 export async function copyToDraft(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   from: { id: string; catalogVersion: number; sourceDocumentIds: string[]; jobId: string },
   draft: { id: string; now: string }
 ) {
-  const content = await getRulebookContent(db, hoaId, from.id)
+  const content = await getRulebookContent(db, organizationId, from.id)
   if (!content) {
     throw new Error("The published rulebook has no records to copy.")
   }
   const [ruleRows, termRows] = await Promise.all([
-    Promise.all(content.rules.map((rule) => ruleRow(hoaId, draft.id, rule))),
-    Promise.all(content.terms.map((term) => termRow(hoaId, draft.id, term)))
+    Promise.all(content.rules.map((rule) => ruleRow(organizationId, draft.id, rule))),
+    Promise.all(content.terms.map((term) => termRow(organizationId, draft.id, term)))
   ])
-  const questionRows = content.questions.map((question) => questionRow(hoaId, draft.id, question))
+  const questionRows = content.questions.map((question) => questionRow(organizationId, draft.id, question))
   // The unique indexes allow one draft and one build per organization; this insert fails if either exists.
   await runBatch(db, [
     db.insert(rulebooks).values({
       id: draft.id,
-      hoaId,
+      organizationId,
       version: null,
       status: "draft",
       error: null,
@@ -204,13 +227,13 @@ export async function copyToDraft(
 /** A rulebook's records, or null while it has none (a rulebook still building). */
 export async function getRulebookContent(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   rulebookId: string
 ): Promise<RulebookContent | null> {
   const rulebook = await db
     .select({ settings: rulebooks.settings, coverage: rulebooks.coverage })
     .from(rulebooks)
-    .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId)))
+    .where(and(eq(rulebooks.organizationId, organizationId), eq(rulebooks.id, rulebookId)))
     .get()
   if (!rulebook?.settings || !rulebook.coverage) {
     return null
@@ -219,15 +242,15 @@ export async function getRulebookContent(
     db
       .select({ rule: rulebookRules.rule })
       .from(rulebookRules)
-      .where(inRulebook(rulebookRules, hoaId, rulebookId)),
+      .where(inRulebook(rulebookRules, organizationId, rulebookId)),
     db
       .select({ term: rulebookTerms.term })
       .from(rulebookTerms)
-      .where(inRulebook(rulebookTerms, hoaId, rulebookId)),
+      .where(inRulebook(rulebookTerms, organizationId, rulebookId)),
     db
       .select()
       .from(rulebookQuestions)
-      .where(inRulebook(rulebookQuestions, hoaId, rulebookId))
+      .where(inRulebook(rulebookQuestions, organizationId, rulebookId))
   ])
   return {
     settings: settingsSchema.parse(rulebook.settings),
@@ -250,13 +273,18 @@ export type RecordChanges = {
  * Saves reviewed or edited records, adding any that are new. A change of up to 100 records lands whole; a bulk review
  * goes in batches of 100, each landing whole.
  */
-export async function saveRulebookChanges(db: Database, hoaId: string, rulebookId: string, changes: RecordChanges) {
+export async function saveRulebookChanges(
+  db: Database,
+  organizationId: string,
+  rulebookId: string,
+  changes: RecordChanges
+) {
   const [ruleRows, termRows] = await Promise.all([
-    Promise.all((changes.rules ?? []).map((rule) => ruleRow(hoaId, rulebookId, ruleSchema.parse(rule)))),
-    Promise.all((changes.terms ?? []).map((term) => termRow(hoaId, rulebookId, termSchema.parse(term))))
+    Promise.all((changes.rules ?? []).map((rule) => ruleRow(organizationId, rulebookId, ruleSchema.parse(rule)))),
+    Promise.all((changes.terms ?? []).map((term) => termRow(organizationId, rulebookId, termSchema.parse(term))))
   ])
   const questionRows = (changes.questions ?? []).map((question) =>
-    questionRow(hoaId, rulebookId, questionSchema.parse(question))
+    questionRow(organizationId, rulebookId, questionSchema.parse(question))
   )
   const statements = [
     ...ruleRows.map((row) => {
@@ -293,7 +321,7 @@ export async function saveRulebookChanges(db: Database, hoaId: string, rulebookI
           db
             .update(rulebooks)
             .set({ settings: settingsSchema.parse(changes.settings) })
-            .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId)))
+            .where(and(eq(rulebooks.organizationId, organizationId), eq(rulebooks.id, rulebookId)))
         ]
       : [])
   ]
@@ -303,17 +331,17 @@ export async function saveRulebookChanges(db: Database, hoaId: string, rulebookI
 }
 
 /** Records where a rulebook's rules file was written, when it's published. */
-export async function recordRulebookFile(db: Database, hoaId: string, rulebookId: string, file: RulesFileRef) {
+export async function recordRulebookFile(db: Database, organizationId: string, rulebookId: string, file: RulesFileRef) {
   await db
     .update(rulebooks)
     .set(file)
-    .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId)))
+    .where(and(eq(rulebooks.organizationId, organizationId), eq(rulebooks.id, rulebookId)))
 }
 
 /** The published rulebook's rules file and when it was published, or null when none is published as a file. */
 export async function getPublishedRulesFile(
   db: Database,
-  hoaId: string
+  organizationId: string
 ): Promise<({ rulebookId: string; publishedAt: string | null } & RulesFileRef) | null> {
   const row = await db
     .select({
@@ -323,7 +351,7 @@ export async function getPublishedRulesFile(
       fileSha256: rulebooks.fileSha256
     })
     .from(rulebooks)
-    .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.status, "published")))
+    .where(and(eq(rulebooks.organizationId, organizationId), eq(rulebooks.status, "published")))
     .orderBy(desc(rulebooks.publishedAt))
     .limit(1)
     .get()
@@ -333,11 +361,15 @@ export async function getPublishedRulesFile(
 }
 
 /** A rulebook's rules file, published now or earlier; null when it has none. */
-export async function getRulesFileOf(db: Database, hoaId: string, rulebookId: string): Promise<RulesFileRef | null> {
+export async function getRulesFileOf(
+  db: Database,
+  organizationId: string,
+  rulebookId: string
+): Promise<RulesFileRef | null> {
   const row = await db
     .select({ fileKey: rulebooks.fileKey, fileSha256: rulebooks.fileSha256 })
     .from(rulebooks)
-    .where(and(eq(rulebooks.hoaId, hoaId), eq(rulebooks.id, rulebookId)))
+    .where(and(eq(rulebooks.organizationId, organizationId), eq(rulebooks.id, rulebookId)))
     .get()
   return row?.fileKey && row.fileSha256 ? { fileKey: row.fileKey, fileSha256: row.fileSha256 } : null
 }

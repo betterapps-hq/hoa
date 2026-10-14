@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { saveBuiltDraft } from "@/rulebook/saveDraft"
-import { builtContent as content, hoaId, now } from "@/tests/builtDraft"
+import { builtContent as content, organizationId, now } from "@/tests/builtDraft"
 import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
 import {
   discardDraftRulebook,
@@ -18,7 +18,7 @@ import { rulebookQuestions, rulebookRules, rulebookTerms } from "./schema"
 function rulebook(id: string, status: "building" | "draft") {
   return {
     id,
-    hoaId,
+    organizationId,
     version: null,
     status,
     error: null,
@@ -48,8 +48,8 @@ describe("rulebookContentRepository", { timeout: 30_000 }, () => {
     await insertRulebook(db, rulebook("draft", "draft"))
     await expect(insertRulebook(db, rulebook("second-building", "building"))).rejects.toThrow("Failed query")
     await expect(insertRulebook(db, rulebook("second-draft", "draft"))).rejects.toThrow("Failed query")
-    expect(await getRulebookContent(db, hoaId, "building")).toBeNull()
-    expect(await getRulebookContent(db, hoaId, "missing")).toBeNull()
+    expect(await getRulebookContent(db, organizationId, "building")).toBeNull()
+    expect(await getRulebookContent(db, organizationId, "missing")).toBeNull()
   })
 
   it("replaces the draft with a built rulebook, and discards only a draft", async () => {
@@ -61,24 +61,24 @@ describe("rulebookContentRepository", { timeout: 30_000 }, () => {
         ...(await db.select().from(rulebookQuestions))
       ].filter((row) => row.rulebookId === rulebookId).length
     await insertRulebook(db, rulebook("old", "draft"))
-    await saveRulebookContent(db, hoaId, "old", content)
+    await saveRulebookContent(db, organizationId, "old", content)
     await insertRulebook(db, rulebook("new", "building"))
-    await saveRulebookContent(db, hoaId, "new", content)
+    await saveRulebookContent(db, organizationId, "new", content)
 
-    await promoteToDraft(db, hoaId, "new")
-    expect(await getRulebook(db, hoaId, "old")).toBeNull()
+    await promoteToDraft(db, organizationId, "new")
+    expect(await getRulebook(db, organizationId, "old")).toBeNull()
     expect(await rowsOf("old")).toBe(0)
-    expect((await getRulebook(db, hoaId, "new"))?.status).toBe("draft")
+    expect((await getRulebook(db, organizationId, "new"))?.status).toBe("draft")
 
-    await publishRulebook(db, hoaId, { rulebookId: "new", userId: "admin", now })
-    await discardDraftRulebook(db, hoaId, "new")
-    expect((await getRulebook(db, hoaId, "new"))?.status).toBe("published")
+    await publishRulebook(db, organizationId, { rulebookId: "new", userId: "admin", now })
+    await discardDraftRulebook(db, organizationId, "new")
+    expect((await getRulebook(db, organizationId, "new"))?.status).toBe("published")
     expect(await rowsOf("new")).toBeGreaterThan(0)
 
     await insertRulebook(db, rulebook("next", "draft"))
-    await saveRulebookContent(db, hoaId, "next", content)
-    await discardDraftRulebook(db, hoaId, "next")
-    expect(await getRulebook(db, hoaId, "next")).toBeNull()
+    await saveRulebookContent(db, organizationId, "next", content)
+    await discardDraftRulebook(db, organizationId, "next")
+    expect(await getRulebook(db, organizationId, "next")).toBeNull()
     expect(await rowsOf("next")).toBe(0)
     expect(await rowsOf("new")).toBeGreaterThan(0)
   })
@@ -86,17 +86,17 @@ describe("rulebookContentRepository", { timeout: 30_000 }, () => {
   it("never lets a stopped build replace the draft", async () => {
     const { db } = database
     await insertRulebook(db, rulebook("old", "draft"))
-    await saveRulebookContent(db, hoaId, "old", content)
+    await saveRulebookContent(db, organizationId, "old", content)
     await insertRulebook(db, rulebook("stopped", "building"))
-    expect(await cancelRulebook(db, hoaId, "stopped")).toBe(true)
-    expect(await cancelRulebook(db, hoaId, "stopped")).toBe(false)
+    expect(await cancelRulebook(db, organizationId, "stopped")).toBe(true)
+    expect(await cancelRulebook(db, organizationId, "stopped")).toBe(false)
 
-    await promoteToDraft(db, hoaId, "stopped")
-    expect((await getRulebook(db, hoaId, "old"))?.status).toBe("draft")
-    expect((await getRulebookContent(db, hoaId, "old"))?.rules).toHaveLength(content.rules.length)
-    expect((await getRulebook(db, hoaId, "stopped"))?.status).toBe("cancelled")
+    await promoteToDraft(db, organizationId, "stopped")
+    expect((await getRulebook(db, organizationId, "old"))?.status).toBe("draft")
+    expect((await getRulebookContent(db, organizationId, "old"))?.rules).toHaveLength(content.rules.length)
+    expect((await getRulebook(db, organizationId, "stopped"))?.status).toBe("cancelled")
     await expect(
-      saveBuiltDraft(db, hoaId, {
+      saveBuiltDraft(db, organizationId, {
         rulebookId: "stopped",
         documents: { uploads: [], referenced: [] },
         content,
@@ -104,6 +104,6 @@ describe("rulebookContentRepository", { timeout: 30_000 }, () => {
         now
       })
     ).rejects.toThrow("was stopped")
-    expect(await getRulebookContent(db, hoaId, "stopped")).toBeNull()
+    expect(await getRulebookContent(db, organizationId, "stopped")).toBeNull()
   })
 })

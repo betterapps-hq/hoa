@@ -95,7 +95,12 @@ function RootLayout() {
 /** The shadcn dashboard-01 layout: inset sidebar, site header and a container-query content column. */
 function MemberShell({ session }: { session: Extract<Session, { status: "member" }> }) {
   return (
-    <RoleProvider roleId={session.roleId} user={session.user} hoaName={session.hoaName} committees={session.committees}>
+    <RoleProvider
+      roleId={session.roleId}
+      user={session.user}
+      organizationName={session.organizationName}
+      committees={session.committees}
+    >
       <TooltipProvider>
         <SidebarProvider style={layoutStyle}>
           <AppSidebar variant="inset" />

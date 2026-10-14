@@ -14,12 +14,19 @@ import {
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { personInputSchema, relationLabels, unitRelations, type Person, type UnitRelation } from "@/people/people"
+import {
+  personInputSchema,
+  relationLabels,
+  unitRelations,
+  type Access,
+  type Person,
+  type UnitRelation
+} from "@/people/people"
 import { phoneText } from "@/people/phone"
 import { RollPicker, type RollChoice } from "../RollPicker/RollPicker"
 
 export type PersonSave = {
-  person: { name: string; email: string; phone: string; mailingAddress: string; access: Person["access"] }
+  person: { name: string; email: string; phone: string; mailingAddress: string; access: Access }
   /** For someone new: the unit they own, live in or rent, if any. */
   home: { unitId: string; relation: UnitRelation } | null
 }
@@ -28,6 +35,8 @@ type PersonDialogProps = {
   /** The person to edit; null to add someone. */
   person: Person | null
   units: readonly RollChoice[]
+  /** Their membership's access once they've joined; null before, when their invitation sets it. */
+  access: Access | null
   /** Whether they can make someone an administrator: administrators can, and the board can't. */
   canGrantAccess: boolean
   onSave: (save: PersonSave) => Promise<void>
@@ -41,14 +50,14 @@ const formSchema = personInputSchema
   .extend({ isAdministrator: z.boolean(), unitId: z.string(), relation: z.enum(unitRelations) })
 
 /** Adds someone to the roll, with the unit they live in, or edits them. */
-export function PersonDialog({ person, units, canGrantAccess, onSave, onOpenChange }: PersonDialogProps) {
+export function PersonDialog({ person, units, access, canGrantAccess, onSave, onOpenChange }: PersonDialogProps) {
   const form = useForm({
     defaultValues: {
       name: person?.name ?? "",
       email: person?.email ?? "",
       phone: person?.phone ? phoneText(person.phone) : "",
       mailingAddress: person?.mailingAddress ?? "",
-      isAdministrator: person?.access === "administrator",
+      isAdministrator: access === "administrator",
       unitId: "",
       relation: "owner" as UnitRelation
     },
@@ -166,7 +175,7 @@ export function PersonDialog({ person, units, canGrantAccess, onSave, onOpenChan
                 </form.Field>
               </div>
             ) : null}
-            {canGrantAccess ? (
+            {canGrantAccess && access !== null ? (
               <form.Field name="isAdministrator">
                 {(field) => (
                   <Field orientation="horizontal">

@@ -6,7 +6,7 @@ const document = (id: string, title: string, kind: GoverningDocument["kind"]): G
   id,
   lineageId: id,
   version: 1,
-  hoaId: "hoa",
+  organizationId: "hoa",
   kind,
   amends: null,
   title,

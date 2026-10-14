@@ -9,7 +9,7 @@ import { claimUnit, getRoll, updatePerson } from "@/db/peopleRepository"
 import { accounts, sessions } from "@/db/schema"
 import { myDetailsSchema, type Access, type CommitteeRole, type UnitRelation } from "@/people/people"
 import { personRows, unitRows } from "@/people/roll"
-import { getMembership } from "@/session/requestContext.server"
+import { accountOf, getMembership, type SignedInAccount } from "@/session/requestContext.server"
 import { deviceOf, type DeviceKind } from "./devices"
 
 /** A browser signed in to the account. */
@@ -69,19 +69,19 @@ async function requireSession() {
   return session
 }
 
-async function membershipOf(account: { id: string; name: string; email: string; emailVerified: boolean }) {
+async function membershipOf(account: SignedInAccount) {
   const membership = await getMembership(account)
   if (!membership) {
     return null
   }
-  const { hoa, person } = membership
+  const { organization, person, access } = membership
   const today = new Date().toISOString().slice(0, 10)
-  const roll = await getRoll(getDb(), hoa.id)
+  const roll = await getRoll(getDb(), organization.id)
   const row = personRows(roll, today).find((candidate) => candidate.person.id === person.id)
   const mine = new Set((row?.units ?? []).map(({ unit }) => unit.id))
   return {
-    association: hoa.name,
-    access: person.access,
+    association: organization.name,
+    access,
     phone: person.phone,
     mailingAddress: person.mailingAddress,
     homes: (row?.units ?? []).map(({ unit, link }) => ({
@@ -109,7 +109,8 @@ async function membershipOf(account: { id: string; name: string; email: string; 
 
 /** The signed-in account: who they are, what their association has on file, how they sign in, and where. */
 export const getAccountDetails = createServerFn({ method: "GET" }).handler(async (): Promise<AccountDetails> => {
-  const { user, session } = await requireSession()
+  const authSession = await requireSession()
+  const { user, session } = authSession
   const db = getDb()
   const [methods, signedIn, membership] = await Promise.all([
     db.select({ id: accounts.id, providerId: accounts.providerId }).from(accounts).where(eq(accounts.userId, user.id)),
@@ -121,7 +122,7 @@ export const getAccountDetails = createServerFn({ method: "GET" }).handler(async
       })
       .from(sessions)
       .where(and(eq(sessions.userId, user.id), gt(sessions.expiresAt, new Date()))),
-    membershipOf(user)
+    membershipOf(accountOf(authSession))
   ])
   const devices = signedIn
     .map((row) => ({
@@ -148,15 +149,14 @@ export const getAccountDetails = createServerFn({ method: "GET" }).handler(async
 export const claimHome = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ unitId: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
-    const { user } = await requireSession()
-    const membership = await getMembership(user)
+    const membership = await getMembership(accountOf(await requireSession()))
     if (!membership) {
       throw new Error("Your email isn't on an association's roll yet.")
     }
     const now = new Date().toISOString()
     const claimed = await claimUnit(
       getDb(),
-      membership.hoa.id,
+      membership.organization.id,
       { unitId: data.unitId, personId: membership.person.id },
       now.slice(0, 10),
       now
@@ -170,11 +170,11 @@ export const claimHome = createServerFn({ method: "POST" })
 export const saveMyDetails = createServerFn({ method: "POST" })
   .validator((data: unknown) => myDetailsSchema.parse(data))
   .handler(async ({ data }) => {
-    const { user } = await requireSession()
+    const authSession = await requireSession()
     const db = getDb()
     // Through Better Auth, so the session's cached copy of the user changes too.
     await getAuth().api.updateUser({ body: { name: data.name }, headers: getRequestHeaders() })
-    const membership = await getMembership(user)
+    const membership = await getMembership(accountOf(authSession))
     if (membership) {
       const { person } = membership
       await updatePerson(
@@ -184,8 +184,7 @@ export const saveMyDetails = createServerFn({ method: "POST" })
           name: data.name,
           email: person.email,
           phone: data.phone,
-          mailingAddress: data.mailingAddress,
-          access: person.access
+          mailingAddress: data.mailingAddress
         },
         new Date().toISOString()
       )

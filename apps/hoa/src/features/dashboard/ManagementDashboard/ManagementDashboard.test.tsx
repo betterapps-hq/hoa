@@ -26,7 +26,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 const asOf = "2026-10-09T12:00:00.000Z"
 const published: DashboardSummary = {
-  hoaName: "Sample Ridge HOA",
+  organizationName: "Sample Ridge HOA",
   publishedVersion: 3,
   publishedAt: "2026-10-07T12:00:00.000Z",
   ruleCount: 42,

@@ -135,7 +135,7 @@ export function simulatedJob(seconds: number, now = Date.now()): Job {
   const last = reached.at(-1)
   return {
     id: "simulated-build",
-    hoaId: "hoa",
+    organizationId: "hoa",
     kind: "rulebook-build",
     subjectId: "draft",
     status: isFinished ? "completed" : "running",

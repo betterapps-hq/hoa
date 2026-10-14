@@ -192,7 +192,7 @@ export type ProjectTypeStatus = (typeof projectTypeStatuses)[number]
 
 export const projectTypeSchema = z.object({
   id: z.string(),
-  hoaId: z.string(),
+  organizationId: z.string(),
   label: z.string(),
   description: z.string().nullable(),
   /** Archived types are hidden from new applications and kept for the ones that use them. */

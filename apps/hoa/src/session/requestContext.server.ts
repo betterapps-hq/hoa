@@ -1,47 +1,69 @@
 import { getRequestHeaders } from "@tanstack/react-start/server"
 import { getAuth } from "@/auth/auth.server"
 import { getDb } from "@/db/client.server"
-import { getHoa } from "@/db/hoaRepository"
-import { committeesInView, peopleForAccount } from "@/db/peopleRepository"
+import { joinRolls } from "@/db/membershipRepository"
+import { getOrganization } from "@/db/organizationRepository"
+import { committeesInView, insertPerson, peopleForAccount } from "@/db/peopleRepository"
 import { assertAdministrator, assertWorkOf, type RoleId } from "@/features/role/roles"
-import type { Hoa } from "@/hoa/hoa"
-import { roleOf, type Committee, type Person } from "@/people/people"
+import type { Organization } from "@/organization/organization"
+import { emailKey, roleOf, type Access, type Committee, type Person } from "@/people/people"
 import type { RequestUser } from "./users"
 
 export type RequestContext = {
-  hoa: Hoa
+  organization: Organization
   role: RoleId
   user: RequestUser
   person: Person
+  /** Their membership's: "administrator" manages the organization. */
+  access: Access
   /** The committees whose work they do (`committeesInView`). */
   committees: Committee[]
+}
+
+type AuthSession = NonNullable<Awaited<ReturnType<ReturnType<typeof getAuth>["api"]["getSession"]>>>
+
+/** The account a Better Auth session is signed in to, and the organization it's in. */
+export function accountOf({ user, session }: AuthSession) {
+  const { id, name, email, emailVerified } = user
+  return { id, name, email, emailVerified, activeOrganizationId: session.activeOrganizationId ?? null }
 }
 
 /** The signed-in account, from its session cookie; null when nobody is signed in. */
 export async function getSignedInAccount() {
   const session = await getAuth().api.getSession({ headers: getRequestHeaders() })
-  if (!session) {
-    return null
-  }
-  const { id, name, email, emailVerified } = session.user
-  return { id, name, email, emailVerified }
+  return session ? accountOf(session) : null
 }
 
-export type SignedInAccount = NonNullable<Awaited<ReturnType<typeof getSignedInAccount>>>
+export type SignedInAccount = ReturnType<typeof accountOf>
 
 /**
- * The association an account belongs to, and who it is there: the person on the roll with its email, linked the first
- * time it signs in. Null when no roll has its email yet. Someone on several rolls gets the first they joined, until the
- * app lets them switch.
+ * The organization an account is in, who it is on the roll there, and its access. Signing in joins every roll with its
+ * email (`peopleForAccount`, `joinRolls`); a member who isn't on the roll, such as one the platform's operators added,
+ * is put on it. The session's active organization, or the first joined. Null when it's in none.
  */
 export async function getMembership(account: SignedInAccount) {
   const db = getDb()
-  const [person] = await peopleForAccount(db, account)
-  if (!person) {
+  const now = new Date()
+  const people = await peopleForAccount(db, account)
+  const memberships = await joinRolls(db, account, people, now)
+  const membership =
+    memberships.find(({ organizationId }) => organizationId === account.activeOrganizationId) ?? memberships[0]
+  if (!membership) {
     return null
   }
-  const hoa = await getHoa(db, person.hoaId)
-  return hoa ? { hoa, person } : null
+  const { organizationId, access } = membership
+  const [organization, person] = await Promise.all([
+    getOrganization(db, organizationId),
+    people.find((candidate) => candidate.organizationId === organizationId) ??
+      insertPerson(
+        db,
+        organizationId,
+        { name: account.name || account.email, email: emailKey(account.email), phone: null, mailingAddress: null },
+        now.toISOString(),
+        account.id
+      )
+  ])
+  return organization ? { organization, person, access } : null
 }
 
 /**
@@ -57,13 +79,14 @@ export async function getRequestContext(): Promise<RequestContext> {
   if (!membership) {
     throw new Error("Your email isn't on an association's roll yet.")
   }
-  const { hoa, person } = membership
+  const { organization, person, access } = membership
   return {
-    hoa,
-    role: roleOf(person),
+    organization,
+    role: roleOf(access),
     user: { id: account.id, name: account.name || person.name, email: account.email },
     person,
-    committees: await committeesInView(getDb(), person, new Date().toISOString().slice(0, 10))
+    access,
+    committees: await committeesInView(getDb(), person, access, new Date().toISOString().slice(0, 10))
   }
 }
 

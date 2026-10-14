@@ -30,8 +30,8 @@ export const getNextRulebook = createServerFn({ method: "GET" }).handler(async (
   }
   const db = getDb()
   const [building, draft] = await Promise.all([
-    getRulebookByStatus(db, context.hoa.id, "building"),
-    getRulebookByStatus(db, context.hoa.id, "draft")
+    getRulebookByStatus(db, context.organization.id, "building"),
+    getRulebookByStatus(db, context.organization.id, "draft")
   ])
   if (building) {
     return { status: "building" }
@@ -39,7 +39,7 @@ export const getNextRulebook = createServerFn({ method: "GET" }).handler(async (
   if (!draft) {
     return null
   }
-  const content = await getRulebookContent(db, context.hoa.id, draft.id)
+  const content = await getRulebookContent(db, context.organization.id, draft.id)
   return {
     status: "draft",
     createdAt: draft.createdAt,
@@ -52,12 +52,12 @@ export const getNextRulebook = createServerFn({ method: "GET" }).handler(async (
  * What the latest review asks the homeowner to add, while the application is theirs to change. A review the bucket
  * can't serve or parse is logged and read as asking for nothing, so the dashboard still lists the application.
  */
-async function missingInformation(hoaId: string, application: Application): Promise<string[]> {
+async function missingInformation(organizationId: string, application: Application): Promise<string[]> {
   if (!application.reviewId || !["reviewed", "information-requested"].includes(application.status)) {
     return []
   }
   try {
-    const key = applicationKeys(hoaId, application.id).review(application.reviewId)
+    const key = applicationKeys(organizationId, application.id).review(application.reviewId)
     const review = await getJson(getBucket(), key, reviewSchema)
     return review?.missingInformation.map((item) => item.text) ?? []
   } catch (error) {
@@ -71,7 +71,7 @@ async function missingInformation(hoaId: string, application: Application): Prom
  * versions): read only for a reviewed draft never submitted whose review read an earlier rulebook than the published one.
  */
 async function rulesChanged(
-  hoaId: string,
+  organizationId: string,
   application: Application,
   latest: ReviewSummary | undefined,
   publishedId: string | null,
@@ -87,8 +87,12 @@ async function rulesChanged(
     return false
   }
   try {
-    const review = await getJson(getBucket(), applicationKeys(hoaId, application.id).review(latest.id), reviewSchema)
-    return (await rulesUpdateOf(hoaId, application, review, definition)) !== null
+    const review = await getJson(
+      getBucket(),
+      applicationKeys(organizationId, application.id).review(latest.id),
+      reviewSchema
+    )
+    return (await rulesUpdateOf(organizationId, application, review, definition)) !== null
   } catch (error) {
     console.error(error)
     return false
@@ -101,9 +105,13 @@ export const listDashboardApplications = createServerFn({ method: "GET" }).handl
     const context = await getRequestContext()
     const db = getDb()
     const [applications, types, published] = await Promise.all([
-      listApplications(db, context.hoa.id, context.role === "administrator" ? {} : { createdBy: context.user.id }),
-      listProjectTypes(db, context.hoa.id),
-      getPublishedRulesFile(db, context.hoa.id)
+      listApplications(
+        db,
+        context.organization.id,
+        context.role === "administrator" ? {} : { createdBy: context.user.id }
+      ),
+      listProjectTypes(db, context.organization.id),
+      getPublishedRulesFile(db, context.organization.id)
     ])
     // A draft is its homeowner's own: the committee sees an application once it's submitted.
     const viewer = { userId: context.user.id, isCommittee: context.role === "administrator" }
@@ -113,11 +121,11 @@ export const listDashboardApplications = createServerFn({ method: "GET" }).handl
         .map(async (application) => {
           const type = types.find((item) => item.id === application.projectTypeId)
           const [reviews, missing] = await Promise.all([
-            listReviewSummaries(db, context.hoa.id, application.id),
-            missingInformation(context.hoa.id, application)
+            listReviewSummaries(db, context.organization.id, application.id),
+            missingInformation(context.organization.id, application)
           ])
           const changed = await rulesChanged(
-            context.hoa.id,
+            context.organization.id,
             application,
             reviews[0],
             published?.rulebookId ?? null,
@@ -157,11 +165,11 @@ export const listRecentActivity = createServerFn({ method: "GET" }).handler(asyn
   const isCommittee = context.role === "administrator"
   const db = getDb()
   const [applications, projectTypes, rulebooks, documents, names] = await Promise.all([
-    listApplications(db, context.hoa.id, isCommittee ? {} : { createdBy: context.user.id }),
-    listProjectTypeAdditions(db, context.hoa.id),
-    listPublishedRulebooks(db, context.hoa.id),
-    isCommittee ? listUploadHistory(db, context.hoa.id) : [],
-    accountNames(db, context.hoa.id)
+    listApplications(db, context.organization.id, isCommittee ? {} : { createdBy: context.user.id }),
+    listProjectTypeAdditions(db, context.organization.id),
+    listPublishedRulebooks(db, context.organization.id),
+    isCommittee ? listUploadHistory(db, context.organization.id) : [],
+    accountNames(db, context.organization.id)
   ])
   const viewer = { userId: context.user.id, isCommittee }
   const labels = new Map(projectTypes.map((type) => [type.id, type.label]))

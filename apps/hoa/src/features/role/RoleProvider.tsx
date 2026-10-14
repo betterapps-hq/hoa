@@ -6,7 +6,7 @@ import { navigationFor, roles, type NavSection, type Role, type RoleId } from ".
 type RoleContextValue = {
   role: Role
   user: SessionUser
-  hoaName: string
+  organizationName: string
   /** The sidebar's sections, from their role and the committees whose work they do. */
   navigation: NavSection[]
 }
@@ -18,14 +18,14 @@ export type RoleProviderProps = {
   /** The signed-in person's role, from the server's session. */
   roleId: RoleId
   user: SessionUser
-  hoaName: string
+  organizationName: string
   committees: readonly Pick<Committee, "name" | "kind">[]
 }
 
 /** The signed-in person's role, account, association and navigation, for the app shell. */
-export function RoleProvider({ children, roleId, user, hoaName, committees }: RoleProviderProps) {
+export function RoleProvider({ children, roleId, user, organizationName, committees }: RoleProviderProps) {
   return (
-    <RoleContext value={{ role: roles[roleId], user, hoaName, navigation: navigationFor(roleId, committees) }}>
+    <RoleContext value={{ role: roles[roleId], user, organizationName, navigation: navigationFor(roleId, committees) }}>
       {children}
     </RoleContext>
   )

@@ -26,12 +26,20 @@ export function codeEmail(to: string, code: string, purpose: CodePurpose, minute
 }
 
 /** An administrator's invitation to sign in: which association, and how to sign in with this email. */
-export function invitationEmail(to: string, name: string, hoaName: string, signInUrl: string): Email {
+export function invitationEmail(
+  to: string,
+  name: string,
+  organizationName: string,
+  signInUrl: string,
+  asAdministrator = false
+): Email {
   const greeting = name ? `Hi ${name},` : "Hi,"
-  const body = `${hoaName} uses this app for its applications, rules and notices. Sign in with this email address (${to}) to see yours.`
+  const body = asAdministrator
+    ? `${organizationName} invited you to help run it in this app, where it keeps its applications, rules and notices. Sign in with this email address (${to}) to start.`
+    : `${organizationName} uses this app for its applications, rules and notices. Sign in with this email address (${to}) to see yours.`
   return {
     to,
-    subject: `${hoaName} invited you to sign in`,
+    subject: `${organizationName} invited you to sign in`,
     text: `${greeting}\n\n${body}\n\n${signInUrl}`,
     html: `<p>${escaped(greeting)}</p><p>${escaped(body)}</p><p><a href="${escaped(signInUrl)}">Sign in</a></p>`
   }

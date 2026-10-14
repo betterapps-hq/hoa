@@ -1,25 +1,23 @@
 import { describe, expect, it } from "vitest"
-import { emailKey, isCurrent, peopleOfAccount, personInputSchema, roleOf, type Person } from "./people"
-import { committeeViews, isLastAdministrator, personRows, accountStatusOf, unitRows, type RollData } from "./roll"
+import { accessOf, emailKey, isCurrent, peopleOfAccount, personInputSchema, roleOf, type Person } from "./people"
+import { accountOf, committeeViews, isLastAdministrator, personRows, unitRows, type RollData } from "./roll"
 
 const person = (id: string, fields: Partial<Person> = {}): Person => ({
   id,
-  hoaId: "hoa",
+  organizationId: "hoa",
   name: id,
   email: `${id}@example.com`,
   phone: null,
   mailingAddress: null,
-  access: "member",
   userId: null,
-  invitedAt: null,
   ...fields
 })
 
 const roll: RollData = {
-  people: [person("pat"), person("sam", { access: "administrator", userId: "user-sam" }), person("lee")],
+  people: [person("pat"), person("sam", { userId: "user-sam" }), person("lee")],
   units: [
-    { id: "u1", hoaId: "hoa", label: "12 Lakeview Drive", address: null, lot: "Lot 12" },
-    { id: "u2", hoaId: "hoa", label: "14 Lakeview Drive", address: null, lot: null }
+    { id: "u1", organizationId: "hoa", label: "12 Lakeview Drive", address: null, lot: "Lot 12" },
+    { id: "u2", organizationId: "hoa", label: "14 Lakeview Drive", address: null, lot: null }
   ],
   links: [
     { id: "l1", unitId: "u1", personId: "lee", relation: "tenant", startedOn: "2024-01-01", endedOn: null },
@@ -29,8 +27,8 @@ const roll: RollData = {
     { id: "l4", unitId: "u2", personId: "sam", relation: "owner", startedOn: "2026-05-01", endedOn: null }
   ],
   committees: [
-    { id: "acc", hoaId: "hoa", name: "Architectural Control Committee", kind: "architectural" },
-    { id: "board", hoaId: "hoa", name: "Board of Directors", kind: "board" }
+    { id: "acc", organizationId: "hoa", name: "Architectural Control Committee", kind: "architectural" },
+    { id: "board", organizationId: "hoa", name: "Board of Directors", kind: "board" }
   ],
   members: [
     {
@@ -60,7 +58,9 @@ const roll: RollData = {
       startedOn: "2025-01-01",
       endedOn: "2026-01-01"
     }
-  ]
+  ],
+  memberships: [{ userId: "user-sam", access: "administrator" }],
+  invitations: []
 }
 
 describe("the roll", () => {
@@ -96,17 +96,25 @@ describe("the roll", () => {
     expect(views[1]?.members.map(({ person }) => person.id)).toEqual(["lee", "pat"])
   })
 
-  it("says whether someone can sign in yet", () => {
-    expect(accountStatusOf(person("a", { userId: "user-a" }))).toBe("joined")
-    expect(accountStatusOf(person("a", { invitedAt: "2026-10-13T00:00:00.000Z" }))).toBe("invited")
-    expect(accountStatusOf(person("a"))).toBe("not-invited")
-    expect(accountStatusOf(person("a", { email: null }))).toBe("no-email")
+  it("says whether someone has joined, with their membership's access or the one they're invited with", () => {
+    const accounts = {
+      memberships: [{ userId: "user-a", access: "administrator" as const }],
+      invitations: [{ email: "b@example.com", access: "administrator" as const }]
+    }
+    expect(accountOf(accounts, person("a", { userId: "user-a" }))).toEqual({
+      status: "joined",
+      access: "administrator"
+    })
+    expect(accountOf(accounts, person("b"))).toEqual({ status: "invited", access: "administrator" })
+    expect(accountOf(accounts, person("c"))).toEqual({ status: "not-invited", access: "member" })
+    expect(accountOf(accounts, person("d", { email: null }))).toEqual({ status: "no-email", access: "member" })
   })
 
   it("keeps at least one administrator", () => {
-    expect(isLastAdministrator(roll.people, "sam")).toBe(true)
-    expect(isLastAdministrator(roll.people, "pat")).toBe(false)
-    expect(isLastAdministrator([...roll.people, person("kim", { access: "administrator" })], "sam")).toBe(false)
+    expect(isLastAdministrator(roll, "sam")).toBe(true)
+    expect(isLastAdministrator(roll, "pat")).toBe(false)
+    const another = { userId: "user-kim", access: "administrator" as const }
+    expect(isLastAdministrator({ ...roll, memberships: [...roll.memberships, another] }, "sam")).toBe(false)
   })
 })
 
@@ -125,8 +133,17 @@ describe("accounts and people", () => {
   })
 
   it("gives administrators the administrator workspace and everyone else the homeowner's", () => {
-    expect(roleOf({ access: "administrator" })).toBe("administrator")
-    expect(roleOf({ access: "member" })).toBe("homeowner")
+    expect(roleOf("administrator")).toBe("administrator")
+    expect(roleOf("member")).toBe("homeowner")
+  })
+
+  it("reads the organization plugin's owner and admin roles as administrators", () => {
+    expect([accessOf("owner"), accessOf("admin"), accessOf("member"), accessOf(null)]).toEqual([
+      "administrator",
+      "administrator",
+      "member",
+      "member"
+    ])
   })
 
   it("keeps emails trimmed and lowercased, and blank as none", () => {

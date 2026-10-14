@@ -14,7 +14,7 @@ const [subject] = projectSubjects(rulesFile, requestType)
 invariant(subject, "The sample has a subject.")
 const type: ProjectType = {
   id: "type-1",
-  hoaId: "hoa",
+  organizationId: "hoa",
   label: "Fence",
   description: null,
   status: "active",

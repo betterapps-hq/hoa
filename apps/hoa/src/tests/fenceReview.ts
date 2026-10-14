@@ -17,7 +17,7 @@ const harmony = "declaration:4.3(b)/p2#harmony"
 
 const file = (id: string, fileName: string, mediaType: string): ApplicationFile => ({
   id,
-  hoaId: "hoa",
+  organizationId: "hoa",
   applicationId: "app-1",
   parentFileId: null,
   ordinal: null,

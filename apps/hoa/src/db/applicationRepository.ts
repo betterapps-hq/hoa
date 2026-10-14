@@ -19,14 +19,14 @@ const legacyProjectType = "fence"
 
 export async function createApplication(
   db: Database,
-  input: Pick<Application, "hoaId" | "projectTypeId" | "answers" | "description" | "createdBy"> & {
+  input: Pick<Application, "organizationId" | "projectTypeId" | "answers" | "description" | "createdBy"> & {
     now: string
     deleteAfter: string
   }
 ): Promise<Application> {
   const application: Application = {
     id: crypto.randomUUID(),
-    hoaId: input.hoaId,
+    organizationId: input.organizationId,
     projectTypeId: input.projectTypeId,
     answers: input.answers,
     description: input.description,
@@ -45,11 +45,11 @@ export async function createApplication(
   return application
 }
 
-export async function getApplication(db: Database, hoaId: string, id: string): Promise<Application | null> {
+export async function getApplication(db: Database, organizationId: string, id: string): Promise<Application | null> {
   const row = await db
     .select()
     .from(applications)
-    .where(and(eq(applications.hoaId, hoaId), eq(applications.id, id)))
+    .where(and(eq(applications.organizationId, organizationId), eq(applications.id, id)))
     .get()
   return row ? applicationSchema.parse(row) : null
 }
@@ -57,10 +57,10 @@ export async function getApplication(db: Database, hoaId: string, id: string): P
 /** A homeowner's own applications, or every application for an administrator, newest first. */
 export async function listApplications(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   filter: { createdBy?: string; statuses?: readonly ApplicationStatus[] } = {}
 ): Promise<Application[]> {
-  const conditions = [eq(applications.hoaId, hoaId)]
+  const conditions = [eq(applications.organizationId, organizationId)]
   if (filter.createdBy) {
     conditions.push(eq(applications.createdBy, filter.createdBy))
   }
@@ -97,7 +97,7 @@ export type ApplicationPatch = Partial<
  */
 export function transitionApplication(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   id: string,
   from: readonly ApplicationStatus[],
   patch: ApplicationPatch
@@ -105,15 +105,21 @@ export function transitionApplication(
   return db
     .update(applications)
     .set(patch)
-    .where(and(eq(applications.hoaId, hoaId), eq(applications.id, id), inArray(applications.status, [...from])))
+    .where(
+      and(
+        eq(applications.organizationId, organizationId),
+        eq(applications.id, id),
+        inArray(applications.status, [...from])
+      )
+    )
     .returning({ id: applications.id })
 }
 
-export async function updateApplication(db: Database, hoaId: string, id: string, patch: ApplicationPatch) {
+export async function updateApplication(db: Database, organizationId: string, id: string, patch: ApplicationPatch) {
   await db
     .update(applications)
     .set(patch)
-    .where(and(eq(applications.hoaId, hoaId), eq(applications.id, id)))
+    .where(and(eq(applications.organizationId, organizationId), eq(applications.id, id)))
 }
 
 /** Applications whose retention has passed, for the daily sweep. */
@@ -125,19 +131,21 @@ export async function listExpiredApplications(db: Database, now: string) {
   return rows.map((row) => applicationSchema.parse(row))
 }
 
-export async function deleteApplication(db: Database, hoaId: string, id: string) {
+export async function deleteApplication(db: Database, organizationId: string, id: string) {
   const files = await db
     .select({ id: applicationFiles.id })
     .from(applicationFiles)
-    .where(and(eq(applicationFiles.hoaId, hoaId), eq(applicationFiles.applicationId, id)))
+    .where(and(eq(applicationFiles.organizationId, organizationId), eq(applicationFiles.applicationId, id)))
   const fileIds = files.map((file) => file.id)
   await db.batch([
     db
       .delete(applicationPages)
-      .where(and(eq(applicationPages.hoaId, hoaId), inArray(applicationPages.fileId, fileIds))),
-    db.delete(applicationFiles).where(and(eq(applicationFiles.hoaId, hoaId), eq(applicationFiles.applicationId, id))),
-    db.delete(reviews).where(and(eq(reviews.hoaId, hoaId), eq(reviews.applicationId, id))),
-    db.delete(applications).where(and(eq(applications.hoaId, hoaId), eq(applications.id, id)))
+      .where(and(eq(applicationPages.organizationId, organizationId), inArray(applicationPages.fileId, fileIds))),
+    db
+      .delete(applicationFiles)
+      .where(and(eq(applicationFiles.organizationId, organizationId), eq(applicationFiles.applicationId, id))),
+    db.delete(reviews).where(and(eq(reviews.organizationId, organizationId), eq(reviews.applicationId, id))),
+    db.delete(applications).where(and(eq(applications.organizationId, organizationId), eq(applications.id, id)))
   ])
 }
 
@@ -145,12 +153,12 @@ export async function deleteApplication(db: Database, hoaId: string, id: string)
  * Deletes a draft its homeowner no longer wants, with its files, pages and reviews: only one that was never submitted
  * and isn't being reviewed, checked in the same statement. False when it isn't such a draft.
  */
-export async function deleteDraftApplication(db: Database, hoaId: string, id: string) {
+export async function deleteDraftApplication(db: Database, organizationId: string, id: string) {
   const [deleted] = await db
     .delete(applications)
     .where(
       and(
-        eq(applications.hoaId, hoaId),
+        eq(applications.organizationId, organizationId),
         eq(applications.id, id),
         inArray(applications.status, ["draft", "reviewed"]),
         isNull(applications.submittedAt)
@@ -160,20 +168,20 @@ export async function deleteDraftApplication(db: Database, hoaId: string, id: st
   if (!deleted) {
     return false
   }
-  await deleteApplication(db, hoaId, id)
+  await deleteApplication(db, organizationId, id)
   return true
 }
 
 export async function createApplicationFile(
   db: Database,
-  input: Pick<ApplicationFile, "hoaId" | "applicationId" | "fileName" | "mediaType" | "sizeBytes"> &
+  input: Pick<ApplicationFile, "organizationId" | "applicationId" | "fileName" | "mediaType" | "sizeBytes"> &
     Partial<Pick<ApplicationFile, "id" | "parentFileId" | "ordinal" | "contextText" | "uploadedAs" | "status">> & {
       now: string
     }
 ): Promise<ApplicationFile> {
   const file: ApplicationFile = {
     id: input.id ?? crypto.randomUUID(),
-    hoaId: input.hoaId,
+    organizationId: input.organizationId,
     applicationId: input.applicationId,
     parentFileId: input.parentFileId ?? null,
     ordinal: input.ordinal ?? null,
@@ -193,24 +201,28 @@ export async function createApplicationFile(
   return file
 }
 
-export async function getApplicationFile(db: Database, hoaId: string, id: string): Promise<ApplicationFile | null> {
+export async function getApplicationFile(
+  db: Database,
+  organizationId: string,
+  id: string
+): Promise<ApplicationFile | null> {
   const row = await db
     .select()
     .from(applicationFiles)
-    .where(and(eq(applicationFiles.hoaId, hoaId), eq(applicationFiles.id, id)))
+    .where(and(eq(applicationFiles.organizationId, organizationId), eq(applicationFiles.id, id)))
     .get()
   return row ? applicationFileSchema.parse(row) : null
 }
 
 export async function listApplicationFiles(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   applicationId: string
 ): Promise<ApplicationFile[]> {
   const rows = await db
     .select()
     .from(applicationFiles)
-    .where(and(eq(applicationFiles.hoaId, hoaId), eq(applicationFiles.applicationId, applicationId)))
+    .where(and(eq(applicationFiles.organizationId, organizationId), eq(applicationFiles.applicationId, applicationId)))
   return rows
     .map((row) => applicationFileSchema.parse(row))
     .toSorted((a, b) => a.createdAt.localeCompare(b.createdAt) || (a.ordinal ?? 0) - (b.ordinal ?? 0))
@@ -218,7 +230,7 @@ export async function listApplicationFiles(
 
 export async function updateApplicationFile(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   id: string,
   patch: Partial<
     Pick<ApplicationFile, "status" | "error" | "sha256" | "pageCount" | "kind" | "uploadedAs" | "contextText">
@@ -227,34 +239,42 @@ export async function updateApplicationFile(
   await db
     .update(applicationFiles)
     .set(patch)
-    .where(and(eq(applicationFiles.hoaId, hoaId), eq(applicationFiles.id, id)))
+    .where(and(eq(applicationFiles.organizationId, organizationId), eq(applicationFiles.id, id)))
 }
 
 /** Removes a file and anything derived from it (pictures extracted from a Word file). */
-export async function deleteApplicationFile(db: Database, hoaId: string, id: string) {
+export async function deleteApplicationFile(db: Database, organizationId: string, id: string) {
   const children = await db
     .select({ id: applicationFiles.id })
     .from(applicationFiles)
-    .where(and(eq(applicationFiles.hoaId, hoaId), eq(applicationFiles.parentFileId, id)))
+    .where(and(eq(applicationFiles.organizationId, organizationId), eq(applicationFiles.parentFileId, id)))
   const ids = [id, ...children.map((child) => child.id)]
   await db.batch([
-    db.delete(applicationPages).where(and(eq(applicationPages.hoaId, hoaId), inArray(applicationPages.fileId, ids))),
-    db.delete(applicationFiles).where(and(eq(applicationFiles.hoaId, hoaId), inArray(applicationFiles.id, ids)))
+    db
+      .delete(applicationPages)
+      .where(and(eq(applicationPages.organizationId, organizationId), inArray(applicationPages.fileId, ids))),
+    db
+      .delete(applicationFiles)
+      .where(and(eq(applicationFiles.organizationId, organizationId), inArray(applicationFiles.id, ids)))
   ])
   return ids
 }
 
 /** Page kinds from classification, written as a whole per file. */
-export async function setPageKinds(db: Database, hoaId: string, fileId: string, kinds: readonly string[]) {
+export async function setPageKinds(db: Database, organizationId: string, fileId: string, kinds: readonly string[]) {
   await db.batch([
-    db.delete(applicationPages).where(and(eq(applicationPages.hoaId, hoaId), eq(applicationPages.fileId, fileId))),
-    ...kinds.map((kind, index) => db.insert(applicationPages).values({ hoaId, fileId, pageIndex: index + 1, kind }))
+    db
+      .delete(applicationPages)
+      .where(and(eq(applicationPages.organizationId, organizationId), eq(applicationPages.fileId, fileId))),
+    ...kinds.map((kind, index) =>
+      db.insert(applicationPages).values({ organizationId, fileId, pageIndex: index + 1, kind })
+    )
   ])
 }
 
 export type ReviewSummary = {
   id: string
-  hoaId: string
+  organizationId: string
   applicationId: string
   jobId: string
   rulebookId: string
@@ -273,13 +293,13 @@ export async function saveReviewSummary(db: Database, summary: ReviewSummary) {
 
 export async function listReviewSummaries(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   applicationId: string
 ): Promise<ReviewSummary[]> {
   const rows = await db
     .select()
     .from(reviews)
-    .where(and(eq(reviews.hoaId, hoaId), eq(reviews.applicationId, applicationId)))
+    .where(and(eq(reviews.organizationId, organizationId), eq(reviews.applicationId, applicationId)))
     .orderBy(desc(reviews.createdAt))
   return rows.map((row) => ({ ...row, recommendation: z.enum(recommendations).parse(row.recommendation) }))
 }

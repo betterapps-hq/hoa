@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-export const hoaSettingsSchema = z.object({
+export const organizationSettingsSchema = z.object({
   /** The recommendation when every unmet rule is curable. */
   curableOutcome: z.enum(["approve-with-conditions", "reject"]).default("approve-with-conditions"),
   /** Days an application is kept after the committee's last decision. */
@@ -11,11 +11,11 @@ export const hoaSettingsSchema = z.object({
   unitSystem: z.enum(["imperial", "metric"]).default("imperial")
 })
 
-export type HoaSettings = z.infer<typeof hoaSettingsSchema>
+export type OrganizationSettings = z.infer<typeof organizationSettingsSchema>
 
-export type Hoa = {
+export type Organization = {
   id: string
   name: string
   slug: string
-  settings: HoaSettings
+  settings: OrganizationSettings
 }

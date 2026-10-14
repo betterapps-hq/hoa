@@ -3,6 +3,7 @@ import {
   HandshakeIcon,
   HomeIcon,
   MailIcon,
+  ShieldCheckIcon,
   PencilIcon,
   PlusIcon,
   SearchIcon,
@@ -38,6 +39,7 @@ import {
   committeeKindLabels,
   relationLabels,
   seatLabel,
+  type Access,
   type Committee,
   type CommitteeKind,
   type CommitteeRole,
@@ -64,7 +66,7 @@ import { RemoveFromUnitDialog, UnitDialog, UnitPeopleDialog } from "../UnitDialo
 export type PeopleActions = {
   savePerson: (id: string | null, person: PersonSave["person"]) => Promise<Person>
   removePerson: (id: string) => Promise<void>
-  invite: (id: string) => Promise<void>
+  invite: (id: string, access: Access) => Promise<void>
   saveUnit: (id: string | null, unit: { label: string; address: string; lot: string }) => Promise<void>
   removeUnit: (id: string) => Promise<void>
   addToUnit: (link: { unitId: string; personId: string; relation: UnitRelation; startedOn: string }) => Promise<void>
@@ -175,8 +177,8 @@ export function PeoplePage({
               isAdministrator
                 ? {
                     onEdit: (person) => setOpen({ kind: "person", person }),
-                    onInvite: (person) =>
-                      void attempt(() => actions.invite(person.id), `Invited ${person.name} to sign in.`).catch(
+                    onInvite: (person, access) =>
+                      void attempt(() => actions.invite(person.id, access), `Invited ${person.name} to join.`).catch(
                         () => undefined
                       ),
                     onRemove: (person) =>
@@ -317,6 +319,7 @@ export function PeoplePage({
       {open?.kind === "person" ? (
         <PersonDialog
           person={open.person}
+          access={people.find((row) => row.person.id === open.person?.id && row.status === "joined")?.access ?? null}
           units={unitChoices}
           canGrantAccess={isAdministrator}
           onOpenChange={(isOpen) => (isOpen ? undefined : close())}
@@ -458,7 +461,7 @@ const personColumn = dataTableColumns<PersonRow>()
 /** What an administrator does to someone on the roll, from their row. */
 type PersonRowActions = {
   onEdit: (person: Person) => void
-  onInvite: (person: Person) => void
+  onInvite: (person: Person, access: Access) => void
   onRemove: (person: Person) => void
 }
 
@@ -535,7 +538,7 @@ function personColumns(actions: PersonRowActions | null) {
       },
       meta: { isRowHeader: true, cellClassName: "min-w-56" }
     }),
-    personColumn.accessor((row) => accessLabels[row.person.access], {
+    personColumn.accessor((row) => accessLabels[row.access], {
       id: "role",
       header: "Role",
       sortFn: "text",
@@ -596,19 +599,29 @@ function personActionsColumn({ onEdit, onInvite, onRemove }: PersonRowActions) {
     header: () => <span className="sr-only">Actions</span>,
     enableSorting: false,
     cell: ({ row }) => {
-      const { person, status } = row.original
+      const { person, status, access } = row.original
+      const isInvited = status === "invited"
       return (
         <RowActions
           name={person.name}
           actions={[
             { label: "Edit", icon: PencilIcon, onSelect: () => onEdit(person) },
-            ...(status === "invited" || status === "not-invited"
+            ...(isInvited || status === "not-invited"
               ? [
                   {
-                    label: status === "invited" ? "Invite again" : "Invite to sign in",
+                    label: isInvited ? "Invite again" : "Invite to join",
                     icon: MailIcon,
-                    onSelect: () => onInvite(person)
-                  }
+                    onSelect: () => onInvite(person, isInvited ? access : "member")
+                  },
+                  ...(isInvited && access === "administrator"
+                    ? []
+                    : [
+                        {
+                          label: "Invite as administrator",
+                          icon: ShieldCheckIcon,
+                          onSelect: () => onInvite(person, "administrator")
+                        }
+                      ])
                 ]
               : []),
             { label: "Take off the roll", icon: Trash2Icon, isDestructive: true, onSelect: () => onRemove(person) }

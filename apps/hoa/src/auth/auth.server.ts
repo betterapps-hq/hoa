@@ -1,14 +1,26 @@
 import { dash } from "@better-auth/infra"
+import { getRequestUrl } from "@tanstack/react-start/server"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
-import { admin, captcha, haveIBeenPwned } from "better-auth/plugins"
+import { admin, captcha, haveIBeenPwned, organization } from "better-auth/plugins"
 import { emailOTP } from "better-auth/plugins/email-otp"
 import { tanstackStartCookies } from "better-auth/tanstack-start"
+import { and, eq } from "drizzle-orm"
 import { getDb } from "@/db/client.server"
-import { accounts, rateLimits, sessions, users, verifications } from "@/db/schema"
+import {
+  accounts,
+  invitations,
+  members,
+  organizations,
+  people,
+  rateLimits,
+  sessions,
+  users,
+  verifications
+} from "@/db/schema"
 import { env } from "@/env.server"
 import { sendEmail } from "./email.server"
-import { codeEmail } from "./emails"
+import { codeEmail, invitationEmail } from "./emails"
 
 /** How long a code by email lasts. */
 export const codeMinutes = 10
@@ -61,6 +73,35 @@ function safeguards() {
   ]
 }
 
+/** How long an invitation to join an organization lasts. */
+const invitationDays = 14
+
+/**
+ * The associations (docs/design/people.md), as Better Auth's organization plugin: the organization, who has an account
+ * in it and their role ("admin" or "member"), and invitations. The roll, units and committees are the app's own.
+ */
+function associations() {
+  return organization({
+    // Only the platform's operators make one, from Better Auth's dashboard, until associations can sign up.
+    allowUserToCreateOrganization: false,
+    creatorRole: "admin",
+    invitationExpiresIn: invitationDays * 24 * 60 * 60,
+    // Inviting again replaces the invitation still waiting, with its role.
+    cancelPendingInvitationsOnReInvite: true,
+    sendInvitationEmail: async ({ email, role, organization: invitedTo }) => {
+      // The person on the roll it's for, to greet them by name.
+      const person = await getDb()
+        .select({ name: people.name })
+        .from(people)
+        .where(and(eq(people.organizationId, invitedTo.id), eq(people.email, email)))
+        .get()
+      // The request that invited them, when no URL is set: a call from the server doesn't give the plugin one.
+      const origin = env.BETTER_AUTH_URL ?? new URL(getRequestUrl()).origin
+      await sendEmail(invitationEmail(email, person?.name ?? "", invitedTo.name, `${origin}/sign-in`, role === "admin"))
+    }
+  })
+}
+
 function createAuth() {
   const google =
     env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
@@ -73,7 +114,7 @@ function createAuth() {
     database: drizzleAdapter(getDb(), {
       provider: "sqlite",
       usePlural: true,
-      schema: { users, sessions, accounts, verifications, rateLimits }
+      schema: { users, sessions, accounts, verifications, rateLimits, organizations, members, invitations }
     }),
     // Counted in D1, since a Worker isolate's memory isn't shared, per visitor as Cloudflare reports them.
     rateLimit: {
@@ -114,6 +155,7 @@ function createAuth() {
           await sendEmail(codeEmail(email, otp, type, codeMinutes))
         }
       }),
+      associations(),
       ...safeguards(),
       // Last, so the cookies the others set reach the response.
       tanstackStartCookies()

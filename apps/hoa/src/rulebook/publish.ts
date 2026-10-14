@@ -52,17 +52,17 @@ export function publishBlockers(records: RulebookRecords) {
 export async function publishDraft(
   db: Database,
   bucket: ObjectBucket,
-  hoaId: string,
+  organizationId: string,
   input: { rulebookId: string; userId: string; now: string }
 ) {
-  const records = await loadRulebookRecords(db, hoaId, input.rulebookId)
+  const records = await loadRulebookRecords(db, organizationId, input.rulebookId)
   const blockers = publishBlockers(records)
   if (blockers.length > 0) {
     throw new Error(blockers.join(" "))
   }
   const assembled = await assembleRulesFile(records)
-  const file = await writeRulesFile(bucket, hoaId, input.rulebookId, assembled)
-  await recordRulebookFile(db, hoaId, input.rulebookId, file)
-  const version = await publishRulebook(db, hoaId, input)
+  const file = await writeRulesFile(bucket, organizationId, input.rulebookId, assembled)
+  await recordRulebookFile(db, organizationId, input.rulebookId, file)
+  const version = await publishRulebook(db, organizationId, input)
   return { version, ...file }
 }

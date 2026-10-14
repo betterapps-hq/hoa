@@ -1,7 +1,7 @@
 import type { Database } from "@/db/database"
 import { createGoverningDocument, type BuiltDocuments } from "@/db/documentRepository"
 import type { RulebookContent } from "@/db/rulebookContentRepository"
-import { hoas } from "@/db/schema"
+import { organizations } from "@/db/schema"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import { buildSettings } from "@/schema/defaultSettings"
 import type { GoverningDocument, Provenance, Provision, Review, Rule, Term } from "@/schema/types"
@@ -11,7 +11,7 @@ import { draftDocuments, draftProvisions, heightRule, vocabulary } from "./encod
 // A small built draft for the save-draft and publish tests: the shed rules' two documents from one upload (the
 // declaration and its rules as a document of their own), the By-Laws they name, and one approved rule.
 
-export const hoaId = "demo-hoa"
+export const organizationId = "demo-hoa"
 export const now = "2026-10-09T00:00:00.000Z"
 
 const provenance: Provenance = { by: "extraction", at: now }
@@ -26,7 +26,7 @@ export const builtRule: Rule = {
 
 const builtTerms: Term[] = vocabulary.map((term) => ({
   ...term,
-  organizationId: hoaId,
+  organizationId: organizationId,
   labels: term.labels.map((label) => ({ ...label, provenance })),
   provenance,
   review: approved,
@@ -59,7 +59,7 @@ const byLaws: GoverningDocument = {
 
 /** The draft's records as publishing reads them. */
 export const builtRecords: RulebookRecords = {
-  organization: { id: hoaId, name: "Maple Hollow" },
+  organization: { id: organizationId, name: "Maple Hollow" },
   documents: [...draftDocuments, byLaws],
   provisions: builtProvisions,
   terms: builtContent.terms,
@@ -84,9 +84,11 @@ export function builtDocuments(uploadId: string): BuiltDocuments {
 
 /** Inserts the organization and an upload, and returns the documents a build of that upload would save. */
 export async function seedUpload(db: Database): Promise<BuiltDocuments> {
-  await db.insert(hoas).values({ id: hoaId, name: "Maple Hollow", slug: "maple-hollow", settings: {}, createdAt: now })
+  await db
+    .insert(organizations)
+    .values({ id: organizationId, name: "Maple Hollow", slug: "maple-hollow", settings: {}, createdAt: new Date(now) })
   const upload = await createGoverningDocument(db, {
-    hoaId,
+    organizationId,
     kind: "declaration",
     title: "Declaration",
     effectiveDate: "2025-01-01",
