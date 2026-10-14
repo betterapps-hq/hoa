@@ -39,7 +39,21 @@ describe("claimUnit", () => {
     const person = (name: string) =>
       insertPerson(db, organizationId, { name, email: null, phone: null, mailingAddress: null }, now)
     const [jordan, casey] = await Promise.all([person("Jordan Avery"), person("Casey Lin")])
-    const unit = await insertUnit(db, organizationId, { label: "12 Birch Lane", address: null, lot: null }, now)
+    const unit = await insertUnit(
+      db,
+      organizationId,
+      {
+        label: "12 Birch Lane",
+        lot: null,
+        street: null,
+        unitNumber: null,
+        city: null,
+        state: null,
+        postalCode: null,
+        place: null
+      },
+      now
+    )
     return { db, jordan, casey, unit }
   }
 

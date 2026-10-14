@@ -7,7 +7,7 @@ import { compromisedPasswordMessage, getAuth, isGoogleConfigured } from "@/auth/
 import { getDb } from "@/db/client.server"
 import { claimUnit, getRoll, updatePerson } from "@/db/peopleRepository"
 import { accounts, sessions } from "@/db/schema"
-import { myDetailsSchema, type Access, type CommitteeRole, type UnitRelation } from "@/people/people"
+import { addressLine, myDetailsSchema, type Access, type CommitteeRole, type UnitRelation } from "@/people/people"
 import { personRows, unitRows } from "@/people/roll"
 import { accountOf, getMembership, type SignedInAccount } from "@/session/requestContext.server"
 import { deviceOf, type DeviceKind } from "./devices"
@@ -101,7 +101,7 @@ async function membershipOf(account: SignedInAccount) {
       .map(({ unit, people }) => ({
         id: unit.id,
         label: unit.label,
-        detail: [unit.lot, unit.address].filter(Boolean).join(", ") || null,
+        detail: [unit.lot, addressLine(unit)].filter(Boolean).join(", ") || null,
         isOwned: people.some(({ link }) => link.relation === "owner")
       }))
   }

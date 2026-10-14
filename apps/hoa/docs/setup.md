@@ -166,4 +166,5 @@ values are in `wrangler.jsonc` `vars` (preview values in its `previews` block), 
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (secret) | "Continue with Google"; off unless both are set | Empty | Not set yet | Not set yet |
 | `RESEND_API_KEY` (secret), `EMAIL_FROM` | Sign-in codes and invitations; without them, development prints each email to the log | Empty | Not set yet | Not set yet |
 | `BETTER_AUTH_API_KEY` (secret) | Better Auth Infrastructure's dashboard of users and sign-ins; off when unset | The project's key | Not set | The project's key |
+| `GOOGLE_MAPS_API_KEY` (secret) | The address search on units (Places API, New); off when unset | A key for the Places API (New) | Not set yet | Not set yet |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` (secret) | Cloudflare Turnstile's bot check on signing in and sending codes; off unless both are set | Empty, or Cloudflare's test keys | Not set yet | Not set yet |

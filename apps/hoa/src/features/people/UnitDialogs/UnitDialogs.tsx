@@ -1,4 +1,5 @@
 import { useForm } from "@tanstack/react-form"
+import { useState } from "react"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import {
@@ -10,10 +11,19 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { relationLabels, unitInputSchema, unitRelations, type Unit, type UnitRelation } from "@/people/people"
+import {
+  relationLabels,
+  unitInputSchema,
+  unitRelations,
+  type Unit,
+  type UnitInput,
+  type UnitRelation
+} from "@/people/people"
+import { unitNameFrom, type Place } from "@/places/address"
+import { AddressSearch } from "../AddressSearch/AddressSearch"
 import { RollPicker, type RollChoice } from "../RollPicker/RollPicker"
 
 const required = (
@@ -25,37 +35,65 @@ const required = (
 type UnitDialogProps = {
   /** The unit to edit; null to add one. */
   unit: Unit | null
-  onSave: (unit: { label: string; address: string; lot: string }) => Promise<void>
+  onSave: (unit: UnitInput) => Promise<void>
   onOpenChange: (open: boolean) => void
 }
 
-/** Adds a unit to the roll or edits one. */
+type UnitText = "street" | "unitNumber" | "city" | "state" | "postalCode" | "label" | "lot"
+
+/**
+ * Adds a unit to the roll or edits one. The address comes first: picking one the search suggests fills its unit
+ * number, city, state and ZIP code, and the unit's name follows its house number until someone types a name.
+ */
 export function UnitDialog({ unit, onSave, onOpenChange }: UnitDialogProps) {
+  const [isNameTyped, setNameTyped] = useState(unit !== null)
   const form = useForm({
-    defaultValues: { label: unit?.label ?? "", lot: unit?.lot ?? "", address: unit?.address ?? "" },
+    defaultValues: {
+      street: unit?.street ?? "",
+      unitNumber: unit?.unitNumber ?? "",
+      city: unit?.city ?? "",
+      state: unit?.state ?? "",
+      postalCode: unit?.postalCode ?? "",
+      label: unit?.label ?? "",
+      lot: unit?.lot ?? "",
+      place: unit?.place ?? (null as Place | null)
+    },
     validators: { onSubmit: unitInputSchema },
     onSubmit: async ({ value }) => {
       await onSave(value)
       onOpenChange(false)
     }
   })
-  const text = (name: "label" | "lot" | "address", label: string, description?: string) => (
+  /** Names the unit by its address's house number, until someone names it. */
+  const nameFromAddress = () => {
+    if (!isNameTyped) {
+      form.setFieldValue("label", unitNameFrom(form.getFieldValue("street"), form.getFieldValue("unitNumber")))
+    }
+  }
+  const text = (
+    name: UnitText,
+    label: string,
+    extra: Partial<{ autoComplete: string; className: string; onChange: () => void }> = {}
+  ) => (
     <form.Field name={name}>
       {(field) => (
-        <Field data-invalid={field.state.meta.errors.length > 0}>
+        <Field data-invalid={field.state.meta.errors.length > 0} className={extra.className}>
           <FieldLabel htmlFor={`unit-${name}`}>
             {label}
             {name === "label" ? required : null}
           </FieldLabel>
           <Input
             id={`unit-${name}`}
+            autoComplete={extra.autoComplete ?? "off"}
             required={name === "label"}
             value={field.state.value}
             onBlur={field.handleBlur}
-            onChange={(event) => field.handleChange(event.target.value)}
+            onChange={(event) => {
+              field.handleChange(event.target.value)
+              extra.onChange?.()
+            }}
             aria-invalid={field.state.meta.errors.length > 0}
           />
-          {description ? <FieldDescription>{description}</FieldDescription> : null}
           <FieldError errors={field.state.meta.errors} />
         </Field>
       )}
@@ -63,7 +101,7 @@ export function UnitDialog({ unit, onSave, onOpenChange }: UnitDialogProps) {
   )
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
         <form
           noValidate
           className="flex flex-col gap-6"
@@ -77,9 +115,42 @@ export function UnitDialog({ unit, onSave, onOpenChange }: UnitDialogProps) {
             <DialogTitle>{unit ? `Edit ${unit.label}` : "Add unit"}</DialogTitle>
           </DialogHeader>
           <FieldGroup>
-            {text("label", "Name", "What the association calls it: a street address, or a lot or unit number.")}
-            {text("lot", "Lot")}
-            {text("address", "Full address", "With the city and ZIP code, for mail and the map.")}
+            <form.Field name="street">
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="unit-street">Address</FieldLabel>
+                  <AddressSearch
+                    id="unit-street"
+                    value={field.state.value}
+                    onChange={(street) => {
+                      field.handleChange(street)
+                      // Typed by hand, it's no longer the place the search found.
+                      form.setFieldValue("place", null)
+                      nameFromAddress()
+                    }}
+                    onFind={({ parts, place }) => {
+                      form.setFieldValue("street", parts.street)
+                      form.setFieldValue("unitNumber", parts.unitNumber)
+                      form.setFieldValue("city", parts.city)
+                      form.setFieldValue("state", parts.state)
+                      form.setFieldValue("postalCode", parts.postalCode)
+                      form.setFieldValue("place", place)
+                      nameFromAddress()
+                    }}
+                  />
+                </Field>
+              )}
+            </form.Field>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-[6rem_1fr_5rem_7rem]">
+              {text("unitNumber", "Unit", { onChange: nameFromAddress })}
+              {text("city", "City")}
+              {text("state", "State")}
+              {text("postalCode", "ZIP")}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-[1fr_8rem]">
+              {text("label", "Name", { onChange: () => setNameTyped(true) })}
+              {text("lot", "Lot")}
+            </div>
           </FieldGroup>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>

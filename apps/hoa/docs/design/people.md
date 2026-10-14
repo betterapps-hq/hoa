@@ -59,6 +59,13 @@ two people can't both win it. Changing a home's owner after that is the board's 
 sale ends the owners' ownership on the day and starts the buyer's; removing someone ends their time there on a day.
 History stays: nothing on the roll is deleted, only ended or marked removed.
 
+## Addresses
+
+A unit's address is kept in parts: street, unit number, city, state and ZIP code. Typing the street searches Google's
+Places API (New) from the server, near the association's other units first; picking a suggestion fills the other parts
+and keeps the place's id and coordinates for the map. The unit's name follows the house number until someone types
+one. Without `GOOGLE_MAPS_API_KEY` the search is off and the parts are typed.
+
 ## Storage
 
 Stored files keep the `hoas/{organizationId}/…` prefix they were written under ([documents.md](documents.md)).

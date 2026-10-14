@@ -34,6 +34,8 @@ export const env = createEnv({
     EMAIL_FROM: z.string().min(3).optional(),
     // Better Auth Infrastructure's dashboard of users, sessions and sign-ins. Off without it.
     BETTER_AUTH_API_KEY: z.string().min(1).optional(),
+    // The address search on units (Google's Places API, New). Off without it.
+    GOOGLE_MAPS_API_KEY: z.string().min(1).optional(),
     // Cloudflare Turnstile's bot check on signing in and sending codes. Off unless both are set.
     TURNSTILE_SITE_KEY: z.string().min(1).optional(),
     TURNSTILE_SECRET_KEY: z.string().min(1).optional()

@@ -1,5 +1,6 @@
 import { z } from "zod"
 import type { RoleId } from "@/features/role/roles"
+import { unitNumberText, type Place } from "@/places/address"
 import { optionalPhone } from "./phone"
 
 // The association's people (docs/design/people.md): everyone on its roll, with or without an account, the units they
@@ -28,7 +29,26 @@ export type Person = {
   userId: string | null
 }
 
-export type Unit = { id: string; organizationId: string; label: string; address: string | null; lot: string | null }
+/** A home, lot or condominium unit: its name, its lot, its address in parts, and where it is once the search found it. */
+export type Unit = {
+  id: string
+  organizationId: string
+  label: string
+  lot: string | null
+  street: string | null
+  unitNumber: string | null
+  city: string | null
+  state: string | null
+  postalCode: string | null
+  place: Place | null
+}
+
+/** A unit's address on one line, as on an envelope: "12 Lakeview Drive #3B, Bellingham, WA 98229". */
+export function addressLine(unit: Pick<Unit, "street" | "unitNumber" | "city" | "state" | "postalCode">) {
+  const street = [unit.street, unit.unitNumber ? unitNumberText(unit.unitNumber) : null].filter(Boolean).join(" ")
+  const region = [unit.state, unit.postalCode].filter(Boolean).join(" ")
+  return [street, unit.city, region].filter(Boolean).join(", ")
+}
 
 /** Someone owning, living in or renting a unit, from one day to another; `endedOn` is null while it lasts. */
 export type UnitLink = {
@@ -116,10 +136,24 @@ export const personInputSchema = z.object({
 
 /** A unit as an administrator adds or edits it. */
 export const unitInputSchema = z.object({
-  label: z.string().trim().min(1, "Give the unit's address or number.").max(200),
-  address: optionalText(300),
-  lot: optionalText(60)
+  label: z.string().trim().min(1, "Give the unit a name.").max(200),
+  lot: optionalText(60),
+  street: optionalText(200),
+  unitNumber: optionalText(30),
+  city: optionalText(100),
+  state: optionalText(40),
+  postalCode: optionalText(20),
+  place: z
+    .object({
+      id: z.string().min(1).max(300),
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180)
+    })
+    .nullable()
 })
+
+/** A unit as its form gives it. */
+export type UnitInput = z.input<typeof unitInputSchema>
 
 const day = z.union([z.literal(""), z.iso.date("Give a date.")]).transform((text) => (text === "" ? null : text))
 

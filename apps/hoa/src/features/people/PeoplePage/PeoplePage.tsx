@@ -37,6 +37,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createSearch } from "@/lib/search"
 import {
   accessLabels,
+  addressLine,
   committeeKindLabels,
   relationLabels,
   seatLabel,
@@ -46,6 +47,7 @@ import {
   type CommitteeRole,
   type Person,
   type Unit,
+  type UnitInput,
   type UnitRelation
 } from "@/people/people"
 import { phoneText } from "@/people/phone"
@@ -70,7 +72,7 @@ export type PeopleActions = {
   removePerson: (id: string) => Promise<void>
   invite: (id: string, access: Access) => Promise<void>
   cancelInvite: (id: string) => Promise<void>
-  saveUnit: (id: string | null, unit: { label: string; address: string; lot: string }) => Promise<void>
+  saveUnit: (id: string | null, unit: UnitInput) => Promise<void>
   removeUnit: (id: string) => Promise<void>
   addToUnit: (link: { unitId: string; personId: string; relation: UnitRelation; startedOn: string }) => Promise<void>
   leaveUnit: (linkId: string, endedOn: string) => Promise<void>
@@ -152,7 +154,7 @@ export function PeoplePage({
   const unitChoices: RollChoice[] = roll.units.map((unit) => ({
     value: unit.id,
     label: unit.label,
-    detail: unit.lot ?? unit.address
+    detail: unit.lot ?? (addressLine(unit) || null)
   }))
   const confirm = (title: string, description: string, label: string, run: () => Promise<void>) =>
     setOpen({ kind: "confirm", title, description, confirm: label, run })
@@ -713,9 +715,9 @@ function unitColumns({ onAdd, onSale, onRemoveSomeone, administration }: Omit<Un
         return (
           <div className="flex min-w-0 flex-col">
             <span className="font-medium">{unit.label}</span>
-            {unit.lot || unit.address ? (
+            {unit.lot || addressLine(unit) ? (
               <span className="truncate text-muted-foreground">
-                {[unit.lot, unit.address].filter(Boolean).join(", ")}
+                {[unit.lot, addressLine(unit)].filter(Boolean).join(", ")}
               </span>
             ) : null}
           </div>
@@ -784,7 +786,7 @@ function UnitsTable({ rows, onAdd, onSale, onRemoveSomeone, administration }: Un
         fields: {
           label: { text: (row) => row.unit.label, boost: 3 },
           lot: { text: (row) => row.unit.lot ?? "" },
-          address: { text: (row) => row.unit.address ?? "" },
+          address: { text: (row) => addressLine(row.unit) },
           people: { text: (row) => row.people.map(({ person }) => person.name).join(" ") }
         }
       }),

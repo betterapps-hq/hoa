@@ -509,10 +509,19 @@ export const units = sqliteTable(
   {
     id: text("id").primaryKey(),
     organizationId: text("organization_id").notNull(),
-    // What the association calls it: a street address, or a lot or unit number.
+    // What the association calls it: a house number, a street address, or a lot or unit number.
     label: text("label").notNull(),
-    address: text("address"),
     lot: text("lot"),
+    // Its address in parts, as the address search fills them; the unit number is an apartment's, suite's or unit's.
+    street: text("street"),
+    unitNumber: text("unit_number"),
+    city: text("city"),
+    state: text("state"),
+    postalCode: text("postal_code"),
+    // The place the address search found it at (Google Places), and where that is: for the map and nearby suggestions.
+    placeId: text("place_id"),
+    latitude: real("latitude"),
+    longitude: real("longitude"),
     createdAt: timestamp("created_at"),
     updatedAt: timestamp("updated_at"),
     removedAt: text("removed_at")

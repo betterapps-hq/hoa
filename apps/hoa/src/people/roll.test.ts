@@ -13,11 +13,13 @@ const person = (id: string, fields: Partial<Person> = {}): Person => ({
   ...fields
 })
 
+const noAddress = { street: null, unitNumber: null, city: null, state: null, postalCode: null, place: null }
+
 const roll: RollData = {
   people: [person("pat"), person("sam", { userId: "user-sam" }), person("lee")],
   units: [
-    { id: "u1", organizationId: "hoa", label: "12 Lakeview Drive", address: null, lot: "Lot 12" },
-    { id: "u2", organizationId: "hoa", label: "14 Lakeview Drive", address: null, lot: null }
+    { id: "u1", organizationId: "hoa", label: "12 Lakeview Drive", lot: "Lot 12", ...noAddress },
+    { id: "u2", organizationId: "hoa", label: "14 Lakeview Drive", lot: null, ...noAddress }
   ],
   links: [
     { id: "l1", unitId: "u1", personId: "lee", relation: "tenant", startedOn: "2024-01-01", endedOn: null },

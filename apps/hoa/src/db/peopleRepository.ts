@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm"
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm"
 import {
   accessOf,
   emailKey,
@@ -34,8 +34,16 @@ const toUnit = (row: typeof units.$inferSelect): Unit => ({
   id: row.id,
   organizationId: row.organizationId,
   label: row.label,
-  address: row.address,
-  lot: row.lot
+  lot: row.lot,
+  street: row.street,
+  unitNumber: row.unitNumber,
+  city: row.city,
+  state: row.state,
+  postalCode: row.postalCode,
+  place:
+    row.placeId !== null && row.latitude !== null && row.longitude !== null
+      ? { id: row.placeId, latitude: row.latitude, longitude: row.longitude }
+      : null
 })
 
 const relationOf = (relation: string): UnitRelation =>
@@ -240,12 +248,42 @@ export async function removePerson(db: Database, person: Person, now: string) {
   ])
 }
 
-type UnitFields = { label: string; address: string | null; lot: string | null }
+type UnitFields = Omit<Unit, "id" | "organizationId">
+
+/** A unit's fields as its row keeps them: the place in columns of its own. */
+const unitColumns = ({ place, ...fields }: UnitFields) => ({
+  ...fields,
+  placeId: place?.id ?? null,
+  latitude: place?.latitude ?? null,
+  longitude: place?.longitude ?? null
+})
 
 export async function insertUnit(db: Database, organizationId: string, fields: UnitFields, now: string): Promise<Unit> {
-  const row = { id: crypto.randomUUID(), organizationId, ...fields, createdAt: now, updatedAt: now, removedAt: null }
+  const row = {
+    id: crypto.randomUUID(),
+    organizationId,
+    ...unitColumns(fields),
+    createdAt: now,
+    updatedAt: now,
+    removedAt: null
+  }
   await db.insert(units).values(row)
   return toUnit(row)
+}
+
+/** The middle of an organization's units on the map; null until one is. The address search looks near it first. */
+export async function unitsCenter(db: Database, organizationId: string) {
+  const row = await db
+    .select({
+      latitude: sql<number | null>`avg(${units.latitude})`,
+      longitude: sql<number | null>`avg(${units.longitude})`
+    })
+    .from(units)
+    .where(and(eq(units.organizationId, organizationId), isNull(units.removedAt), isNotNull(units.latitude)))
+    .get()
+  return row && row.latitude !== null && row.longitude !== null
+    ? { latitude: row.latitude, longitude: row.longitude }
+    : null
 }
 
 export async function getUnit(db: Database, organizationId: string, id: string): Promise<Unit | null> {
@@ -260,7 +298,7 @@ export async function getUnit(db: Database, organizationId: string, id: string):
 export async function updateUnit(db: Database, organizationId: string, id: string, fields: UnitFields, now: string) {
   await db
     .update(units)
-    .set({ ...fields, updatedAt: now })
+    .set({ ...unitColumns(fields), updatedAt: now })
     .where(and(eq(units.organizationId, organizationId), eq(units.id, id)))
 }
 

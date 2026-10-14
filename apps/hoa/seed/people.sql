@@ -18,10 +18,10 @@ INSERT OR IGNORE INTO members (id, organization_id, user_id, role, created_at) V
   ('member-sam', 'demo-hoa', 'demo-administrator', 'admin', 1791936000000),
   ('member-jordan', 'demo-hoa', 'demo-homeowner', 'member', 1791936000000);
 
-INSERT OR IGNORE INTO units (id, organization_id, label, address, lot, created_at, updated_at, removed_at) VALUES
-  ('unit-12', 'demo-hoa', '12 Lakeview Drive', '12 Lakeview Drive, Bellingham, WA 98229', 'Lot 12', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
-  ('unit-14', 'demo-hoa', '14 Lakeview Drive', '14 Lakeview Drive, Bellingham, WA 98229', 'Lot 14', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
-  ('unit-31', 'demo-hoa', '31 Fir Court', '31 Fir Court, Bellingham, WA 98229', 'Lot 31', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL);
+INSERT OR IGNORE INTO units (id, organization_id, label, lot, street, city, state, postal_code, created_at, updated_at, removed_at) VALUES
+  ('unit-12', 'demo-hoa', '12 Lakeview Drive', 'Lot 12', '12 Lakeview Drive', 'Bellingham', 'WA', '98229', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
+  ('unit-14', 'demo-hoa', '14 Lakeview Drive', 'Lot 14', '14 Lakeview Drive', 'Bellingham', 'WA', '98229', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
+  ('unit-31', 'demo-hoa', '31 Fir Court', 'Lot 31', '31 Fir Court', 'Bellingham', 'WA', '98229', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL);
 
 INSERT OR IGNORE INTO unit_people (id, organization_id, unit_id, person_id, relation, started_on, ended_on, created_at) VALUES
   ('unit-person-1', 'demo-hoa', 'unit-12', 'person-jordan', 'owner', '2019-06-01', NULL, '2026-10-13T00:00:00.000Z'),
