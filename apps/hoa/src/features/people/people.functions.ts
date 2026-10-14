@@ -8,6 +8,7 @@ import {
   endUnitLink,
   findPersonByEmail,
   getCommittee,
+  getCommitteeMember,
   getPerson,
   getRoll,
   getUnit,
@@ -19,8 +20,10 @@ import {
   removeCommittee,
   removePerson,
   removeUnit,
+  startNextTerm,
   unitsCenter,
   updateCommittee,
+  updateCommitteeMember,
   updatePerson,
   updateUnit
 } from "@/db/peopleRepository"
@@ -28,6 +31,7 @@ import {
   accessLevels,
   committeeInputSchema,
   committeeMemberInputSchema,
+  seatInputSchema,
   memberRoles,
   personInputSchema,
   unitInputSchema,
@@ -266,7 +270,7 @@ export const dissolveCommittee = createServerFn({ method: "POST" })
     await removeCommittee(getDb(), context.organization.id, data.id, new Date().toISOString())
   })
 
-/** Seats someone on a committee, as its chair or a member, with an officer's title on the board. */
+/** Seats someone on a committee for a first term, as its chair or a member, with an officer's title on the board. */
 export const addToCommittee = createServerFn({ method: "POST" })
   .validator(parse(committeeMemberInputSchema))
   .handler(async ({ data }) => {
@@ -279,7 +283,43 @@ export const addToCommittee = createServerFn({ method: "POST" })
     if (!committee || !person) {
       throw new Error("That committee or person isn't on the roll.")
     }
-    await insertCommitteeMember(db, context.organization.id, data, new Date().toISOString())
+    await insertCommitteeMember(
+      db,
+      context.organization.id,
+      { committeeId: data.committeeId, personId: data.personId, ...data.seat },
+      new Date().toISOString()
+    )
+  })
+
+const seatChangeSchema = z.object({ id: z.string().min(1), seat: seatInputSchema })
+
+/** Corrects someone's term in a seat: its role, office and days. */
+export const editSeat = createServerFn({ method: "POST" })
+  .validator(parse(seatChangeSchema))
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    const db = getDb()
+    if (!(await getCommitteeMember(db, context.organization.id, data.id))) {
+      throw new Error("That seat isn't on the roll.")
+    }
+    await updateCommitteeMember(db, context.organization.id, data.id, data.seat)
+  })
+
+/** Starts someone's next term in a seat they hold, on the day it starts; the term before stays on the roll. */
+export const startNewTerm = createServerFn({ method: "POST" })
+  .validator(parse(seatChangeSchema))
+  .handler(async ({ data }) => {
+    const context = await requireAdministrator()
+    const db = getDb()
+    const previous = await getCommitteeMember(db, context.organization.id, data.id)
+    const { startedOn } = data.seat
+    if (!previous) {
+      throw new Error("That seat isn't on the roll.")
+    }
+    if (!startedOn) {
+      throw new Error("Give the day the new term starts.")
+    }
+    await startNextTerm(db, context.organization.id, previous, { ...data.seat, startedOn }, new Date().toISOString())
   })
 
 /** Ends someone's term on a committee on a day. */

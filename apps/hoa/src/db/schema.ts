@@ -574,7 +574,10 @@ export const committeeMembers = sqliteTable(
     role: text("role").notNull(),
     // An officer's title on the board: president, treasurer, secretary. Null for none.
     office: text("office"),
+    // One term in the seat: the day it starts, the day it's due to end, and the day it did. Someone keeps the seat past
+    // the term's end until it's ended or their next term starts, as an association's bylaws usually say.
     startedOn: text("started_on"),
+    termEndsOn: text("term_ends_on"),
     endedOn: text("ended_on"),
     createdAt: timestamp("created_at")
   },

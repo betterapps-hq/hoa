@@ -26,6 +26,11 @@ export function fileSizeText(bytes: number) {
   return `${sizeFormat.format(bytes / (1024 * 1024))} MB`
 }
 
+const dayFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" })
+
+/** A day (YYYY-MM-DD) as people read it: "May 31, 2027". */
+export const dayText = (day: string) => dayFormat.format(new Date(`${day}T00:00:00Z`))
+
 const moneyFormat = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
 
 /** An amount of dollars as people read it: "$50.00". */

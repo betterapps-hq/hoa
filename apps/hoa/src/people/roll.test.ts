@@ -40,6 +40,7 @@ const roll: RollData = {
       role: "member",
       office: null,
       startedOn: null,
+      termEndsOn: null,
       endedOn: null
     },
     {
@@ -49,6 +50,7 @@ const roll: RollData = {
       role: "chair",
       office: null,
       startedOn: null,
+      termEndsOn: null,
       endedOn: null
     },
     {
@@ -58,6 +60,7 @@ const roll: RollData = {
       role: "chair",
       office: "President",
       startedOn: "2025-01-01",
+      termEndsOn: null,
       endedOn: "2026-01-01"
     }
   ],

@@ -73,6 +73,7 @@ const toMember = (row: typeof committeeMembers.$inferSelect): CommitteeMember =>
   role: row.role === "chair" ? "chair" : "member",
   office: row.office,
   startedOn: row.startedOn,
+  termEndsOn: row.termEndsOn,
   endedOn: row.endedOn
 })
 
@@ -412,21 +413,72 @@ export async function removeCommittee(db: Database, organizationId: string, id: 
   ])
 }
 
+/** A term in a seat as the repository keeps it. */
+type Term = { role: CommitteeRole; office: string | null; startedOn: string | null; termEndsOn: string | null }
+
 export async function insertCommitteeMember(
   db: Database,
   organizationId: string,
-  member: {
-    committeeId: string
-    personId: string
-    role: CommitteeRole
-    office: string | null
-    startedOn: string | null
-  },
+  member: { committeeId: string; personId: string } & Term,
   now: string
 ) {
   await db
     .insert(committeeMembers)
     .values({ id: crypto.randomUUID(), organizationId, ...member, endedOn: null, createdAt: now })
+}
+
+export async function getCommitteeMember(
+  db: Database,
+  organizationId: string,
+  id: string
+): Promise<CommitteeMember | null> {
+  const [row] = await db
+    .select()
+    .from(committeeMembers)
+    .where(and(eq(committeeMembers.organizationId, organizationId), eq(committeeMembers.id, id)))
+  return row ? toMember(row) : null
+}
+
+/** Corrects a term: its role, office and days. A new term is `startNextTerm`, which keeps this one as it was. */
+export async function updateCommitteeMember(db: Database, organizationId: string, id: string, term: Term) {
+  await db
+    .update(committeeMembers)
+    .set(term)
+    .where(and(eq(committeeMembers.organizationId, organizationId), eq(committeeMembers.id, id)))
+}
+
+/**
+ * Starts someone's next term in a seat they hold, on its first day (YYYY-MM-DD): the term before ends that day, and
+ * stays on the roll as one they served.
+ */
+export async function startNextTerm(
+  db: Database,
+  organizationId: string,
+  previous: Pick<CommitteeMember, "id" | "committeeId" | "personId">,
+  term: Term & { startedOn: string },
+  now: string
+) {
+  await db.batch([
+    db
+      .update(committeeMembers)
+      .set({ endedOn: term.startedOn })
+      .where(
+        and(
+          eq(committeeMembers.organizationId, organizationId),
+          eq(committeeMembers.id, previous.id),
+          or(isNull(committeeMembers.endedOn), gt(committeeMembers.endedOn, term.startedOn))
+        )
+      ),
+    db.insert(committeeMembers).values({
+      id: crypto.randomUUID(),
+      organizationId,
+      committeeId: previous.committeeId,
+      personId: previous.personId,
+      ...term,
+      endedOn: null,
+      createdAt: now
+    })
+  ])
 }
 
 /**

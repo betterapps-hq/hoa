@@ -6,17 +6,19 @@ import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogT
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { ChoiceSelect } from "@/features/rulebook/ChoiceSelect/ChoiceSelect"
+import { useAppForm } from "@/lib/form"
 import {
   committeeInputSchema,
   committeeKindChoices,
-  committeeRoleChoices,
-  committeeRoles,
+  nextTermStart,
+  seatInputSchema,
   type Committee,
   type CommitteeKind,
-  type CommitteeRole
+  type CommitteeMember,
+  type SeatInput
 } from "@/people/people"
-import { OfficePicker } from "../OfficePicker/OfficePicker"
 import { RollPicker, type RollChoice } from "../RollPicker/RollPicker"
+import { SeatFields, seatValues } from "../SeatFields/SeatFields"
 
 type CommitteeDialogProps = {
   committee: Committee | null
@@ -100,37 +102,52 @@ export function CommitteeDialog({ committee, onSave, onOpenChange }: CommitteeDi
   )
 }
 
-const memberSchema = z.object({
-  personId: z.string().min(1, "Pick someone."),
-  role: z.enum(committeeRoles),
-  office: z.string().trim().max(80),
-  startedOn: z.union([z.literal(""), z.iso.date("Give a date.")])
-})
+/** Their seat, to correct its term ("edit") or to follow it with their next ("renew"). */
+export type SeatChange = { member: CommitteeMember; personName: string; mode: "edit" | "renew" }
 
 type MemberDialogProps = {
   committee: Committee
   people: readonly RollChoice[]
-  onSave: (member: {
-    committeeId: string
-    personId: string
-    role: CommitteeRole
-    office: string
-    startedOn: string
-  }) => Promise<void>
+  /** The seat to change; null to seat someone for a first term. */
+  change: SeatChange | null
+  today: string
+  onSave: (save: { personId: string; seat: SeatInput }) => Promise<void>
   onOpenChange: (open: boolean) => void
 }
 
-/** Seats someone on the board or a committee, from the committee. */
-export function MemberDialog({ committee, people, onSave, onOpenChange }: MemberDialogProps) {
-  const isBoard = committee.kind === "board"
-  const form = useForm({
-    defaultValues: { personId: "", role: "member" as CommitteeRole, office: "", startedOn: "" },
-    validators: { onSubmit: memberSchema },
+/** Seats someone on the board or a committee, corrects their term, or starts their next one. */
+export function MemberDialog({ committee, people, change, today, onSave, onOpenChange }: MemberDialogProps) {
+  const mode = change?.mode ?? "add"
+  const isRenewing = mode === "renew"
+  const form = useAppForm({
+    defaultValues: {
+      personId: change?.member.personId ?? "",
+      seat:
+        change && isRenewing
+          ? { ...seatValues(change.member), startedOn: nextTermStart(change.member, today), termEndsOn: "" }
+          : seatValues(change?.member ?? null)
+    },
+    validators: {
+      onSubmit: z.object({
+        personId: z.string().min(1, "Pick someone."),
+        seat: isRenewing
+          ? seatInputSchema.refine((seat) => seat.startedOn, {
+              message: "Give the day it starts.",
+              path: ["startedOn"]
+            })
+          : seatInputSchema
+      })
+    },
     onSubmit: async ({ value }) => {
-      await onSave({ ...value, committeeId: committee.id })
+      await onSave(value)
       onOpenChange(false)
     }
   })
+  const title = {
+    add: `Add to ${committee.name}`,
+    edit: `Edit ${change?.personName}'s seat`,
+    renew: `New term for ${change?.personName}`
+  }[mode]
   return (
     <Dialog open onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -144,77 +161,39 @@ export function MemberDialog({ committee, people, onSave, onOpenChange }: Member
           }}
         >
           <DialogHeader>
-            <DialogTitle>Add to {committee.name}</DialogTitle>
+            <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
           <FieldGroup>
-            <form.Field name="personId">
-              {(field) => (
-                <Field data-invalid={field.state.meta.errors.length > 0}>
-                  <FieldLabel htmlFor="member-person">
-                    Person
-                    <RequiredMark />
-                  </FieldLabel>
-                  <RollPicker
-                    id="member-person"
-                    choices={people}
-                    value={field.state.value}
-                    onChange={field.handleChange}
-                    placeholder="Search people"
-                    empty="No matches."
-                    isInvalid={field.state.meta.errors.length > 0}
-                  />
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
-            </form.Field>
-            <form.Field name="role">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="member-role">Role</FieldLabel>
-                  <ChoiceSelect
-                    id="member-role"
-                    className="w-full"
-                    value={field.state.value}
-                    choices={committeeRoleChoices}
-                    onChange={field.handleChange}
-                  />
-                </Field>
-              )}
-            </form.Field>
-            {isBoard ? (
-              <form.Field name="office">
+            {change ? null : (
+              <form.Field name="personId">
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="member-office">Office</FieldLabel>
-                    <OfficePicker id="member-office" value={field.state.value} onChange={field.handleChange} />
+                  <Field data-invalid={field.state.meta.errors.length > 0}>
+                    <FieldLabel htmlFor="member-person">
+                      Person
+                      <RequiredMark />
+                    </FieldLabel>
+                    <RollPicker
+                      id="member-person"
+                      choices={people}
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                      placeholder="Search people"
+                      empty="No matches."
+                      isInvalid={field.state.meta.errors.length > 0}
+                    />
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-            ) : null}
-            <form.Field name="startedOn">
-              {(field) => (
-                <Field data-invalid={field.state.meta.errors.length > 0}>
-                  <FieldLabel htmlFor="member-since">Since</FieldLabel>
-                  <Input
-                    id="member-since"
-                    type="date"
-                    className="w-44"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    aria-invalid={field.state.meta.errors.length > 0}
-                  />
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
-            </form.Field>
+            )}
+            <SeatFields form={form} fields="seat" idPrefix="member" isBoard={committee.kind === "board"} />
           </FieldGroup>
           <DialogFooter>
             <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
             <form.Subscribe selector={(state) => state.isSubmitting}>
               {(isSubmitting) => (
                 <Button type="submit" disabled={isSubmitting}>
-                  Add
+                  {{ add: "Add", edit: "Save", renew: "Start term" }[mode]}
                 </Button>
               )}
             </form.Subscribe>

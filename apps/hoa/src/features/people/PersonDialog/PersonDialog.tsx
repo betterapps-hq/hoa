@@ -20,27 +20,26 @@ import { ChoiceSelect } from "@/features/rulebook/ChoiceSelect/ChoiceSelect"
 import { useAppForm } from "@/lib/form"
 import {
   accessChoices,
-  committeeRoleChoices,
-  committeeRoles,
   personInputSchema,
+  seatInputSchema,
   relationChoices,
   relationLabels,
   unitInputSchema,
   unitRelations,
   type Access,
   type Committee,
-  type CommitteeRole,
   type Person,
+  type SeatInput,
   type UnitInput,
   type UnitRelation
 } from "@/people/people"
 import { phoneText } from "@/people/phone"
-import { OfficePicker } from "../OfficePicker/OfficePicker"
 import { RollPicker, type RollChoice } from "../RollPicker/RollPicker"
+import { SeatFields, seatValues } from "../SeatFields/SeatFields"
 import { UnitFields, unitValues } from "../UnitFields/UnitFields"
 
 /** A seat to add on the board or a committee. */
-export type NewSeat = { committeeId: string; role: CommitteeRole; office: string }
+export type NewSeat = { committeeId: string; seat: SeatInput }
 
 export type PersonSave = {
   person: { name: string; email: string; phone: string; mailingAddress: string; access: Access }
@@ -95,12 +94,7 @@ const formSchema = personInputSchema.extend({
   ),
   ending: z.array(z.string()),
   adding: z.array(
-    z.object({
-      key: z.string(),
-      committeeId: z.string().min(1, "Pick a committee."),
-      role: z.enum(committeeRoles),
-      office: z.string().trim().max(80)
-    })
+    z.object({ key: z.string(), committeeId: z.string().min(1, "Pick a committee."), seat: seatInputSchema })
   )
 })
 
@@ -147,7 +141,7 @@ export function PersonDialog({
           end: value.leavingHomes
         },
         assignments: {
-          add: value.adding.map(({ committeeId, role, office }) => ({ committeeId, role, office: office.trim() })),
+          add: value.adding.map(({ committeeId, seat }) => ({ committeeId, seat })),
           end: value.ending
         }
       })
@@ -391,7 +385,7 @@ export function PersonDialog({
                     return (
                       <>
                         {field.state.value.map((seat, index) => (
-                          <div key={seat.key} className="flex flex-col gap-2 rounded-lg border p-3">
+                          <div key={seat.key} className="flex flex-col gap-4 rounded-lg border p-3">
                             <div className="flex items-start gap-2">
                               <form.Field name={`adding[${index}].committeeId`}>
                                 {(seatField) => (
@@ -417,17 +411,6 @@ export function PersonDialog({
                                   </Field>
                                 )}
                               </form.Field>
-                              <form.Field name={`adding[${index}].role`}>
-                                {(seatField) => (
-                                  <ChoiceSelect
-                                    label="Role"
-                                    className="w-28"
-                                    value={seatField.state.value}
-                                    choices={committeeRoleChoices}
-                                    onChange={seatField.handleChange}
-                                  />
-                                )}
-                              </form.Field>
                               <Button
                                 type="button"
                                 variant="ghost"
@@ -439,20 +422,14 @@ export function PersonDialog({
                               </Button>
                             </div>
                             <form.Subscribe selector={(state) => state.values.adding[index]?.committeeId}>
-                              {(committeeId) =>
-                                open.find((committee) => committee.id === committeeId)?.kind === "board" ? (
-                                  <form.Field name={`adding[${index}].office`}>
-                                    {(seatField) => (
-                                      <OfficePicker
-                                        id={`person-office-${seat.key}`}
-                                        label="Office"
-                                        value={seatField.state.value}
-                                        onChange={seatField.handleChange}
-                                      />
-                                    )}
-                                  </form.Field>
-                                ) : null
-                              }
+                              {(committeeId) => (
+                                <SeatFields
+                                  form={form}
+                                  fields={`adding[${index}].seat`}
+                                  idPrefix={`seat-${seat.key}`}
+                                  isBoard={open.find((committee) => committee.id === committeeId)?.kind === "board"}
+                                />
+                              )}
                             </form.Subscribe>
                           </div>
                         ))}
@@ -463,7 +440,7 @@ export function PersonDialog({
                             size="sm"
                             className="self-start"
                             onClick={() =>
-                              field.pushValue({ key: crypto.randomUUID(), committeeId: "", role: "member", office: "" })
+                              field.pushValue({ key: crypto.randomUUID(), committeeId: "", seat: seatValues(null) })
                             }
                           >
                             <PlusIcon />

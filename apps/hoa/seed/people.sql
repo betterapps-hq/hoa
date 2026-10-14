@@ -33,7 +33,9 @@ INSERT OR IGNORE INTO committees (id, organization_id, name, kind, created_at, r
   ('committee-board', 'demo-hoa', 'Board of Directors', 'board', '2026-10-13T00:00:00.000Z', NULL),
   ('committee-acc', 'demo-hoa', 'Architectural Control Committee', 'architectural', '2026-10-13T00:00:00.000Z', NULL);
 
-INSERT OR IGNORE INTO committee_members (id, organization_id, committee_id, person_id, role, office, started_on, ended_on, created_at) VALUES
-  ('member-1', 'demo-hoa', 'committee-board', 'person-sam', 'chair', 'President', '2025-01-01', NULL, '2026-10-13T00:00:00.000Z'),
-  ('member-2', 'demo-hoa', 'committee-acc', 'person-sam', 'member', NULL, '2025-01-01', NULL, '2026-10-13T00:00:00.000Z'),
-  ('member-3', 'demo-hoa', 'committee-acc', 'person-casey', 'chair', NULL, '2025-01-01', NULL, '2026-10-13T00:00:00.000Z');
+-- Sam served a term on the board before this one, as a director with no office.
+INSERT OR IGNORE INTO committee_members (id, organization_id, committee_id, person_id, role, office, started_on, term_ends_on, ended_on, created_at) VALUES
+  ('member-0', 'demo-hoa', 'committee-board', 'person-sam', 'member', NULL, '2023-01-01', '2024-12-31', '2025-01-01', '2026-10-13T00:00:00.000Z'),
+  ('member-1', 'demo-hoa', 'committee-board', 'person-sam', 'chair', 'President', '2025-01-01', '2026-12-31', NULL, '2026-10-13T00:00:00.000Z'),
+  ('member-2', 'demo-hoa', 'committee-acc', 'person-sam', 'member', NULL, '2025-01-01', NULL, NULL, '2026-10-13T00:00:00.000Z'),
+  ('member-3', 'demo-hoa', 'committee-acc', 'person-casey', 'chair', NULL, '2025-01-01', NULL, NULL, '2026-10-13T00:00:00.000Z');

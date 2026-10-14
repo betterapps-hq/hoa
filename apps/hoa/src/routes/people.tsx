@@ -5,6 +5,7 @@ import {
   addToCommittee,
   addToUnit,
   dissolveCommittee,
+  editSeat,
   getPeopleRoll,
   cancelInvite,
   invitePerson,
@@ -15,7 +16,8 @@ import {
   removeUnitFromRoll,
   saveCommittee,
   savePerson,
-  saveUnit
+  saveUnit,
+  startNewTerm
 } from "@/features/people/people.functions"
 import { PeoplePage } from "@/features/people/PeoplePage/PeoplePage"
 import { useRole } from "@/features/role/RoleProvider"
@@ -59,6 +61,8 @@ function PeopleRoute() {
         }),
         dissolveCommittee: change((id) => dissolveCommittee({ data: { id } })),
         addToCommittee: change((member) => addToCommittee({ data: member })),
+        editSeat: change((id, seat) => editSeat({ data: { id, seat } })),
+        startNewTerm: change((id, seat) => startNewTerm({ data: { id, seat } })),
         leaveCommittee: change((id, endedOn) => leaveCommittee({ data: { id, endedOn } })),
         viewAs:
           session.status === "member" && session.isOperator

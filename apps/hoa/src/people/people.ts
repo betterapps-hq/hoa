@@ -1,5 +1,6 @@
 import { z } from "zod"
 import type { RoleId } from "@/features/role/roles"
+import { dayText } from "@/lib/text"
 import { unitNumberText, type Place } from "@/places/address"
 import { optionalPhone } from "./phone"
 
@@ -71,7 +72,12 @@ export type CommitteeMember = {
   role: CommitteeRole
   /** An officer's title on the board, such as president. */
   office: string | null
+  /**
+   * One term in the seat: the day it starts, the day it's due to end, and the day it did. They keep the seat past the
+   * term's end until it's ended or their next term starts, as an association's bylaws usually say.
+   */
   startedOn: string | null
+  termEndsOn: string | null
   endedOn: string | null
 }
 
@@ -172,13 +178,22 @@ export const committeeInputSchema = z.object({
   kind: z.enum(committeeKinds)
 })
 
-/** Someone added to a committee. */
+/** A term in a seat: chair or member, an office on the board, and the days it starts and is due to end. */
+export const seatInputSchema = z
+  .object({ role: z.enum(committeeRoles), office: optionalText(80), startedOn: day, termEndsOn: day })
+  .refine((seat) => !seat.startedOn || !seat.termEndsOn || seat.startedOn <= seat.termEndsOn, {
+    message: "End it after it starts.",
+    path: ["termEndsOn"]
+  })
+
+/** A seat as its form gives it. */
+export type SeatInput = z.input<typeof seatInputSchema>
+
+/** Someone seated on a committee, for a first term. */
 export const committeeMemberInputSchema = z.object({
   committeeId: z.string().min(1),
   personId: z.string().min(1),
-  role: z.enum(committeeRoles),
-  office: optionalText(80),
-  startedOn: day
+  seat: seatInputSchema
 })
 
 /** Someone's role in the app: an admin manages the association; a member uses it. */
@@ -195,6 +210,16 @@ export const committeeRoleLabels: Record<CommitteeRole, string> = { member: "Mem
 export const seatLabel = (member: Pick<CommitteeMember, "office" | "role">) =>
   [member.office, member.role === "chair" ? committeeRoleLabels.chair : null].filter(Boolean).join(", ") ||
   committeeRoleLabels.member
+
+/** The day someone's next term starts unless they say otherwise: the day after this one is due to end, or today. */
+export const nextTermStart = ({ termEndsOn }: Pick<CommitteeMember, "termEndsOn">, today: string) =>
+  termEndsOn ? new Date(Date.parse(`${termEndsOn}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10) : today
+
+/** Their seat and when its term is due to end, or ended while they hold it on: "President, term ends May 31, 2027". */
+export const seatTermLabel = (member: Pick<CommitteeMember, "office" | "role" | "termEndsOn">, today: string) =>
+  member.termEndsOn
+    ? `${seatLabel(member)}, term ${member.termEndsOn < today ? "ended" : "ends"} ${dayText(member.termEndsOn)}`
+    : seatLabel(member)
 
 /** Each value with its label, in order, for a select. */
 const choicesOf = <V extends string>(values: readonly V[], labels: Record<V, string>) =>

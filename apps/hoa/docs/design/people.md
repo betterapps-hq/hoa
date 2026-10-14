@@ -59,6 +59,15 @@ two people can't both win it. Changing a home's owner after that is the board's 
 sale ends the owners' ownership on the day and starts the buyer's; removing someone ends their time there on a day.
 History stays: nothing on the roll is deleted, only ended or marked removed.
 
+## Terms
+
+Each `committee_members` row is one term in a seat: chair or member, an office (President, Vice President, Secretary,
+Treasurer, or another title), the day it starts, the day it's due to end (`term_ends_on`) and the day it did
+(`ended_on`). Someone keeps the seat past the term's end, as bylaws usually have directors serve until their successors
+take office, so a late election never takes the board's access away; the seat says the term ended. An administrator
+corrects a term in place, starts someone's next term (which ends the last on the day the next starts, and keeps it as
+one they served), or ends the seat on a day.
+
 ## Addresses
 
 A unit's address is kept in parts: street, unit number, city, state and ZIP code. Typing the street searches Google's

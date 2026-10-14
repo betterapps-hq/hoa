@@ -13,7 +13,8 @@ import {
   insertUnit,
   insertUnitLink,
   removeCommittee,
-  removeUnit
+  removeUnit,
+  startNextTerm
 } from "./peopleRepository"
 
 // The rules the database enforces: a home is claimed by one statement, so only a home with no owner can be; and whose
@@ -123,11 +124,11 @@ describe("committeesInView", () => {
       { name: "Design Review", kind: "architectural" },
       now
     )
-    const seat = (committeeId: string, startedOn: string | null) =>
+    const seat = (committeeId: string, startedOn: string | null, termEndsOn: string | null = null) =>
       insertCommitteeMember(
         db,
         organizationId,
-        { committeeId, personId: member.id, role: "member", office: null, startedOn },
+        { committeeId, personId: member.id, role: "member", office: null, startedOn, termEndsOn },
         now
       )
     return { db, member, administrator, board, architectural, seat }
@@ -154,6 +155,35 @@ describe("committeesInView", () => {
     await endCommitteeMember(db, organizationId, boardSeat?.id ?? "", today)
     await removeCommittee(db, organizationId, architectural.id, now)
     expect(await namesIn(db, member)).toEqual([])
+  })
+
+  it("keeps a seat past its term's end, until it's ended", async () => {
+    const { db, member, board, seat } = await setUp()
+    await seat(board.id, "2024-06-01", "2026-05-31")
+    expect(await namesIn(db, member)).toEqual(["Board of Directors"])
+  })
+
+  it("ends a term the day the next one starts, and keeps it as one they served", async () => {
+    const { db, member, board, seat } = await setUp()
+    await seat(board.id, "2024-06-01", "2026-05-31")
+    const [first] = (await getRoll(db, organizationId)).members
+    await startNextTerm(
+      db,
+      organizationId,
+      { id: first?.id ?? "", committeeId: board.id, personId: member.id },
+      { role: "chair", office: "President", startedOn: "2026-06-01", termEndsOn: "2028-05-31" },
+      now
+    )
+    const terms = (await getRoll(db, organizationId)).members.toSorted((a, b) =>
+      (a.startedOn ?? "").localeCompare(b.startedOn ?? "")
+    )
+    expect(
+      terms.map(({ startedOn, termEndsOn, endedOn, office }) => ({ startedOn, termEndsOn, endedOn, office }))
+    ).toEqual([
+      { startedOn: "2024-06-01", termEndsOn: "2026-05-31", endedOn: "2026-06-01", office: null },
+      { startedOn: "2026-06-01", termEndsOn: "2028-05-31", endedOn: null, office: "President" }
+    ])
+    expect(await namesIn(db, member)).toEqual(["Board of Directors"])
   })
 
   it("gives an administrator every committee, seated or not", async () => {

@@ -1,5 +1,6 @@
 import {
   BuildingIcon,
+  CalendarPlusIcon,
   HandshakeIcon,
   HomeIcon,
   EyeIcon,
@@ -41,11 +42,12 @@ import {
   committeeKindLabels,
   relationLabels,
   seatLabel,
+  seatTermLabel,
   type Access,
   type Committee,
   type CommitteeKind,
-  type CommitteeRole,
   type Person,
+  type SeatInput,
   type Unit,
   type UnitInput,
   type UnitRelation
@@ -60,7 +62,7 @@ import {
   type RollData,
   type UnitRow
 } from "@/people/roll"
-import { CommitteeDialog, MemberDialog } from "../CommitteeDialogs/CommitteeDialogs"
+import { CommitteeDialog, MemberDialog, type SeatChange } from "../CommitteeDialogs/CommitteeDialogs"
 import { EndDialog, type EndChoice } from "../EndDialog/EndDialog"
 import { PersonDialog, type PersonSave } from "../PersonDialog/PersonDialog"
 import type { RollChoice } from "../RollPicker/RollPicker"
@@ -79,13 +81,11 @@ export type PeopleActions = {
   recordSale: (unitId: string, buyerId: string, soldOn: string) => Promise<void>
   saveCommittee: (id: string | null, committee: { name: string; kind: CommitteeKind }) => Promise<void>
   dissolveCommittee: (id: string) => Promise<void>
-  addToCommittee: (member: {
-    committeeId: string
-    personId: string
-    role: CommitteeRole
-    office: string
-    startedOn: string
-  }) => Promise<void>
+  addToCommittee: (member: { committeeId: string; personId: string; seat: SeatInput }) => Promise<void>
+  /** Corrects a term in a seat. */
+  editSeat: (memberId: string, seat: SeatInput) => Promise<void>
+  /** Starts someone's next term in a seat they hold; the one before stays on the roll. */
+  startNewTerm: (memberId: string, seat: SeatInput) => Promise<void>
   leaveCommittee: (memberId: string, endedOn: string) => Promise<void>
   /** For the platform's operators: views the app as someone who's joined; null for everyone else. */
   viewAs: ((userId: string) => Promise<void>) | null
@@ -96,7 +96,7 @@ type Open =
   | { kind: "unit"; unit: Unit | null }
   | { kind: "unit-people"; unit: Unit; mode: "add" | "sale" }
   | { kind: "committee"; committee: Committee | null }
-  | { kind: "member"; committee: Committee }
+  | { kind: "member"; committee: Committee; change: SeatChange | null }
   | {
       kind: "end"
       title: string
@@ -284,7 +284,7 @@ export function PeoplePage({
                           {
                             label: "Add member",
                             icon: UserPlusIcon,
-                            onSelect: () => setOpen({ kind: "member", committee })
+                            onSelect: () => setOpen({ kind: "member", committee, change: null })
                           },
                           {
                             label: "Edit",
@@ -321,12 +321,32 @@ export function PeoplePage({
                         <li key={member.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
                           <div className="flex min-w-0 flex-1 flex-col">
                             <span className="truncate font-medium">{person.name}</span>
-                            <span className="text-sm text-muted-foreground">{seatLabel(member)}</span>
+                            <span className="text-sm text-muted-foreground">{seatTermLabel(member, today)}</span>
                           </div>
                           {isAdministrator ? (
                             <RowActions
                               name={person.name}
                               actions={[
+                                {
+                                  label: "Edit",
+                                  icon: PencilIcon,
+                                  onSelect: () =>
+                                    setOpen({
+                                      kind: "member",
+                                      committee,
+                                      change: { member, personName: person.name, mode: "edit" }
+                                    })
+                                },
+                                {
+                                  label: "New term",
+                                  icon: CalendarPlusIcon,
+                                  onSelect: () =>
+                                    setOpen({
+                                      kind: "member",
+                                      committee,
+                                      change: { member, personName: person.name, mode: "renew" }
+                                    })
+                                },
                                 {
                                   label: "End term",
                                   icon: UserMinusIcon,
@@ -369,7 +389,7 @@ export function PeoplePage({
                       memberId: member.id,
                       committeeId: committee.id,
                       committee: committee.name,
-                      label: seatLabel(member)
+                      label: seatTermLabel(member, today)
                     })
                   ),
                   committees: roll.committees
@@ -387,8 +407,8 @@ export function PeoplePage({
                     await actions.addToUnit({ unitId, relation, personId: saved.id, startedOn: "" })
                   }),
                   ...homes.end.map((linkId) => actions.leaveUnit(linkId, today)),
-                  ...assignments.add.map((seat) =>
-                    actions.addToCommittee({ ...seat, personId: saved.id, startedOn: "" })
+                  ...assignments.add.map(({ committeeId, seat }) =>
+                    actions.addToCommittee({ committeeId, personId: saved.id, seat })
                   ),
                   ...assignments.end.map((memberId) => actions.leaveCommittee(memberId, today))
                 ])
@@ -449,8 +469,18 @@ export function PeoplePage({
         <MemberDialog
           committee={open.committee}
           people={personChoices}
+          change={open.change}
+          today={today}
           onOpenChange={(isOpen) => (isOpen ? undefined : close())}
-          onSave={(member) => attempt(() => actions.addToCommittee(member), "Added.")}
+          onSave={({ personId, seat }) => {
+            const { committee, change } = open
+            if (!change) {
+              return attempt(() => actions.addToCommittee({ committeeId: committee.id, personId, seat }), "Added.")
+            }
+            return change.mode === "edit"
+              ? attempt(() => actions.editSeat(change.member.id, seat), "Saved.")
+              : attempt(() => actions.startNewTerm(change.member.id, seat), "New term started.")
+          }}
         />
       ) : null}
       {open?.kind === "confirm" ? (
