@@ -38,7 +38,7 @@ and every Workflow step name starts with it.
 | 12 | Review | | Approved, edited and rejected records | Administrator |
 | 13 | Publish | | The rules file in R2, with its hash | Code, in a server function |
 
-Model results are cached per organization (`hoas/{hoaId}/cache/{stage}/{hash}.json`), so rebuilding after one
+Model results are cached per organization (`hoas/{organizationId}/cache/{stage}/{hash}.json`), so rebuilding after one
 document changes only pays for the calls whose prompt changed.
 
 The stages are one module, `buildRulebook` ([src/encoding/build.ts](../../src/encoding/build.ts)), with its step runner,
@@ -256,10 +256,10 @@ The partial unique indexes (one `building`, one `draft` rulebook per organizatio
 
 | Key | Contents |
 | --- | --- |
-| `hoas/{hoaId}/governing/{documentId}/…` | Source, OCR, pages, layout, figures |
-| `hoas/{hoaId}/rulebooks/{rulebookId}/rules.json` | The published rules file, immutable |
-| `hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json` | Every build step's output, by step name: `structure/{documentId}`, `find-rules/{unitId}`, `find-rules/{unitId}:rerun`, `structure-rules/{batchId}:retry-{round}`, and `{stage}/result` for steps without an item (`plan`, `merge`, `consolidate`) |
-| `hoas/{hoaId}/cache/{stage}/{hash}.json` | Model results |
+| `hoas/{organizationId}/governing/{documentId}/…` | Source, OCR, pages, layout, figures |
+| `hoas/{organizationId}/rulebooks/{rulebookId}/rules.json` | The published rules file, immutable |
+| `hoas/{organizationId}/jobs/{jobId}/{stage}/{itemId}.json` | Every build step's output, by step name: `structure/{documentId}`, `find-rules/{unitId}`, `find-rules/{unitId}:rerun`, `structure-rules/{batchId}:retry-{round}`, and `{stage}/result` for steps without an item (`plan`, `merge`, `consolidate`) |
+| `hoas/{organizationId}/cache/{stage}/{hash}.json` | Model results |
 
 A review records the rulebook id and the file's SHA-256, so it can always be reproduced against the exact file.
 

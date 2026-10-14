@@ -44,18 +44,22 @@ async function listKeys(bucket: ListableBucket, prefix: string) {
 
 export async function resetRulesData(db: Database, bucket: ListableBucket) {
   const [rulebookRows, sectionRows, reviewRows, jobRows] = await Promise.all([
-    db.select({ hoaId: rulebooks.hoaId, id: rulebooks.id }).from(rulebooks),
-    db.select({ hoaId: sections.hoaId, documentId: sections.documentId, id: sections.id }).from(sections),
-    db.select({ hoaId: reviews.hoaId, applicationId: reviews.applicationId, id: reviews.id }).from(reviews),
-    db.select({ hoaId: jobs.hoaId, id: jobs.id }).from(jobs).where(inArray(jobs.kind, ruleJobKinds))
+    db.select({ organizationId: rulebooks.organizationId, id: rulebooks.id }).from(rulebooks),
+    db
+      .select({ organizationId: sections.organizationId, documentId: sections.documentId, id: sections.id })
+      .from(sections),
+    db
+      .select({ organizationId: reviews.organizationId, applicationId: reviews.applicationId, id: reviews.id })
+      .from(reviews),
+    db.select({ organizationId: jobs.organizationId, id: jobs.id }).from(jobs).where(inArray(jobs.kind, ruleJobKinds))
   ])
   const prefixes = [
-    ...rulebookRows.map((row) => rulebookKeys(row.hoaId, row.id).root),
-    ...jobRows.map((row) => jobOutputPrefix(row.hoaId, row.id))
+    ...rulebookRows.map((row) => rulebookKeys(row.organizationId, row.id).root),
+    ...jobRows.map((row) => jobOutputPrefix(row.organizationId, row.id))
   ]
   const keys = [
-    ...sectionRows.map((row) => governingKeys(row.hoaId, row.documentId).sectionText(row.id)),
-    ...reviewRows.map((row) => applicationKeys(row.hoaId, row.applicationId).review(row.id)),
+    ...sectionRows.map((row) => governingKeys(row.organizationId, row.documentId).sectionText(row.id)),
+    ...reviewRows.map((row) => applicationKeys(row.organizationId, row.applicationId).review(row.id)),
     ...(await Promise.all(prefixes.map((prefix) => listKeys(bucket, prefix)))).flat()
   ]
   // Objects first: their keys come from the rows, so a failure part way leaves the rows to find them again.

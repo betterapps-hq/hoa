@@ -81,7 +81,7 @@ export function HomeownerDashboard({ summary, applications, activity, asOf }: Ho
         <Card>
           <CardHeader>
             <CardTitle>
-              <h2>{summary.hoaName}</h2>
+              <h2>{summary.organizationName}</h2>
             </CardTitle>
             <CardDescription>Where each area stands for you.</CardDescription>
           </CardHeader>

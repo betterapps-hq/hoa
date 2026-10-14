@@ -152,7 +152,7 @@ describe("grouping", () => {
       note: "Send a paint chip. Asked 2 days ago."
     })
     const summary = {
-      hoaName: "Sample Ridge HOA",
+      organizationName: "Sample Ridge HOA",
       publishedVersion: 3,
       publishedAt: "2026-10-07T12:00:00.000Z",
       ruleCount: 42,
@@ -307,7 +307,7 @@ describe("area standing", () => {
 
   it("says where the rulebook stands and what's coming", () => {
     const published: DashboardSummary = {
-      hoaName: "Sample Ridge HOA",
+      organizationName: "Sample Ridge HOA",
       publishedVersion: 3,
       publishedAt: "2026-10-07T12:00:00.000Z",
       ruleCount: 42,

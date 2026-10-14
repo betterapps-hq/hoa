@@ -13,9 +13,9 @@ import { createTestDatabase, type TestDatabase } from "@/tests/testDatabase"
 import { untouchedDatabase } from "@/tests/untouchedDatabase"
 import { removeDocument } from "./removeDocument"
 
-const hoaId = "demo-hoa"
+const organizationId = "demo-hoa"
 const now = "2026-10-09T00:00:00.000Z"
-const administrator = { hoa: { id: hoaId }, role: "administrator" as const, user: { id: "admin" } }
+const administrator = { organization: { id: organizationId }, role: "administrator" as const, user: { id: "admin" } }
 
 describe("removeDocument", () => {
   let database: TestDatabase
@@ -30,7 +30,7 @@ describe("removeDocument", () => {
 
   const upload = async (title: string, sha256: string, lineageId?: string) => {
     const document = await createGoverningDocument(database.db, {
-      hoaId,
+      organizationId,
       kind: "declaration",
       title,
       effectiveDate: null,
@@ -41,7 +41,7 @@ describe("removeDocument", () => {
       uploadedAt: now,
       ...(lineageId ? { lineageId } : {})
     })
-    await updateGoverningDocument(database.db, hoaId, document.id, { status: "ready", sha256, pageCount: 3 })
+    await updateGoverningDocument(database.db, organizationId, document.id, { status: "ready", sha256, pageCount: 3 })
     return document
   }
 
@@ -52,7 +52,7 @@ describe("removeDocument", () => {
     const other = await upload("Declaration, restated", "c".repeat(64))
     await insertRulebook(db, {
       id: "building",
-      hoaId,
+      organizationId,
       version: null,
       status: "building",
       error: null,
@@ -64,13 +64,13 @@ describe("removeDocument", () => {
       publishedAt: null
     })
     await expect(removeDocument(db, administrator, newer.id, now)).rejects.toThrow("being processed")
-    await failRulebook(db, hoaId, "building", { stage: "check", message: "x", isRetryable: false })
+    await failRulebook(db, organizationId, "building", { stage: "check", message: "x", isRetryable: false })
 
     await removeDocument(db, administrator, newer.id, now)
-    expect((await listGoverningDocuments(db, hoaId)).map((document) => document.id)).toEqual([other.id])
+    expect((await listGoverningDocuments(db, organizationId)).map((document) => document.id)).toEqual([other.id])
     // What cites its pages still opens them, and the same file can be uploaded again.
-    expect(await getGoverningDocument(db, hoaId, first.id)).not.toBeNull()
-    expect(await findDocumentByHash(db, hoaId, "a".repeat(64), "new-upload")).toBeNull()
+    expect(await getGoverningDocument(db, organizationId, first.id)).not.toBeNull()
+    expect(await findDocumentByHash(db, organizationId, "a".repeat(64), "new-upload")).toBeNull()
     await expect(removeDocument(db, administrator, newer.id, now)).rejects.toThrow("already removed")
   })
 })
@@ -80,7 +80,7 @@ describe("removing a document", () => {
     await expect(
       removeDocument(
         untouchedDatabase(),
-        { hoa: { id: hoaId }, role: "homeowner", user: { id: "homeowner" } },
+        { organization: { id: organizationId }, role: "homeowner", user: { id: "homeowner" } },
         "document",
         now
       )
@@ -107,7 +107,7 @@ describe("refusedDocuments", () => {
 describe("isRefusedBuild", () => {
   const job = {
     id: "job",
-    hoaId,
+    organizationId,
     kind: "rulebook-build" as const,
     subjectId: "rulebook",
     status: "failed" as const,

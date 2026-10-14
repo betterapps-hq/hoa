@@ -10,7 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountRouteImport } from './routes/account'
+import { Route as PeopleRouteImport } from './routes/people'
 import { Route as RulesRouteImport } from './routes/rules'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as ApplicationsIndexRouteImport } from './routes/applications.index'
 import { Route as ApplicationsApplicationIdRouteImport } from './routes/applications.$applicationId'
 import { Route as ApplicationsNewRouteImport } from './routes/applications.new'
@@ -19,8 +24,10 @@ import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$doc
 import { Route as ProjectTypesIndexRouteImport } from './routes/project-types.index'
 import { Route as ProjectTypesProjectTypeIdRouteImport } from './routes/project-types.$projectTypeId'
 import { Route as RulesReviewRouteImport } from './routes/rules_.review'
+import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as FilesGoverningDocumentIdRouteImport } from './routes/files.governing.$documentId'
 import { Route as FilesApplicationsApplicationIdFileIdRouteImport } from './routes/files.applications.$applicationId.$fileId'
+import { Route as FilesOrganizationsOrganizationIdLogoRouteImport } from './routes/files.organizations.$organizationId.logo'
 import { Route as FilesProjectTypesProjectTypeIdTemplatesTemplateIdRouteImport } from './routes/files.project-types.$projectTypeId.templates.$templateId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -28,9 +35,34 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PeopleRoute = PeopleRouteImport.update({
+  id: '/people',
+  path: '/people',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RulesRoute = RulesRouteImport.update({
   id: '/rules',
   path: '/rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SignInRoute = SignInRouteImport.update({
+  id: '/sign-in',
+  path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApplicationsIndexRoute = ApplicationsIndexRouteImport.update({
@@ -75,6 +107,11 @@ const RulesReviewRoute = RulesReviewRouteImport.update({
   path: '/rules/review',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FilesGoverningDocumentIdRoute =
   FilesGoverningDocumentIdRouteImport.update({
     id: '/files/governing/$documentId',
@@ -87,6 +124,12 @@ const FilesApplicationsApplicationIdFileIdRoute =
     path: '/files/applications/$applicationId/$fileId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const FilesOrganizationsOrganizationIdLogoRoute =
+  FilesOrganizationsOrganizationIdLogoRouteImport.update({
+    id: '/files/organizations/$organizationId/logo',
+    path: '/files/organizations/$organizationId/logo',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute =
   FilesProjectTypesProjectTypeIdTemplatesTemplateIdRouteImport.update({
     id: '/files/project-types/$projectTypeId/templates/$templateId',
@@ -96,7 +139,12 @@ const FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/people': typeof PeopleRoute
   '/rules': typeof RulesRoute
+  '/settings': typeof SettingsRoute
+  '/sign-in': typeof SignInRoute
+  '/welcome': typeof WelcomeRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
   '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
@@ -105,13 +153,20 @@ export interface FileRoutesByFullPath {
   '/applications/': typeof ApplicationsIndexRoute
   '/documents/': typeof DocumentsIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
   '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
+  '/files/organizations/$organizationId/logo': typeof FilesOrganizationsOrganizationIdLogoRoute
   '/files/project-types/$projectTypeId/templates/$templateId': typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/people': typeof PeopleRoute
   '/rules': typeof RulesRoute
+  '/settings': typeof SettingsRoute
+  '/sign-in': typeof SignInRoute
+  '/welcome': typeof WelcomeRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
   '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
@@ -120,14 +175,21 @@ export interface FileRoutesByTo {
   '/applications': typeof ApplicationsIndexRoute
   '/documents': typeof DocumentsIndexRoute
   '/project-types': typeof ProjectTypesIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
   '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
+  '/files/organizations/$organizationId/logo': typeof FilesOrganizationsOrganizationIdLogoRoute
   '/files/project-types/$projectTypeId/templates/$templateId': typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
+  '/people': typeof PeopleRoute
   '/rules': typeof RulesRoute
+  '/settings': typeof SettingsRoute
+  '/sign-in': typeof SignInRoute
+  '/welcome': typeof WelcomeRoute
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
   '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
@@ -136,15 +198,22 @@ export interface FileRoutesById {
   '/applications/': typeof ApplicationsIndexRoute
   '/documents/': typeof DocumentsIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
   '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
+  '/files/organizations/$organizationId/logo': typeof FilesOrganizationsOrganizationIdLogoRoute
   '/files/project-types/$projectTypeId/templates/$templateId': typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account'
+    | '/people'
     | '/rules'
+    | '/settings'
+    | '/sign-in'
+    | '/welcome'
     | '/applications/$applicationId'
     | '/applications/new'
     | '/documents/$documentId'
@@ -153,13 +222,20 @@ export interface FileRouteTypes {
     | '/applications/'
     | '/documents/'
     | '/project-types/'
+    | '/api/auth/$'
     | '/files/governing/$documentId'
     | '/files/applications/$applicationId/$fileId'
+    | '/files/organizations/$organizationId/logo'
     | '/files/project-types/$projectTypeId/templates/$templateId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/account'
+    | '/people'
     | '/rules'
+    | '/settings'
+    | '/sign-in'
+    | '/welcome'
     | '/applications/$applicationId'
     | '/applications/new'
     | '/documents/$documentId'
@@ -168,13 +244,20 @@ export interface FileRouteTypes {
     | '/applications'
     | '/documents'
     | '/project-types'
+    | '/api/auth/$'
     | '/files/governing/$documentId'
     | '/files/applications/$applicationId/$fileId'
+    | '/files/organizations/$organizationId/logo'
     | '/files/project-types/$projectTypeId/templates/$templateId'
   id:
     | '__root__'
     | '/'
+    | '/account'
+    | '/people'
     | '/rules'
+    | '/settings'
+    | '/sign-in'
+    | '/welcome'
     | '/applications/$applicationId'
     | '/applications/new'
     | '/documents/$documentId'
@@ -183,14 +266,21 @@ export interface FileRouteTypes {
     | '/applications/'
     | '/documents/'
     | '/project-types/'
+    | '/api/auth/$'
     | '/files/governing/$documentId'
     | '/files/applications/$applicationId/$fileId'
+    | '/files/organizations/$organizationId/logo'
     | '/files/project-types/$projectTypeId/templates/$templateId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountRoute: typeof AccountRoute
+  PeopleRoute: typeof PeopleRoute
   RulesRoute: typeof RulesRoute
+  SettingsRoute: typeof SettingsRoute
+  SignInRoute: typeof SignInRoute
+  WelcomeRoute: typeof WelcomeRoute
   ApplicationsApplicationIdRoute: typeof ApplicationsApplicationIdRoute
   ApplicationsNewRoute: typeof ApplicationsNewRoute
   DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
@@ -199,8 +289,10 @@ export interface RootRouteChildren {
   ApplicationsIndexRoute: typeof ApplicationsIndexRoute
   DocumentsIndexRoute: typeof DocumentsIndexRoute
   ProjectTypesIndexRoute: typeof ProjectTypesIndexRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   FilesGoverningDocumentIdRoute: typeof FilesGoverningDocumentIdRoute
   FilesApplicationsApplicationIdFileIdRoute: typeof FilesApplicationsApplicationIdFileIdRoute
+  FilesOrganizationsOrganizationIdLogoRoute: typeof FilesOrganizationsOrganizationIdLogoRoute
   FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute: typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 
@@ -213,11 +305,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/people': {
+      id: '/people'
+      path: '/people'
+      fullPath: '/people'
+      preLoaderRoute: typeof PeopleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rules': {
       id: '/rules'
       path: '/rules'
       fullPath: '/rules'
       preLoaderRoute: typeof RulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sign-in': {
+      id: '/sign-in'
+      path: '/sign-in'
+      fullPath: '/sign-in'
+      preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/applications/': {
@@ -276,6 +403,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RulesReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/files/governing/$documentId': {
       id: '/files/governing/$documentId'
       path: '/files/governing/$documentId'
@@ -290,6 +424,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FilesApplicationsApplicationIdFileIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/files/organizations/$organizationId/logo': {
+      id: '/files/organizations/$organizationId/logo'
+      path: '/files/organizations/$organizationId/logo'
+      fullPath: '/files/organizations/$organizationId/logo'
+      preLoaderRoute: typeof FilesOrganizationsOrganizationIdLogoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/files/project-types/$projectTypeId/templates/$templateId': {
       id: '/files/project-types/$projectTypeId/templates/$templateId'
       path: '/files/project-types/$projectTypeId/templates/$templateId'
@@ -302,7 +443,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountRoute: AccountRoute,
+  PeopleRoute: PeopleRoute,
   RulesRoute: RulesRoute,
+  SettingsRoute: SettingsRoute,
+  SignInRoute: SignInRoute,
+  WelcomeRoute: WelcomeRoute,
   ApplicationsApplicationIdRoute: ApplicationsApplicationIdRoute,
   ApplicationsNewRoute: ApplicationsNewRoute,
   DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
@@ -311,9 +457,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApplicationsIndexRoute: ApplicationsIndexRoute,
   DocumentsIndexRoute: DocumentsIndexRoute,
   ProjectTypesIndexRoute: ProjectTypesIndexRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
   FilesGoverningDocumentIdRoute: FilesGoverningDocumentIdRoute,
   FilesApplicationsApplicationIdFileIdRoute:
     FilesApplicationsApplicationIdFileIdRoute,
+  FilesOrganizationsOrganizationIdLogoRoute:
+    FilesOrganizationsOrganizationIdLogoRoute,
   FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute:
     FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute,
 }

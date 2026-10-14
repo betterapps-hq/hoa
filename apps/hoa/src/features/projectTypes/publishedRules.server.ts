@@ -20,8 +20,8 @@ import { getBucket } from "@/storage/storage.server"
 export type Published = { id: string; publishedAt: string | null; rulesFile: T.RulesFile } | null
 
 /** Reads the published rulebook, or null before the organization publishes one. */
-export async function publishedRulebook(hoaId: string): Promise<Published> {
-  const published = await getPublishedRulesFile(getDb(), hoaId)
+export async function publishedRulebook(organizationId: string): Promise<Published> {
+  const published = await getPublishedRulesFile(getDb(), organizationId)
   return published
     ? {
         id: published.rulebookId,
@@ -41,11 +41,11 @@ export const isOutdatedType = (type: ProjectType, published: Published) =>
  * when the type is out of date and its own rulebook can't be read: never the published one in its place, which would
  * drop every question and document its rules don't test without the administrator reviewing it.
  */
-export async function ownRulesFile(hoaId: string, type: ProjectType, published: Published) {
+export async function ownRulesFile(organizationId: string, type: ProjectType, published: Published) {
   if (!isOutdatedType(type, published) || type.rulebookId === null) {
     return published ? { id: published.id, rulesFile: published.rulesFile } : null
   }
-  const file = await getRulesFileOf(getDb(), hoaId, type.rulebookId)
+  const file = await getRulesFileOf(getDb(), organizationId, type.rulebookId)
   return file ? { id: type.rulebookId, rulesFile: await readRulesFile(getBucket(), file) } : null
 }
 
@@ -53,15 +53,18 @@ export async function ownRulesFile(hoaId: string, type: ProjectType, published: 
  * Moves every type whose form the published rulebook doesn't change onto it, so only a type with something to review
  * shows as out of date. Run once a rulebook is published.
  */
-export async function carryForwardProjectTypes(hoaId: string, now: string) {
-  const [types, published] = await Promise.all([listProjectTypes(getDb(), hoaId), publishedRulebook(hoaId)])
+export async function carryForwardProjectTypes(organizationId: string, now: string) {
+  const [types, published] = await Promise.all([
+    listProjectTypes(getDb(), organizationId),
+    publishedRulebook(organizationId)
+  ])
   if (!published) {
     return
   }
   const on = now.slice(0, 10)
   const provisions = new Set(published.rulesFile.provisions.map((provision) => provision.key))
   for (const type of types.filter((item) => isOutdatedType(item, published))) {
-    const own = await ownRulesFile(hoaId, type, published)
+    const own = await ownRulesFile(organizationId, type, published)
     const build = (rulesFile: T.RulesFile) =>
       buildDefinition(rulesFile, applicationRequestType, type.definition.subjects, on)
     const definition = carriedForward(
@@ -71,7 +74,11 @@ export async function carryForwardProjectTypes(hoaId: string, now: string) {
       provisions
     )
     if (definition) {
-      await updateProjectType(getDb(), hoaId, type.id, { definition, rulebookId: published.id, updatedAt: now })
+      await updateProjectType(getDb(), organizationId, type.id, {
+        definition,
+        rulebookId: published.id,
+        updatedAt: now
+      })
     }
   }
 }

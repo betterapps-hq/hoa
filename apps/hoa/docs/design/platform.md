@@ -9,7 +9,7 @@ How the design maps onto Cloudflare, and how local development and deployment wo
 | --- | --- | --- |
 | Web app and API | **Workers**, running TanStack Start | Officially supported through Cloudflare's Vite plugin |
 | Files: originals, OCR output, page records, reviews | **R2** | Large objects, free egress, private by default, presigned URLs for browser uploads |
-| Metadata: HOAs, documents, provisions, jobs, rulebooks and their records, project types, applications | **D1** (SQLite), one shared database with an `hoa_id` column | Small relational data; Drizzle support; 10 GB per database is far more than rules and metadata need |
+| Metadata: HOAs, documents, provisions, jobs, rulebooks and their records, project types, applications | **D1** (SQLite), one shared database with an `organization_id` column | Small relational data; Drizzle support; 10 GB per database is far more than rules and metadata need |
 | OCR, rulebook builds and application reviews | **Workflows** | Durable steps with retries, results checkpointed, survives the user closing the tab |
 | Retention | **Cron Trigger** | A daily sweep deletes application data past `deleteAfter` ([documents.md](documents.md#privacy-and-retention)). Not built yet |
 
@@ -18,7 +18,7 @@ What lives in each store is listed in [documents.md](documents.md#what-lives-whe
 Not used: **Workers AI `toMarkdown`** (doesn't OCR), **Vectorize** (a few hundred rules per HOA are filtered in SQL, no
 semantic search needed), **Queues** (Workflows already cover our multi-step jobs; a Queue consumer's 15-minute cap and
 lack of checkpoints suit independent tasks, not pipelines), and **one D1 database per HOA** (database bindings are
-fixed at deploy time, so per-tenant databases can't be chosen at runtime; a shared database with `hoa_id` is simpler and
+fixed at deploy time, so per-tenant databases can't be chosen at runtime; a shared database with `organization_id` is simpler and
 ample).
 
 Requires the **Workers Paid** plan ($5 a month minimum): the free plan's 10 ms of CPU per request and 50 subrequests rule
@@ -75,7 +75,7 @@ ApplicationReview(applicationId)                  started by runReview
 
 Stage ids are defined in [ocr.md](ocr.md#where-it-runs), [encoding.md](encoding.md#stages) and
 [application-review.md](application-review.md#stages). Each workflow instance is one Langfuse session: the job id is the session id. A workflow
-reads `hoaId` from its job row, not from its parameters.
+reads `organizationId` from its job row, not from its parameters.
 
 An administrator can stop a running build (`stopRulebookBuild`): its job becomes `cancelled`, nothing is saved, and
 the follow-up build isn't requested.
@@ -102,14 +102,14 @@ Two separate mechanisms:
 2. **Across instances**, model steps check a content cache in R2 before calling the model. The key is the SHA-256 of
    the stage, the model id, the fully compiled prompt text and the hashes of any attachments, so a change to a prompt
    version, the model or the input misses the cache, and nothing else does.
-   Governing-document stages use `hoas/{hoaId}/cache/{stage}/{key}.json`. Application stages use
-   `hoas/{hoaId}/applications/{applicationId}/cache/{stage}/{key}.json`, so the retention sweep removes them with the
+   Governing-document stages use `hoas/{organizationId}/cache/{stage}/{key}.json`. Application stages use
+   `hoas/{organizationId}/applications/{applicationId}/cache/{stage}/{key}.json`, so the retention sweep removes them with the
    application.
 
 The first step of every workflow, `resolve-prompts`, resolves each prompt label to a version and stores the versions on
 the job; later steps load prompts by those versions. Prompts exist only in Langfuse: a prompt it can't serve fails the
 step with a retryable error. Per-job outputs are written to
-`hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json`.
+`hoas/{organizationId}/jobs/{jobId}/{stage}/{itemId}.json`.
 
 ## Errors and retries
 
@@ -134,7 +134,7 @@ step with a retryable error. Per-job outputs are written to
 ## Server functions
 
 The UI talks to the pipeline only through these, defined in `src/features/**/*.functions.ts`. None of them take
-`hoaId` or the user as input: both come from `getRequestContext()` ([documents.md](documents.md#demo-assumptions)).
+`organizationId` or the user as input: both come from `getRequestContext()` ([documents.md](documents.md#demo-assumptions)).
 Each checks the role and access rules.
 
 | Function | Role | Input | Output |

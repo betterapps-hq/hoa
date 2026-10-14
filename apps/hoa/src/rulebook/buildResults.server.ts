@@ -13,8 +13,8 @@ import { buildResultsSince, type BuildResultsPage, type ResultsBucket } from "./
 export type BuildDocument = { key: string; title: string; provisions: T.Provision[] }
 
 /** The organization's rulebook build, or a refusal: another organization's job id, or another kind of job, finds none. */
-async function buildOf(db: Database, hoaId: string, jobId: string) {
-  const job = await getJob(db, hoaId, jobId)
+async function buildOf(db: Database, organizationId: string, jobId: string) {
+  const job = await getJob(db, organizationId, jobId)
   if (job?.kind !== "rulebook-build") {
     throw new Error("That build isn't one of this organization's.")
   }
@@ -28,11 +28,11 @@ async function buildOf(db: Database, hoaId: string, jobId: string) {
 export async function loadBuildResults(
   db: Database,
   bucket: ResultsBucket,
-  hoaId: string,
+  organizationId: string,
   input: { jobId: string; since: string | null }
 ): Promise<BuildResultsPage> {
-  const job = await buildOf(db, hoaId, input.jobId)
-  return buildResultsSince(bucket, jobOutputPrefix(hoaId, job.id), input.since)
+  const job = await buildOf(db, organizationId, input.jobId)
+  return buildResultsSince(bucket, jobOutputPrefix(organizationId, job.id), input.since)
 }
 
 /** A stored output's JSON, or null when it isn't JSON. */
@@ -55,22 +55,22 @@ const structured = z.object({ documents: structureOutput.shape.documents })
 export async function loadBuildDocuments(
   db: Database,
   bucket: Pick<ResultsBucket, "get">,
-  hoaId: string,
+  organizationId: string,
   jobId: string
 ): Promise<BuildDocument[]> {
-  const job = await buildOf(db, hoaId, jobId)
-  const rulebook = await getRulebook(db, hoaId, job.subjectId)
+  const job = await buildOf(db, organizationId, jobId)
+  const rulebook = await getRulebook(db, organizationId, job.subjectId)
   const ids = rulebook?.sourceDocumentIds ?? []
   const [uploads, structures] = await Promise.all([
-    Promise.all(ids.map((id) => getGoverningDocument(db, hoaId, id))),
-    getDocumentStructures(db, hoaId, ids)
+    Promise.all(ids.map((id) => getGoverningDocument(db, organizationId, id))),
+    getDocumentStructures(db, organizationId, ids)
   ])
   const documents = await Promise.all(
     uploads.map(async (upload) => {
       if (!upload) {
         return []
       }
-      const stored = await bucket.get(jobOutputKey(hoaId, job.id, "structure", upload.id))
+      const stored = await bucket.get(jobOutputKey(organizationId, job.id, "structure", upload.id))
       const parsed = stored ? structured.safeParse(parseJson(await stored.text())) : null
       if (!parsed?.success) {
         return []

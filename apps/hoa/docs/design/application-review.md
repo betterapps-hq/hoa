@@ -672,7 +672,7 @@ wording so adding one back keeps it).
   words ("location described as “by the shed”") instead of asking the homeowner again; a finding met either way stays
   met, and one that also lacks another detail still asks for it (`src/engine/unlistedValues.test.ts`).
 - **The homeowner form**: the project type as cards, a description, the sections in order (amounts in the shared
-  quantity inputs by dimension, in the organization's unit system, `HoaSettings.unitSystem`), and one drop zone for
+  quantity inputs by dimension, in the organization's unit system, `OrganizationSettings.unitSystem`), and one drop zone for
   files, each file marked as one of the documents (guessed from its name only when clear) against a checklist that
   names what's still missing; a document with a template offers "Download the template" under its name
   (`/files/project-types/{id}/templates/{templateId}`, anyone in the organization). In a section that repeats, the questions asked once for every item come first, in their

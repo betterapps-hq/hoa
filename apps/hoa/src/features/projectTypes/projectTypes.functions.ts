@@ -14,6 +14,7 @@ import {
   updateProjectType as updateProjectTypeRecord
 } from "@/db/projectTypeRepository"
 import { getPublishedRulesFile } from "@/db/rulebookContentRepository"
+import { doesWorkOf } from "@/features/role/roles"
 import { bindDefinition } from "@/projectTypes/bind"
 import {
   buildDefinition,
@@ -40,7 +41,7 @@ import {
 import { rulebookChanges, type RulebookChange } from "@/projectTypes/updates"
 import { definitionOf, rulebookVocabulary, scopeNoteOf } from "@/review/documentTypes"
 import type * as T from "@/schema/types"
-import { getRequestContext, requireAdministrator } from "@/session/requestContext.server"
+import { getRequestContext, requireWorkOf } from "@/session/requestContext.server"
 import { projectTypeKeys } from "@/storage/keys"
 import { deleteObjectsUnder } from "@/storage/objects"
 import { getBucket, presignerOrNull } from "@/storage/storage.server"
@@ -56,16 +57,16 @@ import { projectRequirements, type RequirementGroup } from "./requirements"
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-async function requirePublished(hoaId: string) {
-  const published = await publishedRulebook(hoaId)
+async function requirePublished(organizationId: string) {
+  const published = await publishedRulebook(organizationId)
   if (!published) {
     throw new Error("Publish the rulebook first: project types are built from its rules.")
   }
   return published
 }
 
-async function loadOwnType(hoaId: string, id: string) {
-  const type = await getProjectType(getDb(), hoaId, id)
+async function loadOwnType(organizationId: string, id: string) {
+  const type = await getProjectType(getDb(), organizationId, id)
   if (!type) {
     throw new Error("The project type doesn't exist.")
   }
@@ -77,8 +78,8 @@ export const listActiveProjectTypes = createServerFn({ method: "GET" }).handler(
   async (): Promise<OfferedProjectType[]> => {
     const context = await getRequestContext()
     const [types, published] = await Promise.all([
-      listProjectTypeRecords(getDb(), context.hoa.id),
-      publishedRulebook(context.hoa.id)
+      listProjectTypeRecords(getDb(), context.organization.id),
+      publishedRulebook(context.organization.id)
     ])
     return types.filter((type) => type.status === "active").map((type) => offerType(type, published, today()))
   }
@@ -100,17 +101,17 @@ export type ProjectTypesOverview = {
 /** Every project type with how many applications use it, and what a new one can cover. */
 export const getProjectTypesOverview = createServerFn({ method: "GET" }).handler(
   async (): Promise<ProjectTypesOverview> => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("architectural")
     const db = getDb()
     const [types, published] = await Promise.all([
-      listProjectTypeRecords(db, context.hoa.id),
-      publishedRulebook(context.hoa.id)
+      listProjectTypeRecords(db, context.organization.id),
+      publishedRulebook(context.organization.id)
     ])
     return {
       projectTypes: await Promise.all(
         types.map(async (type) => ({
           ...type,
-          applicationCount: await countApplicationsOfType(db, context.hoa.id, type.id),
+          applicationCount: await countApplicationsOfType(db, context.organization.id, type.id),
           outdatedSince: isOutdatedType(type, published) ? (published?.publishedAt ?? null) : null
         }))
       ),
@@ -123,12 +124,12 @@ export const getProjectTypesOverview = createServerFn({ method: "GET" }).handler
 /** How many active project types are out of date with the published rulebook, for the HOA management dashboard. */
 export const countOutdatedProjectTypes = createServerFn({ method: "GET" }).handler(async (): Promise<number> => {
   const context = await getRequestContext()
-  if (context.role !== "administrator") {
+  if (!doesWorkOf(context.role, context.committees, "architectural")) {
     return 0
   }
   const [types, published] = await Promise.all([
-    listProjectTypeRecords(getDb(), context.hoa.id),
-    getPublishedRulesFile(getDb(), context.hoa.id)
+    listProjectTypeRecords(getDb(), context.organization.id),
+    getPublishedRulesFile(getDb(), context.organization.id)
   ])
   return published
     ? types.filter((type) => type.status === "active" && type.rulebookId !== published.rulebookId).length
@@ -176,16 +177,16 @@ function questionInfoOf(rulesFile: T.RulesFile, subjects: readonly string[]): Re
 export const getProjectTypeView = createServerFn({ method: "GET" })
   .validator((data: unknown) => z.object({ projectTypeId: z.string() }).parse(data))
   .handler(async ({ data }): Promise<ProjectTypeView> => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("architectural")
     const db = getDb()
     const [type, published, applicationCount] = await Promise.all([
-      loadOwnType(context.hoa.id, data.projectTypeId),
-      publishedRulebook(context.hoa.id),
-      countApplicationsOfType(db, context.hoa.id, data.projectTypeId)
+      loadOwnType(context.organization.id, data.projectTypeId),
+      publishedRulebook(context.organization.id),
+      countApplicationsOfType(db, context.organization.id, data.projectTypeId)
     ])
     const subjects = published ? projectSubjects(published.rulesFile, applicationRequestType) : []
     const current = currentType(type, published, today())
-    const own = await ownRulesFile(context.hoa.id, type, published)
+    const own = await ownRulesFile(context.organization.id, type, published)
     const buildFrom = (rulesFile: T.RulesFile) =>
       buildDefinition(rulesFile, applicationRequestType, type.definition.subjects, today())
     const available = own ? buildFrom(own.rulesFile) : type.definition
@@ -230,8 +231,8 @@ export const getProjectTypeView = createServerFn({ method: "GET" })
 
 /** Every passage of the published rulebook's documents, for linking one to a question. */
 export const listCitableProvisions = createServerFn({ method: "GET" }).handler(async (): Promise<CitedProvision[]> => {
-  const context = await requireAdministrator()
-  const published = await publishedRulebook(context.hoa.id)
+  const context = await requireWorkOf("architectural")
+  const published = await publishedRulebook(context.organization.id)
   if (!published) {
     return []
   }
@@ -247,14 +248,14 @@ export const listCitableProvisions = createServerFn({ method: "GET" }).handler(a
  */
 export const suggestProjectTypes = createServerFn({ method: "POST" }).handler(
   async (): Promise<ProjectTypeSuggestion[]> => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("architectural")
     const ai = createAiContext()
     if (!ai.isConfigured) {
       throw new Error(`Suggestions need ${ai.missing.join(", ")}.`)
     }
     const [published, existing] = await Promise.all([
-      requirePublished(context.hoa.id),
-      listProjectTypeRecords(getDb(), context.hoa.id)
+      requirePublished(context.organization.id),
+      listProjectTypeRecords(getDb(), context.organization.id)
     ])
     const on = today()
     try {
@@ -270,7 +271,7 @@ export const suggestProjectTypes = createServerFn({ method: "POST" }).handler(
         },
         traceName: "project-type-suggestion",
         environment: ai.environment,
-        sessionId: `project-types-${context.hoa.id}`
+        sessionId: `project-types-${context.organization.id}`
       })
       return checkSuggestions(result.object, {
         rulesFile: published.rulesFile,
@@ -293,13 +294,13 @@ const newProjectType = projectTypeDetails.extend({
 export const createProjectType = createServerFn({ method: "POST" })
   .validator((data: unknown) => newProjectType.parse(data))
   .handler(async ({ data }): Promise<ProjectType> => {
-    const context = await requireAdministrator()
-    const published = await requirePublished(context.hoa.id)
+    const context = await requireWorkOf("architectural")
+    const published = await requirePublished(context.organization.id)
     const known = new Set(projectSubjects(published.rulesFile, applicationRequestType).map((subject) => subject.key))
     const subjects = data.subjects.filter((key) => known.has(key))
     const built = buildDefinition(published.rulesFile, applicationRequestType, subjects, today())
     return insertProjectType(getDb(), {
-      hoaId: context.hoa.id,
+      organizationId: context.organization.id,
       label: data.label,
       description: data.description || null,
       rulebookId: published.id,
@@ -328,8 +329,8 @@ const newTemplates = (definition: ProjectTypeDefinition, before: ProjectTypeDefi
 }
 
 /** Refuses a form whose new templates aren't in storage as uploaded. */
-async function checkTemplates(hoaId: string, projectTypeId: string, templates: readonly DocumentTemplate[]) {
-  const keys = projectTypeKeys(hoaId, projectTypeId)
+async function checkTemplates(organizationId: string, projectTypeId: string, templates: readonly DocumentTemplate[]) {
+  const keys = projectTypeKeys(organizationId, projectTypeId)
   const stored = await Promise.all(
     templates.map((template) => getBucket().head(keys.template(template.id, template.fileName)))
   )
@@ -353,8 +354,8 @@ export const createTemplateUpload = createServerFn({ method: "POST" })
       .parse(data)
   )
   .handler(async ({ data }): Promise<TemplateUpload> => {
-    const context = await requireAdministrator()
-    await loadOwnType(context.hoa.id, data.projectTypeId)
+    const context = await requireWorkOf("architectural")
+    await loadOwnType(context.organization.id, data.projectTypeId)
     const validation = validateUpload({ name: data.fileName, type: data.mediaType, size: data.sizeBytes }, "template")
     if (!validation.isValid) {
       throw new Error(validation.message)
@@ -366,7 +367,7 @@ export const createTemplateUpload = createServerFn({ method: "POST" })
       sizeBytes: data.sizeBytes
     }
     const presigner = presignerOrNull()
-    const key = projectTypeKeys(context.hoa.id, data.projectTypeId).template(template.id, template.fileName)
+    const key = projectTypeKeys(context.organization.id, data.projectTypeId).template(template.id, template.fileName)
     return { template, uploadUrl: presigner ? await presigner.upload(key) : null, contentType: template.mediaType }
   })
 
@@ -386,14 +387,14 @@ export const uploadTemplateFile = createServerFn({ method: "POST" })
     return { ...ids, file }
   })
   .handler(async ({ data }) => {
-    const context = await requireAdministrator()
-    await loadOwnType(context.hoa.id, data.projectTypeId)
+    const context = await requireWorkOf("architectural")
+    await loadOwnType(context.organization.id, data.projectTypeId)
     const validation = validateUpload(data.file, "template")
     if (!validation.isValid) {
       throw new Error(validation.message)
     }
     await getBucket().put(
-      projectTypeKeys(context.hoa.id, data.projectTypeId).template(data.templateId, data.file.name),
+      projectTypeKeys(context.organization.id, data.projectTypeId).template(data.templateId, data.file.name),
       data.file,
       { httpMetadata: { contentType: validation.upload.mediaType } }
     )
@@ -409,15 +410,15 @@ export const updateProjectType = createServerFn({ method: "POST" })
     projectTypeDetails.extend({ id: z.string(), definition: projectTypeDefinition }).parse(data)
   )
   .handler(async ({ data }) => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("architectural")
     const [type, published] = await Promise.all([
-      loadOwnType(context.hoa.id, data.id),
-      requirePublished(context.hoa.id)
+      loadOwnType(context.organization.id, data.id),
+      requirePublished(context.organization.id)
     ])
-    const own = await ownRulesFile(context.hoa.id, type, published)
+    const own = await ownRulesFile(context.organization.id, type, published)
     checkCitations(data.definition, type.definition, published.rulesFile)
-    await checkTemplates(context.hoa.id, type.id, newTemplates(data.definition, type.definition))
-    await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
+    await checkTemplates(context.organization.id, type.id, newTemplates(data.definition, type.definition))
+    await updateProjectTypeRecord(getDb(), context.organization.id, data.id, {
       label: data.label,
       description: data.description || null,
       definition: own
@@ -438,15 +439,15 @@ export const updateProjectType = createServerFn({ method: "POST" })
 export const applyProjectTypeUpdates = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ id: z.string(), definition: projectTypeDefinition }).parse(data))
   .handler(async ({ data }) => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("architectural")
     const [type, published] = await Promise.all([
-      loadOwnType(context.hoa.id, data.id),
-      requirePublished(context.hoa.id)
+      loadOwnType(context.organization.id, data.id),
+      requirePublished(context.organization.id)
     ])
     const built = buildDefinition(published.rulesFile, applicationRequestType, type.definition.subjects, today())
     checkCitations(data.definition, type.definition, published.rulesFile)
-    await checkTemplates(context.hoa.id, type.id, newTemplates(data.definition, type.definition))
-    await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
+    await checkTemplates(context.organization.id, type.id, newTemplates(data.definition, type.definition))
+    await updateProjectTypeRecord(getDb(), context.organization.id, data.id, {
       definition: bindDefinition(data.definition, built),
       rulebookId: published.id,
       updatedAt: new Date().toISOString()
@@ -457,9 +458,9 @@ export const applyProjectTypeUpdates = createServerFn({ method: "POST" })
 export const setProjectTypeStatus = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ id: z.string(), status: z.enum(projectTypeStatuses) }).parse(data))
   .handler(async ({ data }) => {
-    const context = await requireAdministrator()
-    await loadOwnType(context.hoa.id, data.id)
-    await updateProjectTypeRecord(getDb(), context.hoa.id, data.id, {
+    const context = await requireWorkOf("architectural")
+    await loadOwnType(context.organization.id, data.id)
+    await updateProjectTypeRecord(getDb(), context.organization.id, data.id, {
       status: data.status,
       updatedAt: new Date().toISOString()
     })
@@ -469,12 +470,12 @@ export const setProjectTypeStatus = createServerFn({ method: "POST" })
 export const deleteProjectType = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ id: z.string() }).parse(data))
   .handler(async ({ data }) => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("architectural")
     const db = getDb()
-    await loadOwnType(context.hoa.id, data.id)
-    if ((await countApplicationsOfType(db, context.hoa.id, data.id)) > 0) {
+    await loadOwnType(context.organization.id, data.id)
+    if ((await countApplicationsOfType(db, context.organization.id, data.id)) > 0) {
       throw new Error("Applications use this project type, so it can be archived but not deleted.")
     }
-    await deleteProjectTypeRecord(db, context.hoa.id, data.id)
-    await deleteObjectsUnder(getBucket(), projectTypeKeys(context.hoa.id, data.id).root)
+    await deleteProjectTypeRecord(db, context.organization.id, data.id)
+    await deleteObjectsUnder(getBucket(), projectTypeKeys(context.organization.id, data.id).root)
   })

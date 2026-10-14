@@ -39,9 +39,9 @@ export type BuildRequest = ({ status: "started" } & BuildIds) | Extract<BuildDec
 export const newBuildIds = (): BuildIds => ({ rulebookId: crypto.randomUUID(), jobId: crypto.randomUUID() })
 
 /** Creates the build's Workflow instance unless a retried request already did. */
-async function ensureWorkflow(binding: RulebookBuildBinding, hoaId: string, ids: BuildIds) {
+async function ensureWorkflow(binding: RulebookBuildBinding, organizationId: string, ids: BuildIds) {
   try {
-    await binding.create({ id: ids.jobId, params: { hoaId, rulebookId: ids.rulebookId, jobId: ids.jobId } })
+    await binding.create({ id: ids.jobId, params: { organizationId, rulebookId: ids.rulebookId, jobId: ids.jobId } })
   } catch (error) {
     const existing = await binding.get(ids.jobId).catch(() => null)
     if (!existing) {
@@ -59,30 +59,36 @@ async function ensureWorkflow(binding: RulebookBuildBinding, hoaId: string, ids:
 export async function requestRulebookBuild(
   db: Database,
   binding: RulebookBuildBinding,
-  hoaId: string,
+  organizationId: string,
   options: { now: string; ids?: BuildIds; unlessCurrentIs?: readonly string[] }
 ): Promise<BuildRequest> {
   const ids = options.ids ?? newBuildIds()
-  const inserted = await getRulebook(db, hoaId, ids.rulebookId)
+  const inserted = await getRulebook(db, organizationId, ids.rulebookId)
   if (inserted) {
     if (inserted.status === "building") {
-      await ensureWorkflow(binding, hoaId, ids)
+      await ensureWorkflow(binding, organizationId, ids)
     }
     return { status: "started", ...ids }
   }
   const [uploads, building] = await Promise.all([
-    listGoverningDocuments(db, hoaId),
-    getRulebookByStatus(db, hoaId, "building")
+    listGoverningDocuments(db, organizationId),
+    getRulebookByStatus(db, organizationId, "building")
   ])
   const decision = buildDecision(uploads, { isBuilding: building !== null, unlessCurrentIs: options.unlessCurrentIs })
   if (decision.status === "skipped") {
     return decision
   }
   const { sourceDocumentIds } = decision
-  const job = newJob({ id: ids.jobId, hoaId, kind: "rulebook-build", subjectId: ids.rulebookId, now: options.now })
+  const job = newJob({
+    id: ids.jobId,
+    organizationId,
+    kind: "rulebook-build",
+    subjectId: ids.rulebookId,
+    now: options.now
+  })
   const rulebook: Rulebook = {
     id: ids.rulebookId,
-    hoaId,
+    organizationId,
     version: null,
     status: "building",
     error: null,
@@ -98,20 +104,26 @@ export async function requestRulebookBuild(
     await db.batch([insertRulebook(db, rulebook), insertJob(db, job)])
   } catch (error) {
     // The partial unique index refuses a second building rulebook: another request started one first.
-    if (await getRulebookByStatus(db, hoaId, "building")) {
+    if (await getRulebookByStatus(db, organizationId, "building")) {
       return { status: "skipped", reason: "building" }
     }
     throw error
   }
-  await ensureWorkflow(binding, hoaId, ids)
+  await ensureWorkflow(binding, organizationId, ids)
   return { status: "started", ...ids }
 }
 
 /** Fails a requested build whose workflow couldn't start, so its rulebook doesn't stay building with nothing running. */
-export async function abandonRulebookBuild(db: Database, hoaId: string, ids: BuildIds, message: string, now: string) {
+export async function abandonRulebookBuild(
+  db: Database,
+  organizationId: string,
+  ids: BuildIds,
+  message: string,
+  now: string
+) {
   const error = { stage: "start", message, isRetryable: true }
-  await failRulebook(db, hoaId, ids.rulebookId, error)
-  await updateJob(db, hoaId, ids.jobId, { status: "failed", error, now })
+  await failRulebook(db, organizationId, ids.rulebookId, error)
+  await updateJob(db, organizationId, ids.jobId, { status: "failed", error, now })
 }
 
 /** What stopping a build did: stopped it, found it already over, or found none running. */
@@ -155,12 +167,12 @@ export async function terminateBuild(
 export async function stopRulebookBuild(
   db: Database,
   binding: RulebookBuildBinding,
-  context: { hoa: { id: string }; role: RoleId },
+  context: { organization: { id: string }; role: RoleId },
   now: string
 ): Promise<StopResult> {
   assertAdministrator(context.role)
-  const hoaId = context.hoa.id
-  const building = await getRulebookByStatus(db, hoaId, "building")
+  const organizationId = context.organization.id
+  const building = await getRulebookByStatus(db, organizationId, "building")
   if (!building) {
     return { status: "not-building" }
   }
@@ -168,12 +180,12 @@ export async function stopRulebookBuild(
   if ((await terminateBuild(instance)) === "already-finished") {
     return { status: "already-finished" }
   }
-  const isCancelled = await cancelRulebook(db, hoaId, building.id)
+  const isCancelled = await cancelRulebook(db, organizationId, building.id)
   if (!isCancelled) {
     return { status: "already-finished" }
   }
-  const job = await getJob(db, hoaId, building.jobId)
-  await updateJob(db, hoaId, building.jobId, {
+  const job = await getJob(db, organizationId, building.jobId)
+  await updateJob(db, organizationId, building.jobId, {
     status: "cancelled",
     ...(job?.progress ? { progress: stopProgress(job.progress, now) } : {}),
     now

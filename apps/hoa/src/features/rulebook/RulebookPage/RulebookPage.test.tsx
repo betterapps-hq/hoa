@@ -21,7 +21,7 @@ vi.mock("sonner", () => ({
 
 const rulebook = (status: "draft" | "published") => ({
   id: `${status}-1`,
-  hoaId: "hoa",
+  organizationId: "hoa",
   version: status === "published" ? 1 : null,
   status,
   error: null,
@@ -88,7 +88,7 @@ const documents: GoverningDocument[] = [
     id: "doc-1",
     lineageId: "doc-1",
     version: 1,
-    hoaId: "hoa",
+    organizationId: "hoa",
     kind: "declaration",
     amends: null,
     title: "Declaration",
@@ -347,7 +347,7 @@ describe("RulebookPage", () => {
   it("stops a running build after a plain confirmation, and says when it had already finished", async () => {
     const running: Job = {
       id: "job-1",
-      hoaId: "hoa",
+      organizationId: "hoa",
       kind: "rulebook-build",
       subjectId: "rb",
       status: "running",

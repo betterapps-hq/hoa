@@ -1,4 +1,5 @@
 import { screen, within } from "@testing-library/react"
+import type { UserEvent } from "@testing-library/user-event"
 import { describe, expect, it, vi } from "vitest"
 import { approvedReview, renderInWorkspace, sampleRecords } from "@/tests/rulebookWorkspace"
 import { VocabularyTab } from "./VocabularyTab"
@@ -9,6 +10,15 @@ vi.mock("sonner", () => ({
 
 /** A subject's button, which opens it, described by what it holds. */
 const subject = (name: string) => screen.getByRole("button", { name })
+
+/**
+ * Searches the terms for the query in one edit, pasted, after clearing the box. Typed a key at a time, it would render
+ * every shorter query's matches first, and a letter or two matches most of the sample's thousand terms.
+ */
+async function search(user: UserEvent, query: string) {
+  await user.clear(screen.getByRole("searchbox", { name: "Search terms" }))
+  await user.paste(query)
+}
 
 describe("VocabularyTab", () => {
   it("groups the terms under what they describe, most used first", () => {
@@ -41,10 +51,8 @@ describe("VocabularyTab", () => {
 
   it("finds a term through a typo, a partial word and any word order, with the subject it's under", async () => {
     const { user, openRule } = renderInWorkspace(<VocabularyTab />)
-    const box = screen.getByRole("searchbox", { name: "Search terms" })
     for (const query of ["leased premisses", "premis lea"]) {
-      await user.clear(box)
-      await user.type(box, query)
+      await search(user, query)
       expect(screen.getByRole("heading", { name: "Best matches" })).toBeInTheDocument()
       expect(screen.getByRole("region", { name: "Questions about lease registration" })).toBeInTheDocument()
     }
@@ -57,7 +65,7 @@ describe("VocabularyTab", () => {
 
   it("marks a found choice and opens what it means, with its review", async () => {
     const { user, actions } = renderInWorkspace(<VocabularyTab />)
-    await user.type(screen.getByRole("searchbox", { name: "Search terms" }), "vinyl")
+    await search(user, "vinyl")
     const [vinyl] = screen.getAllByRole("button", { name: "Vinyl" })
     expect(vinyl).toHaveClass("border-primary")
     await user.click(vinyl!)
@@ -69,7 +77,7 @@ describe("VocabularyTab", () => {
 
   it("approves or rejects one term from its menu", async () => {
     const { user, actions } = renderInWorkspace(<VocabularyTab />)
-    await user.type(screen.getByRole("searchbox", { name: "Search terms" }), "premises leased")
+    await search(user, "premises leased")
     await user.click(screen.getByRole("button", { name: "Actions for Premises leased" }))
     await user.click(await screen.findByRole("menuitem", { name: "Approve" }))
     expect(actions?.review).toHaveBeenCalledWith(
@@ -98,7 +106,7 @@ describe("VocabularyTab", () => {
     await user.click(screen.getByRole("button", { name: "Filters" }))
     await user.selectOptions(await screen.findByRole("combobox", { name: "Review" }), "approved")
     await user.keyboard("{Escape}")
-    await user.type(screen.getByRole("searchbox", { name: "Search terms" }), "premises leased")
+    await search(user, "premises leased")
     await user.click(screen.getByRole("button", { name: "Actions for Premises leased" }))
     await user.click(await screen.findByRole("menuitem", { name: "Edit" }))
     const dialog = within(await screen.findByRole("dialog", { name: "Edit Premises leased" }))
@@ -128,7 +136,7 @@ describe("VocabularyTab", () => {
 
   it("merges a choice into another from where it's shown", async () => {
     const { user, actions } = renderInWorkspace(<VocabularyTab />)
-    await user.type(screen.getByRole("searchbox", { name: "Search terms" }), "vinyl")
+    await search(user, "vinyl")
     const [vinyl] = screen.getAllByRole("button", { name: "Vinyl" })
     await user.click(vinyl!)
     const popover = within(await screen.findByRole("dialog", { name: "Vinyl" }))

@@ -18,7 +18,7 @@ import type { StepRunner } from "@/jobs/steps"
 import { loadBuildSources } from "@/rulebook/buildSources"
 import type { PreviousReview } from "@/rulebook/carryForward"
 import { saveBuiltDraft } from "@/rulebook/saveDraft"
-import { governingKeys, hoaCacheKey, rulebookBuildKeys } from "@/storage/keys"
+import { governingKeys, organizationCacheKey, rulebookBuildKeys } from "@/storage/keys"
 import { createObjectPromptCache, getJson, putJson } from "@/storage/objects"
 import { loadPages } from "@/storage/pages"
 import { modelStep, storageStep } from "./ocrSteps.server"
@@ -30,7 +30,7 @@ import {
   type RulebookBuildBinding
 } from "./rulebookTrigger.server"
 
-export type RulebookBuildParams = { hoaId: string; rulebookId: string; jobId: string }
+export type RulebookBuildParams = { organizationId: string; rulebookId: string; jobId: string }
 
 // A model step may make a call and its rerun, and a long answer takes minutes to write.
 const buildModelStep = { ...modelStep, timeout: "15 minutes" } as const
@@ -47,34 +47,36 @@ function errorText(error: unknown) {
 export async function requestRulebookBuildStep(
   step: WorkflowStep,
   name: string,
-  context: { db: Database; binding: RulebookBuildBinding; hoaId: string; unlessCurrentIs?: readonly string[] }
+  context: { db: Database; binding: RulebookBuildBinding; organizationId: string; unlessCurrentIs?: readonly string[] }
 ): Promise<BuildRequest | null> {
-  const { db, binding, hoaId, unlessCurrentIs } = context
+  const { db, binding, organizationId, unlessCurrentIs } = context
   const ids = await step.do(`${name}:ids`, storageStep, async () => newBuildIds())
   try {
     return await step.do(name, storageStep, () =>
-      requestRulebookBuild(db, binding, hoaId, { now: new Date().toISOString(), ids, unlessCurrentIs })
+      requestRulebookBuild(db, binding, organizationId, { now: new Date().toISOString(), ids, unlessCurrentIs })
     )
   } catch (error) {
     await step.do(`${name}:fail`, storageStep, () =>
-      abandonRulebookBuild(db, hoaId, ids, errorText(error), new Date().toISOString())
+      abandonRulebookBuild(db, organizationId, ids, errorText(error), new Date().toISOString())
     )
     return null
   }
 }
 
 /** The review a build carries forward: the current draft's, then the published rulebook's, and the stored provisions. */
-async function loadPreviousReview(db: Database, hoaId: string): Promise<PreviousReview> {
+async function loadPreviousReview(db: Database, organizationId: string): Promise<PreviousReview> {
   const [draft, published, records] = await Promise.all([
-    getRulebookByStatus(db, hoaId, "draft"),
-    getRulebookByStatus(db, hoaId, "published"),
-    listDocumentRecords(db, hoaId)
+    getRulebookByStatus(db, organizationId, "draft"),
+    getRulebookByStatus(db, organizationId, "published"),
+    listDocumentRecords(db, organizationId)
   ])
   const [contents, provisions] = await Promise.all([
-    Promise.all([draft, published].map((rulebook) => (rulebook ? getRulebookContent(db, hoaId, rulebook.id) : null))),
+    Promise.all(
+      [draft, published].map((rulebook) => (rulebook ? getRulebookContent(db, organizationId, rulebook.id) : null))
+    ),
     listProvisions(
       db,
-      hoaId,
+      organizationId,
       records.map((record) => record.id)
     )
   ])
@@ -88,7 +90,7 @@ async function loadPreviousReview(db: Database, hoaId: string): Promise<Previous
  */
 export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> {
   async run(event: WorkflowEvent<RulebookBuildParams>, step: WorkflowStep) {
-    const { hoaId, rulebookId, jobId } = event.payload
+    const { organizationId, rulebookId, jobId } = event.payload
     const db = createDatabase(this.env.DB)
     const bucket = this.env.FILES
     const now = () => new Date().toISOString()
@@ -99,14 +101,14 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
       const count = (reported.get(name) ?? 0) + 1
       reported.set(name, count)
       return step.do(`${name}:${count}`, storageStep, () =>
-        reportJobProgress(db, hoaId, jobId, { stage, done, total, now: now() })
+        reportJobProgress(db, organizationId, jobId, { stage, done, total, now: now() })
       )
     }
 
     const sourceDocumentIds = await step.do(
       "load:sources",
       storageStep,
-      async () => (await getRulebook(db, hoaId, rulebookId))?.sourceDocumentIds ?? []
+      async () => (await getRulebook(db, organizationId, rulebookId))?.sourceDocumentIds ?? []
     )
     try {
       const ai = createAiContext()
@@ -114,11 +116,11 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         throw new NonRetryableError(`Missing settings: ${ai.missing.join(", ")}.`)
       }
       const loaded = await step.do("load", storageStep, async () => {
-        const rulebook = await getRulebook(db, hoaId, rulebookId)
+        const rulebook = await getRulebook(db, organizationId, rulebookId)
         if (rulebook?.status !== "building") {
           throw new NonRetryableError("The rulebook isn't being built.")
         }
-        const sources = await loadBuildSources(db, hoaId, rulebook.sourceDocumentIds)
+        const sources = await loadBuildSources(db, organizationId, rulebook.sourceDocumentIds)
         if (sources.length === 0) {
           throw new NonRetryableError("None of the documents are ready.")
         }
@@ -128,16 +130,19 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
       // Every step the build works through, up front, so the page shows the whole build and where it is.
       await step.do("progress:start", storageStep, async () => {
         const workload = { concurrency: ai.encodingConcurrency, documents: loaded.sources.length }
-        await updateJob(db, hoaId, jobId, { progress: startProgress(rulebookBuildStages, workload), now: now() })
+        await updateJob(db, organizationId, jobId, {
+          progress: startProgress(rulebookBuildStages, workload),
+          now: now()
+        })
       })
       await progress("resolve-prompts", 0, 0)
       const promptVersions = await step.do("resolve-prompts", storageStep, async () => {
         const versions = await resolvePromptVersions(ai.loadPrompt, rulebookBuildPrompts)
-        await updateJob(db, hoaId, jobId, { promptVersions: versions, now: now() })
+        await updateJob(db, organizationId, jobId, { promptVersions: versions, now: now() })
         return versions
       })
 
-      const outputs = rulebookBuildKeys(hoaId, jobId)
+      const outputs = rulebookBuildKeys(organizationId, jobId)
       // Step outputs can pass Workflows' 1 MiB limit, so each goes to R2 and is read back, on replay too.
       const runStep: StepRunner = async (name, schema, run, kind = "code") => {
         await step.do(name, kind === "model" ? buildModelStep : storageStep, async () => {
@@ -151,11 +156,11 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
         return output
       }
       const result = await buildRulebook({
-        organizationId: hoaId,
+        organizationId: organizationId,
         sources: loaded.sources.map((source) => ({
           ...source,
           loadPages: () =>
-            loadPages(bucket, governingKeys(hoaId, source.documentId), source.edition.files[0]?.pages ?? 0)
+            loadPages(bucket, governingKeys(organizationId, source.documentId), source.edition.files[0]?.pages ?? 0)
         })),
         step: runStep,
         ai: {
@@ -165,9 +170,9 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
           environment: ai.environment,
           sessionId: jobId,
           promptVersions,
-          cache: (stage) => createObjectPromptCache(bucket, (hash) => hoaCacheKey(hoaId, stage, hash))
+          cache: (stage) => createObjectPromptCache(bucket, (hash) => organizationCacheKey(organizationId, stage, hash))
         },
-        previous: () => loadPreviousReview(db, hoaId),
+        previous: () => loadPreviousReview(db, organizationId),
         now: loaded.startedAt,
         progress,
         concurrency: ai.encodingConcurrency
@@ -175,7 +180,7 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
 
       await progress("save-draft", 0, 1)
       await step.do("save-draft", storageStep, async () => {
-        await saveBuiltDraft(db, hoaId, {
+        await saveBuiltDraft(db, organizationId, {
           rulebookId,
           documents: { uploads: result.documents, referenced: result.referencedDocuments },
           content: result.content,
@@ -197,8 +202,8 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
       await step.do("save-draft:finish", storageStep, async () => {
         const { rules } = result.content
         const finishedAt = now()
-        const job = await getJob(db, hoaId, jobId)
-        await updateJob(db, hoaId, jobId, {
+        const job = await getJob(db, organizationId, jobId)
+        await updateJob(db, organizationId, jobId, {
           ...(job?.progress ? { progress: finishProgress(job.progress, finishedAt) } : {}),
           status: result.failures.length > 0 ? "completed-with-errors" : "completed",
           stage: null,
@@ -210,7 +215,7 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
       })
     } catch (error) {
       await step.do("fail", storageStep, async () => {
-        const job = await getJob(db, hoaId, jobId)
+        const job = await getJob(db, organizationId, jobId)
         if (job?.status === "cancelled") {
           return // Stopped by an administrator: it stays stopped, not failed.
         }
@@ -222,8 +227,8 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
           message: errorText(error),
           isRetryable: !(error instanceof NonRetryableError || error instanceof SourcesRejectedError)
         }
-        await failRulebook(db, hoaId, rulebookId, failed)
-        await updateJob(db, hoaId, jobId, { status: "failed", error: failed, now: now() })
+        await failRulebook(db, organizationId, rulebookId, failed)
+        await updateJob(db, organizationId, jobId, { status: "failed", error: failed, now: now() })
       })
     }
 
@@ -233,13 +238,13 @@ export class RulebookBuild extends WorkflowEntrypoint<Env, RulebookBuildParams> 
     const isStopped = await step.do(
       "follow-up:check",
       storageStep,
-      async () => (await getJob(db, hoaId, jobId))?.status === "cancelled"
+      async () => (await getJob(db, organizationId, jobId))?.status === "cancelled"
     )
     if (sourceDocumentIds.length > 0 && !isStopped) {
       await requestRulebookBuildStep(step, "follow-up", {
         db,
         binding: this.env.RULEBOOK_BUILD,
-        hoaId,
+        organizationId,
         unlessCurrentIs: sourceDocumentIds
       })
     }

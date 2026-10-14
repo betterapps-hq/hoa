@@ -12,7 +12,7 @@ function upload(
     id,
     lineageId,
     version,
-    hoaId: "hoa-1",
+    organizationId: "hoa-1",
     kind: "declaration",
     amends: null,
     title: id,
