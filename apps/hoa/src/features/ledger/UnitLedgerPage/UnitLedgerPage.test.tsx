@@ -48,6 +48,7 @@ const view: UnitLedgerView = {
   owners: ["Casey Morgan"],
   balanceCents: 2500,
   lines: [payment, fine],
+  comingDue: [],
   today: "2026-10-15",
   canManage: true
 }
@@ -104,6 +105,33 @@ describe("UnitLedgerPage", () => {
     })
     expect(screen.queryByRole("group", { name: "Page actions" })).not.toBeInTheDocument()
     expect(screen.queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument()
+  })
+
+  it("shows the dues coming due, and which have posted", () => {
+    setup({
+      comingDue: [
+        {
+          key: "nov",
+          name: "Monthly dues",
+          dueOn: "2026-11-01",
+          amountCents: 35_000,
+          postsOn: "2026-10-02",
+          state: "owed"
+        },
+        {
+          key: "dec",
+          name: "Monthly dues",
+          dueOn: "2026-12-01",
+          amountCents: 35_000,
+          postsOn: "2026-11-01",
+          state: "posts"
+        }
+      ]
+    })
+    expect(screen.getByText("Coming due")).toBeInTheDocument()
+    expect(screen.getByText("Due Nov 1, 2026")).toBeInTheDocument()
+    expect(screen.getByText("On the ledger")).toBeInTheDocument()
+    expect(screen.getByText("Posts Nov 1, 2026")).toBeInTheDocument()
   })
 
   it("says a waived charge was waived", () => {

@@ -19,7 +19,7 @@ describe("navigationFor", () => {
   it("gives each committee they sit on a section with its pages after the organization's, and skips one without", () => {
     expect(sectionsOf("homeowner", [social, board, design])).toEqual([
       [null, ["Dashboard"]],
-      ["Organization", ["Violations", "Ledger", "Rulebook", "People"]],
+      ["Organization", ["Violations", "Ledger", "Dues", "Rulebook", "People"]],
       ["Design Review", ["Applications", "Project types"]]
     ])
   })
@@ -36,7 +36,10 @@ describe("navigationFor", () => {
   it("gives an administrator every page, under the association's when no committee has it", () => {
     expect(sectionsOf("administrator", [])).toEqual([
       [null, ["Dashboard"]],
-      ["Organization", ["Applications", "Project types", "Violations", "Ledger", "Rulebook", "People", "Settings"]]
+      [
+        "Organization",
+        ["Applications", "Project types", "Violations", "Ledger", "Dues", "Rulebook", "People", "Settings"]
+      ]
     ])
   })
 })

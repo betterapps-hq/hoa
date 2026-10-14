@@ -33,9 +33,16 @@ and reverses entries, from the unit's ledger.
 
 ## Dues
 
-An administrator or the board sets up each schedule: its name, the amount (the same for every unit, or each unit's own),
-how often and from when. A daily job posts each charge 30 days before it's due, once per unit and due day, so a missed
-run catches up and a repeated run posts nothing twice. Owners see what's coming due.
+An administrator or the board sets up each schedule on the Dues page: its name, dues or a special assessment, the
+amount (the same for every unit, or each unit's own), how often (once, monthly, quarterly, twice a year, yearly) and
+from when to when. A daily Cron Trigger (`0 10 * * *`) posts each charge 30 days before it's due, once per unit and due
+day (`schedule:{id}:{unit}:{due day}` as its posting key), so a missed run catches up and a repeated run posts nothing
+twice. Setting one up posts what's due already. A schedule never posts a charge due before it was set up, or before the
+unit was added to the roll. Ending a schedule stops its charges; what it posted stays, and can be waived.
+
+Each schedule shows its next due day, what every unit owes together, and how its latest due day is being paid: what's
+been paid of what it charged, less anything waived, and how many units have paid (`scheduleCollection`). A unit's
+ledger shows the dues coming due in the next 90 days, and whether each has posted.
 
 ## Late fees and interest
 

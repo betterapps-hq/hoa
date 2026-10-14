@@ -10,7 +10,7 @@ import {
   type Allocation,
   type LedgerEntry
 } from "@/money/ledger"
-import { insertChunks, runBatch } from "./batching"
+import { chunk, insertChunks, runBatch } from "./batching"
 import type { Database } from "./database"
 import { ledgerAllocations, ledgerEntries } from "./schema"
 
@@ -57,6 +57,32 @@ export async function getUnitLedger(db: Database, organizationId: string, unitId
       .where(and(eq(ledgerAllocations.organizationId, organizationId), eq(ledgerAllocations.unitId, unitId)))
   ])
   return { entries: entries.map((row) => entrySchema.parse(row)), allocations }
+}
+
+/** Every unit's entries and allocations, by unit. */
+export async function getOrganizationLedgers(db: Database, organizationId: string) {
+  const [entries, allocations] = await Promise.all([
+    db.select().from(ledgerEntries).where(eq(ledgerEntries.organizationId, organizationId)),
+    db
+      .select({
+        unitId: ledgerAllocations.unitId,
+        fromEntryId: ledgerAllocations.fromEntryId,
+        toEntryId: ledgerAllocations.toEntryId,
+        amountCents: ledgerAllocations.amountCents
+      })
+      .from(ledgerAllocations)
+      .where(eq(ledgerAllocations.organizationId, organizationId))
+  ])
+  const ledgers = new Map<string, UnitLedger>()
+  for (const row of entries) {
+    const ledger = ledgers.get(row.unitId) ?? { entries: [], allocations: [] }
+    ledger.entries.push(entrySchema.parse(row))
+    ledgers.set(row.unitId, ledger)
+  }
+  for (const { unitId, ...allocation } of allocations) {
+    ledgers.get(unitId)?.allocations.push(allocation)
+  }
+  return ledgers
 }
 
 /** Each unit's balance, for the units that have entries. */
@@ -137,6 +163,61 @@ export async function postCharge(db: Database, posting: Posting, charge: NewEntr
     await runBatch(db, posted.statements)
   }
   return posted?.id ?? null
+}
+
+/**
+ * Posts many charges at once, such as a schedule's dues for every unit: each paid at once from any credit its unit has
+ * waiting, and none whose posting key has posted already. Reads the ledger once and writes in a few batched inserts,
+ * so a run fits a Worker's limit on queries. Returns how many posted.
+ */
+export async function postCharges(
+  db: Database,
+  { organizationId, now }: { organizationId: string; now: string },
+  charges: readonly (NewEntry & { unitId: string })[]
+) {
+  const keys = charges.flatMap((charge) => (charge.postingKey ? [charge.postingKey] : []))
+  const posted = new Set<string>()
+  for (const group of chunk(keys, 90)) {
+    const rows = await db
+      .select({ postingKey: ledgerEntries.postingKey })
+      .from(ledgerEntries)
+      .where(and(eq(ledgerEntries.organizationId, organizationId), inArray(ledgerEntries.postingKey, group)))
+    for (const row of rows) {
+      if (row.postingKey) {
+        posted.add(row.postingKey)
+      }
+    }
+  }
+  const fresh = charges.filter((charge) => !charge.postingKey || !posted.has(charge.postingKey))
+  if (fresh.length === 0) {
+    return 0
+  }
+  const ledgers = await getOrganizationLedgers(db, organizationId)
+  const ledgerOf = (unitId: string) => {
+    const ledger = ledgers.get(unitId) ?? { entries: [], allocations: [] }
+    ledgers.set(unitId, ledger)
+    return ledger
+  }
+  const rows: LedgerEntry[] = []
+  const paid: (Allocation & { unitId: string })[] = []
+  for (const { unitId, ...charge } of fresh) {
+    const ledger = ledgerOf(unitId)
+    const row = entryRow({ organizationId, unitId, now }, { ...charge, kind: "charge" })
+    const applied = applyCredits(row, openAmounts(ledger.entries, ledger.allocations).credits)
+    // Later charges in this run see what this one spent.
+    ledger.entries.push(row)
+    ledger.allocations.push(...applied)
+    rows.push(row)
+    paid.push(...applied.map((allocation) => ({ ...allocation, unitId })))
+  }
+  await runBatch(db, [
+    ...insertChunks(ledgerEntries, rows).map((group) => db.insert(ledgerEntries).values(group)),
+    ...insertChunks(
+      ledgerAllocations,
+      paid.map((allocation) => ({ ...allocation, id: crypto.randomUUID(), organizationId, createdAt: now }))
+    ).map((group) => db.insert(ledgerAllocations).values(group))
+  ])
+  return rows.length
 }
 
 /** Posts a payment or credit, paying the oldest charges due first, or only the ones picked. */

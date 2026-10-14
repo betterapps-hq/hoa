@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
+import { Route as DuesRouteImport } from './routes/dues'
 import { Route as PeopleRouteImport } from './routes/people'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -44,6 +45,11 @@ const IndexRoute = IndexRouteImport.update({
 const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DuesRoute = DuesRouteImport.update({
+  id: '/dues',
+  path: '/dues',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PeopleRoute = PeopleRouteImport.update({
@@ -177,6 +183,7 @@ const FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/dues': typeof DuesRoute
   '/people': typeof PeopleRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/dues': typeof DuesRoute
   '/people': typeof PeopleRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
@@ -234,6 +242,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/dues': typeof DuesRoute
   '/people': typeof PeopleRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
@@ -264,6 +273,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/account'
+    | '/dues'
     | '/people'
     | '/rules'
     | '/settings'
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/account'
+    | '/dues'
     | '/people'
     | '/rules'
     | '/settings'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/account'
+    | '/dues'
     | '/people'
     | '/rules'
     | '/settings'
@@ -349,6 +361,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
+  DuesRoute: typeof DuesRoute
   PeopleRoute: typeof PeopleRoute
   RulesRoute: typeof RulesRoute
   SettingsRoute: typeof SettingsRoute
@@ -389,6 +402,13 @@ declare module '@tanstack/react-router' {
       path: '/account'
       fullPath: '/account'
       preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dues': {
+      id: '/dues'
+      path: '/dues'
+      fullPath: '/dues'
+      preLoaderRoute: typeof DuesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/people': {
@@ -565,6 +585,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
+  DuesRoute: DuesRoute,
   PeopleRoute: PeopleRoute,
   RulesRoute: RulesRoute,
   SettingsRoute: SettingsRoute,

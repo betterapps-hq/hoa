@@ -134,6 +134,13 @@
       "when": 1791982867815,
       "tag": "0018_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1791983701099,
+      "tag": "0019_assessment_schedules",
+      "breakpoints": true
     }
   ]
 }

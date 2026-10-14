@@ -741,3 +741,30 @@ export const ledgerAllocations = sqliteTable(
     index("ledger_allocations_unit").on(table.organizationId, table.unitId)
   ]
 )
+
+// Dues and special assessments (docs/design/money.md, Dues): what each unit owes, how often, from when.
+export const assessmentSchedules = sqliteTable(
+  "assessment_schedules",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    name: text("name").notNull(),
+    // "dues" or "special-assessment".
+    category: text("category").notNull(),
+    // "once", "monthly", "quarterly", "semiannual" or "annual".
+    frequency: text("frequency").notNull(),
+    // What each unit owes each time, in cents, unless it has its own amount.
+    amountCents: integer("amount_cents").notNull(),
+    unitAmounts: json<Record<string, number>>("unit_amounts_json"),
+    firstDueOn: text("first_due_on").notNull(),
+    lastDueOn: text("last_due_on"),
+    // The day it was set up: it never posts charges due before then.
+    postsFrom: text("posts_from").notNull(),
+    // "active", or "ended" once it stops posting.
+    status: text("status").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at"),
+    updatedAt: timestamp("updated_at")
+  },
+  (table) => [index("assessment_schedules_organization").on(table.organizationId, table.status)]
+)

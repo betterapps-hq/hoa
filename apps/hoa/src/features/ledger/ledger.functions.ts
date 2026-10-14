@@ -3,8 +3,10 @@ import { z } from "zod"
 import { getDb } from "@/db/client.server"
 import { getUnitLedger, postCharge, postPayment, reverseEntry, unitBalances } from "@/db/ledgerRepository"
 import { getRoll } from "@/db/peopleRepository"
+import { listSchedules } from "@/db/scheduleRepository"
 import { doesWorkOf } from "@/features/role/roles"
 import { ownedUnits, publishedRules, todayIn } from "@/features/violations/violations.server"
+import { addDays } from "@/lib/days"
 import { optionalText } from "@/lib/fields"
 import {
   chargeCategories,
@@ -15,6 +17,7 @@ import {
   type EntryKind,
   type PaymentMethod
 } from "@/money/ledger"
+import { amountFor, dueDays, postingKeyOf, postsDaysAhead } from "@/money/schedules"
 import { isCurrent } from "@/people/people"
 import { addressLine } from "@/places/address"
 import { getRequestContext, requireWorkOf, type RequestContext } from "@/session/requestContext.server"
@@ -42,15 +45,38 @@ export type LedgerLine = {
   canReverse: boolean
 }
 
+/** A dues charge coming due in the next few months: posted already (owed or paid), or the day it posts. */
+export type ComingDue = {
+  key: string
+  name: string
+  dueOn: string
+  amountCents: number
+  postsOn: string
+  state: "posts" | "owed" | "paid"
+}
+
 export type UnitLedgerView = {
   unit: { id: string; label: string; address: string | null }
   owners: string[]
   balanceCents: number
   /** Newest first. */
   lines: LedgerLine[]
+  /** Soonest first. */
+  comingDue: ComingDue[]
   today: string
   canManage: boolean
 }
+
+/** Whether a dues charge has posted, and if so whether it's paid, from what's open on it once posted. */
+function comingDueState(openCents: number | undefined): ComingDue["state"] {
+  if (openCents === undefined) {
+    return "posts"
+  }
+  return openCents > 0 ? "owed" : "paid"
+}
+
+/** How far ahead a ledger shows dues coming due. */
+const comingDueDays = 90
 
 const managesLedger = (context: RequestContext) => doesWorkOf(context.role, context.committees, "board")
 
@@ -106,8 +132,15 @@ export const getUnitLedgerView = createServerFn({ method: "GET" })
     if (!unit || (!canManage && !owned.includes(unit.id))) {
       throw new Error("That unit's ledger isn't one you can see.")
     }
-    const ledger = await getUnitLedger(getDb(), organizationId, unit.id)
+    const db = getDb()
+    const [ledger, schedules] = await Promise.all([
+      getUnitLedger(db, organizationId, unit.id),
+      listSchedules(db, organizationId)
+    ])
     const lines = statementOf(ledger.entries, ledger.allocations)
+    const posted = new Map(
+      lines.flatMap(({ entry, openCents }) => (entry.postingKey ? [[entry.postingKey, openCents ?? 0] as const] : []))
+    )
     return {
       unit: { id: unit.id, label: unit.label, address: addressLine(unit) || null },
       owners: ownersOf(unit.id),
@@ -127,6 +160,30 @@ export const getUnitLedgerView = createServerFn({ method: "GET" })
         canReverse:
           canManage && entry.kind !== "reversal" && !isReversed && (entry.kind !== "charge" || (openCents ?? 0) > 0)
       })),
+      comingDue: schedules
+        .flatMap((schedule) =>
+          schedule.status === "active"
+            ? dueDays(
+                schedule,
+                today > schedule.postsFrom ? today : schedule.postsFrom,
+                addDays(today, comingDueDays),
+                3
+              ).map((dueOn): ComingDue => {
+                const key = postingKeyOf(schedule.id, unit.id, dueOn)
+                const openCents = posted.get(key)
+                return {
+                  key,
+                  name: schedule.name,
+                  dueOn,
+                  amountCents: amountFor(schedule, unit.id),
+                  postsOn: addDays(dueOn, -postsDaysAhead),
+                  state: comingDueState(openCents)
+                }
+              })
+            : []
+        )
+        .toSorted((a, b) => a.dueOn.localeCompare(b.dueOn))
+        .slice(0, 4),
       today,
       canManage
     }

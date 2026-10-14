@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router"
 import {
+  CalendarSyncIcon,
   ClipboardCheckIcon,
   LayersIcon,
   LayoutDashboardIcon,
@@ -28,6 +29,7 @@ const icons: Record<NavItem["to"], typeof LayoutDashboardIcon> = {
   "/applications": ClipboardCheckIcon,
   "/violations": TriangleAlertIcon,
   "/ledger": WalletIcon,
+  "/dues": CalendarSyncIcon,
   "/people": UsersIcon,
   "/settings": SettingsIcon
 }

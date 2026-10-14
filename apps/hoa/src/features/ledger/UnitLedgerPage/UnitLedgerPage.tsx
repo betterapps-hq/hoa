@@ -12,7 +12,8 @@ import { attempt } from "@/lib/attempt"
 import { dayText } from "@/lib/days"
 import { money } from "@/lib/money"
 import type { ChargeCategory, PaymentMethod } from "@/money/ledger"
-import type { LedgerLine, UnitLedgerView } from "../ledger.functions"
+import { postsDaysAhead } from "@/money/schedules"
+import type { ComingDue, LedgerLine, UnitLedgerView } from "../ledger.functions"
 import { ChargeDialog, CreditDialog, PaymentDialog, ReverseDialog } from "../LedgerDialogs/LedgerDialogs"
 import { balanceText } from "../ledgerDisplay"
 
@@ -96,6 +97,7 @@ export function UnitLedgerPage({ view, actions, onChanged, onBack }: UnitLedgerP
           <span className="text-2xl font-semibold tabular-nums">{money(Math.abs(balanceCents))}</span>
         </div>
       </header>
+      {view.comingDue.length > 0 ? <ComingDueCard items={view.comingDue} /> : null}
       <Card>
         <CardHeader>
           <CardTitle>Entries</CardTitle>
@@ -214,6 +216,52 @@ export function UnitLedgerPage({ view, actions, onChanged, onBack }: UnitLedgerP
     </div>
   )
 }
+
+/** The dues coming due in the next few months, and whether each has posted. */
+function ComingDueCard({ items }: { items: ComingDue[] }) {
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle>Coming due</CardTitle>
+        <CardDescription>Dues post to the ledger {postsDaysAhead} days before they&apos;re due.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          {items.map((item) => (
+            <li key={item.key} className="flex items-center gap-3">
+              <div className="flex size-10 shrink-0 flex-col items-center justify-center rounded-md border bg-muted/40 leading-none">
+                <span className="text-[0.625rem] font-medium text-muted-foreground uppercase">
+                  {monthOf(item.dueOn)}
+                </span>
+                <span className="text-sm font-semibold tabular-nums">{Number(item.dueOn.slice(8))}</span>
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate font-medium">{item.name}</span>
+                <span className="truncate text-sm text-muted-foreground">
+                  {item.state === "posts" ? `Posts ${dayText(item.postsOn)}` : `Due ${dayText(item.dueOn)}`}
+                </span>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <span className="font-medium tabular-nums">{money(item.amountCents)}</span>
+                <ComingDueBadge state={item.state} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ComingDueBadge({ state }: { state: ComingDue["state"] }) {
+  if (state === "paid") {
+    return <Badge variant="secondary">Paid</Badge>
+  }
+  return state === "owed" ? <Badge variant="outline">On the ledger</Badge> : null
+}
+
+const monthFormat = new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" })
+const monthOf = (day: string) => monthFormat.format(new Date(`${day}T00:00:00Z`))
 
 /** Whether a charge is paid or open, and whether an entry was reversed. */
 function LineStatus({ line }: { line: LedgerLine }) {
