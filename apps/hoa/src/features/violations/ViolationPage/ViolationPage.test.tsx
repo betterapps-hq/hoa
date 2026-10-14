@@ -8,7 +8,10 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn<(message: string) => void>(), success: vi.fn<(message: string) => void>() }
 }))
 
-vi.mock("@tanstack/react-router", () => ({ useRouter: () => undefined }))
+vi.mock("@tanstack/react-router", () => ({
+  useRouter: () => undefined,
+  Link: ({ children }: { children?: React.ReactNode }) => <a href="/ledger">{children}</a>
+}))
 
 const rule = {
   key: "rules:4#trash",
@@ -155,7 +158,7 @@ describe("ViolationPage for the board", () => {
     await user.clear(amount)
     await user.type(amount, "150")
     await user.click(within(dialog).getByRole("button", { name: "Impose it" }))
-    expect(await within(dialog).findByText("The documents allow at most $100.00.")).toBeInTheDocument()
+    expect(await within(dialog).findByText("That's more than the $100.00 allowed.")).toBeInTheDocument()
     await user.clear(amount)
     await user.type(amount, "75")
     await user.click(within(dialog).getByRole("button", { name: "Impose it" }))

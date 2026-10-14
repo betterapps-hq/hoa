@@ -21,6 +21,8 @@ import { Route as ApplicationsApplicationIdRouteImport } from './routes/applicat
 import { Route as ApplicationsNewRouteImport } from './routes/applications.new'
 import { Route as DocumentsIndexRouteImport } from './routes/documents.index'
 import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$documentId'
+import { Route as LedgerIndexRouteImport } from './routes/ledger.index'
+import { Route as LedgerUnitIdRouteImport } from './routes/ledger.$unitId'
 import { Route as ProjectTypesIndexRouteImport } from './routes/project-types.index'
 import { Route as ProjectTypesProjectTypeIdRouteImport } from './routes/project-types.$projectTypeId'
 import { Route as RulesReviewRouteImport } from './routes/rules_.review'
@@ -93,6 +95,16 @@ const DocumentsIndexRoute = DocumentsIndexRouteImport.update({
 const DocumentsDocumentIdRoute = DocumentsDocumentIdRouteImport.update({
   id: '/documents/$documentId',
   path: '/documents/$documentId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LedgerIndexRoute = LedgerIndexRouteImport.update({
+  id: '/ledger/',
+  path: '/ledger/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LedgerUnitIdRoute = LedgerUnitIdRouteImport.update({
+  id: '/ledger/$unitId',
+  path: '/ledger/$unitId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectTypesIndexRoute = ProjectTypesIndexRouteImport.update({
@@ -173,12 +185,14 @@ export interface FileRoutesByFullPath {
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
   '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/ledger/$unitId': typeof LedgerUnitIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules/review': typeof RulesReviewRoute
   '/violations/$violationId': typeof ViolationsViolationIdRoute
   '/violations/new': typeof ViolationsNewRoute
   '/applications/': typeof ApplicationsIndexRoute
   '/documents/': typeof DocumentsIndexRoute
+  '/ledger/': typeof LedgerIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
   '/violations/': typeof ViolationsIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -199,12 +213,14 @@ export interface FileRoutesByTo {
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
   '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/ledger/$unitId': typeof LedgerUnitIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules/review': typeof RulesReviewRoute
   '/violations/$violationId': typeof ViolationsViolationIdRoute
   '/violations/new': typeof ViolationsNewRoute
   '/applications': typeof ApplicationsIndexRoute
   '/documents': typeof DocumentsIndexRoute
+  '/ledger': typeof LedgerIndexRoute
   '/project-types': typeof ProjectTypesIndexRoute
   '/violations': typeof ViolationsIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -226,12 +242,14 @@ export interface FileRoutesById {
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
   '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/ledger/$unitId': typeof LedgerUnitIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules_/review': typeof RulesReviewRoute
   '/violations/$violationId': typeof ViolationsViolationIdRoute
   '/violations/new': typeof ViolationsNewRoute
   '/applications/': typeof ApplicationsIndexRoute
   '/documents/': typeof DocumentsIndexRoute
+  '/ledger/': typeof LedgerIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
   '/violations/': typeof ViolationsIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -254,12 +272,14 @@ export interface FileRouteTypes {
     | '/applications/$applicationId'
     | '/applications/new'
     | '/documents/$documentId'
+    | '/ledger/$unitId'
     | '/project-types/$projectTypeId'
     | '/rules/review'
     | '/violations/$violationId'
     | '/violations/new'
     | '/applications/'
     | '/documents/'
+    | '/ledger/'
     | '/project-types/'
     | '/violations/'
     | '/api/auth/$'
@@ -280,12 +300,14 @@ export interface FileRouteTypes {
     | '/applications/$applicationId'
     | '/applications/new'
     | '/documents/$documentId'
+    | '/ledger/$unitId'
     | '/project-types/$projectTypeId'
     | '/rules/review'
     | '/violations/$violationId'
     | '/violations/new'
     | '/applications'
     | '/documents'
+    | '/ledger'
     | '/project-types'
     | '/violations'
     | '/api/auth/$'
@@ -306,12 +328,14 @@ export interface FileRouteTypes {
     | '/applications/$applicationId'
     | '/applications/new'
     | '/documents/$documentId'
+    | '/ledger/$unitId'
     | '/project-types/$projectTypeId'
     | '/rules_/review'
     | '/violations/$violationId'
     | '/violations/new'
     | '/applications/'
     | '/documents/'
+    | '/ledger/'
     | '/project-types/'
     | '/violations/'
     | '/api/auth/$'
@@ -333,12 +357,14 @@ export interface RootRouteChildren {
   ApplicationsApplicationIdRoute: typeof ApplicationsApplicationIdRoute
   ApplicationsNewRoute: typeof ApplicationsNewRoute
   DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
+  LedgerUnitIdRoute: typeof LedgerUnitIdRoute
   ProjectTypesProjectTypeIdRoute: typeof ProjectTypesProjectTypeIdRoute
   RulesReviewRoute: typeof RulesReviewRoute
   ViolationsViolationIdRoute: typeof ViolationsViolationIdRoute
   ViolationsNewRoute: typeof ViolationsNewRoute
   ApplicationsIndexRoute: typeof ApplicationsIndexRoute
   DocumentsIndexRoute: typeof DocumentsIndexRoute
+  LedgerIndexRoute: typeof LedgerIndexRoute
   ProjectTypesIndexRoute: typeof ProjectTypesIndexRoute
   ViolationsIndexRoute: typeof ViolationsIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -433,6 +459,20 @@ declare module '@tanstack/react-router' {
       path: '/documents/$documentId'
       fullPath: '/documents/$documentId'
       preLoaderRoute: typeof DocumentsDocumentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ledger/': {
+      id: '/ledger/'
+      path: '/ledger'
+      fullPath: '/ledger/'
+      preLoaderRoute: typeof LedgerIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ledger/$unitId': {
+      id: '/ledger/$unitId'
+      path: '/ledger/$unitId'
+      fullPath: '/ledger/$unitId'
+      preLoaderRoute: typeof LedgerUnitIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/project-types/': {
@@ -533,12 +573,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApplicationsApplicationIdRoute: ApplicationsApplicationIdRoute,
   ApplicationsNewRoute: ApplicationsNewRoute,
   DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
+  LedgerUnitIdRoute: LedgerUnitIdRoute,
   ProjectTypesProjectTypeIdRoute: ProjectTypesProjectTypeIdRoute,
   RulesReviewRoute: RulesReviewRoute,
   ViolationsViolationIdRoute: ViolationsViolationIdRoute,
   ViolationsNewRoute: ViolationsNewRoute,
   ApplicationsIndexRoute: ApplicationsIndexRoute,
   DocumentsIndexRoute: DocumentsIndexRoute,
+  LedgerIndexRoute: LedgerIndexRoute,
   ProjectTypesIndexRoute: ProjectTypesIndexRoute,
   ViolationsIndexRoute: ViolationsIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

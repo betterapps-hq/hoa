@@ -7,6 +7,7 @@ import { doesWorkOf } from "@/features/role/roles"
 import { citationIndex, citationLabel, referencedRule } from "@/features/rulebook/rulebookRecords"
 import type { ReferencedRule } from "@/features/rulebook/RuleReference/RuleReference"
 import { dayText } from "@/lib/days"
+import { money } from "@/lib/money"
 import { isCurrent } from "@/people/people"
 import type { RollData } from "@/people/roll"
 import { addressLine } from "@/places/address"
@@ -263,8 +264,6 @@ export function answers(input: FactInput, value: FactValue) {
   }
 }
 
-const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
-
 /** A stated value in words. */
 function valueTextOf(value: FactValue, label: (key: T.TermKey, plural?: boolean) => string) {
   switch (value.type) {
@@ -275,7 +274,9 @@ function valueTextOf(value: FactValue, label: (key: T.TermKey, plural?: boolean)
     case "number":
       return String(value.value)
     case "quantity":
-      return value.unit === "usd" ? usd.format(value.value) : `${value.value} ${label(value.unit, value.value !== 1)}`
+      return value.unit === "usd"
+        ? money(Math.round(value.value * 100))
+        : `${value.value} ${label(value.unit, value.value !== 1)}`
     case "value":
       return label(value.term)
   }

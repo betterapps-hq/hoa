@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm"
+import type { BatchItem } from "drizzle-orm/batch"
 import { z } from "zod"
 import type { PriorViolation } from "@/violations/evaluation"
 import {
@@ -56,8 +57,15 @@ export type ViolationRecord = {
 
 export type NewEvent = { kind: EventKind; occurredOn: string; note: string | null; details: unknown }
 
-const eventRow = (organizationId: string, violationId: string, event: NewEvent, recordedBy: string, now: string) => ({
-  id: crypto.randomUUID(),
+const eventRow = (
+  organizationId: string,
+  violationId: string,
+  event: NewEvent,
+  recordedBy: string,
+  now: string,
+  id: string = crypto.randomUUID()
+) => ({
+  id,
   organizationId,
   violationId,
   kind: event.kind,
@@ -211,15 +219,22 @@ export async function addViolationEvent(
     recordedBy: string
     status?: ViolationStatus
     now: string
+    /** The event's id, when what it posts with it names it. */
+    eventId?: string
+    /** What lands with it, such as the charge a fine posts. */
+    also?: BatchItem<"sqlite">[]
   }
 ) {
   const { organizationId, violationId, now } = input
   await db.batch([
-    db.insert(violationEvents).values(eventRow(organizationId, violationId, input.event, input.recordedBy, now)),
+    db
+      .insert(violationEvents)
+      .values(eventRow(organizationId, violationId, input.event, input.recordedBy, now, input.eventId)),
     db
       .update(violations)
       .set({ updatedAt: now, ...(input.status ? { status: input.status } : {}) })
-      .where(and(eq(violations.organizationId, organizationId), eq(violations.id, violationId)))
+      .where(and(eq(violations.organizationId, organizationId), eq(violations.id, violationId))),
+    ...(input.also ?? [])
   ])
 }
 

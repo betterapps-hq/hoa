@@ -4,6 +4,7 @@ import { match } from "ts-pattern"
 import { z } from "zod"
 import { sendEmail } from "@/auth/email.server"
 import { getDb } from "@/db/client.server"
+import { chargeStatements } from "@/db/ledgerRepository"
 import { getRoll } from "@/db/peopleRepository"
 import {
   addViolationEvent,
@@ -14,6 +15,7 @@ import {
   type NewEvent
 } from "@/db/violationRepository"
 import { env } from "@/env.server"
+import type { ChargeCategory } from "@/money/ledger"
 import { relationLabels } from "@/people/people"
 import { unitRows } from "@/people/roll"
 import { addressLine } from "@/places/address"
@@ -45,7 +47,8 @@ import {
   ruleViewOf,
   todayIn,
   violationView,
-  type LoadedViolation
+  type LoadedViolation,
+  type SanctionView
 } from "./violations.server"
 
 // Violations (docs/design/violations.md): the board reports them and takes them through the documents' steps; the
@@ -458,7 +461,35 @@ export const imposeSanction = createServerFn({ method: "POST" })
       throw new Error("The documents don't allow that sanction for this violation now.")
     }
     const amountCents = checkedAmount(sanction.amount, sanction.imposedCents, data.amountCents)
-    await addViolationEvent(getDb(), {
+    const db = getDb()
+    const eventId = crypto.randomUUID()
+    const now = new Date().toISOString()
+    const { violation } = loaded.record
+    const category = chargeCategoryOf(sanction.type)
+    // A fine or charge posts to the unit's ledger with the sanction, citing its rule.
+    const charge =
+      amountCents !== null && category
+        ? await chargeStatements(
+            db,
+            { organizationId: context.organization.id, unitId: violation.unitId, now },
+            {
+              kind: "charge",
+              amountCents,
+              postedOn: loaded.today,
+              dueOn: loaded.today,
+              category,
+              description: `${sanction.rule.title}: ${violation.title}`,
+              reference: null,
+              ruleKey: sanction.ruleKey,
+              rulebookId: violation.rulebookId,
+              sourceType: "violation",
+              sourceId: violation.id,
+              postingKey: `sanction:${eventId}`,
+              createdBy: context.user.id
+            }
+          )
+        : null
+    await addViolationEvent(db, {
       organizationId: context.organization.id,
       violationId: data.violationId,
       event: {
@@ -468,11 +499,24 @@ export const imposeSanction = createServerFn({ method: "POST" })
         details: { ruleKey: sanction.ruleKey, enforced: sanction.enforced, type: sanction.type, amountCents }
       },
       recordedBy: context.user.id,
-      now: new Date().toISOString()
+      now,
+      eventId,
+      also: charge?.statements ?? []
     })
   })
 
 const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`
+
+/** The ledger category a sanction's amount posts under; null for one that isn't a charge, such as a suspension. */
+export function chargeCategoryOf(type: SanctionView["type"]): ChargeCategory | null {
+  return match(type)
+    .returnType<ChargeCategory | null>()
+    .with("fine", () => "fine")
+    .with("late-fee", () => "late-fee")
+    .with("interest", () => "interest")
+    .with("charge", "self-help", () => "fee")
+    .otherwise(() => null)
+}
 
 /** The amount to impose: within what the schedule, its cap and any limit allow, less what's been imposed already. */
 export function checkedAmount(

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { amountText, eventText, firstStepsText, money, remainingCents } from "./violationDisplay"
+import { amountText, eventText, firstStepsText, remainingCents } from "./violationDisplay"
 import type { EventView } from "./violations.server"
 
 const daily = { every: { value: 1, unit: "calendar-day" }, each: 2500, periods: 8 }
@@ -65,5 +65,4 @@ describe("the history in words", () => {
 
 it("says which of the board's steps come first", () => {
   expect(firstStepsText(["notice", "hearing"])).toBe("First, deliver the notice and hold the hearing.")
-  expect(money(125_000)).toBe("$1,250.00")
 })

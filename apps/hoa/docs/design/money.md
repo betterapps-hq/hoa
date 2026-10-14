@@ -9,16 +9,27 @@ charges and payments ([roadmap](../roadmap.md#4-money)).
 
 | Table | Holds |
 | --- | --- |
-| `ledger_entries` | Each charge, payment or credit on a unit: its amount in cents, the day it posts, a charge's due day and category (dues, special assessment, fine, late fee, interest, other fee), what it's for, the rule it cites, and where it came from (a schedule, a violation, a payment) |
-| `ledger_allocations` | Which charges each payment or credit paid, and how much of each |
+| `ledger_entries` | Each charge, payment, credit or reversal on a unit: what it does to the balance in cents, the day it posts, a charge's due day and category (dues, special assessment, fine, late fee, interest, other fee) or a payment's method, what it's for, the rule it cites, where it came from (a schedule, a violation, a payment, by hand), and a posting key that keeps it from posting twice |
+| `ledger_allocations` | Which charges each payment, credit or reversal paid or undid, and how much of each |
 | `assessment_schedules` | Dues and special assessments: the amount for each unit, how often (once, monthly, quarterly, twice a year, yearly), the first due day and the last |
 | `payments` | A payment made online: its Stripe payment, the units and charges it pays, and whether it's pending, paid, failed or returned |
 
 Entries are never edited or deleted. A mistake is reversed by an entry that points at it, so the ledger always shows
-what happened. Amounts are whole cents in US dollars.
+what happened. Amounts are whole cents in US dollars, signed by what they do to the balance: a charge adds, a payment or
+credit takes off, a reversal undoes.
 
-**Balance** is charges less payments and credits. A payment or credit pays the oldest charge due first, unless the
-person paying picks the charges.
+**Balance** is the sum of the entries. A payment or credit pays the oldest charge due first, unless the person paying
+picks the charges; what it doesn't pay waits, and pays the next charge as it posts.
+
+**Reversing.** Reversing a charge waives what's unpaid on it; what's been paid stays paid, and the board gives a credit
+to hand that back. Reversing a payment or credit (a returned check) undoes all of it, and the charges it paid are owed
+again. The logic lives in `src/money/ledger.ts`.
+
+**Fines.** Imposing a fine, charge, late fee or interest on a violation posts it to the unit's ledger in the same batch
+as the sanction's event, due that day, citing the sanction rule and linking back to the violation.
+
+**By hand.** The board records payments by check, cash or another way, adds a charge nothing else posts, gives a credit,
+and reverses entries, from the unit's ledger.
 
 ## Dues
 

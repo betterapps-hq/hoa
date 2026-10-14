@@ -1,84 +1,23 @@
 import { useForm } from "@tanstack/react-form"
-import type { ReactNode } from "react"
 import { z } from "zod"
+import { DialogForm } from "@/components/DialogForm/DialogForm"
+import { MoneyInput } from "@/components/MoneyInput/MoneyInput"
 import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog"
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { Spinner } from "@/components/ui/spinner"
 import { Textarea } from "@/components/ui/textarea"
 import { saveThenClose } from "@/lib/form"
+import { centsFrom, dollarsSchema, dollarsText, money } from "@/lib/money"
 import { sentenceCase } from "@/lib/text"
 import { noticeDeliveries, noticeDeliveryLabels, type FactValue, type NoticeDelivery } from "@/violations/violation"
-import { amountText, money, remainingCents, sanctionTypeLabels } from "../violationDisplay"
+import { amountText, remainingCents, sanctionTypeLabels } from "../violationDisplay"
 import type { ViolationStep } from "../violations.functions"
 import type { FactQuestion, SanctionView } from "../violations.server"
 
 // The violation page's dialogs (violations.md, Steps): sending or recording the notice, recording a step the board took
 // or learned of, imposing a sanction, and an owner's reply or request for a hearing.
-
-type DialogFormProps = {
-  title: string
-  description?: ReactNode
-  submitLabel: string
-  isDestructive?: boolean
-  isSubmitting: boolean
-  onSubmit: () => void
-  onOpenChange: (open: boolean) => void
-  children: ReactNode
-}
-
-/** A dialog holding one form: its title, its fields, and Cancel beside the button that saves it. */
-function DialogForm({
-  title,
-  description,
-  submitLabel,
-  isDestructive = false,
-  isSubmitting,
-  onSubmit,
-  onOpenChange,
-  children
-}: DialogFormProps) {
-  return (
-    <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <form
-          noValidate
-          className="flex flex-col gap-6"
-          onSubmit={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            onSubmit()
-          }}
-        >
-          <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
-            {description ? <DialogDescription>{description}</DialogDescription> : null}
-          </DialogHeader>
-          <FieldGroup>{children}</FieldGroup>
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <Button type="submit" variant={isDestructive ? "destructive" : "default"} disabled={isSubmitting}>
-              {isSubmitting ? <Spinner /> : null}
-              {submitLabel}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
 
 type DayFieldProps = {
   id: string
@@ -472,34 +411,22 @@ type ImposeDialogProps = {
   onOpenChange: (open: boolean) => void
 }
 
-const dollarsOf = (cents: number) => (cents / 100).toFixed(2)
-
 /** Imposes a sanction the documents make available now, for an amount they allow. */
 export function ImposeDialog({ sanction, enforcedTitle, onImpose, onOpenChange }: ImposeDialogProps) {
   const hasAmount = sanction.amount.type !== "none"
   const most = remainingCents(sanction.amount, sanction.imposedCents)
-  const prefilled = sanction.amount.type === "fixed" && most !== null ? dollarsOf(most) : ""
+  const prefilled = sanction.amount.type === "fixed" && most !== null ? dollarsText(most) : ""
   const form = useForm({
     defaultValues: { amount: prefilled, note: "" },
     validators: {
       onSubmit: z.object({
-        amount: hasAmount
-          ? z
-              .string()
-              .trim()
-              .regex(/^\d+(\.\d{1,2})?$/, "Give an amount in dollars, such as 25 or 25.50.")
-              .refine((amount) => Number(amount) > 0, "Give an amount above $0.")
-              .refine(
-                (amount) => most === null || Math.round(Number(amount) * 100) <= most,
-                `The documents allow at most ${money(most ?? 0)}.`
-              )
-          : z.string(),
+        amount: hasAmount ? dollarsSchema(most) : z.string(),
         note: z.string()
       })
     },
     onSubmit: ({ value }) =>
       saveThenClose(
-        () => onImpose({ amountCents: hasAmount ? Math.round(Number(value.amount) * 100) : null, note: value.note }),
+        () => onImpose({ amountCents: hasAmount ? centsFrom(value.amount) : null, note: value.note }),
         () => onOpenChange(false)
       )
   })
@@ -529,19 +456,13 @@ export function ImposeDialog({ sanction, enforcedTitle, onImpose, onOpenChange }
                     Amount
                     <RequiredMark />
                   </FieldLabel>
-                  <InputGroup className="w-44">
-                    <InputGroupAddon>
-                      <InputGroupText>$</InputGroupText>
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      id="impose-amount"
-                      inputMode="decimal"
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                      aria-invalid={field.state.meta.errors.length > 0}
-                    />
-                  </InputGroup>
+                  <MoneyInput
+                    id="impose-amount"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={field.handleChange}
+                    isInvalid={field.state.meta.errors.length > 0}
+                  />
                   {most === null ? null : <FieldDescription>At most {money(most)}.</FieldDescription>}
                   <FieldError errors={field.state.meta.errors} />
                 </Field>
@@ -654,10 +575,11 @@ function factValueOf(question: FactQuestion, answer: string): FactValue | null {
       return answer ? { type: "boolean", value: answer === "yes" } : null
     case "number":
       return answer && Number.isInteger(amount) && amount >= 0 ? { type: "number", value: amount } : null
-    case "quantity":
-      return answer && Number.isFinite(amount) && amount >= 0
-        ? { type: "quantity", value: amount, unit: input.unit }
-        : null
+    case "quantity": {
+      // Dollars are typed as money; other units as a plain number.
+      const value = input.unit === "usd" ? (centsFrom(answer) ?? Number.NaN) / 100 : amount
+      return answer && Number.isFinite(value) && value >= 0 ? { type: "quantity", value, unit: input.unit } : null
+    }
     case "choice": {
       const option = input.options.find((candidate) => candidate.term === answer)
       return option ? { type: "value", term: option.term, text: option.label } : null
@@ -728,13 +650,17 @@ export function FactDialog({ question, onAnswer, onOpenChange }: FactDialogProps
                       aria-invalid={isInvalid}
                     />
                   ) : null}
-                  {input.type === "quantity" ? (
+                  {input.type === "quantity" && input.unit === "usd" ? (
+                    <MoneyInput
+                      id="fact-answer"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={change}
+                      isInvalid={isInvalid}
+                    />
+                  ) : null}
+                  {input.type === "quantity" && input.unit !== "usd" ? (
                     <InputGroup className="w-56">
-                      {input.unit === "usd" ? (
-                        <InputGroupAddon>
-                          <InputGroupText>$</InputGroupText>
-                        </InputGroupAddon>
-                      ) : null}
                       <InputGroupInput
                         id="fact-answer"
                         inputMode="decimal"
@@ -743,11 +669,9 @@ export function FactDialog({ question, onAnswer, onOpenChange }: FactDialogProps
                         onChange={(event) => change(event.target.value)}
                         aria-invalid={isInvalid}
                       />
-                      {input.unit === "usd" ? null : (
-                        <InputGroupAddon align="inline-end">
-                          <InputGroupText>{input.unitLabel}</InputGroupText>
-                        </InputGroupAddon>
-                      )}
+                      <InputGroupAddon align="inline-end">
+                        <InputGroupText>{input.unitLabel}</InputGroupText>
+                      </InputGroupAddon>
                     </InputGroup>
                   ) : null}
                   {input.type === "boolean" || input.type === "choice" ? (

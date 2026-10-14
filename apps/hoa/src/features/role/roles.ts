@@ -6,7 +6,7 @@ export type RoleId = (typeof roleIds)[number]
 
 export type NavItem = {
   title: string
-  to: "/" | "/rules" | "/project-types" | "/applications" | "/violations" | "/people" | "/settings"
+  to: "/" | "/rules" | "/project-types" | "/applications" | "/violations" | "/ledger" | "/people" | "/settings"
 }
 
 /** A group of the sidebar's links, under its heading; the first, the dashboard, has none. */
@@ -71,6 +71,8 @@ export function navigationFor(roleId: RoleId, committees: readonly Pick<Committe
     ...(roleId === "administrator" ? committeePages.architectural.slice(1) : []),
     // Everyone sees the violations they answer for; the board sees every one.
     { title: "Violations", to: "/violations" },
+    // Everyone sees their own units' ledgers; the board sees every unit's.
+    { title: "Ledger", to: "/ledger" },
     { title: "Rulebook", to: "/rules" },
     ...(doesWorkOf(roleId, committees, "board") ? [peoplePage] : []),
     // What the documents don't say about the association, kept by an administrator.

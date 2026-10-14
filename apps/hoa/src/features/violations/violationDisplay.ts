@@ -1,5 +1,6 @@
 import type { CurePeriod, SanctionAmount } from "@/engine/sanctions"
 import { dayText } from "@/lib/days"
+import { money } from "@/lib/money"
 import { sentenceCase } from "@/lib/text"
 import type * as T from "@/schema/types"
 import type { ProcedureStep } from "@/violations/evaluation"
@@ -7,11 +8,6 @@ import type { NoticeDelivery } from "@/violations/violation"
 import type { EventView } from "./violations.server"
 
 // How violations read on screen: amounts, the time to cure, sanctions and each step of the history.
-
-const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
-
-/** Cents as dollars: "$1,250.00". */
-export const money = (cents: number) => usd.format(cents / 100)
 
 export const sanctionTypeLabels: Record<T.Sanction["type"], string> = {
   fine: "Fine",

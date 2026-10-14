@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import {
   ArrowLeftIcon,
   BanIcon,
@@ -21,6 +22,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { RuleReference } from "@/features/rulebook/RuleReference/RuleReference"
 import { attempt } from "@/lib/attempt"
 import { dayText } from "@/lib/days"
+import { money } from "@/lib/money"
 import { sentenceCase } from "@/lib/text"
 import { violationStatusLabels, type FactValue, type ViolationParty } from "@/violations/violation"
 import {
@@ -31,7 +33,7 @@ import {
   StepDialog,
   type StepKind
 } from "../ViolationDialogs/ViolationDialogs"
-import { amountText, cureText, eventText, firstStepsText, money, sanctionTypeLabels } from "../violationDisplay"
+import { amountText, cureText, eventText, firstStepsText, sanctionTypeLabels } from "../violationDisplay"
 import type { ViolationStep } from "../violations.functions"
 import type { FactQuestion, SanctionView, ViolationView } from "../violations.server"
 
@@ -197,6 +199,15 @@ export function ViolationPage({ view, actions, onChanged, onBack }: ViolationPag
                 <span className="text-sm text-muted-foreground tabular-nums">{dayText(event.occurredOn)}</span>
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <span className="font-medium">{eventText(event)}</span>
+                  {event.sanction?.amountCents ? (
+                    <Link
+                      to="/ledger/$unitId"
+                      params={{ unitId: view.unit.id }}
+                      className="w-fit text-sm text-link underline-offset-4 hover:underline"
+                    >
+                      See the ledger
+                    </Link>
+                  ) : null}
                   <span className="text-sm text-muted-foreground">{event.by}</span>
                   {event.note ? <p className="max-w-prose text-sm whitespace-pre-wrap">{event.note}</p> : null}
                 </div>

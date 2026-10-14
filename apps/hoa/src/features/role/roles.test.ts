@@ -12,14 +12,14 @@ describe("navigationFor", () => {
   it("gives a homeowner the association's pages only", () => {
     expect(sectionsOf("homeowner", [])).toEqual([
       [null, ["Dashboard"]],
-      ["Organization", ["Applications", "Violations", "Rulebook"]]
+      ["Organization", ["Applications", "Violations", "Ledger", "Rulebook"]]
     ])
   })
 
   it("gives each committee they sit on a section with its pages after the organization's, and skips one without", () => {
     expect(sectionsOf("homeowner", [social, board, design])).toEqual([
       [null, ["Dashboard"]],
-      ["Organization", ["Violations", "Rulebook", "People"]],
+      ["Organization", ["Violations", "Ledger", "Rulebook", "People"]],
       ["Design Review", ["Applications", "Project types"]]
     ])
   })
@@ -28,7 +28,7 @@ describe("navigationFor", () => {
     const second = { name: "Landscape Review", kind: "architectural" } as const
     expect(sectionsOf("homeowner", [design, second])).toEqual([
       [null, ["Dashboard"]],
-      ["Organization", ["Violations", "Rulebook"]],
+      ["Organization", ["Violations", "Ledger", "Rulebook"]],
       ["Design Review", ["Applications", "Project types"]]
     ])
   })
@@ -36,7 +36,7 @@ describe("navigationFor", () => {
   it("gives an administrator every page, under the association's when no committee has it", () => {
     expect(sectionsOf("administrator", [])).toEqual([
       [null, ["Dashboard"]],
-      ["Organization", ["Applications", "Project types", "Violations", "Rulebook", "People", "Settings"]]
+      ["Organization", ["Applications", "Project types", "Violations", "Ledger", "Rulebook", "People", "Settings"]]
     ])
   })
 })
