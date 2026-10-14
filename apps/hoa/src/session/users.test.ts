@@ -1,18 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { demoUserId, userOf } from "./users"
+import { initialsOf } from "./users"
 
-describe("userOf", () => {
-  it("names a demo role's user, and a Cloudflare Access identity by its email", () => {
-    expect(userOf(demoUserId("administrator"))).toEqual({
-      id: "demo-administrator",
-      name: "Sam Rivera",
-      email: "sam@example.com"
-    })
-    expect(userOf(demoUserId("homeowner")).name).toBe("Jordan Avery")
-    expect(userOf("pat@example.org")).toEqual({
-      id: "pat@example.org",
-      name: "pat@example.org",
-      email: "pat@example.org"
-    })
+describe("initialsOf", () => {
+  it("takes the first letters of a name's first and last words, or of the email without a name", () => {
+    expect(initialsOf("Sam Rivera", "sam@example.com")).toBe("SR")
+    expect(initialsOf("Jordan  Lee Avery ", "jordan@example.com")).toBe("JA")
+    expect(initialsOf("Cher", "cher@example.com")).toBe("C")
+    expect(initialsOf("", "pat@example.com")).toBe("P")
   })
 })

@@ -51,7 +51,7 @@ export async function loadRulebookRoute() {
     getRulebookSources(),
     listDocuments()
   ])
-  if (session.roleId !== "administrator") {
+  if (session.status !== "member" || session.roleId !== "administrator") {
     return { isAdministrator: false as const, published, sources, uploads }
   }
   const [draft, jobs] = await Promise.all([

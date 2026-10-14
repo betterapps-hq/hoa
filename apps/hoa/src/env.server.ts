@@ -21,7 +21,17 @@ export const env = createEnv({
     R2_ACCOUNT_ID: z.string().min(1).optional(),
     R2_BUCKET: z.string().min(1).optional(),
     R2_ACCESS_KEY_ID: z.string().min(1).optional(),
-    R2_SECRET_ACCESS_KEY: z.string().min(1).optional()
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    // Accounts (docs/design/people.md). The secret signs sessions: required outside local development.
+    BETTER_AUTH_SECRET: z.string().min(32).optional(),
+    // Where the app is served, for links in emails and Google's redirect; taken from the request when unset.
+    BETTER_AUTH_URL: z.url().optional(),
+    // "Continue with Google" shows only when both are set.
+    GOOGLE_CLIENT_ID: z.string().min(1).optional(),
+    GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+    // Email through Resend: sign-in codes and invitations. Without them, local development prints emails to the log.
+    RESEND_API_KEY: z.string().min(1).optional(),
+    EMAIL_FROM: z.string().min(3).optional()
   },
   runtimeEnv: process.env,
   emptyStringAsUndefined: true

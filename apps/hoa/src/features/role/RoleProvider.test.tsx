@@ -1,50 +1,39 @@
 import { render, screen } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it } from "vitest"
 import { RoleProvider, useRole } from "./RoleProvider"
-import { isRoleId, type RoleId } from "./roles"
 
 function CurrentRole() {
-  const { role, setRole } = useRole()
+  const { role, user, hoaName } = useRole()
   return (
-    <>
-      <p>
-        {role.name}:{" "}
-        {role.navigation
-          .flatMap((section) => section.items)
-          .map((item) => item.title)
-          .join(", ")}
-      </p>
-      <button type="button" onClick={() => setRole(role.id === "homeowner" ? "administrator" : "homeowner")}>
-        Switch
-      </button>
-    </>
+    <p>
+      {role.name} at {hoaName} as {user.name}:{" "}
+      {role.navigation
+        .flatMap((section) => section.items)
+        .map((item) => item.title)
+        .join(", ")}
+    </p>
   )
 }
 
 describe("RoleProvider", () => {
-  it("starts with the session's role, switches immediately and saves the choice", async () => {
-    const onRoleChange = vi.fn<(role: RoleId) => Promise<void>>().mockResolvedValue(undefined)
+  it("gives the shell the signed-in person's role, account and association", () => {
     render(
-      <RoleProvider roleId="homeowner" onRoleChange={onRoleChange}>
+      <RoleProvider
+        roleId="administrator"
+        user={{ name: "Sam Rivera", email: "sam@example.com" }}
+        hoaName="Maple Hollow"
+      >
         <CurrentRole />
       </RoleProvider>
     )
-    expect(screen.getByText(/^Homeowner:/)).toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole("button", { name: "Switch" }))
-    expect(screen.getByText(/^Administrator:/)).toBeInTheDocument()
-    expect(onRoleChange).toHaveBeenCalledWith("administrator")
+    expect(
+      screen.getByText(
+        "Administrator at Maple Hollow as Sam Rivera: Dashboard, Applications, Project types, Rulebook, People"
+      )
+    ).toBeInTheDocument()
   })
 
   it("requires the provider", () => {
     expect(() => render(<CurrentRole />)).toThrow("useRole must be used inside RoleProvider.")
-  })
-})
-
-describe("isRoleId", () => {
-  it("accepts only the demo roles", () => {
-    expect(isRoleId("administrator")).toBe(true)
-    expect(isRoleId("guest")).toBe(false)
   })
 })

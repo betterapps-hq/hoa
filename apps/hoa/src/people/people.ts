@@ -1,0 +1,142 @@
+import { z } from "zod"
+import type { RoleId } from "@/features/role/roles"
+
+// The association's people (docs/design/people.md): everyone on its roll, with or without an account, the units they
+// own or live in, and the board and committees they sit on.
+
+export const accessLevels = ["member", "administrator"] as const
+export type Access = (typeof accessLevels)[number]
+
+export const unitRelations = ["owner", "resident", "tenant"] as const
+export type UnitRelation = (typeof unitRelations)[number]
+
+export const committeeKinds = ["board", "architectural", "other"] as const
+export type CommitteeKind = (typeof committeeKinds)[number]
+
+export const committeeRoles = ["chair", "member"] as const
+export type CommitteeRole = (typeof committeeRoles)[number]
+
+export type Person = {
+  id: string
+  hoaId: string
+  name: string
+  email: string | null
+  phone: string | null
+  mailingAddress: string | null
+  access: Access
+  /** The account that signed in with their email; null until they do. */
+  userId: string | null
+  invitedAt: string | null
+}
+
+export type Unit = { id: string; hoaId: string; label: string; address: string | null; lot: string | null }
+
+/** Someone owning, living in or renting a unit, from one day to another; `endedOn` is null while it lasts. */
+export type UnitLink = {
+  id: string
+  unitId: string
+  personId: string
+  relation: UnitRelation
+  startedOn: string | null
+  endedOn: string | null
+}
+
+export type Committee = { id: string; hoaId: string; name: string; kind: CommitteeKind }
+
+export type CommitteeMember = {
+  id: string
+  committeeId: string
+  personId: string
+  role: CommitteeRole
+  /** An officer's title on the board, such as president. */
+  office: string | null
+  startedOn: string | null
+  endedOn: string | null
+}
+
+/** The workspace a person signs in to: administrators manage the association, everyone else sees their own. */
+export const roleOf = (person: Pick<Person, "access">): RoleId =>
+  person.access === "administrator" ? "administrator" : "homeowner"
+
+/** How emails are kept and compared: trimmed and lowercased; null for none. */
+export function emailKey(email: string | null | undefined) {
+  const key = email?.trim().toLowerCase() ?? ""
+  return key === "" ? null : key
+}
+
+/**
+ * Which people an account is: those already linked to it, and those on a roll with its email and no account yet, as
+ * long as the account has proven its email. People with another account are never taken over.
+ */
+export function peopleOfAccount<T extends Pick<Person, "email" | "userId">>(
+  people: readonly T[],
+  account: { id: string; email: string; emailVerified: boolean }
+) {
+  const email = emailKey(account.email)
+  return people.filter(
+    (person) =>
+      person.userId === account.id ||
+      (account.emailVerified && person.userId === null && email !== null && emailKey(person.email) === email)
+  )
+}
+
+/** Whether a link is in force on a day (YYYY-MM-DD): started by then, or with no start, and not yet ended. */
+export const isCurrent = (link: Pick<UnitLink, "startedOn" | "endedOn">, today: string) =>
+  (link.startedOn === null || link.startedOn <= today) && (link.endedOn === null || link.endedOn > today)
+
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((text) => (text === "" ? null : text))
+
+/** A person as an administrator adds or edits them. */
+export const personInputSchema = z.object({
+  name: z.string().trim().min(1, "Give their name.").max(200, "Keep the name under 200 characters."),
+  email: z
+    .union([z.literal(""), z.email("Give an email address such as name@example.com.")])
+    .transform((email) => emailKey(email)),
+  phone: optionalText(40),
+  mailingAddress: optionalText(300),
+  access: z.enum(accessLevels)
+})
+
+/** A unit as an administrator adds or edits it. */
+export const unitInputSchema = z.object({
+  label: z.string().trim().min(1, "Give the unit's address or number.").max(200),
+  address: optionalText(300),
+  lot: optionalText(60)
+})
+
+const day = z.union([z.literal(""), z.iso.date("Give a date.")]).transform((text) => (text === "" ? null : text))
+
+/** Someone added to a unit. */
+export const unitLinkInputSchema = z.object({
+  unitId: z.string().min(1),
+  personId: z.string().min(1),
+  relation: z.enum(unitRelations),
+  startedOn: day
+})
+
+/** A committee as an administrator adds or renames it. */
+export const committeeInputSchema = z.object({
+  name: z.string().trim().min(1, "Give the committee's name.").max(200),
+  kind: z.enum(committeeKinds)
+})
+
+/** Someone added to a committee. */
+export const committeeMemberInputSchema = z.object({
+  committeeId: z.string().min(1),
+  personId: z.string().min(1),
+  role: z.enum(committeeRoles),
+  office: optionalText(80),
+  startedOn: day
+})
+
+export const relationLabels: Record<UnitRelation, string> = { owner: "Owner", resident: "Resident", tenant: "Tenant" }
+export const committeeKindLabels: Record<CommitteeKind, string> = {
+  board: "Board",
+  architectural: "Architectural committee",
+  other: "Committee"
+}

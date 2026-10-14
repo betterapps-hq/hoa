@@ -1,0 +1,33 @@
+-- Local development's people (docs/design/people.md): the demo HOA's administrator and a homeowner, each with an
+-- account, their units, the board and the architectural committee. The accounts keep the demo roles' user ids, so
+-- what those roles did before accounts still names them. Sign in with either email: the code prints in the dev
+-- server's log. Safe to run more than once.
+INSERT OR IGNORE INTO users (id, name, email, email_verified, created_at, updated_at) VALUES
+  ('demo-administrator', 'Sam Rivera', 'sam@example.com', 1, 1791936000000, 1791936000000),
+  ('demo-homeowner', 'Jordan Avery', 'jordan@example.com', 1, 1791936000000, 1791936000000);
+
+INSERT OR IGNORE INTO people (id, hoa_id, name, email, phone, mailing_address, access, user_id, invited_at, created_at, updated_at, removed_at) VALUES
+  ('person-sam', 'demo-hoa', 'Sam Rivera', 'sam@example.com', '360-555-0101', NULL, 'administrator', 'demo-administrator', NULL, '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
+  ('person-jordan', 'demo-hoa', 'Jordan Avery', 'jordan@example.com', '360-555-0102', NULL, 'member', 'demo-homeowner', NULL, '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
+  ('person-casey', 'demo-hoa', 'Casey Morgan', 'casey@example.com', NULL, '88 Harbor Road, Bellingham, WA 98226', 'member', NULL, NULL, '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
+  ('person-riley', 'demo-hoa', 'Riley Chen', NULL, '360-555-0104', NULL, 'member', NULL, NULL, '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL);
+
+INSERT OR IGNORE INTO units (id, hoa_id, label, address, lot, created_at, updated_at, removed_at) VALUES
+  ('unit-12', 'demo-hoa', '12 Lakeview Drive', '12 Lakeview Drive, Bellingham, WA 98229', 'Lot 12', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
+  ('unit-14', 'demo-hoa', '14 Lakeview Drive', '14 Lakeview Drive, Bellingham, WA 98229', 'Lot 14', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
+  ('unit-31', 'demo-hoa', '31 Fir Court', '31 Fir Court, Bellingham, WA 98229', 'Lot 31', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL);
+
+INSERT OR IGNORE INTO unit_people (id, hoa_id, unit_id, person_id, relation, started_on, ended_on, created_at) VALUES
+  ('unit-person-1', 'demo-hoa', 'unit-12', 'person-jordan', 'owner', '2019-06-01', NULL, '2026-10-13T00:00:00.000Z'),
+  ('unit-person-2', 'demo-hoa', 'unit-14', 'person-sam', 'owner', '2015-03-15', NULL, '2026-10-13T00:00:00.000Z'),
+  ('unit-person-3', 'demo-hoa', 'unit-31', 'person-casey', 'owner', '2021-09-01', NULL, '2026-10-13T00:00:00.000Z'),
+  ('unit-person-4', 'demo-hoa', 'unit-31', 'person-riley', 'tenant', '2024-01-01', NULL, '2026-10-13T00:00:00.000Z');
+
+INSERT OR IGNORE INTO committees (id, hoa_id, name, kind, created_at, removed_at) VALUES
+  ('committee-board', 'demo-hoa', 'Board of Directors', 'board', '2026-10-13T00:00:00.000Z', NULL),
+  ('committee-acc', 'demo-hoa', 'Architectural Control Committee', 'architectural', '2026-10-13T00:00:00.000Z', NULL);
+
+INSERT OR IGNORE INTO committee_members (id, hoa_id, committee_id, person_id, role, office, started_on, ended_on, created_at) VALUES
+  ('member-1', 'demo-hoa', 'committee-board', 'person-sam', 'chair', 'President', '2025-01-01', NULL, '2026-10-13T00:00:00.000Z'),
+  ('member-2', 'demo-hoa', 'committee-acc', 'person-sam', 'member', NULL, '2025-01-01', NULL, '2026-10-13T00:00:00.000Z'),
+  ('member-3', 'demo-hoa', 'committee-acc', 'person-casey', 'chair', NULL, '2025-01-01', NULL, '2026-10-13T00:00:00.000Z');

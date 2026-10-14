@@ -1,26 +1,22 @@
-import { createContext, use, useState, type ReactNode } from "react"
+import { createContext, use, type ReactNode } from "react"
+import type { SessionUser } from "@/session/session.functions"
 import { roles, type Role, type RoleId } from "./roles"
 
-type RoleContextValue = { role: Role; setRole: (role: RoleId) => void }
+type RoleContextValue = { role: Role; user: SessionUser; hoaName: string }
 
 const RoleContext = createContext<RoleContextValue | null>(null)
 
 export type RoleProviderProps = {
   children: ReactNode
-  /** The role from the server's session. */
+  /** The signed-in person's role, from the server's session. */
   roleId: RoleId
-  /** Persists a new role; the app saves it in a cookie and reloads the route data. */
-  onRoleChange: (role: RoleId) => void | Promise<void>
+  user: SessionUser
+  hoaName: string
 }
 
-/** Holds the demo role. It switches immediately and is saved by `onRoleChange`. */
-export function RoleProvider({ children, roleId, onRoleChange }: RoleProviderProps) {
-  const [current, setCurrent] = useState(roleId)
-  const setRole = (next: RoleId) => {
-    setCurrent(next)
-    void onRoleChange(next)
-  }
-  return <RoleContext value={{ role: roles[current], setRole }}>{children}</RoleContext>
+/** The signed-in person's role, account and association, for the app shell. */
+export function RoleProvider({ children, roleId, user, hoaName }: RoleProviderProps) {
+  return <RoleContext value={{ role: roles[roleId], user, hoaName }}>{children}</RoleContext>
 }
 
 export function useRole() {

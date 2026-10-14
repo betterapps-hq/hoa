@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
-import { createRootRoute, HeadContent, Outlet, Scripts, useRouter } from "@tanstack/react-router"
+import { createRootRoute, HeadContent, Outlet, redirect, Scripts } from "@tanstack/react-router"
 import { ThemeProvider } from "next-themes"
 import { useState, type ReactNode } from "react"
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary"
@@ -12,7 +12,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { RoleProvider } from "@/features/role/RoleProvider"
-import { getSession, setDemoRole } from "@/session/session.functions"
+import { getSession, type Session } from "@/session/session.functions"
 import appCss from "../styles.css?url"
 
 export const Route = createRootRoute({
@@ -24,7 +24,22 @@ export const Route = createRootRoute({
     ],
     links: [{ rel: "stylesheet", href: appCss }]
   }),
-  loader: () => getSession(),
+  // Signed out, every page but sign-in goes to sign-in; signed in with an email no roll has, to the welcome page.
+  beforeLoad: async ({ location }) => {
+    const session = await getSession()
+    const path = location.pathname
+    if (session.status === "signed-out" && path !== "/sign-in") {
+      throw redirect({ to: "/sign-in", search: { redirect: location.href } })
+    }
+    if (session.status === "unaffiliated" && path !== "/welcome" && path !== "/account") {
+      throw redirect({ to: "/welcome" })
+    }
+    if (session.status === "member" && path === "/welcome") {
+      throw redirect({ to: "/" })
+    }
+    return { session }
+  },
+  loader: ({ context }) => context.session,
   shellComponent: RootDocument,
   component: RootLayout
 })
@@ -54,49 +69,54 @@ const layoutStyle: Record<string, string> = {
   "--header-height": "calc(var(--spacing) * 12)"
 }
 
-/** The shadcn dashboard-01 layout: inset sidebar, site header and a container-query content column. */
+/** The app's providers, and the members' shell or, for sign-in and the welcome page, the page alone. */
 function RootLayout() {
   const session = Route.useLoaderData()
-  const router = useRouter()
   const [queryClient] = useState(() => new QueryClient())
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
-        <RoleProvider
-          roleId={session.roleId}
-          onRoleChange={async (roleId) => {
-            await setDemoRole({ data: { roleId } })
-            // The current page may be one the new role can't open; the dashboard is open to every role.
-            await router.navigate({ to: "/" })
-            await router.invalidate()
-          }}
-        >
+        {session.status === "member" ? (
+          <MemberShell session={session} />
+        ) : (
           <TooltipProvider>
-            <SidebarProvider style={layoutStyle}>
-              <AppSidebar variant="inset" />
-              {/* min-w-0 lets the page narrow beside the small-screen rail instead of running past the edge. */}
-              <SidebarInset className="min-w-0">
-                <PageActionsProvider>
-                  <SiteHeader />
-                  <div className="flex flex-1 flex-col">
-                    <div className="@container/main flex flex-1 flex-col gap-2">
-                      <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-                        <ErrorBoundary FallbackComponent={AppError}>
-                          <UnitSystemProvider value={session.unitSystem}>
-                            <Outlet />
-                          </UnitSystemProvider>
-                        </ErrorBoundary>
-                      </div>
-                    </div>
-                  </div>
-                </PageActionsProvider>
-              </SidebarInset>
-            </SidebarProvider>
+            <Outlet />
             <Toaster />
           </TooltipProvider>
-        </RoleProvider>
+        )}
       </QueryClientProvider>
     </ThemeProvider>
+  )
+}
+
+/** The shadcn dashboard-01 layout: inset sidebar, site header and a container-query content column. */
+function MemberShell({ session }: { session: Extract<Session, { status: "member" }> }) {
+  return (
+    <RoleProvider roleId={session.roleId} user={session.user} hoaName={session.hoaName}>
+      <TooltipProvider>
+        <SidebarProvider style={layoutStyle}>
+          <AppSidebar variant="inset" />
+          {/* min-w-0 lets the page narrow beside the small-screen rail instead of running past the edge. */}
+          <SidebarInset className="min-w-0">
+            <PageActionsProvider>
+              <SiteHeader />
+              <div className="flex flex-1 flex-col">
+                <div className="@container/main flex flex-1 flex-col gap-2">
+                  <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+                    <ErrorBoundary FallbackComponent={AppError}>
+                      <UnitSystemProvider value={session.unitSystem}>
+                        <Outlet />
+                      </UnitSystemProvider>
+                    </ErrorBoundary>
+                  </div>
+                </div>
+              </div>
+            </PageActionsProvider>
+          </SidebarInset>
+        </SidebarProvider>
+        <Toaster />
+      </TooltipProvider>
+    </RoleProvider>
   )
 }
 

@@ -1,32 +1,44 @@
 import { createServerFn } from "@tanstack/react-start"
-import { setCookie } from "@tanstack/react-start/server"
-import { z } from "zod"
-import { roleCookie, roleIds, type RoleId } from "@/features/role/roles"
+import { isGoogleConfigured } from "@/auth/auth.server"
+import type { RoleId } from "@/features/role/roles"
 import type { HoaSettings } from "@/hoa/hoa"
-import { getRequestContext } from "./requestContext.server"
+import { roleOf } from "@/people/people"
+import { getMembership, getSignedInAccount } from "./requestContext.server"
 
-export type Session = {
-  roleId: RoleId
-  hoaName: string
-  /** The units the organization's forms offer for amounts. */
-  unitSystem: HoaSettings["unitSystem"]
-  user: { name: string; email: string }
-}
+export type SessionUser = { name: string; email: string }
 
-/** The signed-in user, their role and their HOA, for the app shell. */
+/**
+ * Where the visitor stands: signed out; signed in with an email no association's roll has yet; or a member of one, with
+ * their role in it.
+ */
+export type Session =
+  | { status: "signed-out"; isGoogleConfigured: boolean }
+  | { status: "unaffiliated"; user: SessionUser }
+  | {
+      status: "member"
+      roleId: RoleId
+      hoaName: string
+      /** The units the organization's forms offer for amounts. */
+      unitSystem: HoaSettings["unitSystem"]
+      user: SessionUser
+    }
+
+/** The signed-in user, their role and their HOA, for the app shell and the sign-in pages. */
 export const getSession = createServerFn({ method: "GET" }).handler(async (): Promise<Session> => {
-  const context = await getRequestContext()
+  const account = await getSignedInAccount()
+  if (!account) {
+    return { status: "signed-out", isGoogleConfigured: isGoogleConfigured() }
+  }
+  const membership = await getMembership(account)
+  if (!membership) {
+    return { status: "unaffiliated", user: { name: account.name, email: account.email } }
+  }
+  const { hoa, person } = membership
   return {
-    roleId: context.role,
-    hoaName: context.hoa.name,
-    unitSystem: context.hoa.settings.unitSystem,
-    user: { name: context.user.name, email: context.user.email }
+    status: "member",
+    roleId: roleOf(person),
+    hoaName: hoa.name,
+    unitSystem: hoa.settings.unitSystem,
+    user: { name: account.name || person.name, email: account.email }
   }
 })
-
-/** Switches the demo role. The role lives in a cookie so server functions can check it. */
-export const setDemoRole = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({ roleId: z.enum(roleIds) }).parse(data))
-  .handler(async ({ data }) => {
-    setCookie(roleCookie, data.roleId, { path: "/", sameSite: "lax", httpOnly: true, maxAge: 60 * 60 * 24 * 365 })
-  })

@@ -318,3 +318,174 @@ export const reviews = sqliteTable(
   },
   (table) => [index("reviews_application").on(table.applicationId, table.createdAt)]
 )
+
+// Accounts (docs/design/people.md): Better Auth's tables, as its Drizzle adapter reads them. Its dates and flags are
+// integers, as its adapter writes them for SQLite.
+
+const authDate = (name: string) => integer(name, { mode: "timestamp_ms" })
+
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
+  image: text("image"),
+  createdAt: authDate("created_at").notNull(),
+  updatedAt: authDate("updated_at").notNull()
+})
+
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    expiresAt: authDate("expires_at").notNull(),
+    token: text("token").notNull().unique(),
+    createdAt: authDate("created_at").notNull(),
+    updatedAt: authDate("updated_at").notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" })
+  },
+  (table) => [index("sessions_user").on(table.userId)]
+)
+
+export const accounts = sqliteTable(
+  "accounts",
+  {
+    id: text("id").primaryKey(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: authDate("access_token_expires_at"),
+    refreshTokenExpiresAt: authDate("refresh_token_expires_at"),
+    scope: text("scope"),
+    password: text("password"),
+    createdAt: authDate("created_at").notNull(),
+    updatedAt: authDate("updated_at").notNull()
+  },
+  (table) => [index("accounts_user").on(table.userId)]
+)
+
+export const verifications = sqliteTable(
+  "verifications",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: authDate("expires_at").notNull(),
+    createdAt: authDate("created_at").notNull(),
+    updatedAt: authDate("updated_at").notNull()
+  },
+  (table) => [index("verifications_identifier").on(table.identifier)]
+)
+
+// The association's people (docs/design/people.md): everyone on its roll, with or without an account, the units they
+// own or live in, and the board and committees they sit on.
+
+export const people = sqliteTable(
+  "people",
+  {
+    id: text("id").primaryKey(),
+    hoaId: text("hoa_id").notNull(),
+    name: text("name").notNull(),
+    // Lowercased; how an account finds its person when it signs in. Null for someone with no email on file.
+    email: text("email"),
+    phone: text("phone"),
+    // Where mail reaches them, when it isn't their unit.
+    mailingAddress: text("mailing_address"),
+    // "member", or "administrator": manages the association in the app.
+    access: text("access").notNull(),
+    // The account that signed in with their email; null until they do.
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    // When an administrator invited them to sign in, last.
+    invitedAt: text("invited_at"),
+    createdAt: timestamp("created_at"),
+    updatedAt: timestamp("updated_at"),
+    // When an administrator took them off the roll; their history stays.
+    removedAt: text("removed_at")
+  },
+  (table) => [
+    uniqueIndex("people_hoa_email").on(table.hoaId, table.email),
+    index("people_hoa").on(table.hoaId),
+    index("people_user").on(table.userId)
+  ]
+)
+
+export const units = sqliteTable(
+  "units",
+  {
+    id: text("id").primaryKey(),
+    hoaId: text("hoa_id").notNull(),
+    // What the association calls it: a street address, or a lot or unit number.
+    label: text("label").notNull(),
+    address: text("address"),
+    lot: text("lot"),
+    createdAt: timestamp("created_at"),
+    updatedAt: timestamp("updated_at"),
+    removedAt: text("removed_at")
+  },
+  (table) => [index("units_hoa").on(table.hoaId)]
+)
+
+export const unitPeople = sqliteTable(
+  "unit_people",
+  {
+    id: text("id").primaryKey(),
+    hoaId: text("hoa_id").notNull(),
+    unitId: text("unit_id").notNull(),
+    personId: text("person_id").notNull(),
+    // "owner", "resident" or "tenant".
+    relation: text("relation").notNull(),
+    // Days (YYYY-MM-DD); a sale ends the old owner's and starts the new owner's. Null when it isn't known.
+    startedOn: text("started_on"),
+    endedOn: text("ended_on"),
+    createdAt: timestamp("created_at")
+  },
+  (table) => [
+    index("unit_people_unit").on(table.unitId),
+    index("unit_people_person").on(table.personId),
+    index("unit_people_hoa").on(table.hoaId)
+  ]
+)
+
+export const committees = sqliteTable(
+  "committees",
+  {
+    id: text("id").primaryKey(),
+    hoaId: text("hoa_id").notNull(),
+    name: text("name").notNull(),
+    // "board", "architectural" (decides applications), or "other".
+    kind: text("kind").notNull(),
+    createdAt: timestamp("created_at"),
+    removedAt: text("removed_at")
+  },
+  (table) => [index("committees_hoa").on(table.hoaId)]
+)
+
+export const committeeMembers = sqliteTable(
+  "committee_members",
+  {
+    id: text("id").primaryKey(),
+    hoaId: text("hoa_id").notNull(),
+    committeeId: text("committee_id").notNull(),
+    personId: text("person_id").notNull(),
+    // "chair" or "member".
+    role: text("role").notNull(),
+    // An officer's title on the board: president, treasurer, secretary. Null for none.
+    office: text("office"),
+    startedOn: text("started_on"),
+    endedOn: text("ended_on"),
+    createdAt: timestamp("created_at")
+  },
+  (table) => [
+    index("committee_members_committee").on(table.committeeId),
+    index("committee_members_person").on(table.personId)
+  ]
+)
