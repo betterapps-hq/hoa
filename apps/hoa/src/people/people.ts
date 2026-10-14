@@ -15,8 +15,11 @@ export type UnitRelation = (typeof unitRelations)[number]
 export const committeeKinds = ["board", "architectural", "other"] as const
 export type CommitteeKind = (typeof committeeKinds)[number]
 
-export const committeeRoles = ["chair", "member"] as const
+export const committeeRoles = ["member", "chair"] as const
 export type CommitteeRole = (typeof committeeRoles)[number]
+
+/** The board's usual officers. A seat can hold another title, or none. */
+export const boardOffices = ["President", "Vice President", "Secretary", "Treasurer"] as const
 
 export type Person = {
   id: string
@@ -181,12 +184,22 @@ export const committeeMemberInputSchema = z.object({
 /** Someone's role in the app: an admin manages the association; a member uses it. */
 export const accessLabels: Record<Access, string> = { administrator: "Admin", member: "Member" }
 export const relationLabels: Record<UnitRelation, string> = { owner: "Owner", resident: "Resident", tenant: "Tenant" }
-
-/** Someone's seat on a committee as people say it: their office and whether they chair it, or Member. */
-export const seatLabel = (member: Pick<CommitteeMember, "office" | "role">) =>
-  [member.office, member.role === "chair" ? "Chair" : null].filter(Boolean).join(", ") || "Member"
 export const committeeKindLabels: Record<CommitteeKind, string> = {
   board: "Board of Directors",
   architectural: "Architectural review",
   other: "Other"
 }
+export const committeeRoleLabels: Record<CommitteeRole, string> = { member: "Member", chair: "Chair" }
+
+/** Someone's seat on a committee as people say it: their office and whether they chair it, or Member. */
+export const seatLabel = (member: Pick<CommitteeMember, "office" | "role">) =>
+  [member.office, member.role === "chair" ? committeeRoleLabels.chair : null].filter(Boolean).join(", ") ||
+  committeeRoleLabels.member
+
+/** Each value with its label, in order, for a select. */
+const choicesOf = <V extends string>(values: readonly V[], labels: Record<V, string>) =>
+  values.map((value) => ({ value, label: labels[value] }))
+export const accessChoices = choicesOf(accessLevels, accessLabels)
+export const relationChoices = choicesOf(unitRelations, relationLabels)
+export const committeeKindChoices = choicesOf(committeeKinds, committeeKindLabels)
+export const committeeRoleChoices = choicesOf(committeeRoles, committeeRoleLabels)

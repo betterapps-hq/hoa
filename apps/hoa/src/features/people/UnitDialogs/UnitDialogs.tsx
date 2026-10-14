@@ -13,10 +13,10 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { ChoiceSelect } from "@/features/rulebook/ChoiceSelect/ChoiceSelect"
 import { useAppForm } from "@/lib/form"
 import {
-  relationLabels,
+  relationChoices,
   unitInputSchema,
   unitRelations,
   type Unit,
@@ -76,8 +76,6 @@ export function UnitDialog({ unit, onSave, onOpenChange }: UnitDialogProps) {
     </Dialog>
   )
 }
-
-const isRelation = (value: string): value is UnitRelation => unitRelations.some((relation) => relation === value)
 
 /** Someone for the unit, from a day; a sale needs the day it sold. */
 const linkSchema = (isSale: boolean) =>
@@ -151,22 +149,13 @@ export function UnitPeopleDialog({ unit, mode, people, onSave, onOpenChange }: U
                 {(field) => (
                   <Field>
                     <FieldLabel htmlFor="unit-relation">As</FieldLabel>
-                    <NativeSelect
+                    <ChoiceSelect
                       id="unit-relation"
                       className="w-full"
                       value={field.state.value}
-                      onChange={(event) => {
-                        if (isRelation(event.target.value)) {
-                          field.handleChange(event.target.value)
-                        }
-                      }}
-                    >
-                      {unitRelations.map((relation) => (
-                        <NativeSelectOption key={relation} value={relation}>
-                          {relationLabels[relation]}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
+                      choices={relationChoices}
+                      onChange={field.handleChange}
+                    />
                   </Field>
                 )}
               </form.Field>

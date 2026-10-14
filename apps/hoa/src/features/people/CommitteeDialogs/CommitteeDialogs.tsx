@@ -5,20 +5,18 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { ChoiceSelect } from "@/features/rulebook/ChoiceSelect/ChoiceSelect"
 import {
   committeeInputSchema,
-  committeeKindLabels,
-  committeeKinds,
+  committeeKindChoices,
+  committeeRoleChoices,
   committeeRoles,
   type Committee,
   type CommitteeKind,
   type CommitteeRole
 } from "@/people/people"
+import { OfficePicker } from "../OfficePicker/OfficePicker"
 import { RollPicker, type RollChoice } from "../RollPicker/RollPicker"
-
-const isKind = (value: string): value is CommitteeKind => committeeKinds.some((kind) => kind === value)
-const isRole = (value: string): value is CommitteeRole => committeeRoles.some((role) => role === value)
 
 type CommitteeDialogProps = {
   committee: Committee | null
@@ -75,22 +73,13 @@ export function CommitteeDialog({ committee, onSave, onOpenChange }: CommitteeDi
               {(field) => (
                 <Field>
                   <FieldLabel htmlFor="committee-kind">Type</FieldLabel>
-                  <NativeSelect
+                  <ChoiceSelect
                     id="committee-kind"
                     className="w-full"
                     value={field.state.value}
-                    onChange={(event) => {
-                      if (isKind(event.target.value)) {
-                        field.handleChange(event.target.value)
-                      }
-                    }}
-                  >
-                    {committeeKinds.map((kind) => (
-                      <NativeSelectOption key={kind} value={kind}>
-                        {committeeKindLabels[kind]}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
+                    choices={committeeKindChoices}
+                    onChange={field.handleChange}
+                  />
                 </Field>
               )}
             </form.Field>
@@ -182,19 +171,13 @@ export function MemberDialog({ committee, people, onSave, onOpenChange }: Member
               {(field) => (
                 <Field>
                   <FieldLabel htmlFor="member-role">Role</FieldLabel>
-                  <NativeSelect
+                  <ChoiceSelect
                     id="member-role"
                     className="w-full"
                     value={field.state.value}
-                    onChange={(event) => {
-                      if (isRole(event.target.value)) {
-                        field.handleChange(event.target.value)
-                      }
-                    }}
-                  >
-                    <NativeSelectOption value="member">Member</NativeSelectOption>
-                    <NativeSelectOption value="chair">Chair</NativeSelectOption>
-                  </NativeSelect>
+                    choices={committeeRoleChoices}
+                    onChange={field.handleChange}
+                  />
                 </Field>
               )}
             </form.Field>
@@ -203,13 +186,7 @@ export function MemberDialog({ committee, people, onSave, onOpenChange }: Member
                 {(field) => (
                   <Field>
                     <FieldLabel htmlFor="member-office">Office</FieldLabel>
-                    <Input
-                      id="member-office"
-                      placeholder="Treasurer"
-                      value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(event) => field.handleChange(event.target.value)}
-                    />
+                    <OfficePicker id="member-office" value={field.state.value} onChange={field.handleChange} />
                   </Field>
                 )}
               </form.Field>

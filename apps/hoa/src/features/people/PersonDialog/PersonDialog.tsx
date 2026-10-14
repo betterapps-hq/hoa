@@ -16,12 +16,14 @@ import {
 import { Input } from "@/components/ui/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { ChoiceSelect } from "@/features/rulebook/ChoiceSelect/ChoiceSelect"
 import { useAppForm } from "@/lib/form"
 import {
-  accessLabels,
-  accessLevels,
+  accessChoices,
+  committeeRoleChoices,
   committeeRoles,
   personInputSchema,
+  relationChoices,
   relationLabels,
   unitInputSchema,
   unitRelations,
@@ -33,6 +35,7 @@ import {
   type UnitRelation
 } from "@/people/people"
 import { phoneText } from "@/people/phone"
+import { OfficePicker } from "../OfficePicker/OfficePicker"
 import { RollPicker, type RollChoice } from "../RollPicker/RollPicker"
 import { UnitFields, unitValues } from "../UnitFields/UnitFields"
 
@@ -79,10 +82,6 @@ const newHome = (key: string) => ({
   relation: "owner" as UnitRelation,
   unit: null as UnitInput | null
 })
-
-const isRelation = (value: string): value is UnitRelation => unitRelations.some((relation) => relation === value)
-const isAccess = (value: string): value is Access => accessLevels.some((level) => level === value)
-const isRole = (value: string): value is CommitteeRole => committeeRoles.some((role) => role === value)
 
 const formSchema = personInputSchema.extend({
   leavingHomes: z.array(z.string()),
@@ -291,22 +290,13 @@ export function PersonDialog({
                             )}
                             <form.Field name={`newHomes[${index}].relation`}>
                               {(homeField) => (
-                                <NativeSelect
-                                  aria-label="As"
+                                <ChoiceSelect
+                                  label="As"
                                   className="w-32"
                                   value={homeField.state.value}
-                                  onChange={(event) => {
-                                    if (isRelation(event.target.value)) {
-                                      homeField.handleChange(event.target.value)
-                                    }
-                                  }}
-                                >
-                                  {unitRelations.map((relation) => (
-                                    <NativeSelectOption key={relation} value={relation}>
-                                      {relationLabels[relation]}
-                                    </NativeSelectOption>
-                                  ))}
-                                </NativeSelect>
+                                  choices={relationChoices}
+                                  onChange={homeField.handleChange}
+                                />
                               )}
                             </form.Field>
                             <Button
@@ -344,22 +334,13 @@ export function PersonDialog({
                 {(field) => (
                   <Field>
                     <FieldLabel htmlFor="person-role">Role</FieldLabel>
-                    <NativeSelect
+                    <ChoiceSelect
                       id="person-role"
                       className="w-full"
                       value={field.state.value}
-                      onChange={(event) => {
-                        if (isAccess(event.target.value)) {
-                          field.handleChange(event.target.value)
-                        }
-                      }}
-                    >
-                      {accessLevels.map((level) => (
-                        <NativeSelectOption key={level} value={level}>
-                          {accessLabels[level]}
-                        </NativeSelectOption>
-                      ))}
-                    </NativeSelect>
+                      choices={accessChoices}
+                      onChange={field.handleChange}
+                    />
                     <FieldDescription>An admin manages everything here.</FieldDescription>
                   </Field>
                 )}
@@ -438,19 +419,13 @@ export function PersonDialog({
                               </form.Field>
                               <form.Field name={`adding[${index}].role`}>
                                 {(seatField) => (
-                                  <NativeSelect
-                                    aria-label="Role"
+                                  <ChoiceSelect
+                                    label="Role"
                                     className="w-28"
                                     value={seatField.state.value}
-                                    onChange={(event) => {
-                                      if (isRole(event.target.value)) {
-                                        seatField.handleChange(event.target.value)
-                                      }
-                                    }}
-                                  >
-                                    <NativeSelectOption value="member">Member</NativeSelectOption>
-                                    <NativeSelectOption value="chair">Chair</NativeSelectOption>
-                                  </NativeSelect>
+                                    choices={committeeRoleChoices}
+                                    onChange={seatField.handleChange}
+                                  />
                                 )}
                               </form.Field>
                               <Button
@@ -468,12 +443,11 @@ export function PersonDialog({
                                 open.find((committee) => committee.id === committeeId)?.kind === "board" ? (
                                   <form.Field name={`adding[${index}].office`}>
                                     {(seatField) => (
-                                      <Input
-                                        aria-label="Office"
-                                        placeholder="Office, such as Treasurer"
+                                      <OfficePicker
+                                        id={`person-office-${seat.key}`}
+                                        label="Office"
                                         value={seatField.state.value}
-                                        onBlur={seatField.handleBlur}
-                                        onChange={(event) => seatField.handleChange(event.target.value)}
+                                        onChange={seatField.handleChange}
                                       />
                                     )}
                                   </form.Field>
