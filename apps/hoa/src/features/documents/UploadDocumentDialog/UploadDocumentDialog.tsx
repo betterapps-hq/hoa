@@ -3,6 +3,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { z } from "zod"
 import { FileDropzone } from "@/components/FileDropzone/FileDropzone"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -64,12 +65,6 @@ export type UploadDocumentDialogProps = {
   onUpload: (file: File, details: DocumentDetails) => Promise<unknown>
   onUploaded: () => void
 }
-
-const required = (
-  <span aria-hidden className="ml-0.5 text-destructive">
-    *
-  </span>
-)
 
 /**
  * Uploads a governing document (encoding.md, UX, Documents). Once a file is chosen it asks what the file is: a new
@@ -158,7 +153,10 @@ export function UploadDocumentDialog({
             <form.Field name="file">
               {(field) => (
                 <Field data-invalid={field.state.meta.errors.length > 0}>
-                  <FieldLabel htmlFor="upload-file">File{required}</FieldLabel>
+                  <FieldLabel htmlFor="upload-file">
+                    File
+                    <RequiredMark />
+                  </FieldLabel>
                   <FileDropzone
                     id="upload-file"
                     target="governing"
@@ -267,7 +265,7 @@ export function UploadDocumentDialog({
                         <Field data-invalid={field.state.meta.errors.length > 0}>
                           <FieldLabel htmlFor="upload-title">
                             {document && relation === "amendment" ? "Title of the amendment" : "Title"}
-                            {required}
+                            <RequiredMark />
                           </FieldLabel>
                           <Input
                             id="upload-title"

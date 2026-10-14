@@ -11,7 +11,6 @@ import { ProjectTypesPage } from "@/features/projectTypes/ProjectTypesPage/Proje
 
 export const Route = createFileRoute("/project-types/")({
   staticData: { title: "Project types" },
-  head: () => ({ meta: [{ title: "Project types | HOA design review" }] }),
   loader: () => getProjectTypesOverview(),
   component: ProjectTypesRoute
 })

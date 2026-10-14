@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { InfoTip } from "@/components/InfoTip/InfoTip"
 import { QuantityInput } from "@/components/QuantityInput/QuantityInput"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -410,11 +411,7 @@ export function QuestionField({ field, id, value, onChange, onBlur, errors, reas
       <div className="flex items-start gap-1">
         <FieldLabel htmlFor={id} id={`${id}-label`} className="block leading-snug">
           {field.label}
-          {field.isRequired ? (
-            <span aria-hidden className="ml-0.5 text-destructive">
-              *
-            </span>
-          ) : null}
+          {field.isRequired ? <RequiredMark /> : null}
         </FieldLabel>
         {longHelp || hasReasons ? (
           <InfoTip label={`About: ${field.label}`} icon={hasReasons ? "info" : "help"}>

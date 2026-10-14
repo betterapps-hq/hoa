@@ -118,7 +118,7 @@ const definition: ProjectTypeDefinition = {
 const view: ProjectTypeView = {
   projectType: {
     id: "type-1",
-    hoaId: "hoa",
+    organizationId: "hoa",
     label: "Garden structure",
     description: "Building or changing a structure in the yard.",
     status: "active",

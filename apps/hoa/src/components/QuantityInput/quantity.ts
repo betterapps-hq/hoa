@@ -1,11 +1,12 @@
 import * as D from "@/engine/decimal"
+import type { UnitSystem } from "@/organization/organization"
 import { readNumeral } from "@/text/numerals"
 
 // How the shared quantity inputs lay out an amount and convert it (docs/ux.md, Forms): chosen by what the amount
 // measures, in the organization's unit system, from the units the vocabulary has. Values convert exactly (the
 // rulebook's decimals) and are stored in the property's own unit.
 
-export type UnitSystem = "imperial" | "metric"
+export type { UnitSystem }
 
 /** A unit as the vocabulary gives it: its key, labels and size in its dimension's base; null when it doesn't convert. */
 export type QuantityUnit = { unit: string; labels: readonly string[]; perBase: string | null }

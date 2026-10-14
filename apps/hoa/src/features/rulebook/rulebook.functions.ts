@@ -84,15 +84,18 @@ export type RulebookSources = {
   files: SourceFile[]
 }
 
-async function loadSources(db: Database, hoa: { id: string; name: string }): Promise<RulebookSources> {
-  const [records, uploads] = await Promise.all([listDocumentRecords(db, hoa.id), listGoverningDocuments(db, hoa.id)])
+async function loadSources(db: Database, organization: { id: string; name: string }): Promise<RulebookSources> {
+  const [records, uploads] = await Promise.all([
+    listDocumentRecords(db, organization.id),
+    listGoverningDocuments(db, organization.id)
+  ])
   const rows = await listDocumentProvisions(
     db,
-    hoa.id,
+    organization.id,
     records.map((record) => record.id)
   )
   return {
-    organization: { id: hoa.id, name: hoa.name },
+    organization: { id: organization.id, name: organization.name },
     documents: records.map((record) => record.document),
     provisions: rows.map((row) => row.provision),
     provisionDocumentIds: Object.fromEntries(rows.map((row) => [row.provision.key, row.documentId])),
@@ -107,7 +110,7 @@ async function loadSources(db: Database, hoa: { id: string; name: string }): Pro
 /** The documents and provisions the rules cite, for every rulebook view. */
 export const getRulebookSources = createServerFn({ method: "GET" }).handler(async () => {
   const context = await getRequestContext()
-  return loadSources(getDb(), context.hoa)
+  return loadSources(getDb(), context.organization)
 })
 
 /**
@@ -116,7 +119,7 @@ export const getRulebookSources = createServerFn({ method: "GET" }).handler(asyn
  */
 export const getSourceText = createServerFn({ method: "GET" }).handler(async (): Promise<SourceText[]> => {
   const context = await getRequestContext()
-  const sources = await loadSources(getDb(), context.hoa)
+  const sources = await loadSources(getDb(), context.organization)
   const anchored = new Set(sources.provisions.flatMap((provision) => provision.anchors.map((anchor) => anchor.fileId)))
   const bucket = getBucket()
   return Promise.all(
@@ -125,7 +128,7 @@ export const getSourceText = createServerFn({ method: "GET" }).handler(async ():
       .map(async (file) =>
         textOutsideProvisions(
           file.id,
-          await loadPages(bucket, governingKeys(context.hoa.id, file.id), file.pageCount),
+          await loadPages(bucket, governingKeys(context.organization.id, file.id), file.pageCount),
           sources.provisions
         )
       )
@@ -139,11 +142,11 @@ export const getSourceText = createServerFn({ method: "GET" }).handler(async ():
 export const changePublishedRulebook = createServerFn({ method: "POST" }).handler(async () => {
   const context = await requireAdministrator()
   const db = getDb()
-  const hoaId = context.hoa.id
+  const organizationId = context.organization.id
   const [published, draft, building] = await Promise.all([
-    getRulebookByStatus(db, hoaId, "published"),
-    getRulebookByStatus(db, hoaId, "draft"),
-    getRulebookByStatus(db, hoaId, "building")
+    getRulebookByStatus(db, organizationId, "published"),
+    getRulebookByStatus(db, organizationId, "draft"),
+    getRulebookByStatus(db, organizationId, "building")
   ])
   if (!published) {
     throw new Error("Nothing is published yet.")
@@ -155,7 +158,7 @@ export const changePublishedRulebook = createServerFn({ method: "POST" }).handle
     throw new Error("A draft is already open. Review it, or discard it first.")
   }
   const id = crypto.randomUUID()
-  await copyToDraft(db, hoaId, published, { id, now: new Date().toISOString() })
+  await copyToDraft(db, organizationId, published, { id, now: new Date().toISOString() })
   return { rulebookId: id }
 })
 
@@ -173,12 +176,12 @@ const skippedBuild = {
 export const startRulebookBuild = createServerFn({ method: "POST" }).handler(async () => {
   const context = await requireAdministrator()
   const db = getDb()
-  const hoaId = context.hoa.id
+  const organizationId = context.organization.id
   const ids = newBuildIds()
   const now = new Date().toISOString()
-  const request = await requestRulebookBuild(db, bindings.RULEBOOK_BUILD, hoaId, { now, ids }).catch(
+  const request = await requestRulebookBuild(db, bindings.RULEBOOK_BUILD, organizationId, { now, ids }).catch(
     async (error: unknown) => {
-      await abandonRulebookBuild(db, hoaId, ids, error instanceof Error ? error.message : String(error), now)
+      await abandonRulebookBuild(db, organizationId, ids, error instanceof Error ? error.message : String(error), now)
       throw error
     }
   )
@@ -205,7 +208,7 @@ export const getBuildResults = createServerFn({ method: "GET" })
   .validator((data: unknown) => z.object({ jobId: z.string(), since: z.string().nullable() }).parse(data))
   .handler(async ({ data }): Promise<BuildResultsPage> => {
     const context = await requireAdministrator()
-    return loadBuildResults(getDb(), getBucket(), context.hoa.id, data)
+    return loadBuildResults(getDb(), getBucket(), context.organization.id, data)
   })
 
 /** The documents the running build reads, with their provisions, once it has structured them; none before. */
@@ -213,7 +216,7 @@ export const getBuildDocuments = createServerFn({ method: "GET" })
   .validator((data: unknown) => z.object({ jobId: z.string() }).parse(data))
   .handler(async ({ data }): Promise<BuildDocument[]> => {
     const context = await requireAdministrator()
-    return loadBuildDocuments(getDb(), getBucket(), context.hoa.id, data.jobId)
+    return loadBuildDocuments(getDb(), getBucket(), context.organization.id, data.jobId)
   })
 
 /** Deletes the draft rulebook and its records; the published rulebook stays as it is. */
@@ -222,11 +225,11 @@ export const discardRulebookDraft = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const context = await requireAdministrator()
     const db = getDb()
-    const draft = await getRulebookByStatus(db, context.hoa.id, "draft")
+    const draft = await getRulebookByStatus(db, context.organization.id, "draft")
     if (draft?.id !== data.rulebookId) {
       throw new Error("That draft is no longer current.")
     }
-    await discardDraftRulebook(db, context.hoa.id, draft.id)
+    await discardDraftRulebook(db, context.organization.id, draft.id)
   })
 
 /** The draft (administrators) or the published rulebook (everyone), with its records. */
@@ -235,25 +238,31 @@ export const getRulebookView = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<RulebookView> => {
     const context = data.which === "draft" ? await requireAdministrator() : await getRequestContext()
     const db = getDb()
-    const hoaId = context.hoa.id
+    const organizationId = context.organization.id
     const [building, latestBuild, rulebook] = await Promise.all([
-      getRulebookByStatus(db, hoaId, "building"),
-      getLatestJobOfKind(db, hoaId, "rulebook-build"),
-      getRulebookByStatus(db, hoaId, data.which)
+      getRulebookByStatus(db, organizationId, "building"),
+      getLatestJobOfKind(db, organizationId, "rulebook-build"),
+      getRulebookByStatus(db, organizationId, data.which)
     ])
-    const content = rulebook ? await getRulebookContent(db, hoaId, rulebook.id) : null
-    const file = data.which === "published" ? await getPublishedRulesFile(db, hoaId) : null
+    const content = rulebook ? await getRulebookContent(db, organizationId, rulebook.id) : null
+    const file = data.which === "published" ? await getPublishedRulesFile(db, organizationId) : null
     // A rules file that can't be read leaves the stored documents and provisions standing in; downloading it says why.
     const filed =
       file && file.rulebookId === rulebook?.id ? await readRulesFile(getBucket(), file).catch(() => null) : null
     const review =
-      rulebook && data.which === "draft" && content ? await draftReview(db, context.hoa, rulebook, content) : null
+      rulebook && data.which === "draft" && content
+        ? await draftReview(db, context.organization, rulebook, content)
+        : null
     // A refused build is checked again against the documents as they are now, so removing or replacing the one at
     // fault clears it at once.
     const isRefused = isRefusedBuild(latestBuild)
     const refusedDocuments =
       isRefused && data.which === "draft"
-        ? await checkCurrentSources(db, hoaId, currentDocumentIds(await listGoverningDocuments(db, hoaId)))
+        ? await checkCurrentSources(
+            db,
+            organizationId,
+            currentDocumentIds(await listGoverningDocuments(db, organizationId))
+          )
         : []
     return {
       rulebook,
@@ -275,16 +284,16 @@ export const getRulebookView = createServerFn({ method: "GET" })
 /** Why the draft can't be published yet, and what it changes against the published rulebook. */
 async function draftReview(
   db: Database,
-  hoa: { id: string; name: string },
+  organization: { id: string; name: string },
   draft: Rulebook,
   content: RulebookContent
 ): Promise<{ blockers: string[]; changes: RulebookChanges }> {
   const [sources, uploads, published] = await Promise.all([
-    loadSources(db, hoa),
-    listGoverningDocuments(db, hoa.id),
-    getRulebookByStatus(db, hoa.id, "published")
+    loadSources(db, organization),
+    listGoverningDocuments(db, organization.id),
+    getRulebookByStatus(db, organization.id, "published")
   ])
-  const publishedContent = published ? await getRulebookContent(db, hoa.id, published.id) : null
+  const publishedContent = published ? await getRulebookContent(db, organization.id, published.id) : null
   const changes = await rulebookChanges(
     { ...content, sourceDocumentIds: draft.sourceDocumentIds },
     published && publishedContent ? { ...publishedContent, sourceDocumentIds: published.sourceDocumentIds } : null,
@@ -306,19 +315,19 @@ export const publishRulebook = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const context = await requireAdministrator()
     const db = getDb()
-    const draft = await getRulebookByStatus(db, context.hoa.id, "draft")
+    const draft = await getRulebookByStatus(db, context.organization.id, "draft")
     if (draft?.id !== data.rulebookId) {
       throw new Error("That draft is no longer current.")
     }
     const now = new Date().toISOString()
-    const { version } = await publishDraft(db, getBucket(), context.hoa.id, {
+    const { version } = await publishDraft(db, getBucket(), context.organization.id, {
       rulebookId: draft.id,
       userId: context.user.id,
       now
     })
     // A type this leaves out of date waits for its updates to be reviewed, so a failure here doesn't undo the publish.
     try {
-      await carryForwardProjectTypes(context.hoa.id, now)
+      await carryForwardProjectTypes(context.organization.id, now)
     } catch (error) {
       console.error(error)
     }
@@ -328,7 +337,7 @@ export const publishRulebook = createServerFn({ method: "POST" })
 /** The published rules file exactly as written, for download. */
 export const getPublishedRulesFileJson = createServerFn({ method: "GET" }).handler(async () => {
   const context = await getRequestContext()
-  const file = await getPublishedRulesFile(getDb(), context.hoa.id)
+  const file = await getPublishedRulesFile(getDb(), context.organization.id)
   if (!file) {
     throw new Error("Nothing is published yet.")
   }
@@ -336,7 +345,7 @@ export const getPublishedRulesFileJson = createServerFn({ method: "GET" }).handl
 })
 
 export type DashboardSummary = {
-  hoaName: string
+  organizationName: string
   publishedVersion: number | null
   publishedAt: string | null
   ruleCount: number
@@ -347,11 +356,11 @@ export type DashboardSummary = {
 export const getDashboardSummary = createServerFn({ method: "GET" }).handler(async (): Promise<DashboardSummary> => {
   const context = await getRequestContext()
   const db = getDb()
-  const published = await getRulebookByStatus(db, context.hoa.id, "published")
-  const content = published ? await getRulebookContent(db, context.hoa.id, published.id) : null
-  const documents = await listGoverningDocuments(db, context.hoa.id)
+  const published = await getRulebookByStatus(db, context.organization.id, "published")
+  const content = published ? await getRulebookContent(db, context.organization.id, published.id) : null
+  const documents = await listGoverningDocuments(db, context.organization.id)
   return {
-    hoaName: context.hoa.name,
+    organizationName: context.organization.name,
     publishedVersion: published?.version ?? null,
     publishedAt: published?.publishedAt ?? null,
     ruleCount: content?.rules.filter((rule) => rule.review.status === "approved").length ?? 0,

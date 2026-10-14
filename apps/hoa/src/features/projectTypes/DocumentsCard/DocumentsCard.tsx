@@ -15,6 +15,7 @@ import { useState, type ComponentProps, type ReactNode } from "react"
 import { toast } from "sonner"
 import { fileStatusText, useFileUploader } from "@/components/FileUpload/FileUpload"
 import { InfoTip } from "@/components/InfoTip/InfoTip"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { RowActions } from "@/components/RowActions/RowActions"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -309,11 +310,7 @@ function DocumentRowBody({
         <div className="flex flex-wrap items-center gap-x-1">
           <span className="text-sm font-medium">
             {label}
-            {document.isRequired ? (
-              <span aria-hidden className="ml-0.5 text-destructive">
-                *
-              </span>
-            ) : null}
+            {document.isRequired ? <RequiredMark /> : null}
             {document.isRequired ? <span className="sr-only"> (required)</span> : null}
           </span>
           {document.mustShow.length > 0 ? (

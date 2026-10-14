@@ -133,7 +133,8 @@ components instead of hand-building them.
 
 After changing `src/db/schema.ts`, run `pnpm --filter hoa db:generate` and commit the new migration. Migrations must
 stay backward compatible, since every pull request preview shares one preview database: add tables and nullable
-columns, and read the generated SQL (Drizzle Kit's table rebuilds can copy columns the old table doesn't have).
+columns, and read the generated SQL (Drizzle Kit's table rebuilds can copy columns the old table doesn't have). Then
+look at the change in the [diagram](erd.md).
 
 After changing `wrangler.jsonc`, regenerate the binding types with `pnpm --filter hoa cf-typegen` and commit
 `worker-configuration.d.ts`.
@@ -160,3 +161,10 @@ values are in `wrangler.jsonc` `vars` (preview values in its `previews` block), 
 | `R2_ACCOUNT_ID` | Presigned R2 URLs | Cloudflare account id | Same | Same |
 | `R2_BUCKET` | The environment's bucket | `hoa-dev` | `hoa-preview` | `hoa-files` |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (secrets) | Presigned R2 URLs | Token scoped to `hoa-dev` | Token scoped to `hoa-preview` | Token scoped to `hoa-files` |
+| `BETTER_AUTH_SECRET` (secret) | Signs sessions; required outside local development | Empty (a fixed local one) | Its own | Its own |
+| `BETTER_AUTH_URL` | Where the app is served, for links in emails and Google's redirect; taken from the request when unset | Empty | Empty | The demo's address |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (secret) | "Continue with Google"; off unless both are set | Empty | Not set yet | Not set yet |
+| `RESEND_API_KEY` (secret), `EMAIL_FROM` | Sign-in codes and invitations; without them, development prints each email to the log | Empty | Not set yet | Not set yet |
+| `BETTER_AUTH_API_KEY` (secret) | Better Auth Infrastructure's dashboard of users and sign-ins; off when unset | The project's key | Not set | The project's key |
+| `GOOGLE_MAPS_API_KEY` (secret) | The address search on units (Places API, New); off when unset | A key for the Places API (New) | Not set yet | Not set yet |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` (secret) | Cloudflare Turnstile's bot check on signing in and sending codes; off unless both are set | Empty, or Cloudflare's test keys | Not set yet | Not set yet |

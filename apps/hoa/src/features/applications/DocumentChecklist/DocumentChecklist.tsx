@@ -1,5 +1,6 @@
 import { CheckCircle2Icon, CircleIcon, DownloadIcon } from "lucide-react"
 import { InfoTip } from "@/components/InfoTip/InfoTip"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { listNames, sentenceCase } from "@/lib/text"
 import type { ProjectDocument } from "@/projectTypes/projectType"
 import { templateHref } from "../../projectTypes/uploadTemplate"
@@ -35,11 +36,7 @@ export function DocumentChecklist({ documents, files, projectTypeId }: DocumentC
                 <div className="flex flex-wrap items-center gap-x-1.5">
                   <span className={isAdded ? "font-medium" : undefined}>
                     {sentenceCase(document.label)}
-                    {document.isRequired ? (
-                      <span aria-hidden className="ml-0.5 text-destructive">
-                        *
-                      </span>
-                    ) : null}
+                    {document.isRequired ? <RequiredMark /> : null}
                   </span>
                   <span className="sr-only">
                     {document.isRequired ? "Required. " : ""}

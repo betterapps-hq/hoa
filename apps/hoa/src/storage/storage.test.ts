@@ -3,7 +3,7 @@ import {
   applicationKeys,
   extensionOf,
   governingKeys,
-  hoaCacheKey,
+  organizationCacheKey,
   jobOutputKey,
   jobOutputPrefix,
   projectTypeKeys,
@@ -89,7 +89,7 @@ describe("keys", () => {
     expect(application.cache("facts", "abc")).toBe("hoas/hoa/applications/app/cache/facts/abc.json")
     expect(application.review("r1")).toBe("hoas/hoa/applications/app/reviews/r1.json")
 
-    expect(hoaCacheKey("hoa", "extract", "abc")).toBe("hoas/hoa/cache/extract/abc.json")
+    expect(organizationCacheKey("hoa", "extract", "abc")).toBe("hoas/hoa/cache/extract/abc.json")
     expect(jobOutputKey("hoa", "job", "extract", "s1")).toBe("hoas/hoa/jobs/job/extract/s1.json")
     expect(jobOutputPrefix("hoa", "job")).toBe("hoas/hoa/jobs/job/")
     expect(extensionOf("README")).toBe("bin")

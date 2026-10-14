@@ -22,13 +22,13 @@ describe("insertSql", () => {
   it("writes a row with JSON columns as JSON text, leaving out unset columns", () => {
     expect(
       insertSql(rulebookQuestions, {
-        hoaId: "h",
+        organizationId: "h",
         rulebookId: "r",
         id: "q1",
         question: { question: "Which reading?" }
       })
     ).toBe(
-      `INSERT INTO "rulebook_questions" ("hoa_id", "rulebook_id", "id", "question_json") VALUES ('h', 'r', 'q1', '{"question":"Which reading?"}');`
+      `INSERT INTO "rulebook_questions" ("organization_id", "rulebook_id", "id", "question_json") VALUES ('h', 'r', 'q1', '{"question":"Which reading?"}');`
     )
   })
 
@@ -37,7 +37,7 @@ describe("insertSql", () => {
       insertSql(
         provisions,
         {
-          hoaId: "h",
+          organizationId: "h",
           documentId: "d",
           key: "d:1",
           label: "1",
@@ -49,7 +49,7 @@ describe("insertSql", () => {
         "replace"
       )
     ).toBe(
-      `INSERT OR REPLACE INTO "provisions" ("hoa_id", "document_id", "key", "label", "parent_key", "kind", "ordinal", "provision_json") VALUES ('h', 'd', 'd:1', '1', NULL, 'section', 0, '{}');`
+      `INSERT OR REPLACE INTO "provisions" ("organization_id", "document_id", "key", "label", "parent_key", "kind", "ordinal", "provision_json") VALUES ('h', 'd', 'd:1', '1', NULL, 'section', 0, '{}');`
     )
   })
 })

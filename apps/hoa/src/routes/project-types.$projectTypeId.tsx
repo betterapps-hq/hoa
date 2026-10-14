@@ -15,7 +15,6 @@ import { templateAdapter } from "@/features/projectTypes/uploadTemplate"
 
 export const Route = createFileRoute("/project-types/$projectTypeId")({
   staticData: { title: "Project type" },
-  head: () => ({ meta: [{ title: "Project type | HOA design review" }] }),
   loader: ({ params }) => getProjectTypeView({ data: { projectTypeId: params.projectTypeId } }),
   component: ProjectTypeRoute
 })

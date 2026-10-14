@@ -1,0 +1,222 @@
+import { z } from "zod"
+import type { RoleId } from "@/features/role/roles"
+import { addDays, dayText } from "@/lib/days"
+import { optionalText } from "@/lib/fields"
+import { addressInputSchema, type Address } from "@/places/address"
+import { optionalPhone } from "./phone"
+
+// The association's people (docs/design/people.md): everyone on its roll, with or without an account, the units they
+// own or live in, and the board and committees they sit on.
+
+export const accessLevels = ["member", "administrator"] as const
+export type Access = (typeof accessLevels)[number]
+
+export const unitRelations = ["owner", "resident", "tenant"] as const
+export type UnitRelation = (typeof unitRelations)[number]
+
+export const committeeKinds = ["board", "architectural", "other"] as const
+export type CommitteeKind = (typeof committeeKinds)[number]
+
+export const committeeRoles = ["member", "chair"] as const
+export type CommitteeRole = (typeof committeeRoles)[number]
+
+/** The board's usual officers. A seat can hold another title, or none. */
+export const boardOffices = ["President", "Vice President", "Secretary", "Treasurer"] as const
+
+export type Person = {
+  id: string
+  organizationId: string
+  name: string
+  email: string | null
+  phone: string | null
+  mailingAddress: string | null
+  /** The account that signed in with their email; null until they do. Its membership holds their access. */
+  userId: string | null
+}
+
+/** A home or condominium unit: its name, its address in parts, and where it is once the search found it. */
+export type Unit = { id: string; organizationId: string; label: string } & Address
+
+/** Someone owning, living in or renting a unit, from one day to another; `endedOn` is null while it lasts. */
+export type UnitLink = {
+  id: string
+  unitId: string
+  personId: string
+  relation: UnitRelation
+  startedOn: string | null
+  endedOn: string | null
+}
+
+export type Committee = { id: string; organizationId: string; name: string; kind: CommitteeKind }
+
+export type CommitteeMember = {
+  id: string
+  committeeId: string
+  personId: string
+  role: CommitteeRole
+  /** An officer's title on the board, such as president. */
+  office: string | null
+  /**
+   * One term in the seat: the day it starts, the day it's due to end, and the day it did. They keep the seat past the
+   * term's end until it's ended or their next term starts, as an association's bylaws usually say.
+   */
+  startedOn: string | null
+  termEndsOn: string | null
+  endedOn: string | null
+}
+
+/** The workspace a person signs in to: administrators manage the association, everyone else sees their own. */
+export const roleOf = (access: Access): RoleId => (access === "administrator" ? "administrator" : "homeowner")
+
+/** A membership's role in Better Auth's organization plugin, for each access: "admin" manages the organization. */
+export const memberRoles: Record<Access, "admin" | "member"> = { administrator: "admin", member: "member" }
+
+/** The access a membership's role gives: the plugin's "owner" and "admin" both manage the organization. */
+export const accessOf = (role: string | null): Access =>
+  role === "admin" || role === "owner" ? "administrator" : "member"
+
+/** How emails are kept and compared: trimmed and lowercased; null for none. */
+export function emailKey(email: string | null | undefined) {
+  const key = email?.trim().toLowerCase() ?? ""
+  return key === "" ? null : key
+}
+
+/**
+ * Which people an account is: those already linked to it, and those on a roll with its email and no account yet, as
+ * long as the account has proven its email. People with another account are never taken over.
+ */
+export function peopleOfAccount<T extends Pick<Person, "email" | "userId">>(
+  people: readonly T[],
+  account: { id: string; email: string; emailVerified: boolean }
+) {
+  const email = emailKey(account.email)
+  return people.filter(
+    (person) =>
+      person.userId === account.id ||
+      (account.emailVerified && person.userId === null && email !== null && emailKey(person.email) === email)
+  )
+}
+
+/** Whether a link is in force on a day (YYYY-MM-DD): started by then, or with no start, and not yet ended. */
+export const isCurrent = (link: Pick<UnitLink, "startedOn" | "endedOn">, today: string) =>
+  (link.startedOn === null || link.startedOn <= today) && (link.endedOn === null || link.endedOn > today)
+
+/** Someone's own details, as they edit them on their account page. */
+export const myDetailsSchema = z.object({
+  name: z.string().trim().min(1, "Give your name.").max(200, "Keep your name under 200 characters."),
+  phone: optionalPhone,
+  mailingAddress: optionalText(300)
+})
+
+/** A person as an administrator adds or edits them; their access changes only once they've joined. */
+export const personInputSchema = z.object({
+  name: z.string().trim().min(1, "Give their name.").max(200, "Keep the name under 200 characters."),
+  email: z
+    .union([z.literal(""), z.email("Give an email address such as name@example.com.")])
+    .transform((email) => emailKey(email)),
+  phone: optionalPhone,
+  mailingAddress: optionalText(300),
+  access: z.enum(accessLevels)
+})
+
+/** A unit as an administrator adds or edits it. */
+export const unitInputSchema = addressInputSchema.extend({
+  label: z.string().trim().min(1, "Give the unit a name.").max(200)
+})
+
+/** A unit as its form gives it. */
+export type UnitInput = z.input<typeof unitInputSchema>
+
+const day = z.union([z.literal(""), z.iso.date("Give a date.")]).transform((text) => (text === "" ? null : text))
+
+/** Someone added to a unit. */
+export const unitLinkInputSchema = z.object({
+  unitId: z.string().min(1),
+  personId: z.string().min(1),
+  relation: z.enum(unitRelations),
+  startedOn: day
+})
+
+/** A committee as an administrator adds or renames it. */
+export const committeeInputSchema = z.object({
+  name: z.string().trim().min(1, "Give the committee's name.").max(200),
+  kind: z.enum(committeeKinds)
+})
+
+/** A term in a seat: chair or member, an office on the board, and the days it starts and is due to end. */
+export const seatInputSchema = z
+  .object({ role: z.enum(committeeRoles), office: optionalText(80), startedOn: day, termEndsOn: day })
+  .refine((seat) => !seat.startedOn || !seat.termEndsOn || seat.startedOn <= seat.termEndsOn, {
+    message: "End it after it starts.",
+    path: ["termEndsOn"]
+  })
+
+/** A seat as its form gives it. */
+export type SeatInput = z.input<typeof seatInputSchema>
+
+/** Someone seated on a committee, for a first term. */
+export const committeeMemberInputSchema = z.object({
+  committeeId: z.string().min(1),
+  personId: z.string().min(1),
+  seat: seatInputSchema
+})
+
+/** Someone's role in the app: an admin manages the association; a member uses it. */
+export const accessLabels: Record<Access, string> = { administrator: "Admin", member: "Member" }
+export const relationLabels: Record<UnitRelation, string> = { owner: "Owner", resident: "Resident", tenant: "Tenant" }
+export const committeeKindLabels: Record<CommitteeKind, string> = {
+  board: "Board of Directors",
+  architectural: "Architectural review",
+  other: "Other"
+}
+export const committeeRoleLabels: Record<CommitteeRole, string> = { member: "Member", chair: "Chair" }
+
+/** Someone's seat on a committee as people say it: their office and whether they chair it, or Member. */
+export const seatLabel = (member: Pick<CommitteeMember, "office" | "role">) =>
+  [member.office, member.role === "chair" ? committeeRoleLabels.chair : null].filter(Boolean).join(", ") ||
+  committeeRoleLabels.member
+
+/** The day someone's next term starts unless they say otherwise: the day after this one is due to end, or today. */
+export const nextTermStart = ({ termEndsOn }: Pick<CommitteeMember, "termEndsOn">, today: string) =>
+  termEndsOn ? addDays(termEndsOn, 1) : today
+
+/**
+ * Their seat and its term: the day it starts, if that's later; the day their next term starts, once one is set; the
+ * day they leave, once it's set; or when the term is due to end, or that it ended while they hold the seat on.
+ * "President, term ends May 31, 2027".
+ */
+export function seatTermLabel(
+  member: Pick<CommitteeMember, "office" | "role" | "startedOn" | "termEndsOn" | "endedOn">,
+  today: string,
+  nextTerm: Pick<CommitteeMember, "startedOn"> | null = null
+) {
+  if (member.startedOn && member.startedOn > today) {
+    return `${seatLabel(member)}, starts ${dayText(member.startedOn)}`
+  }
+  if (nextTerm?.startedOn) {
+    return `${seatLabel(member)}, next term from ${dayText(nextTerm.startedOn)}`
+  }
+  if (member.endedOn) {
+    return `${seatLabel(member)}, leaves ${dayText(member.endedOn)}`
+  }
+  if (member.termEndsOn) {
+    return `${seatLabel(member)}, term ${member.termEndsOn < today ? "ended" : "ends"} ${dayText(member.termEndsOn)}`
+  }
+  return seatLabel(member)
+}
+
+/** When a term they served ran: "Jan 1, 2023 to Jan 1, 2025", or "Until Jan 1, 2025" without its start. */
+export const servedText = ({ startedOn, endedOn }: Pick<CommitteeMember, "startedOn" | "endedOn">) =>
+  [startedOn ? `${dayText(startedOn)} to` : "Until", endedOn ? dayText(endedOn) : "now"].join(" ")
+
+/** What a resignation says it did: "You left the Board of Directors", or the day they will. */
+export const resignedText = (committee: string, endedOn: string, today: string) =>
+  endedOn > today ? `You'll leave ${committee} on ${dayText(endedOn)}.` : `You left ${committee}.`
+
+/** Each value with its label, in order, for a select. */
+const choicesOf = <V extends string>(values: readonly V[], labels: Record<V, string>) =>
+  values.map((value) => ({ value, label: labels[value] }))
+export const accessChoices = choicesOf(accessLevels, accessLabels)
+export const relationChoices = choicesOf(unitRelations, relationLabels)
+export const committeeKindChoices = choicesOf(committeeKinds, committeeKindLabels)
+export const committeeRoleChoices = choicesOf(committeeRoles, committeeRoleLabels)

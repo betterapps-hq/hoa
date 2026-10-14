@@ -20,8 +20,8 @@ import {
   updateApplicationFile
 } from "@/db/applicationRepository"
 import { createDatabase } from "@/db/database"
-import { getHoa } from "@/db/hoaRepository"
 import { getJob, updateJob } from "@/db/jobRepository"
+import { getOrganization } from "@/db/organizationRepository"
 import { getProjectType } from "@/db/projectTypeRepository"
 import { getPublishedRulesFile, getRulesFileOf } from "@/db/rulebookContentRepository"
 import { env } from "@/env.server"
@@ -40,7 +40,7 @@ import { getPresigner } from "@/storage/storage.server"
 import { modelStep, runOcr, storageStep } from "./ocrSteps.server"
 
 export type ApplicationReviewParams = {
-  hoaId: string
+  organizationId: string
   applicationId: string
   jobId: string
   /** The status to return to when the review fails. */
@@ -62,8 +62,8 @@ function optionalPresigner() {
 }
 
 /** The OCR keys for one application file. */
-function fileOcrKeys(hoaId: string, applicationId: string, file: Pick<ApplicationFile, "id" | "fileName">) {
-  const keys = applicationKeys(hoaId, applicationId)
+function fileOcrKeys(organizationId: string, applicationId: string, file: Pick<ApplicationFile, "id" | "fileName">) {
+  const keys = applicationKeys(organizationId, applicationId)
   return {
     source: keys.source(file.id, file.fileName),
     ocr: (range: string) => keys.ocr(file.id, "azure-layout", range),
@@ -81,10 +81,10 @@ function fileOcrKeys(hoaId: string, applicationId: string, file: Pick<Applicatio
  */
 export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReviewParams> {
   async run(event: WorkflowEvent<ApplicationReviewParams>, step: WorkflowStep) {
-    const { hoaId, applicationId, jobId, previousStatus } = event.payload
+    const { organizationId, applicationId, jobId, previousStatus } = event.payload
     const db = createDatabase(this.env.DB)
     const bucket = this.env.FILES
-    const keys = applicationKeys(hoaId, applicationId)
+    const keys = applicationKeys(organizationId, applicationId)
     const now = () => new Date().toISOString()
     // Step names must be unique: a stage can report the same count twice.
     const reported = new Map<string, number>()
@@ -93,7 +93,7 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
       const count = (reported.get(name) ?? 0) + 1
       reported.set(name, count)
       return step.do(`${name}:${count}`, storageStep, () =>
-        updateJob(db, hoaId, jobId, { stage, done, total, now: now() })
+        updateJob(db, organizationId, jobId, { stage, done, total, now: now() })
       )
     }
     const failures: { stage: string; itemId: string; message: string }[] = []
@@ -112,7 +112,7 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
       await progress("resolve-prompts")
       const promptVersions = await step.do("resolve-prompts", storageStep, async () => {
         const versions = await resolvePromptVersions(ai.loadPrompt, applicationReviewPrompts)
-        await updateJob(db, hoaId, jobId, { promptVersions: versions, now: now() })
+        await updateJob(db, organizationId, jobId, { promptVersions: versions, now: now() })
         return versions
       })
 
@@ -121,32 +121,34 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
       // one applies.
       await progress("load")
       const loaded = await step.do("load", storageStep, async () => {
-        const application = await getApplication(db, hoaId, applicationId)
+        const application = await getApplication(db, organizationId, applicationId)
         if (!application) {
           throw new NonRetryableError("The application no longer exists.")
         }
         const submitted = application.submittedReviewId
-          ? (await listReviewSummaries(db, hoaId, applicationId)).find(
+          ? (await listReviewSummaries(db, organizationId, applicationId)).find(
               (summary) => summary.id === application.submittedReviewId
             )
           : undefined
-        const pinned = submitted ? await getRulesFileOf(db, hoaId, submitted.rulebookId) : null
+        const pinned = submitted ? await getRulesFileOf(db, organizationId, submitted.rulebookId) : null
         const rulesFile =
           submitted && pinned
             ? { ...pinned, rulebookId: submitted.rulebookId, publishedAt: null }
-            : await getPublishedRulesFile(db, hoaId)
+            : await getPublishedRulesFile(db, organizationId)
         if (!rulesFile) {
           throw new NonRetryableError("The HOA hasn't published a rulebook yet.")
         }
-        const hoa = await getHoa(db, hoaId)
-        if (!hoa) {
+        const organization = await getOrganization(db, organizationId)
+        if (!organization) {
           throw new NonRetryableError("The HOA no longer exists.")
         }
-        const type = application.projectTypeId ? await getProjectType(db, hoaId, application.projectTypeId) : null
+        const type = application.projectTypeId
+          ? await getProjectType(db, organizationId, application.projectTypeId)
+          : null
         const projectType = type
           ? { label: type.label, description: type.description, definition: type.definition }
           : null
-        return { application, projectType, rulesFile, settings: hoa.settings, startedAt: now() }
+        return { application, projectType, rulesFile, settings: organization.settings, startedAt: now() }
       })
       const { application, projectType } = loaded
       // The file is read on every replay, never stored in a step: it's checked against its hash each time.
@@ -156,11 +158,11 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
       // earlier review are already ready and aren't read again.
       await progress("ocr")
       const topLevel = await step.do("ocr:list", storageStep, async () =>
-        (await listApplicationFiles(db, hoaId, applicationId)).filter((file) => file.parentFileId === null)
+        (await listApplicationFiles(db, organizationId, applicationId)).filter((file) => file.parentFileId === null)
       )
       for (const file of topLevel.filter((item) => item.status === "processing" && item.mediaType === wordMediaType)) {
         await step.do(`ocr:media:${file.id}`, storageStep, async () => {
-          const source = await bucket.get(fileOcrKeys(hoaId, applicationId, file).source)
+          const source = await bucket.get(fileOcrKeys(organizationId, applicationId, file).source)
           if (!source) {
             throw new NonRetryableError(`${file.fileName} is missing from storage.`)
           }
@@ -176,7 +178,7 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
             }
             await createApplicationFile(db, {
               id: childId,
-              hoaId,
+              organizationId,
               applicationId,
               parentFileId: file.id,
               ordinal: picture.ordinal,
@@ -188,7 +190,7 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
               now: now()
             })
             if (!picture.mediaType) {
-              await updateApplicationFile(db, hoaId, childId, {
+              await updateApplicationFile(db, organizationId, childId, {
                 error: { stage: "ocr", message: "Unsupported image format.", isRetryable: false }
               })
             }
@@ -196,7 +198,7 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
         })
       }
       const toRead = await step.do("ocr:pending", storageStep, async () =>
-        (await listApplicationFiles(db, hoaId, applicationId)).filter((file) => file.status === "processing")
+        (await listApplicationFiles(db, organizationId, applicationId)).filter((file) => file.status === "processing")
       )
       await progress("ocr", 0, toRead.length)
       const layout = createLayoutClient({
@@ -223,12 +225,12 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
                 mediaType: file.mediaType,
                 documentKind: null,
                 contextText: file.contextText,
-                keys: fileOcrKeys(hoaId, applicationId, file)
+                keys: fileOcrKeys(organizationId, applicationId, file)
               }
             )
             failures.push(...outcome.figureFailures.map((failure) => ({ stage: "visuals", ...failure })))
             await step.do(`ocr:done:${file.id}`, storageStep, () =>
-              updateApplicationFile(db, hoaId, file.id, {
+              updateApplicationFile(db, organizationId, file.id, {
                 status: "ready",
                 sha256: outcome.sha256,
                 pageCount: outcome.pageCount
@@ -238,7 +240,7 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
             // A file Layout can't read is unreadable; the review goes on without it.
             failures.push({ stage: "ocr", itemId: file.id, message: errorText(error) })
             await step.do(`ocr:unreadable:${file.id}`, storageStep, () =>
-              updateApplicationFile(db, hoaId, file.id, {
+              updateApplicationFile(db, organizationId, file.id, {
                 status: "unreadable",
                 error: { stage: "ocr", message: errorText(error), isRetryable: false }
               })
@@ -246,29 +248,31 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
           }
         })
       )
-      const files = await step.do("ocr:files", storageStep, () => listApplicationFiles(db, hoaId, applicationId))
+      const files = await step.do("ocr:files", storageStep, () =>
+        listApplicationFiles(db, organizationId, applicationId)
+      )
       const packet = await loadPacket(
         bucket,
         files,
-        (file) => fileOcrKeys(hoaId, applicationId, file),
-        (file) => loadPages(bucket, fileOcrKeys(hoaId, applicationId, file), file.pageCount ?? 0)
+        (file) => fileOcrKeys(organizationId, applicationId, file),
+        (file) => loadPages(bucket, fileOcrKeys(organizationId, applicationId, file), file.pageCount ?? 0)
       )
 
       // 4 to 14. Each stage's steps keep their output in R2 (Workflows caps a step's output at 1 MiB) and read it back
       // through its schema, on replay too.
       const runStep: StepRunner = async (name, schema, run, kind = "code") => {
         await step.do(name, kind === "model" ? modelStep : storageStep, async () => {
-          await putJson(bucket, jobStepKey(hoaId, jobId, name), await run())
+          await putJson(bucket, jobStepKey(organizationId, jobId, name), await run())
           await ai.flush()
         })
-        const output = await getJson(bucket, jobStepKey(hoaId, jobId, name), schema)
+        const output = await getJson(bucket, jobStepKey(organizationId, jobId, name), schema)
         if (output === null) {
           throw new Error(`The output of step ${name} is missing from storage.`)
         }
         return output
       }
       const result = await reviewApplication({
-        organizationId: hoaId,
+        organizationId: organizationId,
         rulesFile,
         application: {
           requestType: applicationRequestType,
@@ -332,15 +336,15 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
         }
         await putJson(bucket, keys.review(review.id), review)
         for (const [fileId, types] of Object.entries(result.pageTypes)) {
-          await setPageKinds(db, hoaId, fileId, types)
+          await setPageKinds(db, organizationId, fileId, types)
           const [first] = types
-          await updateApplicationFile(db, hoaId, fileId, {
+          await updateApplicationFile(db, organizationId, fileId, {
             kind: first && types.every((type) => type === first) ? first : null
           })
         }
         await saveReviewSummary(db, {
           id: review.id,
-          hoaId,
+          organizationId,
           applicationId,
           jobId,
           rulebookId: review.rulebookId,
@@ -350,7 +354,7 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
           sessionId: jobId,
           createdAt
         })
-        await transitionApplication(db, hoaId, applicationId, ["reviewing"], {
+        await transitionApplication(db, organizationId, applicationId, ["reviewing"], {
           status: "reviewed",
           reviewId: review.id,
           updatedAt: createdAt,
@@ -359,7 +363,7 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
             loaded.settings
           )
         })
-        await updateJob(db, hoaId, jobId, {
+        await updateJob(db, organizationId, jobId, {
           status: failures.length > 0 ? "completed-with-errors" : "completed",
           stage: null,
           failures,
@@ -369,16 +373,16 @@ export class ApplicationReview extends WorkflowEntrypoint<Env, ApplicationReview
     } catch (error) {
       await step.do("fail", storageStep, async () => {
         const failed = {
-          stage: (await getJob(db, hoaId, jobId))?.stage ?? "load",
+          stage: (await getJob(db, organizationId, jobId))?.stage ?? "load",
           message: errorText(error),
           isRetryable: !(error instanceof NonRetryableError)
         }
         // A failed review doesn't change the application's status (docs/design/documents.md, "Applications").
-        await transitionApplication(db, hoaId, applicationId, ["reviewing"], {
+        await transitionApplication(db, organizationId, applicationId, ["reviewing"], {
           status: previousStatus,
           updatedAt: now()
         })
-        await updateJob(db, hoaId, jobId, { status: "failed", error: failed, failures, now: now() })
+        await updateJob(db, organizationId, jobId, { status: "failed", error: failed, failures, now: now() })
       })
     }
   }

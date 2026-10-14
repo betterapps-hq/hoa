@@ -24,7 +24,15 @@ function toDocument(row: typeof governingDocuments.$inferSelect): GoverningDocum
 
 export type NewGoverningDocument = Pick<
   GoverningDocument,
-  "hoaId" | "kind" | "title" | "effectiveDate" | "fileName" | "mediaType" | "sizeBytes" | "uploadedBy" | "uploadedAt"
+  | "organizationId"
+  | "kind"
+  | "title"
+  | "effectiveDate"
+  | "fileName"
+  | "mediaType"
+  | "sizeBytes"
+  | "uploadedBy"
+  | "uploadedAt"
 > & {
   /** The lineage this upload is a new version of; omitted for a new document. */
   lineageId?: string
@@ -38,13 +46,15 @@ export async function createGoverningDocument(db: Database, input: NewGoverningD
   const latest = await db
     .select({ version: max(governingDocuments.version) })
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, input.hoaId), eq(governingDocuments.lineageId, lineageId)))
+    .where(
+      and(eq(governingDocuments.organizationId, input.organizationId), eq(governingDocuments.lineageId, lineageId))
+    )
     .get()
   const document: GoverningDocument = {
     id,
     lineageId,
     version: (latest?.version ?? 0) + 1,
-    hoaId: input.hoaId,
+    organizationId: input.organizationId,
     kind: input.kind,
     amends: input.amends ?? null,
     title: input.title,
@@ -63,36 +73,36 @@ export async function createGoverningDocument(db: Database, input: NewGoverningD
   return document
 }
 
-export async function getGoverningDocument(db: Database, hoaId: string, id: string) {
+export async function getGoverningDocument(db: Database, organizationId: string, id: string) {
   const row = await db
     .select()
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id), hasFile))
+    .where(and(eq(governingDocuments.organizationId, organizationId), eq(governingDocuments.id, id), hasFile))
     .get()
   return row ? toDocument(row) : null
 }
 
 /** When an upload was removed from the governing documents, with its title; null for one in use, or no upload. */
-export async function getUploadRemoval(db: Database, hoaId: string, id: string) {
+export async function getUploadRemoval(db: Database, organizationId: string, id: string) {
   const row = await db
     .select({ title: governingDocuments.title, removedAt: governingDocuments.removedAt })
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id), hasFile))
+    .where(and(eq(governingDocuments.organizationId, organizationId), eq(governingDocuments.id, id), hasFile))
     .get()
   return row?.removedAt ? { title: row.title, removedAt: row.removedAt } : null
 }
 
-export async function listGoverningDocuments(db: Database, hoaId: string) {
+export async function listGoverningDocuments(db: Database, organizationId: string) {
   const rows = await db
     .select()
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, hoaId), hasFile, isInUse))
+    .where(and(eq(governingDocuments.organizationId, organizationId), hasFile, isInUse))
     .orderBy(asc(governingDocuments.uploadedAt))
   return rows.map(toDocument)
 }
 
 /** Every upload, removed ones too, for what happened to the governing documents. */
-export function listUploadHistory(db: Database, hoaId: string) {
+export function listUploadHistory(db: Database, organizationId: string) {
   return db
     .select({
       id: governingDocuments.id,
@@ -106,15 +116,15 @@ export function listUploadHistory(db: Database, hoaId: string) {
       removedAt: governingDocuments.removedAt
     })
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, hoaId), hasFile))
+    .where(and(eq(governingDocuments.organizationId, organizationId), hasFile))
 }
 
 /** Another document in the HOA with the same content, for refusing duplicate uploads. */
-export async function findDocumentByHash(db: Database, hoaId: string, sha256: string, excludeId: string) {
+export async function findDocumentByHash(db: Database, organizationId: string, sha256: string, excludeId: string) {
   const rows = await db
     .select()
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.sha256, sha256), isInUse))
+    .where(and(eq(governingDocuments.organizationId, organizationId), eq(governingDocuments.sha256, sha256), isInUse))
   return rows.map(toDocument).find((document) => document.id !== excludeId) ?? null
 }
 
@@ -124,14 +134,14 @@ export async function findDocumentByHash(db: Database, hoaId: string, sha256: st
  */
 export async function removeGoverningDocument(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   id: string,
   removal: { now: string; userId: string }
 ) {
   const document = await db
     .select({ lineageId: governingDocuments.lineageId })
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id), hasFile, isInUse))
+    .where(and(eq(governingDocuments.organizationId, organizationId), eq(governingDocuments.id, id), hasFile, isInUse))
     .get()
   if (!document) {
     return false
@@ -139,26 +149,32 @@ export async function removeGoverningDocument(
   await db
     .update(governingDocuments)
     .set({ removedAt: removal.now, removedBy: removal.userId })
-    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.lineageId, document.lineageId), hasFile))
+    .where(
+      and(
+        eq(governingDocuments.organizationId, organizationId),
+        eq(governingDocuments.lineageId, document.lineageId),
+        hasFile
+      )
+    )
   return true
 }
 
 export async function updateGoverningDocument(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   id: string,
   patch: Partial<Pick<GoverningDocument, "status" | "error" | "sha256" | "pageCount">>
 ) {
   await db
     .update(governingDocuments)
     .set(patch)
-    .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, id)))
+    .where(and(eq(governingDocuments.organizationId, organizationId), eq(governingDocuments.id, id)))
 }
 
 const sectionKindSchema = z.enum(["body", "definitions", "exhibit"])
 
 function toSection(row: typeof sections.$inferSelect): Section {
-  const { hoaId: _hoaId, ...section } = row
+  const { organizationId: _organizationId, ...section } = row
   return {
     ...section,
     kind: sectionKindSchema.parse(section.kind),
@@ -171,11 +187,11 @@ function toSection(row: typeof sections.$inferSelect): Section {
  * Sections are written once per document version; a second build finds them and writes nothing. One statement per row,
  * in a batch: D1 allows 100 bound parameters per statement, so a multi-row insert of a long document fails.
  */
-export async function saveSections(db: Database, hoaId: string, items: readonly Omit<Section, "routing">[]) {
+export async function saveSections(db: Database, organizationId: string, items: readonly Omit<Section, "routing">[]) {
   const [first, ...rest] = items.map((section) =>
     db
       .insert(sections)
-      .values({ ...section, hoaId, routing: null })
+      .values({ ...section, organizationId, routing: null })
       .onConflictDoNothing()
   )
   if (first) {
@@ -183,11 +199,11 @@ export async function saveSections(db: Database, hoaId: string, items: readonly 
   }
 }
 
-export async function listSections(db: Database, hoaId: string, documentId: string): Promise<Section[]> {
+export async function listSections(db: Database, organizationId: string, documentId: string): Promise<Section[]> {
   const rows = await db
     .select()
     .from(sections)
-    .where(and(eq(sections.hoaId, hoaId), eq(sections.documentId, documentId)))
+    .where(and(eq(sections.organizationId, organizationId), eq(sections.documentId, documentId)))
     .orderBy(asc(sections.ordinal))
   return rows.map(toSection)
 }
@@ -202,14 +218,14 @@ export type DocumentRecord = { id: string; document: Rules.GoverningDocument }
  * came from a rules file rather than an upload (`ready`).
  */
 export function fileLessDocumentRow(
-  hoaId: string,
+  organizationId: string,
   { id, document }: DocumentRecord,
   recordedBy: string,
   recordedAt: string
 ): typeof governingDocuments.$inferInsert {
   return {
     id,
-    hoaId,
+    organizationId,
     lineageId: id,
     version: 1,
     kind: document.kind,
@@ -233,7 +249,7 @@ export function fileLessDocumentRow(
 /** Records documents the rules name that nobody uploaded. Saving one again updates it. */
 export async function saveReferencedDocuments(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   records: readonly DocumentRecord[],
   recordedBy: string,
   recordedAt: string
@@ -242,7 +258,7 @@ export async function saveReferencedDocuments(
     db,
     records.map((record) => {
       const row = fileLessDocumentRow(
-        hoaId,
+        organizationId,
         { id: record.id, document: governingDocument.parse(record.document) },
         recordedBy,
         recordedAt
@@ -257,23 +273,23 @@ export async function saveReferencedDocuments(
 }
 
 /** The organization's documents in the rules schema, by key: the uploads a build has keyed, and the referenced. */
-export async function listDocumentRecords(db: Database, hoaId: string): Promise<DocumentRecord[]> {
+export async function listDocumentRecords(db: Database, organizationId: string): Promise<DocumentRecord[]> {
   const rows = await db
     .select({ id: governingDocuments.id, document: governingDocuments.document })
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, hoaId), isNotNull(governingDocuments.document)))
+    .where(and(eq(governingDocuments.organizationId, organizationId), isNotNull(governingDocuments.document)))
     .orderBy(asc(governingDocuments.key))
   return rows.map((row) => ({ id: row.id, document: governingDocument.parse(row.document) }))
 }
 
 /** A document's provisions as rows, in document order. A provision key starts with its document's key. */
 export function provisionRows(
-  hoaId: string,
+  organizationId: string,
   documentId: string,
   items: readonly Rules.Provision[]
 ): (typeof provisions.$inferInsert)[] {
   return items.map((provision, ordinal) => ({
-    hoaId,
+    organizationId,
     documentId,
     key: provision.key,
     label: provision.label,
@@ -290,17 +306,19 @@ export function provisionRows(
 /** Replaces a document's provisions in one batch, so a retried structure step writes them once. */
 export async function saveProvisions(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   documentId: string,
   items: readonly Rules.Provision[]
 ) {
   const rows = provisionRows(
-    hoaId,
+    organizationId,
     documentId,
     items.map((item) => provisionSchema.parse(item))
   )
   await runBatch(db, [
-    db.delete(provisions).where(and(eq(provisions.hoaId, hoaId), eq(provisions.documentId, documentId))),
+    db
+      .delete(provisions)
+      .where(and(eq(provisions.organizationId, organizationId), eq(provisions.documentId, documentId))),
     ...insertChunks(provisions, rows).map((group) => db.insert(provisions).values(group))
   ])
 }
@@ -308,7 +326,7 @@ export async function saveProvisions(
 /** The documents' provisions with the document each is in, each document's in order. */
 export async function listDocumentProvisions(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   documentIds: readonly string[]
 ): Promise<{ documentId: string; provision: Rules.Provision }[]> {
   if (documentIds.length === 0) {
@@ -317,23 +335,23 @@ export async function listDocumentProvisions(
   const rows = await db
     .select({ documentId: provisions.documentId, provision: provisions.provision })
     .from(provisions)
-    .where(and(eq(provisions.hoaId, hoaId), inArray(provisions.documentId, [...documentIds])))
+    .where(and(eq(provisions.organizationId, organizationId), inArray(provisions.documentId, [...documentIds])))
     .orderBy(asc(provisions.documentId), asc(provisions.ordinal))
   return rows.map((row) => ({ documentId: row.documentId, provision: provisionSchema.parse(row.provision) }))
 }
 
 /** The documents' provisions, each document's in order. */
-export async function listProvisions(db: Database, hoaId: string, documentIds: readonly string[]) {
-  return (await listDocumentProvisions(db, hoaId, documentIds)).map((row) => row.provision)
+export async function listProvisions(db: Database, organizationId: string, documentIds: readonly string[]) {
+  return (await listDocumentProvisions(db, organizationId, documentIds)).map((row) => row.provision)
 }
 
 /** Saves provisions' review changes, such as a no-rule reason, in batches of 100 that each land whole. */
-export async function updateProvisions(db: Database, hoaId: string, items: readonly Rules.Provision[]) {
+export async function updateProvisions(db: Database, organizationId: string, items: readonly Rules.Provision[]) {
   const statements = items.map((item) =>
     db
       .update(provisions)
       .set({ provision: provisionSchema.parse(item) })
-      .where(and(eq(provisions.hoaId, hoaId), eq(provisions.key, item.key)))
+      .where(and(eq(provisions.organizationId, organizationId), eq(provisions.key, item.key)))
   )
   for (const group of chunk(statements, 100)) {
     await runBatch(db, group)
@@ -343,14 +361,14 @@ export async function updateProvisions(db: Database, hoaId: string, items: reado
 // ─── What a build writes (encoding.md, Save draft) ──────────────────────────────────────────────
 
 /** The structures set for uploads, by id; an upload without one is missing. */
-export async function getDocumentStructures(db: Database, hoaId: string, ids: readonly string[]) {
+export async function getDocumentStructures(db: Database, organizationId: string, ids: readonly string[]) {
   if (ids.length === 0) {
     return new Map<string, DocumentStructure>()
   }
   const rows = await db
     .select({ id: governingDocuments.id, structure: governingDocuments.structure })
     .from(governingDocuments)
-    .where(and(eq(governingDocuments.hoaId, hoaId), inArray(governingDocuments.id, [...ids])))
+    .where(and(eq(governingDocuments.organizationId, organizationId), inArray(governingDocuments.id, [...ids])))
   return new Map(rows.flatMap((row) => (row.structure ? [[row.id, documentStructure.parse(row.structure)]] : [])))
 }
 
@@ -366,8 +384,8 @@ export type BuiltDocuments = {
  * the documents the text names, which have no file, take an id from their key. The same key gives the same id on every
  * build, so a later build finds and replaces them.
  */
-export function builtDocumentRecords(hoaId: string, built: BuiltDocuments) {
-  const fileLessId = (key: string) => `${hoaId}:${key}`
+export function builtDocumentRecords(organizationId: string, built: BuiltDocuments) {
+  const fileLessId = (key: string) => `${organizationId}:${key}`
   return [
     ...built.uploads.flatMap(({ documentId, documents }) =>
       documents.map(({ document, provisions: items }, index) => ({
@@ -393,12 +411,12 @@ export function builtDocumentRecords(hoaId: string, built: BuiltDocuments) {
  */
 export async function saveBuiltDocuments(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   built: BuiltDocuments,
   recordedBy: string,
   recordedAt: string
 ) {
-  const records = builtDocumentRecords(hoaId, built)
+  const records = builtDocumentRecords(organizationId, built)
   const keys = records.map((record) => record.document.key)
   const ids = records.map((record) => record.id)
   if (records.length === 0) {
@@ -410,22 +428,24 @@ export async function saveBuiltDocuments(
       .set({ key: null, document: null })
       .where(
         and(
-          eq(governingDocuments.hoaId, hoaId),
+          eq(governingDocuments.organizationId, organizationId),
           inArray(governingDocuments.key, keys),
           notInArray(governingDocuments.id, ids)
         )
       ),
     db
       .delete(provisions)
-      .where(and(eq(provisions.hoaId, hoaId), or(...keys.map((key) => like(provisions.key, `${key}:%`))))),
+      .where(
+        and(eq(provisions.organizationId, organizationId), or(...keys.map((key) => like(provisions.key, `${key}:%`))))
+      ),
     ...records.map((record) => {
       if (record.isUpload) {
         return db
           .update(governingDocuments)
           .set({ key: record.document.key, document: record.document })
-          .where(and(eq(governingDocuments.hoaId, hoaId), eq(governingDocuments.id, record.id)))
+          .where(and(eq(governingDocuments.organizationId, organizationId), eq(governingDocuments.id, record.id)))
       }
-      const row = fileLessDocumentRow(hoaId, record, recordedBy, recordedAt)
+      const row = fileLessDocumentRow(organizationId, record, recordedBy, recordedAt)
       const { kind, title, effectiveDate, status, key, document } = row
       return db.insert(governingDocuments).values(row).onConflictDoUpdate({
         target: governingDocuments.id,
@@ -436,7 +456,7 @@ export async function saveBuiltDocuments(
       insertChunks(
         provisions,
         provisionRows(
-          hoaId,
+          organizationId,
           record.id,
           record.provisions.map((item) => provisionSchema.parse(item))
         )

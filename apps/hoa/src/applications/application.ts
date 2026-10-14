@@ -34,7 +34,7 @@ export const decisionSchema = z.object({
 
 export const applicationSchema = z.object({
   id: z.string(),
-  hoaId: z.string(),
+  organizationId: z.string(),
   /** The organization's project type the homeowner chose (src/projectTypes/projectType.ts); null for "Something else". */
   projectTypeId: z.string().nullable(),
   /** The homeowner's answers to the project type's form; null without a project type. */
@@ -56,7 +56,7 @@ export type Application = z.infer<typeof applicationSchema>
 
 export const applicationFileSchema = z.object({
   id: z.string(),
-  hoaId: z.string(),
+  organizationId: z.string(),
   applicationId: z.string(),
   parentFileId: z.string().nullable(),
   ordinal: z.number().int().nullable(),

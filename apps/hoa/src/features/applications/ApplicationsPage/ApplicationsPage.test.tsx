@@ -8,7 +8,7 @@ vi.mock("@tanstack/react-router", () => ({ useRouter: () => undefined }))
 
 const application: ApplicationListItem = {
   id: "app-1",
-  hoaId: "hoa",
+  organizationId: "hoa",
   projectTypeId: "type-1",
   answers: null,
   description: "Add a structure in the yard",

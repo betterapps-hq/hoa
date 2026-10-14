@@ -64,7 +64,7 @@ export const createDocumentUpload = createServerFn({ method: "POST" })
       throw new Error(validation.message)
     }
     // A new edition joins one of this organization's documents, and an amendment amends one of them.
-    const uploads = data.lineageId || data.amends ? await listGoverningDocuments(getDb(), context.hoa.id) : []
+    const uploads = data.lineageId || data.amends ? await listGoverningDocuments(getDb(), context.organization.id) : []
     if (data.lineageId && !uploads.some((upload) => upload.lineageId === data.lineageId)) {
       throw new Error("The document this is a new edition of doesn't exist.")
     }
@@ -72,7 +72,7 @@ export const createDocumentUpload = createServerFn({ method: "POST" })
       throw new Error("The document this amends doesn't exist.")
     }
     const document = await createGoverningDocument(getDb(), {
-      hoaId: context.hoa.id,
+      organizationId: context.organization.id,
       kind: data.kind,
       title: data.title,
       effectiveDate: data.effectiveDate,
@@ -84,7 +84,7 @@ export const createDocumentUpload = createServerFn({ method: "POST" })
       ...(data.lineageId ? { lineageId: data.lineageId } : {}),
       amends: data.amends
     })
-    const key = governingKeys(context.hoa.id, document.id).source(document.fileName)
+    const key = governingKeys(context.organization.id, document.id).source(document.fileName)
     const presigner = presignerOrNull()
     return {
       documentId: document.id,
@@ -108,11 +108,11 @@ export const uploadDocumentFile = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     const context = await requireAdministrator()
-    const document = await getGoverningDocument(getDb(), context.hoa.id, data.documentId)
+    const document = await getGoverningDocument(getDb(), context.organization.id, data.documentId)
     if (document?.status !== "uploading") {
       throw new Error("This upload has already been completed.")
     }
-    const key = governingKeys(context.hoa.id, document.id).source(document.fileName)
+    const key = governingKeys(context.organization.id, document.id).source(document.fileName)
     await getBucket().put(key, data.file, { httpMetadata: { contentType: document.mediaType } })
   })
 
@@ -122,30 +122,35 @@ export const completeDocumentUpload = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const context = await requireAdministrator()
     const db = getDb()
-    const document = await getGoverningDocument(db, context.hoa.id, data.documentId)
+    const document = await getGoverningDocument(db, context.organization.id, data.documentId)
     if (!document) {
       throw new Error("The document doesn't exist.")
     }
     if (document.status !== "uploading") {
-      return { jobId: (await getLatestJob(db, context.hoa.id, document.id))?.id ?? null }
+      return { jobId: (await getLatestJob(db, context.organization.id, document.id))?.id ?? null }
     }
-    const key = governingKeys(context.hoa.id, document.id).source(document.fileName)
+    const key = governingKeys(context.organization.id, document.id).source(document.fileName)
     const object = await getBucket().head(key)
     if (!object || object.size !== document.sizeBytes) {
       throw new Error("The upload didn't finish. Try again.")
     }
     const now = new Date().toISOString()
-    const job = newJob({ hoaId: context.hoa.id, kind: "document-ingest", subjectId: document.id, now })
+    const job = newJob({
+      organizationId: context.organization.id,
+      kind: "document-ingest",
+      subjectId: document.id,
+      now
+    })
     await db.batch([insertJob(db, job)])
-    await updateGoverningDocument(db, context.hoa.id, document.id, { status: "processing" })
+    await updateGoverningDocument(db, context.organization.id, document.id, { status: "processing" })
     try {
       await bindings.DOCUMENT_INGEST.create({
         id: job.id,
-        params: { hoaId: context.hoa.id, documentId: document.id, jobId: job.id }
+        params: { organizationId: context.organization.id, documentId: document.id, jobId: job.id }
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : "The document couldn't be processed."
-      await updateGoverningDocument(db, context.hoa.id, document.id, {
+      await updateGoverningDocument(db, context.organization.id, document.id, {
         status: "failed",
         error: { stage: "start", message, isRetryable: true }
       })
@@ -163,7 +168,7 @@ export const removeGoverningDocument = createServerFn({ method: "POST" })
 
 export const listDocuments = createServerFn({ method: "GET" }).handler(async () => {
   const context = await getRequestContext()
-  return listGoverningDocuments(getDb(), context.hoa.id)
+  return listGoverningDocuments(getDb(), context.organization.id)
 })
 
 export type DocumentPage = {
@@ -183,12 +188,16 @@ export const getDocumentPage = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }): Promise<DocumentPage> => {
     const context = await getRequestContext()
-    const document = await getGoverningDocument(getDb(), context.hoa.id, data.documentId)
+    const document = await getGoverningDocument(getDb(), context.organization.id, data.documentId)
     if (document?.status !== "ready" || !document.pageCount) {
       throw new Error("That document isn't ready.")
     }
     const pageIndex = Math.min(data.pageIndex, document.pageCount)
-    const page = await getJson(getBucket(), governingKeys(context.hoa.id, document.id).page(pageIndex), pageSchema)
+    const page = await getJson(
+      getBucket(),
+      governingKeys(context.organization.id, document.id).page(pageIndex),
+      pageSchema
+    )
     if (!page) {
       throw new Error(`Page ${pageIndex} of ${document.title} is missing.`)
     }
@@ -218,16 +227,16 @@ export const getDocumentReading = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<DocumentReading | ReadingUnavailable> => {
     const context = await getRequestContext()
     const db = getDb()
-    const hoaId = context.hoa.id
+    const organizationId = context.organization.id
     const [found, records, uploads, removal] = await Promise.all([
-      getGoverningDocument(db, hoaId, data.documentId),
-      listDocumentRecords(db, hoaId),
-      listGoverningDocuments(db, hoaId),
-      getUploadRemoval(db, hoaId, data.documentId)
+      getGoverningDocument(db, organizationId, data.documentId),
+      listDocumentRecords(db, organizationId),
+      listGoverningDocuments(db, organizationId),
+      getUploadRemoval(db, organizationId, data.documentId)
     ])
     const provisions = await listProvisions(
       db,
-      hoaId,
+      organizationId,
       records.map((item) => item.id)
     )
     const isReadable = (item: GoverningDocument | undefined | null): item is GoverningDocument =>
@@ -301,12 +310,12 @@ export const getDocumentReading = createServerFn({ method: "GET" })
       await Promise.all(
         files.map(
           async (file) =>
-            [file.id, await loadPages(bucket, governingKeys(hoaId, file.id), file.pageCount ?? 0)] as const
+            [file.id, await loadPages(bucket, governingKeys(organizationId, file.id), file.pageCount ?? 0)] as const
         )
       )
     )
     // The PDF shows beside the text; its words can be marked when Layout's results were kept at ingest.
-    const uploadKeys = governingKeys(hoaId, upload.id)
+    const uploadKeys = governingKeys(organizationId, upload.id)
     const [source, firstOcr] =
       upload.mediaType === "application/pdf"
         ? await Promise.all([
@@ -346,11 +355,11 @@ export const getPageGeometry = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }): Promise<GeometryPage[]> => {
     const context = await getRequestContext()
-    const upload = await getGoverningDocument(getDb(), context.hoa.id, data.documentId)
+    const upload = await getGoverningDocument(getDb(), context.organization.id, data.documentId)
     if (upload?.status !== "ready" || !upload.pageCount || upload.mediaType !== "application/pdf") {
       throw new Error("That document has no pages to show.")
     }
-    const keys = governingKeys(context.hoa.id, upload.id)
+    const keys = governingKeys(context.organization.id, upload.id)
     const bucket = getBucket()
     const wanted = Array.from(
       { length: Math.min(data.to, upload.pageCount) - data.from + 1 },
@@ -386,12 +395,12 @@ export const locateProvisions = createServerFn({ method: "GET" })
   .handler(async ({ data }): Promise<Record<string, ProvisionLocation>> => {
     const context = await getRequestContext()
     const db = getDb()
-    const records = await listDocumentRecords(db, context.hoa.id)
+    const records = await listDocumentRecords(db, context.organization.id)
     const wanted = new Set(data.keys)
     const provisions = (
       await listProvisions(
         db,
-        context.hoa.id,
+        context.organization.id,
         records.map((record) => record.id)
       )
     ).filter((provision) => wanted.has(provision.key))
@@ -408,7 +417,7 @@ export const getJobStatus = createServerFn({ method: "GET" })
   .validator((data: unknown) => z.object({ jobId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const context = await getRequestContext()
-    return getJob(getDb(), context.hoa.id, data.jobId)
+    return getJob(getDb(), context.organization.id, data.jobId)
   })
 
 /** The latest job for a document, rulebook or application, so a reloaded page finds work in progress. */
@@ -416,5 +425,5 @@ export const getActiveJob = createServerFn({ method: "GET" })
   .validator((data: unknown) => z.object({ subjectId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const context = await getRequestContext()
-    return getLatestJob(getDb(), context.hoa.id, data.subjectId)
+    return getLatestJob(getDb(), context.organization.id, data.subjectId)
   })

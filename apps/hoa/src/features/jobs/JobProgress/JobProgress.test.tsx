@@ -9,7 +9,7 @@ import { stageLabel } from "./JobProgress.utils"
 
 const job = (overrides: Partial<Job>): Job => ({
   id: "job-1",
-  hoaId: "hoa",
+  organizationId: "hoa",
   kind: "rulebook-build",
   subjectId: "rb",
   status: "running",

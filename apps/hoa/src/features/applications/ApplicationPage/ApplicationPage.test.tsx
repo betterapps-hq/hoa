@@ -23,7 +23,7 @@ vi.mock("@tanstack/react-router", () => ({ useRouter: () => undefined }))
 
 const application: Application = {
   id: "app-1",
-  hoaId: "hoa",
+  organizationId: "hoa",
   projectTypeId: "fence-work",
   answers: null,
   description: "Replace the side fence",
@@ -41,7 +41,7 @@ const application: Application = {
 
 const file = (overrides: Partial<ApplicationFile>): ApplicationFile => ({
   id: "f1",
-  hoaId: "hoa",
+  organizationId: "hoa",
   applicationId: "app-1",
   parentFileId: null,
   ordinal: null,

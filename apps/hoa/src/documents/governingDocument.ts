@@ -18,7 +18,7 @@ export const governingDocumentSchema = z.object({
   id: z.string(),
   lineageId: z.string(),
   version: z.number().int().positive(),
-  hoaId: z.string(),
+  organizationId: z.string(),
   kind: z.enum(governingDocumentKinds),
   amends: z.string().nullable(),
   title: z.string(),

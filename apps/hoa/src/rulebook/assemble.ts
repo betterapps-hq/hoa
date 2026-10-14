@@ -1,6 +1,6 @@
 import type { Database } from "@/db/database"
 import { listDocumentRecords, listProvisions } from "@/db/documentRepository"
-import { getHoa } from "@/db/hoaRepository"
+import { getOrganization } from "@/db/organizationRepository"
 import { getRulebookContent, type RulesFileRef } from "@/db/rulebookContentRepository"
 import { getRulebook } from "@/db/rulebookRepository"
 import type { Review, RulesFile } from "@/schema/types"
@@ -68,20 +68,24 @@ export async function assembleRulesFile(records: RulebookRecords) {
  * A rulebook's records from D1: the organization's keyed documents, the provisions of the documents the rulebook was
  * built from (it covers only those), and the rulebook's own.
  */
-export async function loadRulebookRecords(db: Database, hoaId: string, rulebookId: string): Promise<RulebookRecords> {
-  const [hoa, documents, rulebook, content] = await Promise.all([
-    getHoa(db, hoaId),
-    listDocumentRecords(db, hoaId),
-    getRulebook(db, hoaId, rulebookId),
-    getRulebookContent(db, hoaId, rulebookId)
+export async function loadRulebookRecords(
+  db: Database,
+  organizationId: string,
+  rulebookId: string
+): Promise<RulebookRecords> {
+  const [organization, documents, rulebook, content] = await Promise.all([
+    getOrganization(db, organizationId),
+    listDocumentRecords(db, organizationId),
+    getRulebook(db, organizationId, rulebookId),
+    getRulebookContent(db, organizationId, rulebookId)
   ])
-  if (!hoa || !rulebook || !content) {
+  if (!organization || !rulebook || !content) {
     throw new Error(`Rulebook ${rulebookId} has no records to publish.`)
   }
   return {
-    organization: { id: hoa.id, name: hoa.name },
+    organization: { id: organization.id, name: organization.name },
     documents: documents.map((record) => record.document),
-    provisions: await listProvisions(db, hoaId, rulebook.sourceDocumentIds),
+    provisions: await listProvisions(db, organizationId, rulebook.sourceDocumentIds),
     terms: content.terms,
     rules: content.rules,
     settings: content.settings,
@@ -92,11 +96,11 @@ export async function loadRulebookRecords(db: Database, hoaId: string, rulebookI
 /** Writes an assembled rules file to the rulebook's key; the caller records the key and hash on the rulebook. */
 export async function writeRulesFile(
   bucket: ObjectBucket,
-  hoaId: string,
+  organizationId: string,
   rulebookId: string,
   assembled: { json: string; sha256: string }
 ): Promise<RulesFileRef> {
-  const fileKey = rulebookKeys(hoaId, rulebookId).file
+  const fileKey = rulebookKeys(organizationId, rulebookId).file
   await bucket.put(fileKey, assembled.json, { httpMetadata: { contentType: "application/json" } })
   return { fileKey, fileSha256: assembled.sha256 }
 }

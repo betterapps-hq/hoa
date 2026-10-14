@@ -19,7 +19,7 @@ import {
 // request finds the rulebook it inserted, a build that can't start doesn't stay building, and an organization reaches
 // only its own build.
 
-const hoaId = "demo-hoa"
+const organizationId = "demo-hoa"
 const now = "2026-10-09T00:00:00.000Z"
 
 /** A Workflow binding that records the instances it creates, each running until it's terminated or `end`ed. */
@@ -67,7 +67,7 @@ describe("requestRulebookBuild", { timeout: 30_000 }, () => {
 
   async function upload(title: string, status: GoverningDocument["status"]) {
     const document = await createGoverningDocument(database.db, {
-      hoaId,
+      organizationId,
       kind: "declaration",
       title,
       effectiveDate: null,
@@ -77,7 +77,7 @@ describe("requestRulebookBuild", { timeout: 30_000 }, () => {
       uploadedBy: "admin",
       uploadedAt: now
     })
-    await updateGoverningDocument(database.db, hoaId, document.id, { status })
+    await updateGoverningDocument(database.db, organizationId, document.id, { status })
     return document
   }
 
@@ -87,12 +87,14 @@ describe("requestRulebookBuild", { timeout: 30_000 }, () => {
     await upload("Declaration", "ready")
     const ids = { rulebookId: "rulebook-1", jobId: "job-1" }
     binding.create.mockRejectedValueOnce(new Error("Workflows is unavailable."))
-    await expect(requestRulebookBuild(db, binding, hoaId, { now, ids })).rejects.toThrow("Workflows is unavailable.")
-    expect((await getRulebookByStatus(db, hoaId, "building"))?.id).toBe("rulebook-1")
+    await expect(requestRulebookBuild(db, binding, organizationId, { now, ids })).rejects.toThrow(
+      "Workflows is unavailable."
+    )
+    expect((await getRulebookByStatus(db, organizationId, "building"))?.id).toBe("rulebook-1")
     expect(instances.size).toBe(0)
 
-    expect(await requestRulebookBuild(db, binding, hoaId, { now, ids })).toEqual({ status: "started", ...ids })
-    expect(await requestRulebookBuild(db, binding, hoaId, { now, ids })).toEqual({ status: "started", ...ids })
+    expect(await requestRulebookBuild(db, binding, organizationId, { now, ids })).toEqual({ status: "started", ...ids })
+    expect(await requestRulebookBuild(db, binding, organizationId, { now, ids })).toEqual({ status: "started", ...ids })
     expect([...instances]).toEqual(["job-1"])
   })
 
@@ -102,19 +104,21 @@ describe("requestRulebookBuild", { timeout: 30_000 }, () => {
     await upload("Declaration", "ready")
     const ids = { rulebookId: "rulebook-1", jobId: "job-1" }
     binding.create.mockRejectedValue(new Error("Workflows is unavailable."))
-    await expect(requestRulebookBuild(db, binding, hoaId, { now, ids })).rejects.toThrow("Workflows is unavailable.")
-    await abandonRulebookBuild(db, hoaId, ids, "Workflows is unavailable.", now)
-    expect(await getRulebook(db, hoaId, "rulebook-1")).toMatchObject({
+    await expect(requestRulebookBuild(db, binding, organizationId, { now, ids })).rejects.toThrow(
+      "Workflows is unavailable."
+    )
+    await abandonRulebookBuild(db, organizationId, ids, "Workflows is unavailable.", now)
+    expect(await getRulebook(db, organizationId, "rulebook-1")).toMatchObject({
       status: "failed",
       error: { stage: "start", message: "Workflows is unavailable." }
     })
-    expect(await getJob(db, hoaId, "job-1")).toMatchObject({ status: "failed" })
+    expect(await getJob(db, organizationId, "job-1")).toMatchObject({ status: "failed" })
   })
 })
 
 describe("stopRulebookBuild", { timeout: 30_000 }, () => {
   let database: TestDatabase
-  const administrator = { hoa: { id: hoaId }, role: "administrator" as const }
+  const administrator = { organization: { id: organizationId }, role: "administrator" as const }
 
   beforeEach(async () => {
     database = await createTestDatabase()
@@ -126,7 +130,7 @@ describe("stopRulebookBuild", { timeout: 30_000 }, () => {
 
   async function startBuild(binding: RulebookBuildBinding) {
     const document = await createGoverningDocument(database.db, {
-      hoaId,
+      organizationId,
       kind: "declaration",
       title: "Declaration",
       effectiveDate: null,
@@ -136,8 +140,8 @@ describe("stopRulebookBuild", { timeout: 30_000 }, () => {
       uploadedBy: "admin",
       uploadedAt: now
     })
-    await updateGoverningDocument(database.db, hoaId, document.id, { status: "ready" })
-    const started = await requestRulebookBuild(database.db, binding, hoaId, { now })
+    await updateGoverningDocument(database.db, organizationId, document.id, { status: "ready" })
+    const started = await requestRulebookBuild(database.db, binding, organizationId, { now })
     if (started.status !== "started") {
       throw new Error("The build should start")
     }
@@ -149,7 +153,7 @@ describe("stopRulebookBuild", { timeout: 30_000 }, () => {
     const { binding, terminate } = fakeBinding()
     await startBuild(binding)
 
-    expect(await stopRulebookBuild(db, binding, { ...administrator, hoa: { id: "other-hoa" } }, now)).toEqual({
+    expect(await stopRulebookBuild(db, binding, { ...administrator, organization: { id: "other-hoa" } }, now)).toEqual({
       status: "not-building"
     })
     expect(terminate).not.toHaveBeenCalled()
@@ -160,7 +164,7 @@ describe("stopping a build", () => {
   it("is for administrators only", async () => {
     const { binding, terminate } = fakeBinding()
     await expect(
-      stopRulebookBuild(untouchedDatabase(), binding, { hoa: { id: hoaId }, role: "homeowner" }, now)
+      stopRulebookBuild(untouchedDatabase(), binding, { organization: { id: organizationId }, role: "homeowner" }, now)
     ).rejects.toThrow("Only an administrator can do this.")
     expect(terminate).not.toHaveBeenCalled()
   })

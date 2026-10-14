@@ -10,7 +10,7 @@ export type JobFailure = z.infer<typeof jobFailureSchema>
 export const jobSchema = z.object({
   /** The Workflow instance id, also the Langfuse session id. */
   id: z.string(),
-  hoaId: z.string(),
+  organizationId: z.string(),
   kind: z.enum(jobKinds),
   subjectId: z.string(),
   /** `cancelled`: an administrator stopped it. */

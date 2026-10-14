@@ -16,13 +16,15 @@ export const Route = createFileRoute("/files/project-types/$projectTypeId/templa
     handlers: {
       GET: async ({ params }) => {
         const context = await getRequestContext()
-        const type = await getProjectType(getDb(), context.hoa.id, params.projectTypeId)
+        const type = await getProjectType(getDb(), context.organization.id, params.projectTypeId)
         const template = type?.definition.documents.find(
           (document) => document.template?.id === params.templateId
         )?.template
         const object =
           type && template
-            ? await getBucket().get(projectTypeKeys(context.hoa.id, type.id).template(template.id, template.fileName))
+            ? await getBucket().get(
+                projectTypeKeys(context.organization.id, type.id).template(template.id, template.fileName)
+              )
             : null
         if (!template || !object) {
           return new Response("Not found", { status: 404 })

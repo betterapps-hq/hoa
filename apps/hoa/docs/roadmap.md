@@ -36,8 +36,18 @@ against the covenants. The window is open, but not for long.
 - **Applications:** homeowners apply, upload files, and get an AI review against the rulebook; the committee decides
   ([design/application-review.md](design/application-review.md)).
 - **Owner portal:** the homeowner's dashboard ([dashboard.md](dashboard.md)): what waits on them, where their
-  applications stand, the rules in force and recent activity. It needs real accounts and the modules below.
-- **Roles:** a demo switcher between a homeowner and an administrator. There are no real accounts or memberships yet.
+  applications stand, the rules in force and recent activity. It grows with the modules below.
+- **Accounts:** sign-in by email code, Google or password, invitations, and an account page with the person's details,
+  homes, committee seats, sign-in methods and sessions; deleting the account
+  ([design/people.md](design/people.md)).
+- **The roll:** everyone in the association, with or without an account; homes with their addresses, and who owns,
+  lives in or rents each from one day to another; recording a sale. Signing in joins every roll with the account's
+  email.
+- **Roles and committees:** administrators and members; the board and committees, each seat with its role, an office
+  such as Treasurer, and terms kept over time; resigning a seat. What someone may do follows the seats they hold today.
+- **Settings:** the association's name, logo and mailing address, units of measure and how long applications are
+  kept; deleting the association.
+- **Operators:** the platform's own staff open any association and view the app as someone in it.
 
 ## Priorities
 
@@ -179,15 +189,17 @@ One notification system every module sends through.
 
 The P1 work, in order:
 
-1. **People:** accounts, units, roles and committees, and importing an association's data. Every other module depends
-   on it.
-2. **Notifications:** email and text; every later module sends through them.
-3. **Applications:** neighbor sign-off, online signatures and committee decisions, on the module that's built.
-4. **Money:** payments, dues and autopay, late fees and payment plans, fines, then the QuickBooks sync.
-5. **Owner portal and documents:** the homeowner's dashboard grows to show balances, payments and documents.
-6. **Violations** with enforcement and phone inspections.
-7. **Owner voting.**
-8. **Mobile app.**
+1. **People:** built. Still to come: importing an association's data, export, tags and custom fields, the resident
+   directory and two-step login.
+2. **Violations and fines:** reports with photos citing the rule, the documents' enforcement steps, and fines.
+3. **Dues and payments:** each unit's ledger, dues and assessments, payments and autopay, late fees and payment plans;
+   fines land on the same ledger.
+4. **QuickBooks sync:** each unit's charges and payments sent to the association's books.
+5. **Notifications:** email and text; every module sends through them.
+6. **Applications:** neighbor sign-off, online signatures and committee decisions, on the module that's built.
+7. **Owner portal and documents:** the homeowner's dashboard grows to show balances, payments and documents.
+8. **Owner voting.**
+9. **Mobile app.**
 
 Then the P2 modules, as associations ask for them.
 
@@ -197,9 +209,9 @@ Every PayHOA plan has every feature. What it does, and where this app stands:
 
 | Area | PayHOA | This app |
 | --- | --- | --- |
-| Owners and units | Import, tags, custom fields, ownership change, tenants as contacts only | Planned: People |
-| Roles | Read or edit per module, no named roles | Planned: People, with named roles and committees |
-| Sign-in | One login for several units, optional two-step login | Planned: People |
+| Owners and units | Import, tags, custom fields, ownership change, tenants as contacts only | **Built:** owners, residents and renters with dates, ownership change, renters' own sign-in; import, tags and custom fields planned |
+| Roles | Read or edit per module, no named roles | **Built:** administrators, and committees with chairs, officers and terms |
+| Sign-in | One login for several units, optional two-step login | **Built:** one login for several units, by email code, Google or password; two-step login planned |
 | Invoices and dues | One-time and recurring, bulk by tag, emailed or mailed | Planned: Money |
 | Payments | Stripe bank and card, autopay, lockbox, pass-through fees | Planned: Money |
 | Late fees and collections | Flat, percentage or compounding; reminders; payment plans; account lock | Planned: Money |
@@ -223,7 +235,7 @@ Every PayHOA plan has every feature. What it does, and where this app stands:
 | Resale documents | Through HomeWiseDocs | Planned: Community |
 | AI | Penny for owners, Gable for administrators (beta), AI bank reconciliation | Rulebook and application review **built**; assistants planned |
 | Management companies | One login across associations | Later |
-| QuickBooks | No connection | Planned: Money |
+| QuickBooks | No connection | Planned: QuickBooks sync, after dues and payments |
 | E-signatures | Waivers accepted by click only | Planned: Applications |
 
 ### Where PayHOA is weak

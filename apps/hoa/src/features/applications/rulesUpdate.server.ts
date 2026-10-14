@@ -25,8 +25,8 @@ async function readOrNull(ref: RulesFileRef) {
 }
 
 /** The published rulebook's version for each rulebook id, for saying which version a review read. */
-export async function rulebookVersions(hoaId: string): Promise<ReadonlyMap<string, number | null>> {
-  const rulebooks = await listPublishedRulebooks(getDb(), hoaId)
+export async function rulebookVersions(organizationId: string): Promise<ReadonlyMap<string, number | null>> {
+  const rulebooks = await listPublishedRulebooks(getDb(), organizationId)
   return new Map(rulebooks.map((rulebook) => [rulebook.id, rulebook.version]))
 }
 
@@ -35,7 +35,7 @@ export async function rulebookVersions(hoaId: string): Promise<ReadonlyMap<strin
  * published rulebook, nothing it applied changed, or the application was submitted.
  */
 export async function rulesUpdateOf(
-  hoaId: string,
+  organizationId: string,
   application: Pick<Application, "submittedReviewId">,
   review: Pick<Review, "rulebookId" | "rulesFileSha256" | "selected" | "request"> | null,
   definition: ProjectTypeDefinition | null
@@ -43,14 +43,14 @@ export async function rulesUpdateOf(
   if (!review || application.submittedReviewId !== null) {
     return null
   }
-  const published = await getPublishedRulesFile(getDb(), hoaId)
+  const published = await getPublishedRulesFile(getDb(), organizationId)
   if (!published || published.rulebookId === review.rulebookId) {
     return null
   }
   const [before, after, versions] = await Promise.all([
-    readOrNull({ fileKey: rulebookKeys(hoaId, review.rulebookId).file, fileSha256: review.rulesFileSha256 }),
+    readOrNull({ fileKey: rulebookKeys(organizationId, review.rulebookId).file, fileSha256: review.rulesFileSha256 }),
     readOrNull(published),
-    rulebookVersions(hoaId)
+    rulebookVersions(organizationId)
   ])
   if (!before || !after) {
     return null
