@@ -24,10 +24,14 @@ import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$doc
 import { Route as ProjectTypesIndexRouteImport } from './routes/project-types.index'
 import { Route as ProjectTypesProjectTypeIdRouteImport } from './routes/project-types.$projectTypeId'
 import { Route as RulesReviewRouteImport } from './routes/rules_.review'
+import { Route as ViolationsIndexRouteImport } from './routes/violations.index'
+import { Route as ViolationsViolationIdRouteImport } from './routes/violations.$violationId'
+import { Route as ViolationsNewRouteImport } from './routes/violations.new'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as FilesGoverningDocumentIdRouteImport } from './routes/files.governing.$documentId'
 import { Route as FilesApplicationsApplicationIdFileIdRouteImport } from './routes/files.applications.$applicationId.$fileId'
 import { Route as FilesOrganizationsOrganizationIdLogoRouteImport } from './routes/files.organizations.$organizationId.logo'
+import { Route as FilesViolationsViolationIdPhotoIdRouteImport } from './routes/files.violations.$violationId.$photoId'
 import { Route as FilesProjectTypesProjectTypeIdTemplatesTemplateIdRouteImport } from './routes/files.project-types.$projectTypeId.templates.$templateId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -107,6 +111,21 @@ const RulesReviewRoute = RulesReviewRouteImport.update({
   path: '/rules/review',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ViolationsIndexRoute = ViolationsIndexRouteImport.update({
+  id: '/violations/',
+  path: '/violations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ViolationsViolationIdRoute = ViolationsViolationIdRouteImport.update({
+  id: '/violations/$violationId',
+  path: '/violations/$violationId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ViolationsNewRoute = ViolationsNewRouteImport.update({
+  id: '/violations/new',
+  path: '/violations/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -130,6 +149,12 @@ const FilesOrganizationsOrganizationIdLogoRoute =
     path: '/files/organizations/$organizationId/logo',
     getParentRoute: () => rootRouteImport,
   } as any)
+const FilesViolationsViolationIdPhotoIdRoute =
+  FilesViolationsViolationIdPhotoIdRouteImport.update({
+    id: '/files/violations/$violationId/$photoId',
+    path: '/files/violations/$violationId/$photoId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute =
   FilesProjectTypesProjectTypeIdTemplatesTemplateIdRouteImport.update({
     id: '/files/project-types/$projectTypeId/templates/$templateId',
@@ -150,13 +175,17 @@ export interface FileRoutesByFullPath {
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules/review': typeof RulesReviewRoute
+  '/violations/$violationId': typeof ViolationsViolationIdRoute
+  '/violations/new': typeof ViolationsNewRoute
   '/applications/': typeof ApplicationsIndexRoute
   '/documents/': typeof DocumentsIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
+  '/violations/': typeof ViolationsIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
   '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
   '/files/organizations/$organizationId/logo': typeof FilesOrganizationsOrganizationIdLogoRoute
+  '/files/violations/$violationId/$photoId': typeof FilesViolationsViolationIdPhotoIdRoute
   '/files/project-types/$projectTypeId/templates/$templateId': typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 export interface FileRoutesByTo {
@@ -172,13 +201,17 @@ export interface FileRoutesByTo {
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules/review': typeof RulesReviewRoute
+  '/violations/$violationId': typeof ViolationsViolationIdRoute
+  '/violations/new': typeof ViolationsNewRoute
   '/applications': typeof ApplicationsIndexRoute
   '/documents': typeof DocumentsIndexRoute
   '/project-types': typeof ProjectTypesIndexRoute
+  '/violations': typeof ViolationsIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
   '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
   '/files/organizations/$organizationId/logo': typeof FilesOrganizationsOrganizationIdLogoRoute
+  '/files/violations/$violationId/$photoId': typeof FilesViolationsViolationIdPhotoIdRoute
   '/files/project-types/$projectTypeId/templates/$templateId': typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 export interface FileRoutesById {
@@ -195,13 +228,17 @@ export interface FileRoutesById {
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules_/review': typeof RulesReviewRoute
+  '/violations/$violationId': typeof ViolationsViolationIdRoute
+  '/violations/new': typeof ViolationsNewRoute
   '/applications/': typeof ApplicationsIndexRoute
   '/documents/': typeof DocumentsIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
+  '/violations/': typeof ViolationsIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
   '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
   '/files/organizations/$organizationId/logo': typeof FilesOrganizationsOrganizationIdLogoRoute
+  '/files/violations/$violationId/$photoId': typeof FilesViolationsViolationIdPhotoIdRoute
   '/files/project-types/$projectTypeId/templates/$templateId': typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 export interface FileRouteTypes {
@@ -219,13 +256,17 @@ export interface FileRouteTypes {
     | '/documents/$documentId'
     | '/project-types/$projectTypeId'
     | '/rules/review'
+    | '/violations/$violationId'
+    | '/violations/new'
     | '/applications/'
     | '/documents/'
     | '/project-types/'
+    | '/violations/'
     | '/api/auth/$'
     | '/files/governing/$documentId'
     | '/files/applications/$applicationId/$fileId'
     | '/files/organizations/$organizationId/logo'
+    | '/files/violations/$violationId/$photoId'
     | '/files/project-types/$projectTypeId/templates/$templateId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -241,13 +282,17 @@ export interface FileRouteTypes {
     | '/documents/$documentId'
     | '/project-types/$projectTypeId'
     | '/rules/review'
+    | '/violations/$violationId'
+    | '/violations/new'
     | '/applications'
     | '/documents'
     | '/project-types'
+    | '/violations'
     | '/api/auth/$'
     | '/files/governing/$documentId'
     | '/files/applications/$applicationId/$fileId'
     | '/files/organizations/$organizationId/logo'
+    | '/files/violations/$violationId/$photoId'
     | '/files/project-types/$projectTypeId/templates/$templateId'
   id:
     | '__root__'
@@ -263,13 +308,17 @@ export interface FileRouteTypes {
     | '/documents/$documentId'
     | '/project-types/$projectTypeId'
     | '/rules_/review'
+    | '/violations/$violationId'
+    | '/violations/new'
     | '/applications/'
     | '/documents/'
     | '/project-types/'
+    | '/violations/'
     | '/api/auth/$'
     | '/files/governing/$documentId'
     | '/files/applications/$applicationId/$fileId'
     | '/files/organizations/$organizationId/logo'
+    | '/files/violations/$violationId/$photoId'
     | '/files/project-types/$projectTypeId/templates/$templateId'
   fileRoutesById: FileRoutesById
 }
@@ -286,13 +335,17 @@ export interface RootRouteChildren {
   DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
   ProjectTypesProjectTypeIdRoute: typeof ProjectTypesProjectTypeIdRoute
   RulesReviewRoute: typeof RulesReviewRoute
+  ViolationsViolationIdRoute: typeof ViolationsViolationIdRoute
+  ViolationsNewRoute: typeof ViolationsNewRoute
   ApplicationsIndexRoute: typeof ApplicationsIndexRoute
   DocumentsIndexRoute: typeof DocumentsIndexRoute
   ProjectTypesIndexRoute: typeof ProjectTypesIndexRoute
+  ViolationsIndexRoute: typeof ViolationsIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   FilesGoverningDocumentIdRoute: typeof FilesGoverningDocumentIdRoute
   FilesApplicationsApplicationIdFileIdRoute: typeof FilesApplicationsApplicationIdFileIdRoute
   FilesOrganizationsOrganizationIdLogoRoute: typeof FilesOrganizationsOrganizationIdLogoRoute
+  FilesViolationsViolationIdPhotoIdRoute: typeof FilesViolationsViolationIdPhotoIdRoute
   FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute: typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 
@@ -403,6 +456,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RulesReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/violations/': {
+      id: '/violations/'
+      path: '/violations'
+      fullPath: '/violations/'
+      preLoaderRoute: typeof ViolationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/violations/$violationId': {
+      id: '/violations/$violationId'
+      path: '/violations/$violationId'
+      fullPath: '/violations/$violationId'
+      preLoaderRoute: typeof ViolationsViolationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/violations/new': {
+      id: '/violations/new'
+      path: '/violations/new'
+      fullPath: '/violations/new'
+      preLoaderRoute: typeof ViolationsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -431,6 +505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FilesOrganizationsOrganizationIdLogoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/files/violations/$violationId/$photoId': {
+      id: '/files/violations/$violationId/$photoId'
+      path: '/files/violations/$violationId/$photoId'
+      fullPath: '/files/violations/$violationId/$photoId'
+      preLoaderRoute: typeof FilesViolationsViolationIdPhotoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/files/project-types/$projectTypeId/templates/$templateId': {
       id: '/files/project-types/$projectTypeId/templates/$templateId'
       path: '/files/project-types/$projectTypeId/templates/$templateId'
@@ -454,15 +535,20 @@ const rootRouteChildren: RootRouteChildren = {
   DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
   ProjectTypesProjectTypeIdRoute: ProjectTypesProjectTypeIdRoute,
   RulesReviewRoute: RulesReviewRoute,
+  ViolationsViolationIdRoute: ViolationsViolationIdRoute,
+  ViolationsNewRoute: ViolationsNewRoute,
   ApplicationsIndexRoute: ApplicationsIndexRoute,
   DocumentsIndexRoute: DocumentsIndexRoute,
   ProjectTypesIndexRoute: ProjectTypesIndexRoute,
+  ViolationsIndexRoute: ViolationsIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   FilesGoverningDocumentIdRoute: FilesGoverningDocumentIdRoute,
   FilesApplicationsApplicationIdFileIdRoute:
     FilesApplicationsApplicationIdFileIdRoute,
   FilesOrganizationsOrganizationIdLogoRoute:
     FilesOrganizationsOrganizationIdLogoRoute,
+  FilesViolationsViolationIdPhotoIdRoute:
+    FilesViolationsViolationIdPhotoIdRoute,
   FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute:
     FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute,
 }

@@ -3,7 +3,7 @@
 const megabyte = 1024 * 1024
 const docxType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-export type UploadTarget = "governing" | "application" | "template"
+export type UploadTarget = "governing" | "application" | "template" | "photo"
 const uploadFormats = ["pdf", "docx", "image"] as const
 export type UploadFormat = (typeof uploadFormats)[number]
 
@@ -24,7 +24,9 @@ const limits: Record<UploadTarget, Partial<Record<UploadFormat, number>>> = {
   governing: { pdf: 50 * megabyte, docx: 50 * megabyte },
   application: { pdf: 25 * megabyte, docx: 25 * megabyte, image: 5 * megabyte },
   /** A form a project type gives homeowners to fill in. */
-  template: { pdf: 10 * megabyte, docx: 10 * megabyte }
+  template: { pdf: 10 * megabyte, docx: 10 * megabyte },
+  /** A violation's photo, as a phone takes it. */
+  photo: { image: 15 * megabyte }
 }
 
 /** The media types and extensions a target accepts, as a file picker's filter: { "application/pdf": [".pdf"] }. */

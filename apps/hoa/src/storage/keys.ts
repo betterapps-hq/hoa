@@ -76,3 +76,9 @@ export const organizationPrefix = (organizationId: string) => `hoas/${organizati
 
 /** An organization's logo, one object replaced on each upload. */
 export const organizationLogoKey = (organizationId: string) => `${organizationPrefix(organizationId)}logo`
+
+/** A violation's photos (docs/design/violations.md, Records). */
+export const violationKeys = (organizationId: string, violationId: string) => {
+  const root = `${organizationPrefix(organizationId)}violations/${violationId}/`
+  return { root, photo: (photoId: string) => `${root}photos/${photoId}` }
+}

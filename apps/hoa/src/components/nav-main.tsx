@@ -5,6 +5,7 @@ import {
   LayoutDashboardIcon,
   ScrollTextIcon,
   SettingsIcon,
+  TriangleAlertIcon,
   UsersIcon
 } from "lucide-react"
 import {
@@ -24,6 +25,7 @@ const icons: Record<NavItem["to"], typeof LayoutDashboardIcon> = {
   "/rules": ScrollTextIcon,
   "/project-types": LayersIcon,
   "/applications": ClipboardCheckIcon,
+  "/violations": TriangleAlertIcon,
   "/people": UsersIcon,
   "/settings": SettingsIcon
 }

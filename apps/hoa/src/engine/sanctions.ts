@@ -22,10 +22,11 @@ export type SanctionInput = {
   /** The rules found broken: a violation's rules once the board finds them broken, an assessment's due date. */
   broken: T.RuleKey[]
   /**
-   * Which occurrence a sanction counts this as, by its `occurrences`; null when it can't be told. The feature that keeps
-   * the violations counts them. Without it, the request's `violation.occurrence` fact counts for every sanction.
+   * Which occurrence a sanction counts this as, for the broken rule it enforces, by its `occurrences`; null when it
+   * can't be told. The feature that keeps the violations counts them. Without it, the request's `violation.occurrence`
+   * fact counts for every sanction.
    */
-  occurrenceOf?: (rule: T.SanctionRule) => number | null
+  occurrenceOf?: (rule: T.SanctionRule, enforced: T.RuleKey) => number | null
 }
 
 export type CureStatus =
@@ -90,10 +91,17 @@ export type SanctionResult = {
   lasts: T.Sanction["lasts"]
   /** The limits that cap or forbid it. */
   limitedBy: T.RuleKey[]
+  /** When it waits on a procedure the settings require first (notice and hearing, say): that procedure's condition. */
+  precondition: T.Condition | null
   inputs: Input[]
 }
 
-export type SanctionsResult = { cures: CurePeriod[]; sanctions: SanctionResult[] }
+export type SanctionsResult = {
+  cures: CurePeriod[]
+  sanctions: SanctionResult[]
+  /** Every fact the cure periods and sanctions read, for asking what's unknown. */
+  reads: Input[]
+}
 
 const outcomeOrder: SanctionOutcome[] = ["available", "pending", "missing-information", "blocked", "not-applicable"]
 
@@ -148,13 +156,19 @@ const fresh = (context: Context): Context => ({ ...context, reads: [], deriving:
 
 const requestScope = (context: Context): Scope => ({ subject: { type: "entity", id: context.rootId("request") } })
 
+/** Whether a condition holds for a request as sanctions read it, such as a procedure the settings require first. */
+export const conditionHolds = (rulesFile: T.RulesFile, request: T.EvaluationRequest, condition: T.Condition) => {
+  const context = sanctionContext(rulesFile, request)
+  return evaluateCondition(context, requestScope(context), condition)
+}
+
 const selects = (selection: T.RuleSelection, rule: T.Rule) =>
   Array.isArray(selection)
     ? selection.includes(rule.key)
     : !selection.except.includes(rule.key) && selection.documents.includes(documentKeyOf(mainProvision(rule)))
 
 /** Whether a sanction rule enforces a broken rule: by its key, or its whole document. */
-const enforces = (sanction: T.SanctionRule, rule: T.Rule) =>
+export const enforces = (sanction: T.SanctionRule, rule: T.Rule) =>
   !sanction.enforces.except.includes(rule.key) &&
   (sanction.enforces.rules.includes(rule.key) ||
     sanction.enforces.documents.includes(documentKeyOf(mainProvision(rule))))
@@ -170,20 +184,27 @@ function periodEnd(context: Context, from: number, amount: T.Amount) {
 
 /** A rule's cure period: its own, none for an event or health and safety, or the settings' default. */
 export function curePeriodOf(context: Context, rule: T.NormRule): CurePeriod {
+  const reading = fresh(context)
+  const period = curePeriodIn(reading, rule)
+  // What it read, for asking what's unknown.
+  context.reads.push(...reading.reads)
+  return period
+}
+
+function curePeriodIn(reading: Context, rule: T.NormRule): CurePeriod {
   const base = { ruleKey: rule.key, startsOn: null, endsOn: null, curedOn: null, needs: [] }
-  const thing = rule.appliesTo ? context.vocabulary.get(context.vocabulary.thingOf(rule.appliesTo)) : undefined
+  const thing = rule.appliesTo ? reading.vocabulary.get(reading.vocabulary.thingOf(rule.appliesTo)) : undefined
   if (thing?.kind === "thing" && thing.nature === "event") {
     return { ...base, status: "none", reason: "It's about an event that's over, so it can't be cured.", citations: [] }
   }
   if (rule.cure === "none") {
     return { ...base, status: "none", reason: "The rule allows no time to cure.", citations: rule.citations }
   }
-  const cure = rule.cure ?? context.settings.clauses.cure
-  const citations = rule.cure ? rule.citations : (context.settings.clauses.cure?.citations ?? [])
+  const cure = rule.cure ?? reading.settings.clauses.cure
+  const citations = rule.cure ? rule.citations : (reading.settings.clauses.cure?.citations ?? [])
   if (!cure) {
     return { ...base, status: "none", reason: "Neither the rule nor the documents give a time to cure.", citations }
   }
-  const reading = fresh(context)
   const scope = requestScope(reading)
   const start = dayOf(resolvePath(reading, scope, cure.after))
   const label = (path: T.Path) => reading.vocabulary.label(path.path.at(-1) ?? "")
@@ -368,7 +389,13 @@ function againstOf(context: Context, rule: T.SanctionRule) {
   return [...new Set([...rule.against, ...answering.map((liability) => liability.liable)])]
 }
 
-type Waiting = { outcome: SanctionOutcome; reason: string; availableOn: T.IsoDate | null; needs: string[] }
+type Waiting = {
+  outcome: SanctionOutcome
+  reason: string
+  availableOn: T.IsoDate | null
+  needs: string[]
+  precondition?: T.Condition
+}
 
 /** What, if anything, a sanction still waits on: its condition, the cure period, its own period, the procedures. */
 function waitingOn(context: Context, rule: T.SanctionRule, cure: CurePeriod | null): Waiting | null {
@@ -433,10 +460,22 @@ function waitingOn(context: Context, rule: T.SanctionRule, cure: CurePeriod | nu
     }
     const holds = evaluateCondition(context, scope, precondition.condition)
     if (holds === false) {
-      return { outcome: "pending", reason: `First: ${describe(precondition.condition)}.`, availableOn: null, needs: [] }
+      return {
+        outcome: "pending",
+        reason: `First: ${describe(precondition.condition)}.`,
+        availableOn: null,
+        needs: [],
+        precondition: precondition.condition
+      }
     }
     if (holds === null) {
-      return { outcome: "missing-information", reason: "", availableOn: null, needs: unknownLabels(context) }
+      return {
+        outcome: "missing-information",
+        reason: "",
+        availableOn: null,
+        needs: unknownLabels(context),
+        precondition: precondition.condition
+      }
     }
   }
   return null
@@ -460,11 +499,11 @@ function evaluateSanction(
   broken: T.NormRule,
   cure: CurePeriod | null,
   limits: T.LimitRule[],
-  occurrenceOf: (rule: T.SanctionRule) => number | null
+  occurrenceOf: NonNullable<SanctionInput["occurrenceOf"]>
 ): SanctionResult {
   const context = fresh(shared)
   const limited = limitsOn(context, limits, rule)
-  const occurrence = rule.sanction.occurrences ? occurrenceOf(rule) : null
+  const occurrence = rule.sanction.occurrences ? occurrenceOf(rule, broken.key) : null
   const waiting = blockedBy(context, limited) ?? waitingOn(context, rule, cure)
   const amount = amountOf(context, rule, occurrence, cure, limited.rules)
   const verb = rule.modality === "obligation" ? "Must be imposed" : "May be imposed"
@@ -487,6 +526,7 @@ function evaluateSanction(
     limitedBy: [
       ...new Set([...limited.rules.map((limit) => limit.key), ...(limited.forbids ? [limited.forbids.key] : [])])
     ],
+    precondition: waiting?.precondition ?? null,
     inputs: context.reads
   }
 }
@@ -526,6 +566,7 @@ export function evaluateSanctions({ rulesFile, request, broken, occurrenceOf }: 
     cures,
     sanctions: sanctions.toSorted(
       (a, b) => outcomeOrder.indexOf(a.outcome) - outcomeOrder.indexOf(b.outcome) || a.ruleKey.localeCompare(b.ruleKey)
-    )
+    ),
+    reads: [...context.reads, ...sanctions.flatMap((sanction) => sanction.inputs)]
   }
 }

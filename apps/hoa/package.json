@@ -13,6 +13,7 @@
     "db:migrate:local": "wrangler d1 migrations apply hoa-dev --local --env dev",
     "db:seed:local": "wrangler d1 execute hoa-dev --local --env dev --file seed/hoa.sql && wrangler d1 execute hoa-dev --local --env dev --file seed/people.sql",
     "db:reset:rules": "tsx scripts/reset-rules.ts",
+    "db:seed:rulebook": "tsx scripts/seed-sample-rulebook.ts",
     "db:migrate:preview": "wrangler d1 migrations apply hoa-preview --remote --env preview-workflows",
     "db:seed:preview": "wrangler d1 execute hoa-preview --remote --env preview-workflows --file seed/hoa.sql",
     "db:migrate:demo": "wrangler d1 migrations apply hoa --remote",
