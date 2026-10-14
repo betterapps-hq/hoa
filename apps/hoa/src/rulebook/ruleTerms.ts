@@ -55,16 +55,23 @@ const dimensionOf = (vocabulary: Vocabulary, key: T.TermKey) => {
   return unit?.kind === "unit" ? unit.dimension : null
 }
 
+/**
+ * The kind of value a property holds, as text two properties share when they hold the same kind: a quantity of one
+ * dimension, a choice from one list, a reference to one thing, or else one type.
+ */
+export function valueKindOf(vocabulary: Vocabulary, valueType: T.ValueType) {
+  return JSON.stringify(
+    match(valueType)
+      .with({ type: "quantity" }, ({ unit }) => ["quantity", dimensionOf(vocabulary, unit)])
+      .with({ type: "choice" }, ({ set }) => ["choice", set])
+      .with({ type: "reference" }, ({ to }) => ["reference", to])
+      .otherwise(({ type }) => [type])
+  )
+}
+
 /** Whether two properties hold the same kind of value: a quantity of the same dimension, a choice from the same list. */
-export function isSameValueType(vocabulary: Vocabulary, a: T.ValueType, b: T.ValueType) {
-  return match(a)
-    .with(
-      { type: "quantity" },
-      ({ unit }) => b.type === "quantity" && dimensionOf(vocabulary, unit) === dimensionOf(vocabulary, b.unit)
-    )
-    .with({ type: "choice" }, ({ set }) => b.type === "choice" && b.set === set)
-    .with({ type: "reference" }, ({ to }) => b.type === "reference" && b.to === to)
-    .otherwise(() => a.type === b.type)
+function isSameValueType(vocabulary: Vocabulary, a: T.ValueType, b: T.ValueType) {
+  return valueKindOf(vocabulary, a) === valueKindOf(vocabulary, b)
 }
 
 /**

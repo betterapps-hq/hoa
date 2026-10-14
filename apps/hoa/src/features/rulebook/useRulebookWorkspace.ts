@@ -8,9 +8,10 @@ import type { TermEdit } from "@/rulebook/termEdits"
 import type * as T from "@/schema/types"
 import type { RulebookIssue } from "@/schema/validate"
 import type { Vocabulary } from "@/schema/vocabulary"
-import type { RuleDraft } from "@/schema/zod"
+import type { RuleDraft, TermContent } from "@/schema/zod"
 import type { CitationIndex } from "./rulebookRecords"
 import type { ReviewResult } from "./rulebookReview.functions"
+import type { TermSubject } from "./VocabularyTab/VocabularyTab.utils"
 
 /** The pages citations point into, and their text outside any provision, which the coverage tab reads. */
 export type RulebookSource = CitationSource & { loadSourceText: () => Promise<SourceText[]> }
@@ -43,6 +44,12 @@ export type RulebookActions = {
 export type RulebookWorkspaceValue = {
   records: RulebookRecords
   vocabulary: Vocabulary
+  /** The terms a term can be merged into (`mergeCandidates`), found once for every term the page shows. */
+  mergeTargets: (key: T.TermKey) => TermContent[]
+  /** The rules that read each term, rejected rules left out. */
+  termUsage: Map<T.TermKey, T.RuleKey[]>
+  /** The terms grouped under what they describe, built once for every search and filter of the terms tab. */
+  termSubjects: TermSubject[]
   citations: CitationIndex
   coverage: Coverage
   /** Problems validation finds, by record key: a rule's, a term's, a provision's, or "settings". */
