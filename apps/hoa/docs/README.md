@@ -2,6 +2,7 @@
 
 | Page                 | What it covers                                                                                     |
 | -------------------- | -------------------------------------------------------------------------------------------------- |
+| [roadmap.md](roadmap.md) | The product's modules beyond design review, measured against PayHOA, in build order, and pricing. |
 | [setup.md](setup.md) | Langfuse and OpenRouter projects, local credentials, OpenRouter Broadcast and running the app.     |
 | [design/](design/README.md) | The rulebook and review design: rule model, OCR, storage, pipelines, evaluation, Cloudflare and CI/CD. |
 | [ai.md](ai.md)       | How model calls, Langfuse prompts, tracing, cost and evaluators fit together; the AI feature rules. |
