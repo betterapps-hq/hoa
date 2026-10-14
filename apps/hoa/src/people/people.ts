@@ -146,6 +146,8 @@ export const committeeMemberInputSchema = z.object({
   startedOn: day
 })
 
+/** Someone's role in the app: an admin manages the association; a member uses it. */
+export const accessLabels: Record<Access, string> = { administrator: "Admin", member: "Member" }
 export const relationLabels: Record<UnitRelation, string> = { owner: "Owner", resident: "Resident", tenant: "Tenant" }
 
 /** Someone's seat on a committee as people say it: their office and whether they chair it, or Member. */

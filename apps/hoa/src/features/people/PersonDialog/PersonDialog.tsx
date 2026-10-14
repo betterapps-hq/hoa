@@ -2,11 +2,9 @@ import { useForm } from "@tanstack/react-form"
 import { PlusIcon, XIcon } from "lucide-react"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Field,
-  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
@@ -18,6 +16,8 @@ import { Input } from "@/components/ui/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import {
+  accessLabels,
+  accessLevels,
   committeeRoles,
   personInputSchema,
   relationLabels,
@@ -54,17 +54,17 @@ type PersonDialogProps = {
   units: readonly RollChoice[]
   /** Their membership's access once they've joined; null before, when their invitation sets it. */
   access: Access | null
-  /** For an administrator: their assignments, and making them one. Null for the board, which can't change either. */
+  /** For an admin: their role and assignments. Null for the board, which can't change either. */
   assignments: AssignmentChoices | null
   onSave: (save: PersonSave) => Promise<void>
   onOpenChange: (open: boolean) => void
 }
 
 const isRelation = (value: string): value is UnitRelation => unitRelations.some((relation) => relation === value)
+const isAccess = (value: string): value is Access => accessLevels.some((level) => level === value)
 const isRole = (value: string): value is CommitteeRole => committeeRoles.some((role) => role === value)
 
-const formSchema = personInputSchema.omit({ access: true }).extend({
-  isAdministrator: z.boolean(),
+const formSchema = personInputSchema.extend({
   unitId: z.string(),
   relation: z.enum(unitRelations),
   ending: z.array(z.string()),
@@ -86,7 +86,7 @@ export function PersonDialog({ person, units, access, assignments, onSave, onOpe
       email: person?.email ?? "",
       phone: person?.phone ? phoneText(person.phone) : "",
       mailingAddress: person?.mailingAddress ?? "",
-      isAdministrator: access === "administrator",
+      access: access ?? ("member" as Access),
       unitId: "",
       relation: "owner" as UnitRelation,
       ending: [] as string[],
@@ -100,7 +100,7 @@ export function PersonDialog({ person, units, access, assignments, onSave, onOpe
           email: value.email,
           phone: value.phone,
           mailingAddress: value.mailingAddress,
-          access: value.isAdministrator ? "administrator" : "member"
+          access: value.access
         },
         home: !person && value.unitId ? { unitId: value.unitId, relation: value.relation } : null,
         assignments: {
@@ -208,30 +208,37 @@ export function PersonDialog({ person, units, access, assignments, onSave, onOpe
                 </form.Field>
               </div>
             ) : null}
+            {assignments && access !== null ? (
+              <form.Field name="access">
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="person-role">Role</FieldLabel>
+                    <NativeSelect
+                      id="person-role"
+                      className="w-full"
+                      value={field.state.value}
+                      onChange={(event) => {
+                        if (isAccess(event.target.value)) {
+                          field.handleChange(event.target.value)
+                        }
+                      }}
+                    >
+                      {accessLevels.map((level) => (
+                        <NativeSelectOption key={level} value={level}>
+                          {accessLabels[level]}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                    <FieldDescription>An admin manages everything here.</FieldDescription>
+                  </Field>
+                )}
+              </form.Field>
+            ) : null}
           </FieldGroup>
           {assignments ? (
             <FieldSet>
               <FieldLegend variant="label">Assignments</FieldLegend>
               <div className="flex flex-col gap-3">
-                {access === null ? null : (
-                  <form.Field name="isAdministrator">
-                    {(field) => (
-                      <Field orientation="horizontal">
-                        <Checkbox
-                          id="person-administrator"
-                          checked={field.state.value}
-                          onCheckedChange={(checked) => field.handleChange(checked)}
-                        />
-                        <FieldContent>
-                          <FieldLabel htmlFor="person-administrator" className="font-normal">
-                            Administrator
-                          </FieldLabel>
-                          <FieldDescription>Manages everything here.</FieldDescription>
-                        </FieldContent>
-                      </Field>
-                    )}
-                  </form.Field>
-                )}
                 <form.Field name="ending">
                   {(field) =>
                     assignments.seats.map((seat) => {
