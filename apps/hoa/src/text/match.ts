@@ -99,11 +99,15 @@ export function partialRatio(a: string, b: string) {
     return longer.length === 0 ? 1 : 0
   }
   const common = commonSubsequenceWith(shorter)
+  // A window one character on shares at most one character more with the shorter text, so after a window sharing
+  // `found`, the next `best - found` windows can't share more than the best: they're skipped.
   let best = 0
-  for (let start = 0; start + shorter.length <= longer.length && best < 1; start += 1) {
-    best = Math.max(best, (2 * common(longer.slice(start, start + shorter.length))) / (2 * shorter.length))
+  for (let start = 0; start + shorter.length <= longer.length && best < shorter.length;) {
+    const found = common(longer.slice(start, start + shorter.length))
+    best = Math.max(best, found)
+    start += best - found + 1
   }
-  return best
+  return best / shorter.length
 }
 
 const words = (text: string) => text.split(" ").filter(Boolean)

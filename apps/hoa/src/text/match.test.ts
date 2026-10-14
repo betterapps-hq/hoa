@@ -52,6 +52,29 @@ describe("scores", () => {
     }
   })
 
+  it("partial ratio skips only windows that can't beat the best, finding what every window finds", () => {
+    const everyWindow = (a: string, b: string) => {
+      const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a]
+      let best = 0
+      for (let start = 0; start + shorter.length <= longer.length; start += 1) {
+        best = Math.max(best, ratio(shorter, longer.slice(start, start + shorter.length)))
+      }
+      return best
+    }
+    // A fixed linear congruential sequence: statement-like lengths, one text often much longer than the other.
+    let seed = 13
+    const next = (limit: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed % limit
+    }
+    const text = (length: number) => Array.from({ length }, () => "abcde fg"[next(8)]).join("")
+    for (let round = 0; round < 300; round += 1) {
+      const a = text(1 + next(80))
+      const b = text(1 + next(300))
+      expect([a, b, partialRatio(a, b)]).toEqual([a, b, everyWindow(a, b)])
+    }
+  })
+
   it("partial ratio finds the shorter text inside the longer", () => {
     expect(partialRatio("gray", "winchester gray")).toBe(1)
     expect(partialRatio("", "")).toBe(1)
