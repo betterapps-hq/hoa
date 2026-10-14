@@ -6,7 +6,13 @@ import { doesWorkOf, navigationFor, roles, type NavSection, type Role, type Role
 type RoleContextValue = {
   role: Role
   user: SessionUser
+  organizationId: string
   organizationName: string
+  organizationLogo: string | null
+  /** The organizations they can switch to, this one among them; empty with just one. */
+  organizations: readonly { id: string; name: string; logo: string | null }[]
+  /** False for one of the platform's operators looking at an organization whose roll they're not on. */
+  isOnRoll: boolean
   /** The sidebar's sections, from their role and the committees whose work they do. */
   navigation: NavSection[]
   /** Whether they do a kind of committee's work (`doesWorkOf`). */
@@ -20,18 +26,21 @@ export type RoleProviderProps = {
   /** The signed-in person's role, from the server's session. */
   roleId: RoleId
   user: SessionUser
+  organizationId: string
   organizationName: string
+  organizationLogo: string | null
+  organizations: readonly { id: string; name: string; logo: string | null }[]
+  isOnRoll: boolean
   committees: readonly Pick<Committee, "name" | "kind">[]
 }
 
 /** The signed-in person's role, account, association and navigation, for the app shell. */
-export function RoleProvider({ children, roleId, user, organizationName, committees }: RoleProviderProps) {
+export function RoleProvider({ children, roleId, committees, ...shell }: RoleProviderProps) {
   return (
     <RoleContext
       value={{
+        ...shell,
         role: roles[roleId],
-        user,
-        organizationName,
         navigation: navigationFor(roleId, committees),
         doesWorkOf: (kind) => doesWorkOf(roleId, committees, kind)
       }}

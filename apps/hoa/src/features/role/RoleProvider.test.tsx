@@ -20,7 +20,11 @@ describe("RoleProvider", () => {
       <RoleProvider
         roleId="administrator"
         user={{ name: "Sam Rivera", email: "sam@example.com" }}
+        organizationId="maple-hollow"
         organizationName="Maple Hollow"
+        organizationLogo={null}
+        organizations={[]}
+        isOnRoll
         committees={[{ name: "Design Review", kind: "architectural" }]}
       >
         <CurrentRole />

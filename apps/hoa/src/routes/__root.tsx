@@ -101,7 +101,11 @@ function MemberShell({ session }: { session: Extract<Session, { status: "member"
     <RoleProvider
       roleId={session.roleId}
       user={session.user}
+      organizationId={session.organizationId}
       organizationName={session.organizationName}
+      organizationLogo={session.organizationLogo}
+      organizations={session.organizations}
+      isOnRoll={session.personId !== null}
       committees={session.committees}
     >
       <TooltipProvider>

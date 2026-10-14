@@ -71,7 +71,7 @@ async function requireSession() {
 
 async function membershipOf(account: SignedInAccount) {
   const membership = await getMembership(account)
-  if (!membership) {
+  if (!membership?.person) {
     return null
   }
   const { organization, person, access } = membership
@@ -150,8 +150,8 @@ export const claimHome = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ unitId: z.string().min(1) }).parse(data))
   .handler(async ({ data }) => {
     const membership = await getMembership(accountOf(await requireSession()))
-    if (!membership) {
-      throw new Error("Your email isn't on an association's roll yet.")
+    if (!membership?.person) {
+      throw new Error("Your email isn't on this association's roll.")
     }
     const now = new Date().toISOString()
     const claimed = await claimUnit(
@@ -175,7 +175,7 @@ export const saveMyDetails = createServerFn({ method: "POST" })
     // Through Better Auth, so the session's cached copy of the user changes too.
     await getAuth().api.updateUser({ body: { name: data.name }, headers: getRequestHeaders() })
     const membership = await getMembership(accountOf(authSession))
-    if (membership) {
+    if (membership?.person) {
       const { person } = membership
       await updatePerson(
         db,

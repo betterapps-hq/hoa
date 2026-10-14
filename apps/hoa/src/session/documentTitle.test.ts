@@ -6,7 +6,10 @@ const user = { name: "Sam Rivera", email: "sam@example.com" }
 const member: Session = {
   status: "member",
   roleId: "administrator",
+  organizationId: "demo-hoa",
   organizationName: "Sudden Valley Community Association",
+  organizationLogo: null,
+  organizations: [],
   committees: [],
   personId: "person-sam",
   isOperator: false,

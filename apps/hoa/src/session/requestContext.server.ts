@@ -1,8 +1,8 @@
-import { getRequestHeaders } from "@tanstack/react-start/server"
+import { deleteCookie, getCookie, getRequestHeaders, getRequestUrl, setCookie } from "@tanstack/react-start/server"
 import { getAuth } from "@/auth/auth.server"
 import { getDb } from "@/db/client.server"
-import { joinRolls } from "@/db/membershipRepository"
-import { getOrganization } from "@/db/organizationRepository"
+import { isMember, joinRolls } from "@/db/membershipRepository"
+import { firstOrganization, getOrganization } from "@/db/organizationRepository"
 import { committeesInView, insertPerson, peopleForAccount } from "@/db/peopleRepository"
 import { assertAdministrator, assertWorkOf, type RoleId } from "@/features/role/roles"
 import type { Organization } from "@/organization/organization"
@@ -13,7 +13,8 @@ export type RequestContext = {
   organization: Organization
   role: RoleId
   user: RequestUser
-  person: Person
+  /** Who they are on the roll; null for a platform operator looking at an organization they're not on. */
+  person: Person | null
   /** Their membership's: "administrator" manages the organization. */
   access: Access
   /** The committees whose work they do (`committeesInView`). */
@@ -45,18 +46,38 @@ export async function getSignedInAccount() {
 
 export type SignedInAccount = ReturnType<typeof accountOf>
 
+/** The organization a platform operator opened without being a member of it. */
+const operatorOrganizationCookie = "operator_organization"
+
 /**
  * The organization an account is in, who it is on the roll there, and its access. Signing in joins every roll with its
  * email (`peopleForAccount`, `joinRolls`); a member who isn't on the roll, such as one the platform's operators added,
- * is put on it. The session's active organization, or the first joined. Null when it's in none.
+ * is put on it. The session's active organization, or the first joined. A platform operator can open any organization
+ * (`openOrganization`) and works in it as an administrator without being on its roll; one in none lands in the first.
+ * Null when it's in none. `memberOf` lists the organizations it's a member of.
  */
-export async function getMembership(account: SignedInAccount) {
+export async function getMembership(account: SignedInAccount): Promise<{
+  organization: Organization
+  person: Person | null
+  access: Access
+  memberOf: string[]
+} | null> {
   const db = getDb()
   const now = new Date()
   const people = await peopleForAccount(db, account)
   const memberships = await joinRolls(db, account, people, now)
-  const membership =
-    memberships.find(({ organizationId }) => organizationId === account.activeOrganizationId) ?? memberships[0]
+  const memberOf = memberships.map(({ organizationId }) => organizationId)
+  const chosenId =
+    (account.isOperator ? getCookie(operatorOrganizationCookie) : undefined) ?? account.activeOrganizationId
+  const chosen = memberships.find(({ organizationId }) => organizationId === chosenId)
+  if (!chosen && account.isOperator) {
+    const opened = chosenId ? await getOrganization(db, chosenId) : null
+    const organization = opened ?? (memberships.length === 0 ? await firstOrganization(db) : null)
+    if (organization) {
+      return { organization, person: null, access: "administrator", memberOf }
+    }
+  }
+  const membership = chosen ?? memberships[0]
   if (!membership) {
     return null
   }
@@ -72,7 +93,30 @@ export async function getMembership(account: SignedInAccount) {
         account.id
       )
   ])
-  return organization ? { organization, person, access } : null
+  return organization ? { organization, person, access, memberOf } : null
+}
+
+/**
+ * Opens another organization: one the account is a member of, as Better Auth's active organization; or, for a platform
+ * operator, any, remembered in a cookie of its own.
+ */
+export async function openOrganization(account: SignedInAccount, organizationId: string) {
+  const db = getDb()
+  if (await isMember(db, organizationId, account.id)) {
+    await getAuth().api.setActiveOrganization({ body: { organizationId }, headers: getRequestHeaders() })
+    deleteCookie(operatorOrganizationCookie, { path: "/" })
+    return
+  }
+  if (!account.isOperator || !(await getOrganization(db, organizationId))) {
+    throw new Error("You're not a member of that association.")
+  }
+  setCookie(operatorOrganizationCookie, organizationId, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: new URL(getRequestUrl()).protocol === "https:",
+    maxAge: 60 * 60 * 24 * 30
+  })
 }
 
 /**
@@ -92,10 +136,15 @@ export async function getRequestContext(): Promise<RequestContext> {
   return {
     organization,
     role: roleOf(access),
-    user: { id: account.id, name: account.name || person.name, email: account.email },
+    user: { id: account.id, name: account.name || person?.name || account.email, email: account.email },
     person,
     access,
-    committees: await committeesInView(getDb(), person, access, new Date().toISOString().slice(0, 10))
+    committees: await committeesInView(
+      getDb(),
+      { id: person?.id ?? null, organizationId: organization.id },
+      access,
+      new Date().toISOString().slice(0, 10)
+    )
   }
 }
 

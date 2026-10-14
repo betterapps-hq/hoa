@@ -46,8 +46,11 @@ first they joined.
 - **The sidebar** has the organization's pages (People for the board), then a section for each committee whose work
   they do that has pages of its own, named as the association names it (`navigationFor`).
 
-The platform's operators are separate: Better Auth's admin plugin, with `users.role` set to `admin`. They can view the
-app as someone who's joined, under a yellow bar across the top with the way back.
+The platform's operators are separate: Better Auth's admin plugin, with `users.role` set to `admin`. They open any
+association from the switcher atop the sidebar and work in it as an administrator without being on its roll
+(`openOrganization`, which remembers it in a cookie of its own; a member's switch sets Better Auth's active
+organization). There they can view the app as someone who's joined, under a yellow bar across the top with the way
+back.
 
 ## Homes
 

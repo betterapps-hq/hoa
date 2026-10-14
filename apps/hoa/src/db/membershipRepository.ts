@@ -8,6 +8,16 @@ import { invitations, members } from "./schema"
 
 export type Membership = { organizationId: string; access: Access }
 
+/** Whether an account is a member of an organization. */
+export async function isMember(db: Database, organizationId: string, userId: string) {
+  const row = await db
+    .select({ id: members.id })
+    .from(members)
+    .where(and(eq(members.organizationId, organizationId), eq(members.userId, userId)))
+    .get()
+  return row !== undefined
+}
+
 /** An account's memberships, oldest first. */
 async function membershipsOf(db: Database, userId: string): Promise<Membership[]> {
   const rows = await db

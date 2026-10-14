@@ -406,25 +406,30 @@ export async function insertCommitteeMember(
 
 /**
  * The committees whose work someone does, whose pages they see: every committee for an administrator, and otherwise the
- * ones they sit on on a day (YYYY-MM-DD). In the order they were added, as the roll lists them.
+ * ones they sit on on a day (YYYY-MM-DD). In the order they were added, as the roll lists them. A null id is someone
+ * not on the roll: a platform operator looking at the organization.
  */
 export async function committeesInView(
   db: Database,
-  person: Pick<Person, "id" | "organizationId">,
+  person: { id: string | null; organizationId: string },
   access: Access,
   today: string
 ): Promise<Committee[]> {
-  const seats = db
-    .select({ committeeId: committeeMembers.committeeId })
-    .from(committeeMembers)
-    .where(
-      and(
-        eq(committeeMembers.organizationId, person.organizationId),
-        eq(committeeMembers.personId, person.id),
-        or(isNull(committeeMembers.startedOn), lte(committeeMembers.startedOn, today)),
-        or(isNull(committeeMembers.endedOn), gt(committeeMembers.endedOn, today))
+  const seatsOf = (personId: string) =>
+    db
+      .select({ committeeId: committeeMembers.committeeId })
+      .from(committeeMembers)
+      .where(
+        and(
+          eq(committeeMembers.organizationId, person.organizationId),
+          eq(committeeMembers.personId, personId),
+          or(isNull(committeeMembers.startedOn), lte(committeeMembers.startedOn, today)),
+          or(isNull(committeeMembers.endedOn), gt(committeeMembers.endedOn, today))
+        )
       )
-    )
+  if (access !== "administrator" && person.id === null) {
+    return []
+  }
   const rows = await db
     .select()
     .from(committees)
@@ -432,7 +437,7 @@ export async function committeesInView(
       and(
         eq(committees.organizationId, person.organizationId),
         isNull(committees.removedAt),
-        access === "administrator" ? undefined : inArray(committees.id, seats)
+        access === "administrator" || person.id === null ? undefined : inArray(committees.id, seatsOf(person.id))
       )
     )
     .orderBy(asc(committees.createdAt))

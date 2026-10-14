@@ -17,5 +17,7 @@ export type Organization = {
   id: string
   name: string
   slug: string
+  /** Its logo's URL; null shows its initials. */
+  logo: string | null
   settings: OrganizationSettings
 }
