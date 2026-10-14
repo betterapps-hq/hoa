@@ -131,24 +131,43 @@ export function CommitteeDialog({ committee, onSave, onOpenChange }: CommitteeDi
 }
 
 const memberSchema = z.object({
+  committeeId: z.string().min(1, "Pick the board or a committee."),
   personId: z.string().min(1, "Pick someone on the roll."),
   role: z.enum(committeeRoles),
   office: z.string().trim().max(80),
   startedOn: z.union([z.literal(""), z.iso.date("Give a date.")])
 })
 
+/** A committee to seat someone on, who's picked from the roll; or someone to seat, on a committee picked from these. */
+type Seat =
+  | { committee: Committee; people: readonly RollChoice[] }
+  | { person: { id: string; name: string }; committees: readonly Committee[] }
+
 type MemberDialogProps = {
-  committee: Committee
-  people: readonly RollChoice[]
-  onSave: (member: { personId: string; role: CommitteeRole; office: string; startedOn: string }) => Promise<void>
+  seat: Seat
+  onSave: (member: {
+    committeeId: string
+    personId: string
+    role: CommitteeRole
+    office: string
+    startedOn: string
+  }) => Promise<void>
   onOpenChange: (open: boolean) => void
 }
 
-/** Seats someone on the board or a committee. */
-export function MemberDialog({ committee, people, onSave, onOpenChange }: MemberDialogProps) {
-  const isBoard = committee.kind === "board"
+/** Seats someone on the board or a committee: from the committee, or from the person. */
+export function MemberDialog({ seat, onSave, onOpenChange }: MemberDialogProps) {
+  const forCommittee = "committee" in seat ? seat : null
+  const forPerson = "person" in seat ? seat : null
+  const committees = forCommittee ? [forCommittee.committee] : (forPerson?.committees ?? [])
   const form = useForm({
-    defaultValues: { personId: "", role: "member" as CommitteeRole, office: "", startedOn: "" },
+    defaultValues: {
+      committeeId: forCommittee?.committee.id ?? (committees.length === 1 ? (committees[0]?.id ?? "") : ""),
+      personId: forPerson?.person.id ?? "",
+      role: "member" as CommitteeRole,
+      office: "",
+      startedOn: ""
+    },
     validators: { onSubmit: memberSchema },
     onSubmit: async ({ value }) => {
       await onSave(value)
@@ -168,66 +187,111 @@ export function MemberDialog({ committee, people, onSave, onOpenChange }: Member
           }}
         >
           <DialogHeader>
-            <DialogTitle>Add someone to {committee.name}</DialogTitle>
+            <DialogTitle>
+              {forCommittee
+                ? `Add someone to ${forCommittee.committee.name}`
+                : `Add ${forPerson?.person.name ?? "them"} to the board or a committee`}
+            </DialogTitle>
             <DialogDescription>Their term starts on the day you give, or now.</DialogDescription>
           </DialogHeader>
           <FieldGroup>
-            <form.Field name="personId">
-              {(field) => (
-                <Field data-invalid={field.state.meta.errors.length > 0}>
-                  <FieldLabel htmlFor="member-person">
-                    Person
-                    {required}
-                  </FieldLabel>
-                  <RollPicker
-                    id="member-person"
-                    choices={people}
-                    value={field.state.value}
-                    onChange={field.handleChange}
-                    placeholder="Find someone on the roll"
-                    empty="Nobody on the roll matches."
-                    isInvalid={field.state.meta.errors.length > 0}
-                  />
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
-            </form.Field>
-            <form.Field name="role">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="member-role">Role</FieldLabel>
-                  <NativeSelect
-                    id="member-role"
-                    className="w-full"
-                    value={field.state.value}
-                    onChange={(event) => {
-                      if (isRole(event.target.value)) {
-                        field.handleChange(event.target.value)
-                      }
-                    }}
-                  >
-                    <NativeSelectOption value="member">Member</NativeSelectOption>
-                    <NativeSelectOption value="chair">{isBoard ? "Chair or president" : "Chair"}</NativeSelectOption>
-                  </NativeSelect>
-                </Field>
-              )}
-            </form.Field>
-            {isBoard ? (
-              <form.Field name="office">
+            {forCommittee ? (
+              <form.Field name="personId">
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="member-office">Office</FieldLabel>
-                    <Input
-                      id="member-office"
+                  <Field data-invalid={field.state.meta.errors.length > 0}>
+                    <FieldLabel htmlFor="member-person">
+                      Person
+                      {required}
+                    </FieldLabel>
+                    <RollPicker
+                      id="member-person"
+                      choices={forCommittee.people}
                       value={field.state.value}
-                      onBlur={field.handleBlur}
-                      onChange={(event) => field.handleChange(event.target.value)}
+                      onChange={field.handleChange}
+                      placeholder="Find someone on the roll"
+                      empty="Nobody on the roll matches."
+                      isInvalid={field.state.meta.errors.length > 0}
                     />
-                    <FieldDescription>Such as president, treasurer or secretary.</FieldDescription>
+                    <FieldError errors={field.state.meta.errors} />
                   </Field>
                 )}
               </form.Field>
-            ) : null}
+            ) : (
+              <form.Field name="committeeId">
+                {(field) => (
+                  <Field data-invalid={field.state.meta.errors.length > 0}>
+                    <FieldLabel htmlFor="member-committee">
+                      Board or committee
+                      {required}
+                    </FieldLabel>
+                    <NativeSelect
+                      id="member-committee"
+                      className="w-full"
+                      value={field.state.value}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      aria-invalid={field.state.meta.errors.length > 0}
+                    >
+                      <NativeSelectOption value="">Pick one</NativeSelectOption>
+                      {committees.map((committee) => (
+                        <NativeSelectOption key={committee.id} value={committee.id}>
+                          {committee.name}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                    <FieldError errors={field.state.meta.errors} />
+                  </Field>
+                )}
+              </form.Field>
+            )}
+            <form.Subscribe
+              selector={(state) => committees.find((committee) => committee.id === state.values.committeeId)}
+            >
+              {(committee) => {
+                const isBoard = committee?.kind === "board"
+                return (
+                  <>
+                    <form.Field name="role">
+                      {(field) => (
+                        <Field>
+                          <FieldLabel htmlFor="member-role">Role</FieldLabel>
+                          <NativeSelect
+                            id="member-role"
+                            className="w-full"
+                            value={field.state.value}
+                            onChange={(event) => {
+                              if (isRole(event.target.value)) {
+                                field.handleChange(event.target.value)
+                              }
+                            }}
+                          >
+                            <NativeSelectOption value="member">Member</NativeSelectOption>
+                            <NativeSelectOption value="chair">
+                              {isBoard ? "Chair or president" : "Chair"}
+                            </NativeSelectOption>
+                          </NativeSelect>
+                        </Field>
+                      )}
+                    </form.Field>
+                    {isBoard ? (
+                      <form.Field name="office">
+                        {(field) => (
+                          <Field>
+                            <FieldLabel htmlFor="member-office">Office</FieldLabel>
+                            <Input
+                              id="member-office"
+                              value={field.state.value}
+                              onBlur={field.handleBlur}
+                              onChange={(event) => field.handleChange(event.target.value)}
+                            />
+                            <FieldDescription>Such as President, Treasurer or Secretary.</FieldDescription>
+                          </Field>
+                        )}
+                      </form.Field>
+                    ) : null}
+                  </>
+                )
+              }}
+            </form.Subscribe>
             <form.Field name="startedOn">
               {(field) => (
                 <Field data-invalid={field.state.meta.errors.length > 0}>

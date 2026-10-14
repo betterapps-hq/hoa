@@ -5,14 +5,13 @@ import {
   MailIcon,
   ShieldCheckIcon,
   PencilIcon,
-  PlusIcon,
   SearchIcon,
   Trash2Icon,
   UserMinusIcon,
   UserPlusIcon,
   UsersIcon
 } from "lucide-react"
-import { useMemo, useState, type ReactNode } from "react"
+import { useMemo, useState, type ComponentProps, type ReactNode } from "react"
 import { toast } from "sonner"
 import { DataTable } from "@/components/DataTable/DataTable"
 import { dataTableColumns } from "@/components/DataTable/DataTable.utils"
@@ -58,9 +57,10 @@ import {
   type UnitRow
 } from "@/people/roll"
 import { CommitteeDialog, MemberDialog } from "../CommitteeDialogs/CommitteeDialogs"
+import { EndDialog, type EndChoice } from "../EndDialog/EndDialog"
 import { PersonDialog, type PersonSave } from "../PersonDialog/PersonDialog"
 import type { RollChoice } from "../RollPicker/RollPicker"
-import { RemoveFromUnitDialog, UnitDialog, UnitPeopleDialog } from "../UnitDialogs/UnitDialogs"
+import { UnitDialog, UnitPeopleDialog } from "../UnitDialogs/UnitDialogs"
 
 /** The People page's changes, each throwing an Error that says what went wrong. */
 export type PeopleActions = {
@@ -88,9 +88,15 @@ type Open =
   | { kind: "person"; person: Person | null }
   | { kind: "unit"; unit: Unit | null }
   | { kind: "unit-people"; unit: Unit; mode: "add" | "sale" }
-  | { kind: "unit-remove"; row: UnitRow }
   | { kind: "committee"; committee: Committee | null }
-  | { kind: "member"; committee: Committee }
+  | { kind: "member"; seat: ComponentProps<typeof MemberDialog>["seat"] }
+  | {
+      kind: "end"
+      title: string
+      legend: string
+      choices: EndChoice[]
+      run: (choiceId: string, endedOn: string) => Promise<void>
+    }
   | { kind: "confirm"; title: string; description: string; confirm: string; run: () => Promise<void> }
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : "That didn't work. Try again.")
@@ -142,28 +148,30 @@ export function PeoplePage({
   }))
   const confirm = (title: string, description: string, label: string, run: () => Promise<void>) =>
     setOpen({ kind: "confirm", title, description, confirm: label, run })
+  const endSeat = (title: string, choices: EndChoice[]) =>
+    setOpen({
+      kind: "end",
+      title,
+      legend: "Which",
+      choices,
+      run: (memberId, endedOn) => attempt(() => actions.leaveCommittee(memberId, endedOn), "Ended.")
+    })
+  // The page's main action adds what the open tab lists; the board adds people only.
+  const adds = [
+    { label: "Add a person", icon: UserPlusIcon, onSelect: () => setOpen({ kind: "person", person: null }) },
+    { label: "Add a unit", icon: HomeIcon, onSelect: () => setOpen({ kind: "unit", unit: null }) },
+    { label: "Add a committee", icon: UsersIcon, onSelect: () => setOpen({ kind: "committee", committee: null }) }
+  ]
+  const addFor = (shown: string) => {
+    if (!isAdministrator || shown === "people") {
+      return adds[0]
+    }
+    return shown === "units" ? adds[1] : adds[2]
+  }
 
   return (
     <div className="flex flex-col gap-4 px-4 lg:px-6">
-      <PageActions
-        primary={{
-          label: "Add a person",
-          icon: UserPlusIcon,
-          onSelect: () => setOpen({ kind: "person", person: null })
-        }}
-        more={
-          isAdministrator
-            ? [
-                { label: "Add a unit", icon: HomeIcon, onSelect: () => setOpen({ kind: "unit", unit: null }) },
-                {
-                  label: "Add a committee",
-                  icon: UsersIcon,
-                  onSelect: () => setOpen({ kind: "committee", committee: null })
-                }
-              ]
-            : []
-        }
-      />
+      <PageActions primary={addFor(tab)} more={isAdministrator ? adds.filter((add) => add !== addFor(tab)) : []} />
       <Tabs value={tab} onValueChange={(value) => setTab(String(value))} className="gap-4">
         <TabsList variant="line" aria-label="People">
           <TabsTrigger value="people">People</TabsTrigger>
@@ -180,6 +188,16 @@ export function PeoplePage({
                     onInvite: (person, access) =>
                       void attempt(() => actions.invite(person.id, access), `Invited ${person.name} to join.`).catch(
                         () => undefined
+                      ),
+                    onSeat: (person) => setOpen({ kind: "member", seat: { person, committees: roll.committees } }),
+                    onUnseat: (row) =>
+                      endSeat(
+                        `Take ${row.person.name} off the board or a committee`,
+                        row.committees.map(({ committee, member }) => ({
+                          id: member.id,
+                          title: committee.name,
+                          subtitle: seatLabel(member)
+                        }))
                       ),
                     onRemove: (person) =>
                       confirm(
@@ -198,7 +216,19 @@ export function PeoplePage({
             rows={units}
             onAdd={(unit) => setOpen({ kind: "unit-people", unit, mode: "add" })}
             onSale={(unit) => setOpen({ kind: "unit-people", unit, mode: "sale" })}
-            onRemoveSomeone={(row) => setOpen({ kind: "unit-remove", row })}
+            onRemoveSomeone={(row) =>
+              setOpen({
+                kind: "end",
+                title: `Remove someone from ${row.unit.label}`,
+                legend: "Who",
+                choices: row.people.map(({ person, link }) => ({
+                  id: link.id,
+                  title: person.name,
+                  subtitle: relationLabels[link.relation]
+                })),
+                run: (linkId, endedOn) => attempt(() => actions.leaveUnit(linkId, endedOn), "Removed.")
+              })
+            }
             administration={
               isAdministrator
                 ? {
@@ -247,7 +277,7 @@ export function PeoplePage({
                           {
                             label: "Add someone",
                             icon: UserPlusIcon,
-                            onSelect: () => setOpen({ kind: "member", committee })
+                            onSelect: () => setOpen({ kind: "member", seat: { committee, people: personChoices } })
                           },
                           {
                             label: "Edit",
@@ -295,12 +325,9 @@ export function PeoplePage({
                                   icon: UserMinusIcon,
                                   isDestructive: true,
                                   onSelect: () =>
-                                    confirm(
-                                      `End ${person.name}'s term on ${committee.name}?`,
-                                      "It ends today. Their history stays.",
-                                      "End it today",
-                                      () => attempt(() => actions.leaveCommittee(member.id, today))
-                                    )
+                                    endSeat(`End ${person.name}'s term`, [
+                                      { id: member.id, title: committee.name, subtitle: seatLabel(member) }
+                                    ])
                                 }
                               ]}
                             />
@@ -358,17 +385,14 @@ export function PeoplePage({
           }
         />
       ) : null}
-      {open?.kind === "unit-remove" ? (
-        <RemoveFromUnitDialog
-          unit={open.row.unit}
-          people={open.row.people.map(({ person, link }) => ({
-            linkId: link.id,
-            name: person.name,
-            relation: link.relation
-          }))}
+      {open?.kind === "end" ? (
+        <EndDialog
+          title={open.title}
+          legend={open.legend}
+          choices={open.choices}
           today={today}
           onOpenChange={(isOpen) => (isOpen ? undefined : close())}
-          onRemove={({ linkId, endedOn }) => attempt(() => actions.leaveUnit(linkId, endedOn), "Removed.")}
+          onEnd={({ id, endedOn }) => open.run(id, endedOn)}
         />
       ) : null}
       {open?.kind === "committee" ? (
@@ -385,10 +409,9 @@ export function PeoplePage({
       ) : null}
       {open?.kind === "member" ? (
         <MemberDialog
-          committee={open.committee}
-          people={personChoices}
+          seat={open.seat}
           onOpenChange={(isOpen) => (isOpen ? undefined : close())}
-          onSave={(member) => attempt(() => actions.addToCommittee({ ...member, committeeId: open.committee.id }))}
+          onSave={(member) => attempt(() => actions.addToCommittee(member), "Added.")}
         />
       ) : null}
       {open?.kind === "confirm" ? (
@@ -462,6 +485,9 @@ const personColumn = dataTableColumns<PersonRow>()
 type PersonRowActions = {
   onEdit: (person: Person) => void
   onInvite: (person: Person, access: Access) => void
+  /** Seats them on the board or a committee; and takes them off one, from the row's seats. */
+  onSeat: (person: Person) => void
+  onUnseat: (row: PersonRow) => void
   onRemove: (person: Person) => void
 }
 
@@ -593,13 +619,13 @@ function personColumns(actions: PersonRowActions | null) {
   ])
 }
 
-function personActionsColumn({ onEdit, onInvite, onRemove }: PersonRowActions) {
+function personActionsColumn({ onEdit, onInvite, onSeat, onUnseat, onRemove }: PersonRowActions) {
   return personColumn.display({
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
     enableSorting: false,
     cell: ({ row }) => {
-      const { person, status, access } = row.original
+      const { person, status, access, committees } = row.original
       const isInvited = status === "invited"
       return (
         <RowActions
@@ -622,6 +648,16 @@ function personActionsColumn({ onEdit, onInvite, onRemove }: PersonRowActions) {
                           onSelect: () => onInvite(person, "administrator")
                         }
                       ])
+                ]
+              : []),
+            { label: "Add to the board or a committee", icon: UsersIcon, onSelect: () => onSeat(person) },
+            ...(committees.length > 0
+              ? [
+                  {
+                    label: "Take off the board or a committee",
+                    icon: UserMinusIcon,
+                    onSelect: () => onUnseat(row.original)
+                  }
                 ]
               : []),
             { label: "Take off the roll", icon: Trash2Icon, isDestructive: true, onSelect: () => onRemove(person) }
@@ -758,17 +794,7 @@ function UnitsTable({ rows, onAdd, onSale, onRemoveSomeone, administration }: Un
       noun="units"
       search={{ query, ids: search.ids }}
       initialSorting={[{ id: "unit", desc: false }]}
-      toolbar={
-        <>
-          <SearchBox label="Search units" value={query} onChange={setQuery} />
-          {administration ? (
-            <Button variant="outline" onClick={administration.onAddUnit}>
-              <PlusIcon />
-              Add a unit
-            </Button>
-          ) : null}
-        </>
-      }
+      toolbar={<SearchBox label="Search units" value={query} onChange={setQuery} />}
       renderSummary={(shown) => (
         <p className="text-sm text-muted-foreground" aria-live="polite">
           {shown.length === rows.length ? `${rows.length} units.` : `${shown.length} of ${rows.length} units.`}
