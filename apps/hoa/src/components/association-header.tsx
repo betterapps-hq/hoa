@@ -34,7 +34,7 @@ export function AssociationHeader() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        {organizations.length > 1 ? (
+        {organizations.length > 0 ? (
           <DropdownMenu>
             <DropdownMenuTrigger render={<SidebarMenuButton size="lg" className="aria-expanded:bg-muted" />}>
               {current}

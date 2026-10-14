@@ -12,7 +12,7 @@ import {
   UserPlusIcon,
   UsersIcon
 } from "lucide-react"
-import { useMemo, useState, type ComponentProps, type ReactNode } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 import { DataTable } from "@/components/DataTable/DataTable"
 import { dataTableColumns } from "@/components/DataTable/DataTable.utils"
@@ -56,7 +56,7 @@ import {
   type RollData,
   type UnitRow
 } from "@/people/roll"
-import { AssignmentsDialog, CommitteeDialog, MemberDialog } from "../CommitteeDialogs/CommitteeDialogs"
+import { CommitteeDialog, MemberDialog } from "../CommitteeDialogs/CommitteeDialogs"
 import { EndDialog, type EndChoice } from "../EndDialog/EndDialog"
 import { PersonDialog, type PersonSave } from "../PersonDialog/PersonDialog"
 import type { RollChoice } from "../RollPicker/RollPicker"
@@ -92,7 +92,6 @@ type Open =
   | { kind: "unit-people"; unit: Unit; mode: "add" | "sale" }
   | { kind: "committee"; committee: Committee | null }
   | { kind: "member"; committee: Committee }
-  | { kind: "assignments"; personId: string }
   | {
       kind: "end"
       title: string
@@ -202,7 +201,6 @@ export function PeoplePage({
                             await actions.viewAs?.(userId)
                           }).catch(() => undefined)
                       : null,
-                    onAssign: (person) => setOpen({ kind: "assignments", personId: person.id }),
                     onRemove: (person) =>
                       confirm(
                         `Remove ${person.name}?`,
@@ -346,15 +344,33 @@ export function PeoplePage({
           person={open.person}
           access={people.find((row) => row.person.id === open.person?.id && row.status === "joined")?.access ?? null}
           units={unitChoices}
-          canGrantAccess={isAdministrator}
+          assignments={
+            isAdministrator
+              ? {
+                  seats: (people.find((row) => row.person.id === open.person?.id)?.committees ?? []).map(
+                    ({ committee, member }) => ({
+                      memberId: member.id,
+                      committeeId: committee.id,
+                      committee: committee.name,
+                      label: seatLabel(member)
+                    })
+                  ),
+                  committees: roll.committees
+                }
+              : null
+          }
           onOpenChange={(isOpen) => (isOpen ? undefined : close())}
-          onSave={async ({ person, home }) => {
+          onSave={async ({ person, home, assignments }) => {
             await attempt(
               async () => {
                 const saved = await actions.savePerson(open.person?.id ?? null, person)
-                if (home) {
-                  await actions.addToUnit({ ...home, personId: saved.id, startedOn: "" })
-                }
+                await Promise.all([
+                  ...(home ? [actions.addToUnit({ ...home, personId: saved.id, startedOn: "" })] : []),
+                  ...assignments.add.map((seat) =>
+                    actions.addToCommittee({ ...seat, personId: saved.id, startedOn: "" })
+                  ),
+                  ...assignments.end.map((memberId) => actions.leaveCommittee(memberId, today))
+                ])
               },
               open.person ? "Saved." : `Added ${person.name}.`
             )
@@ -413,15 +429,6 @@ export function PeoplePage({
           onSave={(member) => attempt(() => actions.addToCommittee(member), "Added.")}
         />
       ) : null}
-      {open?.kind === "assignments" ? (
-        <AssignmentsFor
-          row={people.find((row) => row.person.id === open.personId)}
-          committees={roll.committees}
-          onOpenChange={(isOpen) => (isOpen ? undefined : close())}
-          onAdd={(member) => attempt(() => actions.addToCommittee(member), "Added.")}
-          onEnd={(memberId) => attempt(() => actions.leaveCommittee(memberId, today), "Ended.")}
-        />
-      ) : null}
       {open?.kind === "confirm" ? (
         <AlertDialog open onOpenChange={(isOpen) => (isOpen ? undefined : close())}>
           <AlertDialogContent>
@@ -445,29 +452,6 @@ export function PeoplePage({
         </AlertDialog>
       ) : null}
     </div>
-  )
-}
-
-/** Someone's assignments, from their row as the roll has it now, so an add or end shows at once. */
-function AssignmentsFor({
-  row,
-  committees,
-  ...props
-}: { row: PersonRow | undefined } & Omit<ComponentProps<typeof AssignmentsDialog>, "person" | "seats">) {
-  if (!row) {
-    return null
-  }
-  return (
-    <AssignmentsDialog
-      person={row.person}
-      seats={row.committees.map(({ committee, member }) => ({
-        memberId: member.id,
-        committee: committee.name,
-        label: seatLabel(member)
-      }))}
-      committees={committees.filter((committee) => !row.committees.some((seat) => seat.committee.id === committee.id))}
-      {...props}
-    />
   )
 }
 
@@ -519,8 +503,6 @@ type PersonRowActions = {
   /** For the platform's operators: views the app as someone else who's joined. */
   onViewAs: ((userId: string) => void) | null
   viewerId: string | null
-  /** Their seats on the board and committees, to add or end. */
-  onAssign: (person: Person) => void
   onRemove: (person: Person) => void
 }
 
@@ -661,7 +643,7 @@ function personColumns(actions: PersonRowActions | null) {
   ])
 }
 
-function personActionsColumn({ onEdit, onInvite, onViewAs, viewerId, onAssign, onRemove }: PersonRowActions) {
+function personActionsColumn({ onEdit, onInvite, onViewAs, viewerId, onRemove }: PersonRowActions) {
   return personColumn.display({
     id: "actions",
     header: () => <span className="sr-only">Actions</span>,
@@ -695,7 +677,6 @@ function personActionsColumn({ onEdit, onInvite, onViewAs, viewerId, onAssign, o
                       ])
                 ]
               : []),
-            { label: "Assignments", icon: UsersIcon, onSelect: () => onAssign(person) },
             { label: "Remove", icon: Trash2Icon, isDestructive: true, onSelect: () => onRemove(person) }
           ]}
         />

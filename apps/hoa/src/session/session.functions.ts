@@ -24,7 +24,10 @@ export type Session =
       organizationId: string
       organizationName: string
       organizationLogo: string | null
-      /** The organizations they can switch to, this one among them: every one for an operator; empty with just one. */
+      /**
+       * The organizations they can switch to, this one among them: every one for an operator; empty for a member of just
+       * one.
+       */
       organizations: { id: string; name: string; logo: string | null }[]
       /** The committees whose work they do, for the sidebar's sections. */
       committees: Pick<Committee, "name" | "kind">[]

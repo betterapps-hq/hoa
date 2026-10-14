@@ -9,7 +9,9 @@ type RoleContextValue = {
   organizationId: string
   organizationName: string
   organizationLogo: string | null
-  /** The organizations they can switch to, this one among them; empty with just one. */
+  /**
+   * The organizations they can switch to, this one among them: every one for an operator; empty for a member of just one.
+   */
   organizations: readonly { id: string; name: string; logo: string | null }[]
   /** False for one of the platform's operators looking at an organization whose roll they're not on. */
   isOnRoll: boolean
