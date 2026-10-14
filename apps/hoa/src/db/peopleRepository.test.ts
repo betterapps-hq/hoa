@@ -44,7 +44,6 @@ describe("claimUnit", () => {
       organizationId,
       {
         label: "12 Birch Lane",
-        lot: null,
         street: null,
         unitNumber: null,
         city: null,

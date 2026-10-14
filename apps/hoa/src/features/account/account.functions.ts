@@ -26,7 +26,7 @@ export type AccountDevice = {
 export type ClaimableHome = {
   id: string
   label: string
-  /** Its lot and address, when the roll has them. */
+  /** Its address, when the roll has it. */
   detail: string | null
   /** Someone owns it already, so it can't be claimed. */
   isOwned: boolean
@@ -101,7 +101,7 @@ async function membershipOf(account: SignedInAccount) {
       .map(({ unit, people }) => ({
         id: unit.id,
         label: unit.label,
-        detail: [unit.lot, addressLine(unit)].filter(Boolean).join(", ") || null,
+        detail: addressLine(unit) || null,
         isOwned: people.some(({ link }) => link.relation === "owner")
       }))
   }

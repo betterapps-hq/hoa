@@ -49,9 +49,7 @@ function PeopleRoute() {
         removePerson: change((id) => removeFromRoll({ data: { id } })),
         invite: change((id, access) => invitePerson({ data: { id, access } })),
         cancelInvite: change((id) => cancelInvite({ data: { id } })),
-        saveUnit: change(async (id, unit) => {
-          await saveUnit({ data: { id, unit } })
-        }),
+        saveUnit: change((id, unit) => saveUnit({ data: { id, unit } })),
         removeUnit: change((id) => removeUnitFromRoll({ data: { id } })),
         addToUnit: change((link) => addToUnit({ data: link })),
         leaveUnit: change((id, endedOn) => leaveUnit({ data: { id, endedOn } })),

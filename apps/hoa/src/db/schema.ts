@@ -509,9 +509,8 @@ export const units = sqliteTable(
   {
     id: text("id").primaryKey(),
     organizationId: text("organization_id").notNull(),
-    // What the association calls it: a house number, a street address, or a lot or unit number.
+    // What the association calls it: a house number by default.
     label: text("label").notNull(),
-    lot: text("lot"),
     // Its address in parts, as the address search fills them; the unit number is an apartment's, suite's or unit's.
     street: text("street"),
     unitNumber: text("unit_number"),

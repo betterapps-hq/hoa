@@ -2221,13 +2221,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "lot": {
-          "name": "lot",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "street": {
           "name": "street",
           "type": "text",

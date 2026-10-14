@@ -1,5 +1,6 @@
 import { useForm } from "@tanstack/react-form"
 import { z } from "zod"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -7,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import {
   committeeInputSchema,
+  committeeKindLabels,
   committeeKinds,
   committeeRoles,
   type Committee,
@@ -14,18 +16,6 @@ import {
   type CommitteeRole
 } from "@/people/people"
 import { RollPicker, type RollChoice } from "../RollPicker/RollPicker"
-
-const required = (
-  <span aria-hidden className="ml-0.5 text-destructive">
-    *
-  </span>
-)
-
-const kindChoices: Record<CommitteeKind, string> = {
-  board: "Board",
-  architectural: "Architectural review",
-  other: "Other"
-}
 
 const isKind = (value: string): value is CommitteeKind => committeeKinds.some((kind) => kind === value)
 const isRole = (value: string): value is CommitteeRole => committeeRoles.some((role) => role === value)
@@ -67,7 +57,7 @@ export function CommitteeDialog({ committee, onSave, onOpenChange }: CommitteeDi
                 <Field data-invalid={field.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="committee-name">
                     Name
-                    {required}
+                    <RequiredMark />
                   </FieldLabel>
                   <Input
                     id="committee-name"
@@ -97,7 +87,7 @@ export function CommitteeDialog({ committee, onSave, onOpenChange }: CommitteeDi
                   >
                     {committeeKinds.map((kind) => (
                       <NativeSelectOption key={kind} value={kind}>
-                        {kindChoices[kind]}
+                        {committeeKindLabels[kind]}
                       </NativeSelectOption>
                     ))}
                   </NativeSelect>
@@ -173,7 +163,7 @@ export function MemberDialog({ committee, people, onSave, onOpenChange }: Member
                 <Field data-invalid={field.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="member-person">
                     Person
-                    {required}
+                    <RequiredMark />
                   </FieldLabel>
                   <RollPicker
                     id="member-person"

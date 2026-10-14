@@ -72,7 +72,7 @@ export type PeopleActions = {
   removePerson: (id: string) => Promise<void>
   invite: (id: string, access: Access) => Promise<void>
   cancelInvite: (id: string) => Promise<void>
-  saveUnit: (id: string | null, unit: UnitInput) => Promise<void>
+  saveUnit: (id: string | null, unit: UnitInput) => Promise<{ id: string }>
   removeUnit: (id: string) => Promise<void>
   addToUnit: (link: { unitId: string; personId: string; relation: UnitRelation; startedOn: string }) => Promise<void>
   leaveUnit: (linkId: string, endedOn: string) => Promise<void>
@@ -132,12 +132,13 @@ export function PeoplePage({
   const [tab, setTab] = useState("people")
   const [open, setOpen] = useState<Open | null>(null)
   const close = () => setOpen(null)
-  const attempt = async (run: () => Promise<void>, success?: string) => {
+  const attempt = async <T,>(run: () => Promise<T>, success?: string): Promise<T> => {
     try {
-      await run()
+      const result = await run()
       if (success) {
         toast.success(success)
       }
+      return result
     } catch (caught) {
       toast.error(messageOf(caught))
       throw caught
@@ -154,7 +155,7 @@ export function PeoplePage({
   const unitChoices: RollChoice[] = roll.units.map((unit) => ({
     value: unit.id,
     label: unit.label,
-    detail: unit.lot ?? (addressLine(unit) || null)
+    detail: addressLine(unit) || null
   }))
   const confirm = (title: string, description: string, label: string, run: () => Promise<void>) =>
     setOpen({ kind: "confirm", title, description, confirm: label, run })
@@ -271,7 +272,10 @@ export function PeoplePage({
                   <CardTitle>
                     <h2>{committee.name}</h2>
                   </CardTitle>
-                  <CardDescription>{committeeKindLabels[committee.kind]}</CardDescription>
+                  {/* Its kind, when its name doesn't already say it. */}
+                  {committee.kind === "other" || committee.name === committeeKindLabels[committee.kind] ? null : (
+                    <CardDescription>{committeeKindLabels[committee.kind]}</CardDescription>
+                  )}
                   {isAdministrator ? (
                     <CardAction>
                       <RowActions
@@ -351,6 +355,12 @@ export function PeoplePage({
           person={open.person}
           access={people.find((row) => row.person.id === open.person?.id && row.status === "joined")?.access ?? null}
           units={unitChoices}
+          homes={(people.find((row) => row.person.id === open.person?.id)?.units ?? []).map(({ unit, link }) => ({
+            linkId: link.id,
+            unit: unit.label,
+            relation: link.relation
+          }))}
+          canAddUnits={isAdministrator}
           assignments={
             isAdministrator
               ? {
@@ -367,12 +377,16 @@ export function PeoplePage({
               : null
           }
           onOpenChange={(isOpen) => (isOpen ? undefined : close())}
-          onSave={async ({ person, home, assignments }) => {
+          onSave={async ({ person, homes, assignments }) => {
             await attempt(
               async () => {
                 const saved = await actions.savePerson(open.person?.id ?? null, person)
                 await Promise.all([
-                  ...(home ? [actions.addToUnit({ ...home, personId: saved.id, startedOn: "" })] : []),
+                  ...homes.add.map(async ({ unit, relation }) => {
+                    const unitId = typeof unit === "string" ? unit : (await actions.saveUnit(null, unit)).id
+                    await actions.addToUnit({ unitId, relation, personId: saved.id, startedOn: "" })
+                  }),
+                  ...homes.end.map((linkId) => actions.leaveUnit(linkId, today)),
                   ...assignments.add.map((seat) =>
                     actions.addToCommittee({ ...seat, personId: saved.id, startedOn: "" })
                   ),
@@ -388,9 +402,12 @@ export function PeoplePage({
         <UnitDialog
           unit={open.unit}
           onOpenChange={(isOpen) => (isOpen ? undefined : close())}
-          onSave={(unit) =>
-            attempt(() => actions.saveUnit(open.unit?.id ?? null, unit), open.unit ? "Saved." : `Added ${unit.label}.`)
-          }
+          onSave={async (unit) => {
+            await attempt(
+              () => actions.saveUnit(open.unit?.id ?? null, unit),
+              open.unit ? "Saved." : `Added ${unit.label}.`
+            )
+          }}
         />
       ) : null}
       {open?.kind === "unit-people" ? (
@@ -530,7 +547,7 @@ function PeopleTable({ rows, actions }: PeopleTableProps) {
           name: { text: (row) => row.person.name, boost: 3 },
           email: { text: (row) => row.person.email ?? "" },
           phone: { text: (row) => (row.person.phone ? `${row.person.phone} ${phoneText(row.person.phone)}` : "") },
-          units: { text: (row) => row.units.map(({ unit }) => `${unit.label} ${unit.lot ?? ""}`).join(" ") }
+          units: { text: (row) => row.units.map(({ unit }) => `${unit.label} ${addressLine(unit)}`).join(" ") }
         }
       }),
     [rows]
@@ -715,11 +732,7 @@ function unitColumns({ onAdd, onSale, onRemoveSomeone, administration }: Omit<Un
         return (
           <div className="flex min-w-0 flex-col">
             <span className="font-medium">{unit.label}</span>
-            {unit.lot || addressLine(unit) ? (
-              <span className="truncate text-muted-foreground">
-                {[unit.lot, addressLine(unit)].filter(Boolean).join(", ")}
-              </span>
-            ) : null}
+            {addressLine(unit) ? <span className="truncate text-muted-foreground">{addressLine(unit)}</span> : null}
           </div>
         )
       },
@@ -730,9 +743,7 @@ function unitColumns({ onAdd, onSale, onRemoveSomeone, administration }: Omit<Un
       header: "People",
       sortFn: "text",
       cell: ({ row }) =>
-        row.original.people.length === 0 ? (
-          <span className="text-muted-foreground">Nobody yet</span>
-        ) : (
+        row.original.people.length === 0 ? null : (
           <ul className="flex flex-col gap-2">
             {row.original.people.map(({ person, link }) => (
               <li key={link.id}>
@@ -785,7 +796,6 @@ function UnitsTable({ rows, onAdd, onSale, onRemoveSomeone, administration }: Un
         id: (row) => row.unit.id,
         fields: {
           label: { text: (row) => row.unit.label, boost: 3 },
-          lot: { text: (row) => row.unit.lot ?? "" },
           address: { text: (row) => addressLine(row.unit) },
           people: { text: (row) => row.people.map(({ person }) => person.name).join(" ") }
         }
@@ -797,7 +807,7 @@ function UnitsTable({ rows, onAdd, onSale, onRemoveSomeone, administration }: Un
       <EmptyState
         icon={<BuildingIcon />}
         title="No units yet"
-        description="Add each home, lot or condominium unit, then who owns, lives in or rents it."
+        description="Add each home or condominium unit, then who owns, lives in or rents it."
         action={administration ? <Button onClick={administration.onAddUnit}>Add unit</Button> : null}
       />
     )

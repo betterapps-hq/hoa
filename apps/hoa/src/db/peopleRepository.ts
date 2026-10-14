@@ -34,7 +34,6 @@ const toUnit = (row: typeof units.$inferSelect): Unit => ({
   id: row.id,
   organizationId: row.organizationId,
   label: row.label,
-  lot: row.lot,
   street: row.street,
   unitNumber: row.unitNumber,
   city: row.city,

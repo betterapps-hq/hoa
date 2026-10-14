@@ -29,12 +29,11 @@ export type Person = {
   userId: string | null
 }
 
-/** A home, lot or condominium unit: its name, its lot, its address in parts, and where it is once the search found it. */
+/** A home or condominium unit: its name, its address in parts, and where it is once the search found it. */
 export type Unit = {
   id: string
   organizationId: string
   label: string
-  lot: string | null
   street: string | null
   unitNumber: string | null
   city: string | null
@@ -137,7 +136,6 @@ export const personInputSchema = z.object({
 /** A unit as an administrator adds or edits it. */
 export const unitInputSchema = z.object({
   label: z.string().trim().min(1, "Give the unit a name.").max(200),
-  lot: optionalText(60),
   street: optionalText(200),
   unitNumber: optionalText(30),
   city: optionalText(100),
@@ -188,7 +186,7 @@ export const relationLabels: Record<UnitRelation, string> = { owner: "Owner", re
 export const seatLabel = (member: Pick<CommitteeMember, "office" | "role">) =>
   [member.office, member.role === "chair" ? "Chair" : null].filter(Boolean).join(", ") || "Member"
 export const committeeKindLabels: Record<CommitteeKind, string> = {
-  board: "Board",
-  architectural: "Architectural committee",
-  other: "Committee"
+  board: "Board of Directors",
+  architectural: "Architectural review",
+  other: "Other"
 }

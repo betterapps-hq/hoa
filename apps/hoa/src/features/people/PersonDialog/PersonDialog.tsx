@@ -1,6 +1,7 @@
-import { useForm } from "@tanstack/react-form"
 import { PlusIcon, XIcon } from "lucide-react"
+import { useState } from "react"
 import { z } from "zod"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -15,29 +16,36 @@ import {
 import { Input } from "@/components/ui/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { useAppForm } from "@/lib/form"
 import {
   accessLabels,
   accessLevels,
   committeeRoles,
   personInputSchema,
   relationLabels,
+  unitInputSchema,
   unitRelations,
   type Access,
   type Committee,
   type CommitteeRole,
   type Person,
+  type UnitInput,
   type UnitRelation
 } from "@/people/people"
 import { phoneText } from "@/people/phone"
 import { RollPicker, type RollChoice } from "../RollPicker/RollPicker"
+import { UnitFields, unitValues } from "../UnitFields/UnitFields"
 
 /** A seat to add on the board or a committee. */
 export type NewSeat = { committeeId: string; role: CommitteeRole; office: string }
 
 export type PersonSave = {
   person: { name: string; email: string; phone: string; mailingAddress: string; access: Access }
-  /** For someone new: the unit they own, live in or rent, if any. */
-  home: { unitId: string; relation: UnitRelation } | null
+  /**
+   * Units to put them in, as an owner, resident or tenant: one on the roll by its id, or a new one to add; and their time
+   * in units they're in (by link) to end today.
+   */
+  homes: { add: { unit: string | UnitInput; relation: UnitRelation }[]; end: string[] }
   /** Seats to add, and the seats they hold (by their member id) to end today. */
   assignments: { add: NewSeat[]; end: string[] }
 }
@@ -52,6 +60,10 @@ type PersonDialogProps = {
   /** The person to edit; null to add someone. */
   person: Person | null
   units: readonly RollChoice[]
+  /** The units they're in today, and how. */
+  homes: readonly { linkId: string; unit: string; relation: UnitRelation }[]
+  /** Whether they can be put in a new unit, added here; the board doesn't add units. */
+  canAddUnits: boolean
   /** Their membership's access once they've joined; null before, when their invitation sets it. */
   access: Access | null
   /** For an admin: their role and assignments. Null for the board, which can't change either. */
@@ -60,13 +72,28 @@ type PersonDialogProps = {
   onOpenChange: (open: boolean) => void
 }
 
+/** A unit row: a unit to pick, or once it's null, a new unit's form. */
+const newHome = (key: string) => ({
+  key,
+  unitId: "",
+  relation: "owner" as UnitRelation,
+  unit: null as UnitInput | null
+})
+
 const isRelation = (value: string): value is UnitRelation => unitRelations.some((relation) => relation === value)
 const isAccess = (value: string): value is Access => accessLevels.some((level) => level === value)
 const isRole = (value: string): value is CommitteeRole => committeeRoles.some((role) => role === value)
 
 const formSchema = personInputSchema.extend({
-  unitId: z.string(),
-  relation: z.enum(unitRelations),
+  leavingHomes: z.array(z.string()),
+  newHomes: z.array(
+    z.object({
+      key: z.string(),
+      unitId: z.string(),
+      relation: z.enum(unitRelations),
+      unit: unitInputSchema.nullable()
+    })
+  ),
   ending: z.array(z.string()),
   adding: z.array(
     z.object({
@@ -79,16 +106,27 @@ const formSchema = personInputSchema.extend({
 })
 
 /** Adds someone to the roll, with the unit they live in, or edits them; and for an administrator, their assignments. */
-export function PersonDialog({ person, units, access, assignments, onSave, onOpenChange }: PersonDialogProps) {
-  const form = useForm({
+export function PersonDialog({
+  person,
+  units,
+  homes,
+  canAddUnits,
+  access,
+  assignments,
+  onSave,
+  onOpenChange
+}: PersonDialogProps) {
+  // Someone new starts with a unit to pick; the key is made once, as the form's defaults must stay the same.
+  const [firstHomeKey] = useState<string>(() => crypto.randomUUID())
+  const form = useAppForm({
     defaultValues: {
       name: person?.name ?? "",
       email: person?.email ?? "",
       phone: person?.phone ? phoneText(person.phone) : "",
       mailingAddress: person?.mailingAddress ?? "",
       access: access ?? ("member" as Access),
-      unitId: "",
-      relation: "owner" as UnitRelation,
+      leavingHomes: [] as string[],
+      newHomes: person ? [] : [newHome(firstHomeKey)],
       ending: [] as string[],
       adding: [] as (NewSeat & { key: string })[]
     },
@@ -102,7 +140,13 @@ export function PersonDialog({ person, units, access, assignments, onSave, onOpe
           mailingAddress: value.mailingAddress,
           access: value.access
         },
-        home: !person && value.unitId ? { unitId: value.unitId, relation: value.relation } : null,
+        homes: {
+          add: value.newHomes.flatMap(({ unitId, unit, relation }) => {
+            const home = unit ?? unitId
+            return home ? [{ unit: home, relation }] : []
+          }),
+          end: value.leavingHomes
+        },
         assignments: {
           add: value.adding.map(({ committeeId, role, office }) => ({ committeeId, role, office: office.trim() })),
           end: value.ending
@@ -121,11 +165,7 @@ export function PersonDialog({ person, units, access, assignments, onSave, onOpe
         <Field data-invalid={field.state.meta.errors.length > 0}>
           <FieldLabel htmlFor={`person-${name}`}>
             {label}
-            {extra.required ? (
-              <span aria-hidden className="ml-0.5 text-destructive">
-                *
-              </span>
-            ) : null}
+            {extra.required ? <RequiredMark /> : null}
           </FieldLabel>
           <Input
             id={`person-${name}`}
@@ -166,48 +206,139 @@ export function PersonDialog({ person, units, access, assignments, onSave, onOpe
             })}
             {text("phone", "Phone", { type: "tel" })}
             {text("mailingAddress", "Mailing address", { description: "If not their unit." })}
-            {!person && units.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-[1fr_9rem]">
-                <form.Field name="unitId">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor="person-unit">Unit</FieldLabel>
-                      <RollPicker
-                        id="person-unit"
-                        choices={units}
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        placeholder="Find a unit"
-                        empty="No units match."
-                      />
-                    </Field>
-                  )}
+            <FieldSet>
+              <FieldLegend variant="label">Units</FieldLegend>
+              <div className="flex flex-col gap-3">
+                <form.Field name="leavingHomes">
+                  {(field) =>
+                    homes.map((home) => {
+                      const isLeaving = field.state.value.includes(home.linkId)
+                      return (
+                        <Item key={home.linkId} variant="outline" size="sm">
+                          <ItemContent>
+                            <ItemTitle className={isLeaving ? "text-muted-foreground line-through" : undefined}>
+                              {home.unit}
+                            </ItemTitle>
+                            <ItemDescription>
+                              {isLeaving ? "Ends today" : relationLabels[home.relation]}
+                            </ItemDescription>
+                          </ItemContent>
+                          <ItemActions>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                field.handleChange(
+                                  isLeaving
+                                    ? field.state.value.filter((id) => id !== home.linkId)
+                                    : [...field.state.value, home.linkId]
+                                )
+                              }
+                            >
+                              {isLeaving ? "Undo" : "End"}
+                            </Button>
+                          </ItemActions>
+                        </Item>
+                      )
+                    })
+                  }
                 </form.Field>
-                <form.Field name="relation">
+                <form.Field name="newHomes" mode="array">
                   {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor="person-relation">As</FieldLabel>
-                      <NativeSelect
-                        id="person-relation"
-                        className="w-full"
-                        value={field.state.value}
-                        onChange={(event) => {
-                          if (isRelation(event.target.value)) {
-                            field.handleChange(event.target.value)
-                          }
-                        }}
+                    <>
+                      {field.state.value.map((home, index) => (
+                        // A new unit's address opens in its row, in place of the picker.
+                        <div
+                          key={home.key}
+                          className={home.unit ? "flex flex-col gap-4 rounded-lg border p-3" : undefined}
+                        >
+                          <div className="flex items-start gap-2">
+                            {home.unit ? (
+                              <p className="min-w-0 flex-1 self-center text-sm font-medium">New unit</p>
+                            ) : (
+                              <form.Field name={`newHomes[${index}].unitId`}>
+                                {(homeField) => (
+                                  <div className="min-w-0 flex-1">
+                                    <RollPicker
+                                      id={`person-unit-${home.key}`}
+                                      label="Unit"
+                                      choices={units}
+                                      value={homeField.state.value}
+                                      onChange={homeField.handleChange}
+                                      placeholder="Find a unit"
+                                      empty="No units match."
+                                      onCreate={
+                                        canAddUnits
+                                          ? (street) => {
+                                              field.replaceValue(index, {
+                                                ...form.getFieldValue(`newHomes[${index}]`),
+                                                unitId: "",
+                                                unit: unitValues(null, street)
+                                              })
+                                              // The picker gives way to the address; carry on typing there.
+                                              requestAnimationFrame(() =>
+                                                document.getElementById(`unit-${home.key}-street`)?.focus()
+                                              )
+                                            }
+                                          : undefined
+                                      }
+                                      createLabel="New unit"
+                                    />
+                                  </div>
+                                )}
+                              </form.Field>
+                            )}
+                            <form.Field name={`newHomes[${index}].relation`}>
+                              {(homeField) => (
+                                <NativeSelect
+                                  aria-label="As"
+                                  className="w-32"
+                                  value={homeField.state.value}
+                                  onChange={(event) => {
+                                    if (isRelation(event.target.value)) {
+                                      homeField.handleChange(event.target.value)
+                                    }
+                                  }}
+                                >
+                                  {unitRelations.map((relation) => (
+                                    <NativeSelectOption key={relation} value={relation}>
+                                      {relationLabels[relation]}
+                                    </NativeSelectOption>
+                                  ))}
+                                </NativeSelect>
+                              )}
+                            </form.Field>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Remove"
+                              onClick={() => field.removeValue(index)}
+                            >
+                              <XIcon />
+                            </Button>
+                          </div>
+                          {home.unit ? (
+                            <UnitFields form={form} fields={`newHomes[${index}].unit`} idPrefix={`unit-${home.key}`} />
+                          ) : null}
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="self-start"
+                        onClick={() => field.pushValue(newHome(crypto.randomUUID()))}
                       >
-                        {unitRelations.map((relation) => (
-                          <NativeSelectOption key={relation} value={relation}>
-                            {relationLabels[relation]}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                    </Field>
+                        <PlusIcon />
+                        Add unit
+                      </Button>
+                    </>
                   )}
                 </form.Field>
               </div>
-            ) : null}
+            </FieldSet>
             {assignments && access !== null ? (
               <form.Field name="access">
                 {(field) => (
