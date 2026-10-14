@@ -70,3 +70,9 @@ export function jobStepKey(organizationId: string, jobId: string, name: string) 
 export const rulebookBuildKeys = (organizationId: string, jobId: string) => ({
   step: (name: string) => jobStepKey(organizationId, jobId, name)
 })
+
+/** Everything an organization keeps in storage, under one prefix. */
+export const organizationPrefix = (organizationId: string) => `hoas/${organizationId}/`
+
+/** An organization's logo, one object replaced on each upload. */
+export const organizationLogoKey = (organizationId: string) => `${organizationPrefix(organizationId)}logo`

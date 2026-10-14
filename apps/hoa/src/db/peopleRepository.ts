@@ -13,6 +13,7 @@ import {
   type UnitLink,
   type UnitRelation
 } from "@/people/people"
+import { addressRow, toAddress } from "./addresses"
 import type { Database } from "./database"
 import { cancelingInvitations } from "./membershipRepository"
 import { committeeMembers, committees, invitations, members, people, unitPeople, units, users } from "./schema"
@@ -34,15 +35,7 @@ const toUnit = (row: typeof units.$inferSelect): Unit => ({
   id: row.id,
   organizationId: row.organizationId,
   label: row.label,
-  street: row.street,
-  unitNumber: row.unitNumber,
-  city: row.city,
-  state: row.state,
-  postalCode: row.postalCode,
-  place:
-    row.placeId !== null && row.latitude !== null && row.longitude !== null
-      ? { id: row.placeId, latitude: row.latitude, longitude: row.longitude }
-      : null
+  ...toAddress(row)
 })
 
 const relationOf = (relation: string): UnitRelation =>
@@ -250,13 +243,8 @@ export async function removePerson(db: Database, person: Person, now: string) {
 
 type UnitFields = Omit<Unit, "id" | "organizationId">
 
-/** A unit's fields as its row keeps them: the place in columns of its own. */
-const unitColumns = ({ place, ...fields }: UnitFields) => ({
-  ...fields,
-  placeId: place?.id ?? null,
-  latitude: place?.latitude ?? null,
-  longitude: place?.longitude ?? null
-})
+/** A unit's fields as its row keeps them. */
+const unitColumns = ({ label, ...address }: UnitFields) => ({ label, ...addressRow(address) })
 
 export async function insertUnit(db: Database, organizationId: string, fields: UnitFields, now: string): Promise<Unit> {
   const row = {

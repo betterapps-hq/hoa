@@ -8,11 +8,15 @@ import {
   SmartphoneIcon,
   TabletIcon,
   UserMinusIcon,
+  UserXIcon,
   UsersIcon,
   type LucideIcon
 } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
+import { match } from "ts-pattern"
+import { lastAdministratorText } from "@/auth/accountDeletion"
+import { DangerDialog } from "@/components/DangerDialog/DangerDialog"
 import { RowActions } from "@/components/RowActions/RowActions"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +33,7 @@ import {
   ItemTitle
 } from "@/components/ui/item"
 import { ResignDialog } from "@/features/people/EndDialog/EndDialog"
+import { attempt, messageOf } from "@/lib/attempt"
 import { localToday } from "@/lib/days"
 import { relationLabels, resignedText, seatTermLabel } from "@/people/people"
 import { phoneText } from "@/people/phone"
@@ -50,9 +55,10 @@ export type AccountActions = {
   claimHome: (unitId: string) => Promise<void>
   /** Leaves one of their seats on a committee on a day. */
   resign: (seatId: string, endedOn: string) => Promise<void>
+  /** Signs out, to sign in again before deleting the account. */
+  signInAgain: () => Promise<void>
+  deleteAccount: () => Promise<void>
 }
-
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : "That didn't work. Try again.")
 
 /** Runs an action, saying in a toast how it went. */
 async function run(action: () => Promise<void>, done: string) {
@@ -99,6 +105,9 @@ export function AccountPage({ account, actions }: { account: AccountDetails; act
       </Section>
       <Section title="Sessions">
         <DevicesCard devices={account.devices} asOf={account.asOf} actions={actions} />
+      </Section>
+      <Section title="Delete account">
+        <DeleteCard account={account} actions={actions} />
       </Section>
     </div>
   )
@@ -319,15 +328,9 @@ function CommitteesCard({ membership, actions }: { membership: AccountMembership
           seat={resigning}
           today={today}
           onOpenChange={(isOpen) => (isOpen ? undefined : setResigning(null))}
-          onResign={async (endedOn) => {
-            try {
-              await actions.resign(resigning.id, endedOn)
-            } catch (caught) {
-              toast.error(messageOf(caught))
-              throw caught
-            }
-            toast.success(resignedText(resigning.name, endedOn, today))
-          }}
+          onResign={(endedOn) =>
+            attempt(() => actions.resign(resigning.id, endedOn), resignedText(resigning.name, endedOn, today))
+          }
         />
       ) : null}
     </>
@@ -457,6 +460,45 @@ function DevicesCard({
           </div>
         )
       })}
+    </RowsCard>
+  )
+}
+
+/**
+ * Deleting the account: its sign-in methods and sessions. An association it's the only administrator of needs another
+ * first, and an old sign-in signs in again first.
+ */
+function DeleteCard({ account, actions }: { account: AccountDetails; actions: AccountActions }) {
+  const [isDeleting, setDeleting] = useState(false)
+  const { lastAdministratorOf, isFreshSignIn } = account.deletion
+  const kept = account.membership ? ` ${account.membership.association} keeps you on its roll.` : ""
+  const isOnlyAdministrator = lastAdministratorOf.length > 0
+  const description = match({ isOnlyAdministrator, isFreshSignIn })
+    .with({ isOnlyAdministrator: true }, () => lastAdministratorText(lastAdministratorOf))
+    .with({ isFreshSignIn: true }, () => `Deletes how you sign in, and signs you out everywhere.${kept}`)
+    .otherwise(() => "For your security, sign in again to delete your account.")
+  const action =
+    isOnlyAdministrator || isFreshSignIn ? (
+      <Button variant="destructive" size="sm" disabled={isOnlyAdministrator} onClick={() => setDeleting(true)}>
+        Delete account
+      </Button>
+    ) : (
+      <Button variant="outline" size="sm" onClick={() => void run(actions.signInAgain, "Signed out.")}>
+        Sign in again
+      </Button>
+    )
+  return (
+    <RowsCard>
+      <Row icon={<UserXIcon />} title="Delete your account" description={description} action={action} />
+      {isDeleting ? (
+        <DangerDialog
+          title="Delete your account?"
+          description={`How you sign in is deleted, and you’re signed out everywhere.${kept} This can’t be undone.`}
+          confirmLabel="Delete account"
+          onConfirm={() => attempt(actions.deleteAccount)}
+          onOpenChange={setDeleting}
+        />
+      ) : null}
     </RowsCard>
   )
 }

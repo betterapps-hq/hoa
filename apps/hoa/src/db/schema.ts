@@ -10,6 +10,22 @@ const timestamp = (name: string) => text(name).notNull()
 const authDate = (name: string) => integer(name, { mode: "timestamp_ms" })
 
 // The associations (docs/design/people.md): Better Auth's organization plugin's table, with the app's settings.
+/**
+ * An address in parts, as the address search fills them (the unit number is an apartment's, suite's or unit's), and
+ * the place it found it at (Google Places) and where that is: for the map and nearby suggestions. A unit's, or an
+ * association's own.
+ */
+const addressColumns = () => ({
+  street: text("street"),
+  unitNumber: text("unit_number"),
+  city: text("city"),
+  state: text("state"),
+  postalCode: text("postal_code"),
+  placeId: text("place_id"),
+  latitude: real("latitude"),
+  longitude: real("longitude")
+})
+
 export const organizations = sqliteTable("organizations", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -19,6 +35,8 @@ export const organizations = sqliteTable("organizations", {
   metadata: text("metadata"),
   // OrganizationSettings. Empty for an organization the plugin made: the settings' defaults fill it in.
   settings: json<unknown>("settings_json").notNull().default({}),
+  // The association's own mailing address.
+  ...addressColumns(),
   createdAt: authDate("created_at").notNull()
 })
 
@@ -511,16 +529,7 @@ export const units = sqliteTable(
     organizationId: text("organization_id").notNull(),
     // What the association calls it: a house number by default.
     label: text("label").notNull(),
-    // Its address in parts, as the address search fills them; the unit number is an apartment's, suite's or unit's.
-    street: text("street"),
-    unitNumber: text("unit_number"),
-    city: text("city"),
-    state: text("state"),
-    postalCode: text("postal_code"),
-    // The place the address search found it at (Google Places), and where that is: for the map and nearby suggestions.
-    placeId: text("place_id"),
-    latitude: real("latitude"),
-    longitude: real("longitude"),
+    ...addressColumns(),
     createdAt: timestamp("created_at"),
     updatedAt: timestamp("updated_at"),
     removedAt: text("removed_at")

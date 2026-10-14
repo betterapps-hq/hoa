@@ -1,7 +1,8 @@
 import { z } from "zod"
 import type { RoleId } from "@/features/role/roles"
 import { addDays, dayText } from "@/lib/days"
-import { unitNumberText, type Place } from "@/places/address"
+import { optionalText } from "@/lib/fields"
+import { addressInputSchema, type Address } from "@/places/address"
 import { optionalPhone } from "./phone"
 
 // The association's people (docs/design/people.md): everyone on its roll, with or without an account, the units they
@@ -34,24 +35,7 @@ export type Person = {
 }
 
 /** A home or condominium unit: its name, its address in parts, and where it is once the search found it. */
-export type Unit = {
-  id: string
-  organizationId: string
-  label: string
-  street: string | null
-  unitNumber: string | null
-  city: string | null
-  state: string | null
-  postalCode: string | null
-  place: Place | null
-}
-
-/** A unit's address on one line, as on an envelope: "12 Lakeview Drive #3B, Bellingham, WA 98229". */
-export function addressLine(unit: Pick<Unit, "street" | "unitNumber" | "city" | "state" | "postalCode">) {
-  const street = [unit.street, unit.unitNumber ? unitNumberText(unit.unitNumber) : null].filter(Boolean).join(" ")
-  const region = [unit.state, unit.postalCode].filter(Boolean).join(" ")
-  return [street, unit.city, region].filter(Boolean).join(", ")
-}
+export type Unit = { id: string; organizationId: string; label: string } & Address
 
 /** Someone owning, living in or renting a unit, from one day to another; `endedOn` is null while it lasts. */
 export type UnitLink = {
@@ -117,13 +101,6 @@ export function peopleOfAccount<T extends Pick<Person, "email" | "userId">>(
 export const isCurrent = (link: Pick<UnitLink, "startedOn" | "endedOn">, today: string) =>
   (link.startedOn === null || link.startedOn <= today) && (link.endedOn === null || link.endedOn > today)
 
-const optionalText = (max: number) =>
-  z
-    .string()
-    .trim()
-    .max(max)
-    .transform((text) => (text === "" ? null : text))
-
 /** Someone's own details, as they edit them on their account page. */
 export const myDetailsSchema = z.object({
   name: z.string().trim().min(1, "Give your name.").max(200, "Keep your name under 200 characters."),
@@ -143,20 +120,8 @@ export const personInputSchema = z.object({
 })
 
 /** A unit as an administrator adds or edits it. */
-export const unitInputSchema = z.object({
-  label: z.string().trim().min(1, "Give the unit a name.").max(200),
-  street: optionalText(200),
-  unitNumber: optionalText(30),
-  city: optionalText(100),
-  state: optionalText(40),
-  postalCode: optionalText(20),
-  place: z
-    .object({
-      id: z.string().min(1).max(300),
-      latitude: z.number().min(-90).max(90),
-      longitude: z.number().min(-180).max(180)
-    })
-    .nullable()
+export const unitInputSchema = addressInputSchema.extend({
+  label: z.string().trim().min(1, "Give the unit a name.").max(200)
 })
 
 /** A unit as its form gives it. */

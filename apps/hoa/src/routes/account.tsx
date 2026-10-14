@@ -48,7 +48,17 @@ function AccountRoute() {
           await router.invalidate()
         },
         claimHome: (unitId) => thenReload(claimHome({ data: { unitId } })),
-        resign: (id, endedOn) => thenReload(resignSeat({ data: { id, endedOn } }))
+        resign: (id, endedOn) => thenReload(resignSeat({ data: { id, endedOn } })),
+        signInAgain: async () => {
+          throwIfFailed(await authClient.signOut())
+          await router.navigate({ to: "/sign-in", search: { redirect: "/account" } })
+        },
+        deleteAccount: async () => {
+          const result = await authClient.deleteUser()
+          throwIfFailed(result, result.error?.message)
+          // A full load, so nothing of the account stays on the page.
+          window.location.assign("/sign-in")
+        }
       }}
     />
   )

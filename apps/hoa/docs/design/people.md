@@ -72,10 +72,34 @@ the board is never left with nobody on it.
 
 ## Addresses
 
-A unit's address is kept in parts: street, unit number, city, state and ZIP code. Typing the street searches Google's
-Places API (New) from the server, near the association's other units first; picking a suggestion fills the other parts
-and keeps the place's id and coordinates for the map. The unit's name follows the house number until someone types
-one. Without `GOOGLE_MAPS_API_KEY` the search is off and the parts are typed.
+A unit's address, and the association's mailing address, are kept in parts: street, unit number, city, state and ZIP
+code (`addressColumns`). Typing the street searches Google's Places API (New) from the server, near the association's
+other units first; picking a suggestion fills the other parts and keeps the place's id and coordinates for the map. A
+unit's name follows the house number until someone types one. Without `GOOGLE_MAPS_API_KEY` the search is off and the
+parts are typed.
+
+## Settings
+
+An administrator keeps what the documents don't say on the Settings page: the association's name, logo and mailing
+address, whether forms measure in US or metric units, and how long decided applications and unsent drafts are kept.
+What the documents decide, such as the review policy and the time zone, is the rulebook's settings.
+
+The logo is a PNG, JPEG or WebP image of 1 MB or less, kept at `hoas/{organizationId}/logo`. It's served publicly, like
+any logo, at a URL that changes with each upload, so browsers keep it for good. Without one, the association's initials
+show.
+
+Deleting the association, after typing its name, deletes its records in every table with an `organization_id`, its
+memberships and invitations, and every file under its prefix (`deleteOrganization`). Sessions that had it open open
+none, and the accounts stay.
+
+## Deleting an account
+
+Someone deletes their own account from the account page: Better Auth's `deleteUser` takes its sign-in methods,
+sessions and memberships, and invitations it sent that are still waiting. Each association keeps the person on its roll,
+unlinked (`people.user_id` is cleared), so signing in again with the same email makes a new account that joins the
+same rolls. It needs a sign-in in the last day, else they sign in again first, and it's refused while the account is
+an association's only administrator (`organizationsOnlyAdministeredBy`), until there's another or the association is
+deleted.
 
 ## Storage
 

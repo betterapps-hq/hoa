@@ -11,7 +11,8 @@ const messages: Record<string, string> = {
   PASSWORD_TOO_LONG: "Use at most 128 characters.",
   INVALID_PASSWORD: "That isn't your current password.",
   CREDENTIAL_ACCOUNT_NOT_FOUND: "This account has no password yet. Sign in with a code instead.",
-  USER_NOT_FOUND: "No account has that email. Sign in with a code to start one."
+  USER_NOT_FOUND: "No account has that email. Sign in with a code to start one.",
+  SESSION_EXPIRED: "For your security, sign out and sign in again, then try again."
 }
 
 /** What went wrong signing in, in words someone can act on. */

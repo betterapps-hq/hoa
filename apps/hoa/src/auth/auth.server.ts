@@ -2,12 +2,13 @@ import { dash } from "@better-auth/infra"
 import { getRequestUrl } from "@tanstack/react-start/server"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { APIError } from "better-auth/api"
 import { admin, captcha, haveIBeenPwned, organization } from "better-auth/plugins"
 import { emailOTP } from "better-auth/plugins/email-otp"
 import { tanstackStartCookies } from "better-auth/tanstack-start"
 import { and, eq } from "drizzle-orm"
 import { getDb } from "@/db/client.server"
-import { invitationDays } from "@/db/membershipRepository"
+import { invitationDays, organizationsOnlyAdministeredBy } from "@/db/membershipRepository"
 import {
   accounts,
   invitations,
@@ -20,11 +21,26 @@ import {
   verifications
 } from "@/db/schema"
 import { env } from "@/env.server"
+import { freshSignInSeconds, lastAdministratorText } from "./accountDeletion"
 import { sendEmail } from "./email.server"
 import { codeEmail, invitationEmail } from "./emails"
 
 /** How long a code by email lasts. */
 export const codeMinutes = 10
+
+/**
+ * Refuses to delete an account that's the only administrator of an association, which would leave nobody to manage
+ * it.
+ */
+async function beforeDeleteAccount(user: { id: string }) {
+  const stranded = await organizationsOnlyAdministeredBy(getDb(), user.id)
+  if (stranded.length > 0) {
+    throw new APIError("BAD_REQUEST", {
+      code: "LAST_ADMINISTRATOR",
+      message: lastAdministratorText(stranded)
+    })
+  }
+}
 
 /** Signs sessions in local development, where no secret is set. Never used elsewhere. */
 const developmentSecret = "local-development-only-secret-never-used-in-production"
@@ -147,9 +163,12 @@ function createAuth() {
     socialProviders: google,
     // A code by email always works, so Google can be disconnected even when it's the only account linked.
     account: { accountLinking: { enabled: true, trustedProviders: ["google"], allowUnlinkingAll: true } },
+    // Deleted from the account page, by someone who signed in within the last day.
+    user: { deleteUser: { enabled: true, beforeDelete: beforeDeleteAccount } },
     session: {
       expiresIn: 60 * 60 * 24 * 30,
       updateAge: 60 * 60 * 24,
+      freshAge: freshSignInSeconds,
       // Encrypted, not only signed, so the cookie doesn't show the account's details to whoever holds it.
       cookieCache: { enabled: true, maxAge: 5 * 60, strategy: "jwe" }
     },

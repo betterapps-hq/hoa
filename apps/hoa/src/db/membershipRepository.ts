@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, gt } from "drizzle-orm"
+import { and, asc, desc, eq, gt, inArray } from "drizzle-orm"
 import { accessOf, memberRoles, type Access, type Person } from "@/people/people"
 import type { Database } from "./database"
-import { invitations, members } from "./schema"
+import { invitations, members, organizations } from "./schema"
 
 // Memberships (docs/design/people.md): Better Auth's organization plugin's members and invitations. The plugin holds
 // who has an account in an organization and their access; the roll holds everyone, and keeps the two in step.
@@ -129,4 +129,28 @@ export async function setMemberAccess(db: Database, organizationId: string, user
     .update(members)
     .set({ role: memberRoles[access] })
     .where(and(eq(members.organizationId, organizationId), eq(members.userId, userId)))
+}
+
+/**
+ * The names of the organizations an account is the only administrator of, oldest membership first: deleting the
+ * account would leave them with nobody to manage them.
+ */
+export async function organizationsOnlyAdministeredBy(db: Database, userId: string) {
+  const administered = (await membershipsOf(db, userId))
+    .filter(({ access }) => access === "administrator")
+    .map(({ organizationId }) => organizationId)
+  if (administered.length === 0) {
+    return []
+  }
+  const rows = await db
+    .select({ organizationId: members.organizationId, role: members.role, name: organizations.name })
+    .from(members)
+    .innerJoin(organizations, eq(organizations.id, members.organizationId))
+    .where(inArray(members.organizationId, administered))
+  return administered.flatMap((organizationId) => {
+    const administrators = rows.filter(
+      (row) => row.organizationId === organizationId && accessOf(row.role) === "administrator"
+    )
+    return administrators.length === 1 ? administrators.map((row) => row.name) : []
+  })
 }

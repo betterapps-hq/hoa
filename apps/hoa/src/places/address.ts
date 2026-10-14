@@ -1,3 +1,6 @@
+import { z } from "zod"
+import { optionalText } from "@/lib/fields"
+
 /** A part of an address from Google Places: its text in full and short, and what it is ("street_number", "route"…). */
 export type AddressComponent = { longText: string; shortText: string; types: readonly string[] }
 
@@ -6,6 +9,53 @@ export type AddressParts = { street: string; unitNumber: string; city: string; s
 
 /** Where an address is, from the address search: the place's id and its coordinates. */
 export type Place = { id: string; latitude: number; longitude: number }
+
+/** An address as the app keeps it, a unit's or an association's: in parts, with the place the search found it at. */
+export type Address = {
+  street: string | null
+  unitNumber: string | null
+  city: string | null
+  state: string | null
+  postalCode: string | null
+  place: Place | null
+}
+
+/** An address as its form gives it. */
+export const addressInputSchema = z.object({
+  street: optionalText(200),
+  unitNumber: optionalText(30),
+  city: optionalText(100),
+  state: optionalText(40),
+  postalCode: optionalText(20),
+  place: z
+    .object({
+      id: z.string().min(1).max(300),
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180)
+    })
+    .nullable()
+})
+
+export type AddressInput = z.input<typeof addressInputSchema>
+
+/** A form's start for an address: the one kept, or a new one from the street typed so far. */
+export const addressValues = (address: Address | null, street = ""): AddressInput => ({
+  street: address?.street ?? street,
+  unitNumber: address?.unitNumber ?? "",
+  city: address?.city ?? "",
+  state: address?.state ?? "",
+  postalCode: address?.postalCode ?? "",
+  place: address?.place ?? null
+})
+
+/** An address on one line, as on an envelope: "12 Lakeview Drive #3B, Bellingham, WA 98229". */
+export function addressLine(address: Omit<Address, "place">) {
+  const street = [address.street, address.unitNumber ? unitNumberText(address.unitNumber) : null]
+    .filter(Boolean)
+    .join(" ")
+  const region = [address.state, address.postalCode].filter(Boolean).join(" ")
+  return [street, address.city, region].filter(Boolean).join(", ")
+}
 
 /** An address the search suggests for what's been typed: the street, and the city and state under it. */
 export type AddressSuggestion = { placeId: string; main: string; secondary: string | null }

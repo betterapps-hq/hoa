@@ -16,12 +16,11 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { RollPicker, type RollChoice } from "@/features/people/RollPicker/RollPicker"
+import { messageOf } from "@/lib/attempt"
 import { myDetailsSchema } from "@/people/people"
 
 /** Someone's own details as the dialog edits them; empty text for none. */
 export type Details = { name: string; phone: string; mailingAddress: string }
-
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : "That didn't work. Try again.")
 
 type DetailsDialogProps = {
   details: Details

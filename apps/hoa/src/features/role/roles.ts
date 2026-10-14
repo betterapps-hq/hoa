@@ -4,7 +4,10 @@ import type { Committee, CommitteeKind } from "@/people/people"
 export const roleIds = ["homeowner", "administrator"] as const
 export type RoleId = (typeof roleIds)[number]
 
-export type NavItem = { title: string; to: "/" | "/rules" | "/project-types" | "/applications" | "/people" }
+export type NavItem = {
+  title: string
+  to: "/" | "/rules" | "/project-types" | "/applications" | "/people" | "/settings"
+}
 
 /** A group of the sidebar's links, under its heading; the first, the dashboard, has none. */
 export type NavSection = { label: string | null; items: NavItem[] }
@@ -67,7 +70,9 @@ export function navigationFor(roleId: RoleId, committees: readonly Pick<Committe
     { title: "Applications", to: "/applications" },
     ...(roleId === "administrator" ? committeePages.architectural.slice(1) : []),
     { title: "Rulebook", to: "/rules" },
-    ...(doesWorkOf(roleId, committees, "board") ? [peoplePage] : [])
+    ...(doesWorkOf(roleId, committees, "board") ? [peoplePage] : []),
+    // What the documents don't say about the association, kept by an administrator.
+    ...(roleId === "administrator" ? [{ title: "Settings", to: "/settings" } as const] : [])
   ]
   return [
     { label: null, items: [{ title: "Dashboard", to: "/" }] },

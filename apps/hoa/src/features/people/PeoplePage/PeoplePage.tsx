@@ -16,32 +16,22 @@ import {
   UsersIcon
 } from "lucide-react"
 import { useMemo, useState, type ReactNode } from "react"
-import { toast } from "sonner"
+import { DangerDialog } from "@/components/DangerDialog/DangerDialog"
 import { DataTable } from "@/components/DataTable/DataTable"
 import { dataTableColumns } from "@/components/DataTable/DataTable.utils"
 import { PageActions } from "@/components/PageActions/PageActions"
 import { RowActions, type RowAction } from "@/components/RowActions/RowActions"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle
-} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { attempt } from "@/lib/attempt"
 import { localToday } from "@/lib/days"
 import { createSearch } from "@/lib/search"
 import {
   accessLabels,
-  addressLine,
   committeeKindLabels,
   relationLabels,
   seatLabel,
@@ -68,6 +58,7 @@ import {
   type RollData,
   type UnitRow
 } from "@/people/roll"
+import { addressLine } from "@/places/address"
 import { CommitteeDialog, MemberDialog, type SeatChange } from "../CommitteeDialogs/CommitteeDialogs"
 import { EndDialog, ResignDialog, type EndChoice } from "../EndDialog/EndDialog"
 import { PersonDialog, type PersonSave } from "../PersonDialog/PersonDialog"
@@ -115,8 +106,6 @@ type Open =
     }
   | { kind: "confirm"; title: string; description: string; confirm: string; run: () => Promise<void> }
 
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : "That didn't work. Try again.")
-
 /**
  * The association's people (docs/design/people.md): everyone on its roll and whether they can sign in yet, the units
  * and who owns, lives in or rents each, and the board and committees. An administrator changes all of it; the board
@@ -138,18 +127,6 @@ export function PeoplePage({
   const [tab, setTab] = useState("people")
   const [open, setOpen] = useState<Open | null>(null)
   const close = () => setOpen(null)
-  const attempt = async <T,>(run: () => Promise<T>, success?: string): Promise<T> => {
-    try {
-      const result = await run()
-      if (success) {
-        toast.success(success)
-      }
-      return result
-    } catch (caught) {
-      toast.error(messageOf(caught))
-      throw caught
-    }
-  }
   const people = useMemo(() => personRows(roll, today), [roll, today])
   const units = useMemo(() => unitRows(roll, today), [roll, today])
   const committees = useMemo(() => committeeViews(roll, today), [roll, today])
@@ -538,26 +515,13 @@ export function PeoplePage({
         />
       ) : null}
       {open?.kind === "confirm" ? (
-        <AlertDialog open onOpenChange={(isOpen) => (isOpen ? undefined : close())}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{open.title}</AlertDialogTitle>
-              <AlertDialogDescription>{open.description}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                onClick={() => {
-                  close()
-                  void open.run().catch(() => undefined)
-                }}
-              >
-                {open.confirm}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <DangerDialog
+          title={open.title}
+          description={open.description}
+          confirmLabel={open.confirm}
+          onConfirm={open.run}
+          onOpenChange={(isOpen) => (isOpen ? undefined : close())}
+        />
       ) : null}
     </div>
   )

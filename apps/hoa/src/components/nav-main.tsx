@@ -1,5 +1,12 @@
 import { Link, useRouterState } from "@tanstack/react-router"
-import { ClipboardCheckIcon, LayersIcon, LayoutDashboardIcon, ScrollTextIcon, UsersIcon } from "lucide-react"
+import {
+  ClipboardCheckIcon,
+  LayersIcon,
+  LayoutDashboardIcon,
+  ScrollTextIcon,
+  SettingsIcon,
+  UsersIcon
+} from "lucide-react"
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -17,7 +24,8 @@ const icons: Record<NavItem["to"], typeof LayoutDashboardIcon> = {
   "/rules": ScrollTextIcon,
   "/project-types": LayersIcon,
   "/applications": ClipboardCheckIcon,
-  "/people": UsersIcon
+  "/people": UsersIcon,
+  "/settings": SettingsIcon
 }
 
 /** The sidebar's links: the dashboard on its own, then each section under its heading. */

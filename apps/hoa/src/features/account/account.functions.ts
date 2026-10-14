@@ -3,13 +3,16 @@ import { getRequestHeaders } from "@tanstack/react-start/server"
 import { isPasswordCompromised } from "better-auth/plugins"
 import { and, eq, gt } from "drizzle-orm"
 import { z } from "zod"
+import { isFreshSignIn } from "@/auth/accountDeletion"
 import { compromisedPasswordMessage, getAuth, isGoogleConfigured } from "@/auth/auth.server"
 import { getDb } from "@/db/client.server"
+import { organizationsOnlyAdministeredBy } from "@/db/membershipRepository"
 import { claimUnit, endCommitteeMember, getRoll, updatePerson } from "@/db/peopleRepository"
 import { accounts, sessions } from "@/db/schema"
 import { addDays } from "@/lib/days"
-import { addressLine, myDetailsSchema, type Access, type CommitteeRole, type UnitRelation } from "@/people/people"
+import { myDetailsSchema, type Access, type CommitteeRole, type UnitRelation } from "@/people/people"
 import { personRows, resignationProblem, unitRows } from "@/people/roll"
+import { addressLine } from "@/places/address"
 import { accountOf, getMembership, type SignedInAccount } from "@/session/requestContext.server"
 import { deviceOf, type DeviceKind } from "./devices"
 
@@ -67,6 +70,8 @@ export type AccountDetails = {
   membership: AccountMembership | null
   /** The current browser first, then the most recently active. */
   devices: AccountDevice[]
+  /** What deleting the account waits on: the associations it's the only administrator of, and a recent sign-in. */
+  deletion: { lastAdministratorOf: string[]; isFreshSignIn: boolean }
   /** When the server read all this, so the page says how long ago things were the same way on both sides. */
   asOf: string
 }
@@ -125,7 +130,8 @@ export const getAccountDetails = createServerFn({ method: "GET" }).handler(async
   const authSession = await requireSession()
   const { user, session } = authSession
   const db = getDb()
-  const [methods, signedIn, membership] = await Promise.all([
+  const now = new Date()
+  const [methods, signedIn, membership, lastAdministratorOf] = await Promise.all([
     db.select({ id: accounts.id, providerId: accounts.providerId }).from(accounts).where(eq(accounts.userId, user.id)),
     db
       .select({
@@ -134,8 +140,9 @@ export const getAccountDetails = createServerFn({ method: "GET" }).handler(async
         updatedAt: sessions.updatedAt
       })
       .from(sessions)
-      .where(and(eq(sessions.userId, user.id), gt(sessions.expiresAt, new Date()))),
-    membershipOf(accountOf(authSession))
+      .where(and(eq(sessions.userId, user.id), gt(sessions.expiresAt, now))),
+    membershipOf(accountOf(authSession)),
+    organizationsOnlyAdministeredBy(db, user.id)
   ])
   const devices = signedIn
     .map((row) => ({
@@ -154,7 +161,8 @@ export const getAccountDetails = createServerFn({ method: "GET" }).handler(async
     isGoogleConfigured: isGoogleConfigured(),
     membership,
     devices,
-    asOf: new Date().toISOString()
+    deletion: { lastAdministratorOf, isFreshSignIn: isFreshSignIn(session, now) },
+    asOf: now.toISOString()
   }
 })
 

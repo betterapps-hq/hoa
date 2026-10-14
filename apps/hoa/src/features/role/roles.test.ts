@@ -36,7 +36,7 @@ describe("navigationFor", () => {
   it("gives an administrator every page, under the association's when no committee has it", () => {
     expect(sectionsOf("administrator", [])).toEqual([
       [null, ["Dashboard"]],
-      ["Organization", ["Applications", "Project types", "Rulebook", "People"]]
+      ["Organization", ["Applications", "Project types", "Rulebook", "People", "Settings"]]
     ])
   })
 })
