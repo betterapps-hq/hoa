@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest"
 import {
   findLabels,
   fuzzyThreshold,
+  labelsMatch,
   levenshtein,
   matchLabel,
   partialRatio,
+  preparedLabel,
   ratio,
   similarity,
   tokenSetRatio
@@ -94,6 +96,32 @@ describe("matchLabel", () => {
     expect(matchLabel("fence", { text: "gate" })).toBeNull()
     expect(fuzzyThreshold(5)).toBe(0.9)
     expect(fuzzyThreshold(12)).toBe(0.85)
+  })
+})
+
+describe("labelsMatch", () => {
+  it("agrees with matchLabel either way round, exactly and fuzzily", () => {
+    // A fixed linear congruential sequence over words that share letters, with a typo, hyphens and stored plurals.
+    let seed = 11
+    const next = (limit: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed % limit
+    }
+    const words = ["fence", "fences", "gate", "height", "hieght", "common", "area", "limited", "arc", "roof", "solar"]
+    const label = () => {
+      const text = Array.from({ length: 1 + next(3) }, () => words[next(words.length)]).join(next(4) ? " " : "-")
+      return next(3) ? { text } : { text, plural: `${text}s` }
+    }
+    const kinds = new Set<string>()
+    for (let round = 0; round < 400; round += 1) {
+      const a = label()
+      const b = label()
+      const found = [matchLabel(a.text, b), matchLabel(b.text, a)]
+      kinds.add(found.find((match) => match?.kind === "exact")?.kind ?? found.find(Boolean)?.kind ?? "none")
+      const expected = found.some(Boolean)
+      expect([a, b, labelsMatch(preparedLabel(a), preparedLabel(b))]).toEqual([a, b, expected])
+    }
+    expect([...kinds].toSorted()).toEqual(["exact", "fuzzy", "none"])
   })
 })
 

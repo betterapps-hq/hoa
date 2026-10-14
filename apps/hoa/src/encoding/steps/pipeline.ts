@@ -46,7 +46,6 @@ import {
 } from "./vocabulary"
 import {
   applyVocabularyMerge,
-  mergeClusters,
   mergeExactKeys,
   vocabularyMergeAnswer,
   vocabularyMergeVariables,
@@ -381,16 +380,18 @@ export function vocabularyEntries(
 
 const noMerges: VocabularyMergeAnswer = { merges: [], renames: [], distinct: [], notes: [] }
 
-/** Whether C-merge has anything to decide: clusters of near-duplicates or collisions. */
-export const hasClusters = (entries: readonly VocabularyEntry[]) => mergeClusters(entries).length > 0
-
-/** C-merge's call over the entries' clusters; null when there are none. */
-export async function mergeVocabulary(input: Call & { entries: readonly VocabularyEntry[] }) {
-  const clusters = mergeClusters(input.entries)
+/**
+ * C-merge's call over the entries' clusters (`mergeClusters`, which the caller finds once: matching every pair of
+ * labels takes long, and freezing the vocabulary needs them too); null when there are none.
+ */
+export async function mergeVocabulary(
+  input: Call & { entries: readonly VocabularyEntry[]; clusters: readonly number[][] }
+) {
+  const { entries, clusters } = input
   if (clusters.length === 0) {
     return null
   }
-  const { variables } = vocabularyMergeVariables(input.entries, clusters)
+  const { variables } = vocabularyMergeVariables(entries, clusters)
   const result = await runStepPrompt({
     ai: input.ai,
     cacheStage: input.cacheStage,
@@ -405,11 +406,15 @@ export async function mergeVocabulary(input: Call & { entries: readonly Vocabula
 }
 
 /**
- * The frozen vocabulary: C-merge's answer applied to the entries (no answer merges nothing), exact keys merged again,
- * with what each term serves.
+ * The frozen vocabulary: C-merge's answer, about the entries' clusters, applied to the entries (no answer merges
+ * nothing), exact keys merged again, with what each term serves.
  */
-export function freezeVocabulary(entries: readonly VocabularyEntry[], answer: VocabularyMergeAnswer | null) {
-  const { ids } = vocabularyMergeVariables(entries, mergeClusters(entries))
+export function freezeVocabulary(
+  entries: readonly VocabularyEntry[],
+  clusters: readonly number[][],
+  answer: VocabularyMergeAnswer | null
+) {
+  const { ids } = vocabularyMergeVariables(entries, clusters)
   return applyVocabularyMerge({ entries, ids, answer: answer ?? noMerges })
 }
 
