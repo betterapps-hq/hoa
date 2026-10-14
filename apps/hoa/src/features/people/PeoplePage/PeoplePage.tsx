@@ -19,7 +19,7 @@ import { toast } from "sonner"
 import { DataTable } from "@/components/DataTable/DataTable"
 import { dataTableColumns } from "@/components/DataTable/DataTable.utils"
 import { PageActions } from "@/components/PageActions/PageActions"
-import { RowActions } from "@/components/RowActions/RowActions"
+import { RowActions, type RowAction } from "@/components/RowActions/RowActions"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +35,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { localToday } from "@/lib/days"
 import { createSearch } from "@/lib/search"
 import {
   accessLabels,
@@ -42,9 +43,11 @@ import {
   committeeKindLabels,
   relationLabels,
   seatLabel,
+  resignedText,
   seatTermLabel,
   type Access,
   type Committee,
+  type CommitteeMember,
   type CommitteeKind,
   type Person,
   type SeatInput,
@@ -63,7 +66,7 @@ import {
   type UnitRow
 } from "@/people/roll"
 import { CommitteeDialog, MemberDialog, type SeatChange } from "../CommitteeDialogs/CommitteeDialogs"
-import { EndDialog, type EndChoice } from "../EndDialog/EndDialog"
+import { EndDialog, ResignDialog, type EndChoice } from "../EndDialog/EndDialog"
 import { PersonDialog, type PersonSave } from "../PersonDialog/PersonDialog"
 import type { RollChoice } from "../RollPicker/RollPicker"
 import { UnitDialog, UnitPeopleDialog } from "../UnitDialogs/UnitDialogs"
@@ -86,6 +89,8 @@ export type PeopleActions = {
   editSeat: (memberId: string, seat: SeatInput) => Promise<void>
   /** Starts someone's next term in a seat they hold; the one before stays on the roll. */
   startNewTerm: (memberId: string, seat: SeatInput) => Promise<void>
+  /** Leaves one of the viewer's own seats on a day; `isLeavingPage` when it takes this page away from them. */
+  resign: (memberId: string, endedOn: string, isLeavingPage: boolean) => Promise<void>
   leaveCommittee: (memberId: string, endedOn: string) => Promise<void>
   /** For the platform's operators: views the app as someone who's joined; null for everyone else. */
   viewAs: ((userId: string) => Promise<void>) | null
@@ -97,6 +102,7 @@ type Open =
   | { kind: "unit-people"; unit: Unit; mode: "add" | "sale" }
   | { kind: "committee"; committee: Committee | null }
   | { kind: "member"; committee: Committee; change: SeatChange | null }
+  | { kind: "resign"; committee: Committee; member: CommitteeMember }
   | {
       kind: "end"
       title: string
@@ -107,9 +113,6 @@ type Open =
   | { kind: "confirm"; title: string; description: string; confirm: string; run: () => Promise<void> }
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : "That didn't work. Try again.")
-
-/** Today, where the viewer is: YYYY-MM-DD. */
-const localToday = () => new Date().toLocaleDateString("en-CA")
 
 /**
  * The association's people (docs/design/people.md): everyone on its roll and whether they can sign in yet, the units
@@ -167,6 +170,39 @@ export function PeoplePage({
       choices,
       run: (memberId, endedOn) => attempt(() => actions.leaveCommittee(memberId, endedOn), "Ended.")
     })
+  /**
+   * What the viewer may do to a seat: an administrator corrects it or starts its next term, and ends anyone else's;
+   * the seat's holder resigns from it.
+   */
+  const seatActions = (committee: Committee, member: CommitteeMember, person: Person): RowAction[] => {
+    const isOwn = person.id === viewerId
+    const change = (mode: SeatChange["mode"]) => () =>
+      setOpen({ kind: "member", committee, change: { member, personName: person.name, mode } })
+    return [
+      ...(isAdministrator
+        ? [
+            { label: "Edit", icon: PencilIcon, onSelect: change("edit") },
+            { label: "New term", icon: CalendarPlusIcon, onSelect: change("renew") }
+          ]
+        : []),
+      isOwn
+        ? {
+            label: "Resign",
+            icon: UserMinusIcon,
+            isDestructive: true,
+            onSelect: () => setOpen({ kind: "resign", committee, member })
+          }
+        : {
+            label: "End term",
+            icon: UserMinusIcon,
+            isDestructive: true,
+            onSelect: () =>
+              endSeat(`End ${person.name}'s term`, [
+                { id: member.id, title: committee.name, subtitle: seatLabel(member) }
+              ])
+          }
+    ]
+  }
   // The page's main action adds what the open tab lists; the board adds people only.
   const adds = [
     { label: "Add person", icon: UserPlusIcon, onSelect: () => setOpen({ kind: "person", person: null }) },
@@ -323,41 +359,8 @@ export function PeoplePage({
                             <span className="truncate font-medium">{person.name}</span>
                             <span className="text-sm text-muted-foreground">{seatTermLabel(member, today)}</span>
                           </div>
-                          {isAdministrator ? (
-                            <RowActions
-                              name={person.name}
-                              actions={[
-                                {
-                                  label: "Edit",
-                                  icon: PencilIcon,
-                                  onSelect: () =>
-                                    setOpen({
-                                      kind: "member",
-                                      committee,
-                                      change: { member, personName: person.name, mode: "edit" }
-                                    })
-                                },
-                                {
-                                  label: "New term",
-                                  icon: CalendarPlusIcon,
-                                  onSelect: () =>
-                                    setOpen({
-                                      kind: "member",
-                                      committee,
-                                      change: { member, personName: person.name, mode: "renew" }
-                                    })
-                                },
-                                {
-                                  label: "End term",
-                                  icon: UserMinusIcon,
-                                  isDestructive: true,
-                                  onSelect: () =>
-                                    endSeat(`End ${person.name}'s term`, [
-                                      { id: member.id, title: committee.name, subtitle: seatLabel(member) }
-                                    ])
-                                }
-                              ]}
-                            />
+                          {isAdministrator || person.id === viewerId ? (
+                            <RowActions name={person.name} actions={seatActions(committee, member, person)} />
                           ) : null}
                         </li>
                       ))}
@@ -451,6 +454,26 @@ export function PeoplePage({
           today={today}
           onOpenChange={(isOpen) => (isOpen ? undefined : close())}
           onEnd={({ id, endedOn }) => open.run(id, endedOn)}
+        />
+      ) : null}
+      {open?.kind === "resign" ? (
+        <ResignDialog
+          committee={open.committee.name}
+          seat={open.member}
+          today={today}
+          onOpenChange={(isOpen) => (isOpen ? undefined : close())}
+          onResign={(endedOn) =>
+            attempt(
+              () =>
+                actions.resign(
+                  open.member.id,
+                  endedOn,
+                  // The board's work is this page, for someone who isn't an administrator.
+                  !isAdministrator && open.committee.kind === "board" && endedOn <= today
+                ),
+              resignedText(open.committee.name, endedOn, today)
+            )
+          }
         />
       ) : null}
       {open?.kind === "committee" ? (

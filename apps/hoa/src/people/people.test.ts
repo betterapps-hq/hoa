@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { nextTermStart, seatInputSchema, seatTermLabel } from "./people"
+import { nextTermStart, resignedText, seatInputSchema, seatTermLabel } from "./people"
 
 const seat = { role: "member" as const, office: "" }
 
@@ -19,7 +19,7 @@ describe("seatInputSchema", () => {
 })
 
 describe("seatTermLabel", () => {
-  const president = { role: "chair" as const, office: "President" }
+  const president = { role: "chair" as const, office: "President", endedOn: null }
 
   it("says when the term ends, or that it ended while they hold the seat", () => {
     expect(seatTermLabel({ ...president, termEndsOn: "2027-05-31" }, "2026-10-14")).toBe(
@@ -29,6 +29,21 @@ describe("seatTermLabel", () => {
       "President, Chair, term ended May 31, 2026"
     )
     expect(seatTermLabel({ ...president, termEndsOn: null }, "2026-10-14")).toBe("President, Chair")
+  })
+
+  it("says the day they leave once it's set, over when the term ends", () => {
+    expect(seatTermLabel({ ...president, termEndsOn: "2027-05-31", endedOn: "2026-11-01" }, "2026-10-14")).toBe(
+      "President, Chair, leaves Nov 1, 2026"
+    )
+  })
+})
+
+describe("resignedText", () => {
+  it("says they left, or the day they will", () => {
+    expect(resignedText("the Board of Directors", "2026-10-14", "2026-10-14")).toBe("You left the Board of Directors.")
+    expect(resignedText("the Board of Directors", "2026-11-01", "2026-10-14")).toBe(
+      "You'll leave the Board of Directors on Nov 1, 2026."
+    )
   })
 })
 

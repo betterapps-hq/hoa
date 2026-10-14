@@ -5,10 +5,11 @@ import { and, eq, gt } from "drizzle-orm"
 import { z } from "zod"
 import { compromisedPasswordMessage, getAuth, isGoogleConfigured } from "@/auth/auth.server"
 import { getDb } from "@/db/client.server"
-import { claimUnit, getRoll, updatePerson } from "@/db/peopleRepository"
+import { claimUnit, endCommitteeMember, getRoll, updatePerson } from "@/db/peopleRepository"
 import { accounts, sessions } from "@/db/schema"
+import { addDays } from "@/lib/days"
 import { addressLine, myDetailsSchema, type Access, type CommitteeRole, type UnitRelation } from "@/people/people"
-import { personRows, unitRows } from "@/people/roll"
+import { personRows, resignationProblem, unitRows } from "@/people/roll"
 import { accountOf, getMembership, type SignedInAccount } from "@/session/requestContext.server"
 import { deviceOf, type DeviceKind } from "./devices"
 
@@ -39,7 +40,15 @@ export type AccountMembership = {
   phone: string | null
   mailingAddress: string | null
   homes: { id: string; label: string; relation: UnitRelation; since: string | null }[]
-  committees: { id: string; name: string; role: CommitteeRole; office: string | null }[]
+  /** Their seats, by the seat's id, with when the term is due to end and the day they leave once it's set. */
+  committees: {
+    id: string
+    name: string
+    role: CommitteeRole
+    office: string | null
+    termEndsOn: string | null
+    endedOn: string | null
+  }[]
   /** Every home on the roll they don't own or live in, for claiming theirs. */
   claimable: ClaimableHome[]
 }
@@ -94,7 +103,9 @@ async function membershipOf(account: SignedInAccount) {
       id: member.id,
       name: committee.name,
       role: member.role,
-      office: member.office
+      office: member.office,
+      termEndsOn: member.termEndsOn,
+      endedOn: member.endedOn
     })),
     claimable: unitRows(roll, today)
       .filter(({ unit }) => !mine.has(unit.id))
@@ -164,6 +175,35 @@ export const claimHome = createServerFn({ method: "POST" })
     if (!claimed) {
       throw new Error("That home already has an owner on the roll. Ask your board or an administrator to change it.")
     }
+  })
+
+/**
+ * Ends the signed-in person's own seat on a committee on a day: today, as their time zone has it, or later. The term
+ * stays on the roll, and the board is never left with nobody on it.
+ */
+export const resignSeat = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ id: z.string().min(1), endedOn: z.iso.date() }).parse(data))
+  .handler(async ({ data }) => {
+    const membership = await getMembership(accountOf(await requireSession()))
+    const person = membership?.person
+    if (!membership || !person) {
+      throw new Error("Your email isn't on this association's roll.")
+    }
+    const db = getDb()
+    const roll = await getRoll(db, membership.organization.id)
+    const seat = roll.members.find((member) => member.id === data.id && member.personId === person.id)
+    if (!seat) {
+      throw new Error("That seat isn't yours.")
+    }
+    // A day behind the server's, for someone west of it whose today hasn't turned yet.
+    if (data.endedOn < addDays(new Date().toISOString().slice(0, 10), -1)) {
+      throw new Error("Pick today or a later day.")
+    }
+    const problem = resignationProblem(roll, seat, data.endedOn)
+    if (problem) {
+      throw new Error(problem)
+    }
+    await endCommitteeMember(db, membership.organization.id, seat.id, data.endedOn)
   })
 
 /** Saves someone's own name, on their account and the roll, and the phone and mailing address the roll has for them. */

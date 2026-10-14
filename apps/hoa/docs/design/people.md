@@ -66,7 +66,9 @@ Treasurer, or another title), the day it starts, the day it's due to end (`term_
 (`ended_on`). Someone keeps the seat past the term's end, as bylaws usually have directors serve until their successors
 take office, so a late election never takes the board's access away; the seat says the term ended. An administrator
 corrects a term in place, starts someone's next term (which ends the last on the day the next starts, and keeps it as
-one they served), or ends the seat on a day.
+one they served), or ends the seat on a day. Someone resigns from their own seat, from their account or the committee's
+card, today or on a later day (`resignSeat`), as bylaws let a director do by notice; the board's last member can't, so
+the board is never left with nobody on it.
 
 ## Addresses
 

@@ -1,6 +1,6 @@
 import { z } from "zod"
 import type { RoleId } from "@/features/role/roles"
-import { dayText } from "@/lib/text"
+import { addDays, dayText } from "@/lib/days"
 import { unitNumberText, type Place } from "@/places/address"
 import { optionalPhone } from "./phone"
 
@@ -213,13 +213,28 @@ export const seatLabel = (member: Pick<CommitteeMember, "office" | "role">) =>
 
 /** The day someone's next term starts unless they say otherwise: the day after this one is due to end, or today. */
 export const nextTermStart = ({ termEndsOn }: Pick<CommitteeMember, "termEndsOn">, today: string) =>
-  termEndsOn ? new Date(Date.parse(`${termEndsOn}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10) : today
+  termEndsOn ? addDays(termEndsOn, 1) : today
 
-/** Their seat and when its term is due to end, or ended while they hold it on: "President, term ends May 31, 2027". */
-export const seatTermLabel = (member: Pick<CommitteeMember, "office" | "role" | "termEndsOn">, today: string) =>
-  member.termEndsOn
-    ? `${seatLabel(member)}, term ${member.termEndsOn < today ? "ended" : "ends"} ${dayText(member.termEndsOn)}`
-    : seatLabel(member)
+/**
+ * Their seat and when they hold it until: the day they leave, once it's set, or when the term is due to end, or that
+ * it ended while they hold the seat on. "President, term ends May 31, 2027".
+ */
+export function seatTermLabel(
+  member: Pick<CommitteeMember, "office" | "role" | "termEndsOn" | "endedOn">,
+  today: string
+) {
+  if (member.endedOn) {
+    return `${seatLabel(member)}, leaves ${dayText(member.endedOn)}`
+  }
+  if (member.termEndsOn) {
+    return `${seatLabel(member)}, term ${member.termEndsOn < today ? "ended" : "ends"} ${dayText(member.termEndsOn)}`
+  }
+  return seatLabel(member)
+}
+
+/** What a resignation says it did: "You left the Board of Directors", or the day they will. */
+export const resignedText = (committee: string, endedOn: string, today: string) =>
+  endedOn > today ? `You'll leave ${committee} on ${dayText(endedOn)}.` : `You left ${committee}.`
 
 /** Each value with its label, in order, for a select. */
 const choicesOf = <V extends string>(values: readonly V[], labels: Record<V, string>) =>

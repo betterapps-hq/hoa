@@ -4,6 +4,7 @@ import { throwIfFailed } from "@/auth/authErrors"
 import {
   addPassword,
   claimHome,
+  resignSeat,
   getAccountDetails,
   saveMyDetails,
   signOutDevice
@@ -46,7 +47,8 @@ function AccountRoute() {
           throwIfFailed(await authClient.revokeOtherSessions())
           await router.invalidate()
         },
-        claimHome: (unitId) => thenReload(claimHome({ data: { unitId } }))
+        claimHome: (unitId) => thenReload(claimHome({ data: { unitId } })),
+        resign: (id, endedOn) => thenReload(resignSeat({ data: { id, endedOn } }))
       }}
     />
   )

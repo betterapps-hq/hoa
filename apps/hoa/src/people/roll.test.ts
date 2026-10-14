@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest"
 import { accessOf, emailKey, isCurrent, peopleOfAccount, personInputSchema, roleOf, type Person } from "./people"
-import { accountOf, committeeViews, isLastAdministrator, personRows, unitRows, type RollData } from "./roll"
+import {
+  accountOf,
+  committeeViews,
+  isLastAdministrator,
+  personRows,
+  resignationProblem,
+  unitRows,
+  type RollData
+} from "./roll"
 
 const person = (id: string, fields: Partial<Person> = {}): Person => ({
   id,
@@ -166,5 +174,35 @@ describe("accounts and people", () => {
       true,
       false
     ])
+  })
+})
+
+describe("resignationProblem", () => {
+  const seat = (id: string, committeeId: string, endedOn: string | null = null) => ({
+    id,
+    committeeId,
+    personId: id,
+    role: "member" as const,
+    office: null,
+    startedOn: null,
+    termEndsOn: null,
+    endedOn
+  })
+  const committees = roll.committees
+
+  it("keeps the board from being left with nobody on it", () => {
+    const president = seat("sam", "board")
+    expect(resignationProblem({ committees, members: [president] }, president, "2026-10-14")).toMatch(/last member/)
+  })
+
+  it("lets a board member go while someone else stays on that day", () => {
+    const [sam, lee] = [seat("sam", "board"), seat("lee", "board", "2026-12-01")]
+    expect(resignationProblem({ committees, members: [sam, lee] }, sam, "2026-10-14")).toBeNull()
+    expect(resignationProblem({ committees, members: [sam, lee] }, sam, "2026-12-01")).toMatch(/last member/)
+  })
+
+  it("lets any other committee empty", () => {
+    const pat = seat("pat", "acc")
+    expect(resignationProblem({ committees, members: [pat] }, pat, "2026-10-14")).toBeNull()
   })
 })

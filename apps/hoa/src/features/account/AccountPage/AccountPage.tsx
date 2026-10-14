@@ -7,11 +7,13 @@ import {
   PlusIcon,
   SmartphoneIcon,
   TabletIcon,
+  UserMinusIcon,
   UsersIcon,
   type LucideIcon
 } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { toast } from "sonner"
+import { RowActions } from "@/components/RowActions/RowActions"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -26,7 +28,9 @@ import {
   ItemSeparator,
   ItemTitle
 } from "@/components/ui/item"
-import { relationLabels, seatLabel } from "@/people/people"
+import { ResignDialog } from "@/features/people/EndDialog/EndDialog"
+import { localToday } from "@/lib/days"
+import { relationLabels, resignedText, seatTermLabel } from "@/people/people"
 import { phoneText } from "@/people/phone"
 import { initialsOf } from "@/session/users"
 import type { AccountDetails, AccountDevice, AccountMembership } from "../account.functions"
@@ -44,6 +48,8 @@ export type AccountActions = {
   signOutDevice: (id: string) => Promise<void>
   signOutElsewhere: () => Promise<void>
   claimHome: (unitId: string) => Promise<void>
+  /** Leaves one of their seats on a committee on a day. */
+  resign: (seatId: string, endedOn: string) => Promise<void>
 }
 
 const messageOf = (error: unknown) => (error instanceof Error ? error.message : "That didn't work. Try again.")
@@ -85,14 +91,7 @@ export function AccountPage({ account, actions }: { account: AccountDetails; act
       ) : null}
       {membership && membership.committees.length > 0 ? (
         <Section title="Committees">
-          <RowsCard>
-            {membership.committees.map((committee, index) => (
-              <div key={committee.id}>
-                {index > 0 ? <ItemSeparator className="my-0" /> : null}
-                <Row icon={<UsersIcon />} title={committee.name} description={seatLabel(committee)} />
-              </div>
-            ))}
-          </RowsCard>
+          <CommitteesCard membership={membership} actions={actions} />
         </Section>
       ) : null}
       <Section title="Sign-in">
@@ -277,6 +276,58 @@ function HomesCard({ membership, actions }: { membership: AccountMembership; act
             toast.success("Home added.")
           }}
           onOpenChange={setClaiming}
+        />
+      ) : null}
+    </>
+  )
+}
+
+/** The seats they hold, each with a way to resign from it. */
+function CommitteesCard({ membership, actions }: { membership: AccountMembership; actions: AccountActions }) {
+  const [resigning, setResigning] = useState<AccountMembership["committees"][number] | null>(null)
+  const today = localToday()
+  return (
+    <>
+      <RowsCard>
+        {membership.committees.map((committee, index) => (
+          <div key={committee.id}>
+            {index > 0 ? <ItemSeparator className="my-0" /> : null}
+            <Row
+              icon={<UsersIcon />}
+              title={committee.name}
+              description={seatTermLabel(committee, today)}
+              action={
+                <RowActions
+                  name={committee.name}
+                  actions={[
+                    {
+                      label: "Resign",
+                      icon: UserMinusIcon,
+                      isDestructive: true,
+                      onSelect: () => setResigning(committee)
+                    }
+                  ]}
+                />
+              }
+            />
+          </div>
+        ))}
+      </RowsCard>
+      {resigning ? (
+        <ResignDialog
+          committee={resigning.name}
+          seat={resigning}
+          today={today}
+          onOpenChange={(isOpen) => (isOpen ? undefined : setResigning(null))}
+          onResign={async (endedOn) => {
+            try {
+              await actions.resign(resigning.id, endedOn)
+            } catch (caught) {
+              toast.error(messageOf(caught))
+              throw caught
+            }
+            toast.success(resignedText(resigning.name, endedOn, today))
+          }}
         />
       ) : null}
     </>

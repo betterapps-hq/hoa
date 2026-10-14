@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router"
 import { authClient } from "@/auth/authClient"
 import { throwIfFailed } from "@/auth/authErrors"
+import { resignSeat } from "@/features/account/account.functions"
 import {
   addToCommittee,
   addToUnit,
@@ -64,6 +65,14 @@ function PeopleRoute() {
         editSeat: change((id, seat) => editSeat({ data: { id, seat } })),
         startNewTerm: change((id, seat) => startNewTerm({ data: { id, seat } })),
         leaveCommittee: change((id, endedOn) => leaveCommittee({ data: { id, endedOn } })),
+        resign: async (id, endedOn, isLeavingPage) => {
+          await resignSeat({ data: { id, endedOn } })
+          // Off the page first, so reloading doesn't ask for a roll they can no longer read.
+          if (isLeavingPage) {
+            await router.navigate({ to: "/" })
+          }
+          await router.invalidate()
+        },
         viewAs:
           session.status === "member" && session.isOperator
             ? async (userId) => {

@@ -123,6 +123,24 @@ export function committeeViews(roll: RollData, today: string): CommitteeView[] {
 }
 
 /** Whether taking `personId` off the roll, or their administrator access away, would leave nobody to manage it. */
+/**
+ * Why someone can't leave their seat on a day (YYYY-MM-DD), or null: the board is never left with nobody on it. Any
+ * other committee can empty.
+ */
+export function resignationProblem(
+  roll: Pick<RollData, "committees" | "members">,
+  seat: CommitteeMember,
+  endedOn: string
+) {
+  const committee = roll.committees.find((candidate) => candidate.id === seat.committeeId)
+  const stays = roll.members.some(
+    (member) => member.committeeId === seat.committeeId && member.id !== seat.id && isCurrent(member, endedOn)
+  )
+  return committee?.kind === "board" && !stays
+    ? "You're the board's last member. An admin needs to seat someone else first."
+    : null
+}
+
 export function isLastAdministrator(roll: Pick<RollData, "people" | "memberships">, personId: string) {
   const administrators = roll.memberships.filter((membership) => membership.access === "administrator")
   const userId = roll.people.find((person) => person.id === personId)?.userId
