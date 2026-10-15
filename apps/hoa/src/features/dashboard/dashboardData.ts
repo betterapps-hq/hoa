@@ -14,4 +14,6 @@ export type DashboardApplication = Pick<
   reviews: { recommendation: Recommendation; createdAt: string }[]
   /** What the latest review asks the homeowner to add to the packet, as its action items say it. */
   missingInformation: string[]
+  /** A newer rulebook changes rules the latest review applied, so the review must run again before submitting. */
+  rulesChanged: boolean
 }

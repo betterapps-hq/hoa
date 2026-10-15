@@ -1,15 +1,18 @@
 import { useState } from "react"
 import { InfoTip } from "@/components/InfoTip/InfoTip"
 import { QuantityInput } from "@/components/QuantityInput/QuantityInput"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Textarea } from "@/components/ui/textarea"
 import { citedProvisionHref } from "@/features/documents/citationLink"
 import { ReaderLink } from "@/features/documents/ReaderLink/ReaderLink"
-import { sentenceCase } from "@/lib/text"
+import { moneyText, sentenceCase } from "@/lib/text"
+import { invalidParts, isAnswerRecord } from "@/projectTypes/answers"
 import type { AnswerValue, ProjectField } from "@/projectTypes/projectType"
 import { asSentence, exampleOf } from "@/projectTypes/wording"
 import type { CitedProvision } from "../../rulebook/citedProvision"
@@ -155,6 +158,118 @@ function ChoicesInput({ field, id, value, onChange, onBlur, isInvalid, described
   )
 }
 
+const signedFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: "UTC" })
+
+/** Today in the homeowner's own time zone, as the day they signed. */
+const today = () => {
+  const now = new Date()
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+}
+
+/** A signature: the homeowner types their full name, which signs what the question states, on the day they type it. */
+function SignatureInput({ field, id, value, onChange, onBlur, isInvalid, describedBy }: InputProps<"signature">) {
+  const signature = isAnswerRecord(value) ? value : null
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Input
+        id={id}
+        autoComplete="name"
+        placeholder="Type your full name"
+        value={signature?.name ?? ""}
+        onBlur={onBlur}
+        onChange={(event) => {
+          const name = event.target.value
+          onChange(name.trim() === "" ? null : { name, signedOn: today() })
+        }}
+        aria-invalid={isInvalid}
+        aria-describedby={[describedBy, `${id}-signed`].filter(Boolean).join(" ")}
+        aria-required={field.isRequired}
+      />
+      <p id={`${id}-signed`} className="text-sm text-muted-foreground">
+        {signature?.signedOn
+          ? `Signed ${signedFormat.format(new Date(signature.signedOn))}`
+          : "Typing your name signs it."}
+      </p>
+    </div>
+  )
+}
+
+type ContactPart = { part: string; label: string; type: "text" | "tel" | "email" | "url"; isWide: boolean }
+
+/** The parts a contact asks for: a business's company first and its website last. */
+const contactParts = (isBusiness: boolean): ContactPart[] => [
+  ...(isBusiness ? [{ part: "company", label: "Company", type: "text" as const, isWide: true }] : []),
+  { part: "name", label: isBusiness ? "Contact name" : "Name", type: "text", isWide: true },
+  { part: "phone", label: "Phone", type: "tel", isWide: false },
+  { part: "email", label: "Email", type: "email", isWide: false },
+  ...(isBusiness ? [{ part: "website", label: "Website (optional)", type: "url" as const, isWide: true }] : [])
+]
+
+/** A person's details: their name, then a phone and an email to reach them by; a business's company and website too. */
+function ContactInput({ field, id, value, onChange, onBlur, isInvalid, describedBy }: InputProps<"contact">) {
+  const contact = isAnswerRecord(value) ? value : {}
+  const parts = contactParts(field.isBusiness === true)
+  const [first] = parts
+  // Only the part that's wrong is marked; a missing answer marks the first part, which it needs first.
+  const wrong = isInvalid ? invalidParts(field, value) : new Set<string>()
+  const isPartInvalid = (part: string) => isInvalid && (wrong.size === 0 ? part === first?.part : wrong.has(part))
+  const set = (part: string, text: string) => {
+    const next = { ...Object.fromEntries(parts.map((item) => [item.part, contact[item.part] ?? ""])), [part]: text }
+    onChange(Object.values(next).every((item) => item.trim() === "") ? null : next)
+  }
+  return (
+    <fieldset
+      aria-labelledby={`${id}-label`}
+      aria-describedby={describedBy}
+      className="m-0 grid min-w-0 gap-3 border-0 p-0 text-foreground sm:grid-cols-2"
+    >
+      {parts.map(({ part, label, type, isWide }) => {
+        const partId = part === first?.part ? id : `${id}-${part}`
+        return (
+          <div key={part} className={isWide ? "flex flex-col gap-1.5 sm:col-span-2" : "flex flex-col gap-1.5"}>
+            <Label htmlFor={partId} className="text-xs font-normal text-muted-foreground">
+              {label}
+            </Label>
+            <Input
+              id={partId}
+              type={type}
+              autoComplete="off"
+              value={contact[part] ?? ""}
+              onBlur={onBlur}
+              onChange={(event) => set(part, event.target.value)}
+              aria-invalid={isPartInvalid(part)}
+              aria-required={(part === "name" || part === "company") && field.isRequired}
+            />
+          </div>
+        )
+      })}
+    </fieldset>
+  )
+}
+
+/** A fee: its amount, and a box the homeowner checks to confirm they'll pay it. */
+function FeeInput({ field, id, value, onChange, onBlur, isInvalid, describedBy }: InputProps<"fee">) {
+  return (
+    <div id={id} className="flex flex-col gap-2.5">
+      <p className="text-lg font-semibold tabular-nums">{moneyText(field.amount)}</p>
+      <Field orientation="horizontal" className="text-foreground">
+        <Checkbox
+          id={`${id}-confirm`}
+          checked={value === true}
+          onBlur={onBlur}
+          onCheckedChange={(checked) => onChange(checked ? true : null)}
+          aria-invalid={isInvalid}
+          aria-describedby={describedBy}
+          aria-required={field.isRequired}
+        />
+        <Label htmlFor={`${id}-confirm`} className="font-normal">
+          I&apos;ll pay this fee
+        </Label>
+      </Field>
+    </div>
+  )
+}
+
 /** A yes-or-no answer as the radio group's value: "" before an answer. */
 function yesNoValue(value: AnswerValue) {
   if (value === null || Array.isArray(value)) {
@@ -165,7 +280,8 @@ function yesNoValue(value: AnswerValue) {
 
 function QuestionInput(props: InputProps) {
   const { field, id, value, onChange, onBlur, isInvalid, describedBy } = props
-  const text = value === null || typeof value === "boolean" || Array.isArray(value) ? "" : String(value)
+  const text =
+    value === null || typeof value === "boolean" || Array.isArray(value) || isAnswerRecord(value) ? "" : String(value)
   const common = {
     id,
     onBlur,
@@ -192,6 +308,12 @@ function QuestionInput(props: InputProps) {
       return <ChoiceInput {...props} field={field} />
     case "choices":
       return <ChoicesInput {...props} field={field} />
+    case "signature":
+      return <SignatureInput {...props} field={field} />
+    case "contact":
+      return <ContactInput {...props} field={field} />
+    case "fee":
+      return <FeeInput {...props} field={field} />
     case "yes-no":
       return (
         <RadioGroup
@@ -289,11 +411,7 @@ export function QuestionField({ field, id, value, onChange, onBlur, errors, reas
       <div className="flex items-start gap-1">
         <FieldLabel htmlFor={id} id={`${id}-label`} className="block leading-snug">
           {field.label}
-          {field.isRequired ? (
-            <span aria-hidden className="ml-0.5 text-destructive">
-              *
-            </span>
-          ) : null}
+          {field.isRequired ? <RequiredMark /> : null}
         </FieldLabel>
         {longHelp || hasReasons ? (
           <InfoTip label={`About: ${field.label}`} icon={hasReasons ? "info" : "help"}>

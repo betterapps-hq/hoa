@@ -29,8 +29,14 @@ describe("loadBuildResults", { timeout: 30_000 }, () => {
 
   it("reads only a rulebook build of the asking organization", async () => {
     const { db } = database
-    await insertJob(db, newJob({ id: "build-1", hoaId: "hoa-a", kind: "rulebook-build", subjectId: "rb-1", now }))
-    await insertJob(db, newJob({ id: "ingest-1", hoaId: "hoa-a", kind: "document-ingest", subjectId: "doc-1", now }))
+    await insertJob(
+      db,
+      newJob({ id: "build-1", organizationId: "hoa-a", kind: "rulebook-build", subjectId: "rb-1", now })
+    )
+    await insertJob(
+      db,
+      newJob({ id: "ingest-1", organizationId: "hoa-a", kind: "document-ingest", subjectId: "doc-1", now })
+    )
 
     expect(await loadBuildResults(db, emptyBucket, "hoa-a", { jobId: "build-1", since: null })).toEqual({
       results: [],
@@ -59,7 +65,7 @@ describe("loadBuildDocuments", { timeout: 30_000 }, () => {
   it("gives the documents once the build has structured them, with their titles and provisions", async () => {
     const { db } = database
     const upload = await createGoverningDocument(db, {
-      hoaId: "hoa-a",
+      organizationId: "hoa-a",
       kind: "declaration",
       title: "Declaration of Covenants for Maple Hollow",
       effectiveDate: null,
@@ -71,7 +77,7 @@ describe("loadBuildDocuments", { timeout: 30_000 }, () => {
     })
     await insertRulebook(db, {
       id: "rb-1",
-      hoaId: "hoa-a",
+      organizationId: "hoa-a",
       version: null,
       status: "building",
       error: null,
@@ -82,7 +88,10 @@ describe("loadBuildDocuments", { timeout: 30_000 }, () => {
       publishedBy: null,
       publishedAt: null
     })
-    await insertJob(db, newJob({ id: "build-1", hoaId: "hoa-a", kind: "rulebook-build", subjectId: "rb-1", now }))
+    await insertJob(
+      db,
+      newJob({ id: "build-1", organizationId: "hoa-a", kind: "rulebook-build", subjectId: "rb-1", now })
+    )
     const [declaration] = readingDocuments(simulatedBuildSeconds)
     const structured: ResultsBucket = {
       ...emptyBucket,

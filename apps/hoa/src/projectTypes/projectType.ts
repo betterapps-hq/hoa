@@ -18,6 +18,12 @@ const fieldBase = {
   /** An example answer, shown in the empty input; null for none. */
   example: z.string().nullable().default(null),
   isRequired: z.boolean(),
+  /**
+   * In a section that repeats, answered once for every item (the same material for every fence run) instead of for
+   * each: the form asks it above the items and every item keeps the answer. Absent, it's asked for each item; ignored
+   * in a section that doesn't repeat.
+   */
+  isShared: z.boolean().optional(),
   /** Who can usually state it: the applicant, or only the association. */
   answeredBy: z.enum(["applicant", "association"]).default("applicant"),
   /**
@@ -83,7 +89,25 @@ const fieldKinds = z.discriminatedUnion("kind", [
   z.object({ ...fieldBase, kind: z.literal("choices"), options: choiceOptions }),
   z.object({ ...fieldBase, kind: z.literal("yes-no") }),
   z.object({ ...fieldBase, kind: z.literal("date") }),
-  z.object({ ...fieldBase, kind: z.literal("time") })
+  z.object({ ...fieldBase, kind: z.literal("time") }),
+  /**
+   * The homeowner signs what the question states by typing their full name; the answer keeps the name and the day it
+   * was signed. Only the administrator's own questions ask this way.
+   */
+  z.object({ ...fieldBase, kind: z.literal("signature") }),
+  /** A person's name, phone and email (a contractor, a neighbor); only the administrator's own questions ask this way. */
+  // A business, such as a contractor: its company name too, and its website when it has one.
+  z.object({ ...fieldBase, kind: z.literal("contact"), isBusiness: z.boolean().optional() }),
+  /**
+   * A fee the homeowner pays with the application, such as a filing fee: the form shows the amount, with the help
+   * saying how to pay, and the homeowner confirms they'll pay it. Paying happens outside the app.
+   */
+  z.object({
+    ...fieldBase,
+    kind: z.literal("fee"),
+    /** In dollars. */
+    amount: z.number().positive()
+  })
 ])
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -112,6 +136,18 @@ export type ProjectGroup = z.infer<typeof projectGroup>
 export const uploadFormats = ["pdf", "docx", "image"] as const
 
 /**
+ * A file the administrator gives homeowners to fill in as a document, such as a form for a neighbor to sign: stored
+ * with the project type (src/storage/keys.ts, `projectTypeKeys`), a new object for every new file.
+ */
+export const documentTemplate = z.object({
+  id: z.uuid(),
+  fileName: z.string().min(1).max(200),
+  mediaType: z.string(),
+  sizeBytes: z.number().int().positive()
+})
+export type DocumentTemplate = z.infer<typeof documentTemplate>
+
+/**
  * A document the form asks for, uploaded with what it must show: one the rules require, or one the administrator
  * asks for themselves (no rules; its own key, "custom.").
  */
@@ -125,7 +161,9 @@ export const projectDocument = z.object({
   /** The passages it cites, by provision key, for the administrator's own; a required one cites its rules'. */
   citations: z.array(z.string()).default([]),
   /** The file formats it takes; null for every format applications take. */
-  accepts: z.array(z.enum(uploadFormats)).nullable().default(null)
+  accepts: z.array(z.enum(uploadFormats)).nullable().default(null),
+  /** The form homeowners download, fill in and upload as this document; absent for none. */
+  template: documentTemplate.optional()
 })
 export type ProjectDocument = z.infer<typeof projectDocument>
 
@@ -154,7 +192,7 @@ export type ProjectTypeStatus = (typeof projectTypeStatuses)[number]
 
 export const projectTypeSchema = z.object({
   id: z.string(),
-  hoaId: z.string(),
+  organizationId: z.string(),
   label: z.string(),
   description: z.string().nullable(),
   /** Archived types are hidden from new applications and kept for the ones that use them. */
@@ -173,7 +211,10 @@ export const projectTypeDetails = z.object({
   description: z.string().trim().max(1000, "Keep the description under 1,000 characters.")
 })
 
-export const answerValue = z.union([z.string(), z.number(), z.boolean(), z.array(z.string())]).nullable()
+/** An answer: text, an amount, yes or no, several choices, or a record of named parts (a signature, a contact). */
+export const answerValue = z
+  .union([z.string(), z.number(), z.boolean(), z.array(z.string()), z.record(z.string(), z.string())])
+  .nullable()
 export type AnswerValue = z.infer<typeof answerValue>
 
 /** The homeowner's answers: per group (by subject), one record per item, keyed by property. */

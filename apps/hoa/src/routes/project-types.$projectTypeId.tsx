@@ -3,16 +3,18 @@ import { toast } from "sonner"
 import { ProjectTypePage } from "@/features/projectTypes/ProjectTypePage/ProjectTypePage"
 import {
   applyProjectTypeUpdates,
+  createTemplateUpload,
   deleteProjectType,
   getProjectTypeView,
   listCitableProvisions,
   setProjectTypeStatus,
-  updateProjectType
+  updateProjectType,
+  uploadTemplateFile
 } from "@/features/projectTypes/projectTypes.functions"
+import { templateAdapter } from "@/features/projectTypes/uploadTemplate"
 
 export const Route = createFileRoute("/project-types/$projectTypeId")({
   staticData: { title: "Project type" },
-  head: () => ({ meta: [{ title: "Project type | HOA design review" }] }),
   loader: ({ params }) => getProjectTypeView({ data: { projectTypeId: params.projectTypeId } }),
   component: ProjectTypeRoute
 })
@@ -22,6 +24,13 @@ function ProjectTypeRoute() {
   const router = useRouter()
   const navigate = useNavigate()
   const id = view.projectType.id
+  const adapter = templateAdapter(
+    {
+      createUpload: (data) => createTemplateUpload({ data }),
+      uploadThroughServer: (form) => uploadTemplateFile({ data: form })
+    },
+    id
+  )
   return (
     <ProjectTypePage
       view={view}
@@ -46,6 +55,7 @@ function ProjectTypeRoute() {
         await navigate({ to: "/project-types" })
       }}
       loadProvisions={() => listCitableProvisions()}
+      templateAdapter={adapter}
     />
   )
 }

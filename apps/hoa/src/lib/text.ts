@@ -15,3 +15,18 @@ export function listNames(names: readonly string[]) {
   }
   return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
 }
+
+const sizeFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 })
+
+/** A file's size as people read it: "240 KB", "2.5 MB". */
+export function fileSizeText(bytes: number) {
+  if (bytes < 1024 * 1024) {
+    return `${sizeFormat.format(Math.max(bytes / 1024, 0.1))} KB`
+  }
+  return `${sizeFormat.format(bytes / (1024 * 1024))} MB`
+}
+
+const moneyFormat = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" })
+
+/** An amount of dollars as people read it: "$50.00". */
+export const moneyText = (dollars: number) => moneyFormat.format(dollars)

@@ -6,7 +6,7 @@ import { errorInfoSchema } from "@/shared/schemas"
 
 export const rulebookSchema = z.object({
   id: z.string(),
-  hoaId: z.string(),
+  organizationId: z.string(),
   version: z.number().int().positive().nullable(),
   /** `cancelled`: an administrator stopped its build. */
   status: z.enum(["building", "draft", "published", "superseded", "failed", "cancelled"]),

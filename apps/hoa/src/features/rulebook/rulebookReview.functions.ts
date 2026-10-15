@@ -37,14 +37,14 @@ const note = z.string().trim().min(1).nullable()
 async function openDraft(rulebookId: string) {
   const context = await requireAdministrator()
   const db = getDb()
-  const draft = await getRulebookByStatus(db, context.hoa.id, "draft")
+  const draft = await getRulebookByStatus(db, context.organization.id, "draft")
   if (draft?.id !== rulebookId) {
     throw new Error("That draft is no longer current.")
   }
-  const records = await loadRulebookRecords(db, context.hoa.id, rulebookId)
+  const records = await loadRulebookRecords(db, context.organization.id, rulebookId)
   const by = context.user.id
   const at = new Date().toISOString()
-  return { db, hoaId: context.hoa.id, records, by, at }
+  return { db, organizationId: context.organization.id, records, by, at }
 }
 
 export type ReviewResult = { updated: number; skipped: { ref: RecordRef; reasons: string[] }[] }
@@ -62,10 +62,10 @@ export const reviewRulebookRecords = createServerFn({ method: "POST" })
       .parse(data)
   )
   .handler(async ({ data }): Promise<ReviewResult> => {
-    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
+    const { db, organizationId, records, by, at } = await openDraft(data.rulebookId)
     const changes = reviewRecords(records, data.refs, { status: data.status, by, at, note: data.note })
-    await saveRulebookChanges(db, hoaId, data.rulebookId, changes)
-    await updateProvisions(db, hoaId, changes.provisions)
+    await saveRulebookChanges(db, organizationId, data.rulebookId, changes)
+    await updateProvisions(db, organizationId, changes.provisions)
     const updated = changes.rules.length + changes.terms.length + changes.provisions.length + (changes.settings ? 1 : 0)
     return { updated, skipped: changes.skipped }
   })
@@ -78,7 +78,7 @@ export const resolveRulebookIssue = createServerFn({ method: "POST" })
       .parse(data)
   )
   .handler(async ({ data }) => {
-    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
+    const { db, organizationId, records, by, at } = await openDraft(data.rulebookId)
     const resolution = { note: data.note, by, at }
     const changes = match(data.ref)
       .with({ type: "settings" }, () => ({ settings: resolveIssue(records.settings, data.index, resolution) }))
@@ -89,7 +89,7 @@ export const resolveRulebookIssue = createServerFn({ method: "POST" })
         terms: [resolveIssue(inDraft(records.terms, key), data.index, resolution)]
       }))
       .exhaustive()
-    await saveRulebookChanges(db, hoaId, data.rulebookId, changes)
+    await saveRulebookChanges(db, organizationId, data.rulebookId, changes)
   })
 
 function inDraft<R extends { key: string }>(records: R[], key: string) {
@@ -110,7 +110,7 @@ const issuesOf = (records: RulebookRecords, recordKey: string) => reviewIssues(r
 export const saveRulebookRule = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ ...draftInput, rule: ruleDraft }).parse(data))
   .handler(async ({ data }) => {
-    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
+    const { db, organizationId, records, by, at } = await openDraft(data.rulebookId)
     const existing = inDraft(records.rules, data.rule.key)
     const rule = ruleSchema.parse({
       ...data.rule,
@@ -118,7 +118,7 @@ export const saveRulebookRule = createServerFn({ method: "POST" })
       review: { status: "proposed", by: null, at: null, note: null },
       issues: existing.issues
     })
-    await saveRulebookChanges(db, hoaId, data.rulebookId, { rules: [rule] })
+    await saveRulebookChanges(db, organizationId, data.rulebookId, { rules: [rule] })
     return issuesOf({ ...records, rules: records.rules.map((item) => (item.key === rule.key ? rule : item)) }, rule.key)
   })
 
@@ -137,13 +137,13 @@ export const changeRulebookRuleTerm = createServerFn({ method: "POST" })
     z.object({ ...draftInput, ruleKey: z.string(), from: z.string(), change: termChange }).parse(data)
   )
   .handler(async ({ data }) => {
-    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
+    const { db, organizationId, records, by, at } = await openDraft(data.rulebookId)
     const { rule, terms } = changeRuleTerm(
       records,
       { ruleKey: data.ruleKey, from: data.from, change: data.change },
       { by, at }
     )
-    await saveRulebookChanges(db, hoaId, data.rulebookId, { rules: [rule], terms })
+    await saveRulebookChanges(db, organizationId, data.rulebookId, { rules: [rule], terms })
     const changed = {
       ...records,
       rules: records.rules.map((item) => (item.key === rule.key ? rule : item)),
@@ -173,8 +173,8 @@ export const saveRulebookTerm = createServerFn({ method: "POST" })
       .parse(data)
   )
   .handler(async ({ data }) => {
-    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
-    await saveRulebookChanges(db, hoaId, data.rulebookId, editTerm(records, data.edit, { by, at }))
+    const { db, organizationId, records, by, at } = await openDraft(data.rulebookId)
+    await saveRulebookChanges(db, organizationId, data.rulebookId, editTerm(records, data.edit, { by, at }))
   })
 
 /** Adds a choice to a list, to review. */
@@ -183,8 +183,8 @@ export const addRulebookChoice = createServerFn({ method: "POST" })
     z.object({ ...draftInput, listKey: z.string(), label: z.string().trim().min(1) }).parse(data)
   )
   .handler(async ({ data }) => {
-    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
-    await saveRulebookChanges(db, hoaId, data.rulebookId, {
+    const { db, organizationId, records, by, at } = await openDraft(data.rulebookId)
+    await saveRulebookChanges(db, organizationId, data.rulebookId, {
       terms: [addChoice(records, data.listKey, data.label, { by, at })]
     })
   })
@@ -193,8 +193,8 @@ export const addRulebookChoice = createServerFn({ method: "POST" })
 export const mergeRulebookTerm = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ ...draftInput, from: z.string(), into: z.string() }).parse(data))
   .handler(async ({ data }) => {
-    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
-    await saveRulebookChanges(db, hoaId, data.rulebookId, mergeTerm(records, data.from, data.into, { by, at }))
+    const { db, organizationId, records, by, at } = await openDraft(data.rulebookId)
+    await saveRulebookChanges(db, organizationId, data.rulebookId, mergeTerm(records, data.from, data.into, { by, at }))
   })
 
 /** Answers a question: its chosen reading's rules are approved, the other candidates rejected. */
@@ -203,7 +203,7 @@ export const answerRulebookQuestion = createServerFn({ method: "POST" })
     z.object({ ...draftInput, questionId: z.string(), option: z.number().int().nonnegative(), text: note }).parse(data)
   )
   .handler(async ({ data }) => {
-    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
+    const { db, organizationId, records, by, at } = await openDraft(data.rulebookId)
     const result = answerQuestion(records, {
       questionId: data.questionId,
       option: data.option,
@@ -211,7 +211,7 @@ export const answerRulebookQuestion = createServerFn({ method: "POST" })
       by,
       at
     })
-    await saveRulebookChanges(db, hoaId, data.rulebookId, {
+    await saveRulebookChanges(db, organizationId, data.rulebookId, {
       questions: [result.question],
       rules: result.rules,
       terms: result.terms
@@ -238,10 +238,10 @@ export const setProvisionNoRule = createServerFn({ method: "POST" })
       .parse(data)
   )
   .handler(async ({ data }) => {
-    const { db, hoaId, records, by, at } = await openDraft(data.rulebookId)
+    const { db, organizationId, records, by, at } = await openDraft(data.rulebookId)
     const provision = inDraft(records.provisions, data.provisionKey)
     const review: Rules.Review = { status: "approved", by, at, note: null }
-    await updateProvisions(db, hoaId, [{ ...provision, noRule: data.noRule && { ...data.noRule, review } }])
+    await updateProvisions(db, organizationId, [{ ...provision, noRule: data.noRule && { ...data.noRule, review } }])
   })
 
 /** Saves edited settings clauses or policy; the settings go back to proposed, and problems found come back. */
@@ -256,7 +256,7 @@ export const saveRulebookSettings = createServerFn({ method: "POST" })
       .parse(data)
   )
   .handler(async ({ data }) => {
-    const { db, hoaId, records } = await openDraft(data.rulebookId)
+    const { db, organizationId, records } = await openDraft(data.rulebookId)
     const settings = settingsSchema.parse({
       ...records.settings,
       clauses: {
@@ -269,6 +269,6 @@ export const saveRulebookSettings = createServerFn({ method: "POST" })
       policy: data.policy ?? records.settings.policy,
       review: { status: "proposed", by: null, at: null, note: null }
     })
-    await saveRulebookChanges(db, hoaId, data.rulebookId, { settings })
+    await saveRulebookChanges(db, organizationId, data.rulebookId, { settings })
     return issuesOf({ ...records, settings }, "settings")
   })

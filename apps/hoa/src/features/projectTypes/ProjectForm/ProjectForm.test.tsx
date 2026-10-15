@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react"
+import { render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { useState } from "react"
 import { describe, expect, it, vi } from "vitest"
@@ -93,17 +93,30 @@ const definition: ProjectTypeDefinition = {
   unasked: []
 }
 
+// The same items with their color asked once for every item.
+const shared: ProjectTypeDefinition = {
+  ...definition,
+  groups: definition.groups.map((group) => ({
+    ...group,
+    fields: group.fields
+      .filter((field) => field.property === "item.name" || field.property === "item.color")
+      .map((field) => (field.property === "item.color" ? { ...field, isShared: true } : field))
+  }))
+}
+
 function Form({
   onChange,
-  showsAllErrors = false
+  showsAllErrors = false,
+  of = definition
 }: {
   onChange: (value: ProjectAnswers) => void
   showsAllErrors?: boolean
+  of?: ProjectTypeDefinition
 }) {
-  const [value, setValue] = useState(emptyAnswers(definition))
+  const [value, setValue] = useState(emptyAnswers(of))
   return (
     <ProjectForm
-      definition={definition}
+      definition={of}
       value={value}
       onChange={(next) => {
         setValue(next)
@@ -182,6 +195,166 @@ describe("ProjectForm", () => {
         .getAllByRole("textbox", { name: "What do you call it?" })
         .map((input) => (input instanceof HTMLInputElement ? input.value : null))
     ).toEqual(["", "Third"])
+  })
+
+  it("asks a question shared by every item once, above the items, and keeps its answer on each, new ones too", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn<(value: ProjectAnswers) => void>()
+    render(<Form onChange={onChange} of={shared} />)
+    await user.click(screen.getByRole("button", { name: "Add item" }))
+    const every = screen.getByRole("region", { name: "Every item" })
+    expect(screen.getAllByRole("radiogroup", { name: "What color is it?" })).toHaveLength(1)
+    expect(within(every).getByRole("radiogroup", { name: "What color is it?" })).toBeInTheDocument()
+    expect(within(screen.getByRole("region", { name: "Item 2" })).queryByRole("radiogroup")).not.toBeInTheDocument()
+    await user.click(within(every).getByRole("radio", { name: "Grey" }))
+    await user.click(screen.getByRole("button", { name: "Add item" }))
+    const items = onChange.mock.lastCall?.[0].item ?? []
+    expect(items.map((item) => item["item.color"])).toEqual(["color.grey", "color.grey", "color.grey"])
+    expect(screen.getAllByRole("textbox", { name: "What do you call it?" })).toHaveLength(3)
+  })
+
+  it("takes a signature as a typed name, and a person's name, phone and email", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn<(value: ProjectAnswers) => void>()
+    const own = { ...base, binding: null, isRequired: true }
+    const people: ProjectTypeDefinition = {
+      ...definition,
+      groups: [
+        {
+          ...definition.groups[0]!,
+          isRepeatable: false,
+          fields: [
+            { ...own, property: "custom.signed", kind: "signature", label: "I confirm the plans are complete" },
+            { ...own, property: "custom.builder", kind: "contact", label: "Who is building it?" }
+          ]
+        }
+      ]
+    }
+    render(<Form onChange={onChange} of={people} />)
+    expect(screen.getByText("Typing your name signs it.")).toBeInTheDocument()
+    await user.type(screen.getByRole("textbox", { name: "I confirm the plans are complete" }), "Jordan Avery")
+    expect(screen.getByText(/^Signed /)).toBeInTheDocument()
+    const builder = screen.getByRole("group", { name: "Who is building it?" })
+    await user.type(within(builder).getByRole("textbox", { name: /Name$/ }), "Pat Lee")
+    await user.type(within(builder).getByRole("textbox", { name: "Email" }), "pat@example.com")
+    const [item] = onChange.mock.lastCall?.[0].item ?? []
+    expect(item?.["custom.signed"]).toEqual({
+      name: "Jordan Avery",
+      signedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
+    })
+    expect(item?.["custom.builder"]).toEqual({ name: "Pat Lee", phone: "", email: "pat@example.com" })
+    // A wrong email marks only the email.
+    await user.clear(within(builder).getByRole("textbox", { name: "Email" }))
+    await user.type(within(builder).getByRole("textbox", { name: "Email" }), "pat")
+    await user.tab()
+    expect(screen.getByText("Give an email address such as name@example.com.")).toBeInTheDocument()
+    expect(within(builder).getByRole("textbox", { name: "Email" })).toHaveAttribute("aria-invalid", "true")
+    expect(within(builder).getByRole("textbox", { name: /Name$/ })).toHaveAttribute("aria-invalid", "false")
+  })
+
+  it("asks a business for its company first and its website last", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn<(value: ProjectAnswers) => void>()
+    const contractor: ProjectTypeDefinition = {
+      ...definition,
+      groups: [
+        {
+          ...definition.groups[0]!,
+          isRepeatable: false,
+          fields: [
+            {
+              ...base,
+              binding: null,
+              isRequired: true,
+              property: "custom.contractor",
+              kind: "contact",
+              label: "Who is your contractor?",
+              isBusiness: true
+            }
+          ]
+        }
+      ]
+    }
+    render(<Form onChange={onChange} of={contractor} />)
+    const group = screen.getByRole("group", { name: "Who is your contractor?" })
+    const inputs = within(group).getAllByRole("textbox")
+    const order = [/Company$/, /Contact name$/, /Phone$/, /Email$/, /Website \(optional\)$/].map((name) =>
+      inputs.indexOf(within(group).getByRole("textbox", { name }))
+    )
+    expect(order).toEqual([0, 1, 2, 3, 4])
+    await user.type(within(group).getByRole("textbox", { name: /Company$/ }), "Lee Builders")
+    await user.type(within(group).getByRole("textbox", { name: /Website/ }), "leebuilders.com")
+    const [item] = onChange.mock.lastCall?.[0].item ?? []
+    expect(item?.["custom.contractor"]).toEqual({
+      company: "Lee Builders",
+      name: "",
+      phone: "",
+      email: "",
+      website: "leebuilders.com"
+    })
+  })
+
+  it("shows a fee's amount and takes the homeowner's word they'll pay it", async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn<(value: ProjectAnswers) => void>()
+    const fees: ProjectTypeDefinition = {
+      ...definition,
+      groups: [
+        {
+          ...definition.groups[0]!,
+          isRepeatable: false,
+          fields: [
+            {
+              ...base,
+              property: "custom.filing-fee",
+              binding: null,
+              kind: "fee",
+              label: "Filing fee",
+              isRequired: true,
+              amount: 1250.5
+            }
+          ]
+        }
+      ]
+    }
+    const { rerender } = render(<Form onChange={onChange} of={fees} showsAllErrors />)
+    expect(screen.getByText("$1,250.50")).toBeInTheDocument()
+    expect(screen.getByText("Confirm you'll pay this fee.")).toBeInTheDocument()
+    await user.click(screen.getByRole("checkbox", { name: "I'll pay this fee" }))
+    expect(onChange).toHaveBeenLastCalledWith({ item: [{ "custom.filing-fee": true }] })
+    rerender(<Form onChange={onChange} of={fees} showsAllErrors />)
+    expect(screen.queryByText("Confirm you'll pay this fee.")).not.toBeInTheDocument()
+  })
+
+  it("closes the form with its fee and then its signature, after every section", () => {
+    const own = { ...base, binding: null, isRequired: true }
+    const closing: ProjectTypeDefinition = {
+      ...definition,
+      groups: [
+        {
+          ...definition.groups[0]!,
+          subject: "work",
+          label: "The project",
+          isRepeatable: false,
+          fields: [
+            { ...own, property: "custom.signed", kind: "signature", label: "I confirm the plans are complete" },
+            { ...own, property: "custom.why", kind: "text", label: "Why are you building it?" },
+            { ...own, property: "custom.fee", kind: "fee", label: "Filing fee", amount: 50 }
+          ]
+        },
+        ...definition.groups
+      ]
+    }
+    render(<Form onChange={vi.fn<(value: ProjectAnswers) => void>()} of={closing} />)
+    const sections = screen.getAllByRole("group").filter((group) => group.tagName === "FIELDSET")
+    const last = sections.at(-1)
+    expect(last).toHaveAccessibleName("Fee and signature")
+    expect(
+      within(last!)
+        .getAllByText(/^(Filing fee|I confirm the plans are complete)$/)
+        .map((label) => label.textContent?.replace("*", ""))
+    ).toEqual(["Filing fee", "I confirm the plans are complete"])
+    expect(within(sections[0]!).queryByText("Filing fee")).not.toBeInTheDocument()
   })
 
   it("says what's wrong once a question is left, or all at once after a submit", async () => {

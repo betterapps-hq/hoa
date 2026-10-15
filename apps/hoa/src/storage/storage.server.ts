@@ -22,3 +22,12 @@ export function getPresigner(): Presigner {
     secretAccessKey: R2_SECRET_ACCESS_KEY
   })
 }
+
+/** The presigner, or null when the environment has no R2 API token: uploads then go through the Worker. */
+export function presignerOrNull(): Presigner | null {
+  try {
+    return getPresigner()
+  } catch {
+    return null
+  }
+}

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { moneyText } from "@/lib/text"
 import { normalizeForMatching } from "@/ocr/page"
 import { planFacts, type FactPlan } from "@/review/factPlan"
 import type { FactAnswer } from "@/review/factSchema"
@@ -14,8 +15,47 @@ import type { AnswerValue, ProjectAnswers, ProjectField, ProjectGroup, ProjectTy
 /** The file id of the answers page in the packet. */
 export const answersFileId = "form-answers"
 
+/** An answer of named parts: a signature's name and day, a contact's name, phone and email. */
+export const isAnswerRecord = (value: AnswerValue | undefined): value is Record<string, string> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
 const isBlank = (value: AnswerValue | undefined) =>
-  value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)
+  value === null ||
+  value === undefined ||
+  value === "" ||
+  (Array.isArray(value) && value.length === 0) ||
+  (isAnswerRecord(value) && Object.values(value).every((part) => part.trim() === ""))
+
+/** A signature: the name the homeowner typed and the day they typed it. */
+const signatureSchema = z.object({
+  name: z.string().trim().min(1, "Type your full name to sign.").max(200, "Keep the name under 200 characters."),
+  signedOn: z.iso.date()
+})
+
+const person = {
+  name: z.string().trim().min(1, "Give the person's name.").max(200, "Keep the name under 200 characters."),
+  phone: z.string().max(40, "Keep the phone number under 40 characters."),
+  email: z.union([z.literal(""), z.email("Give an email address such as name@example.com.")])
+}
+
+/** A person's details: a name, and a phone or email to reach them by. */
+const contactSchema = z.object(person)
+
+/** A business's details, such as a contractor's: its company name, a person there, and its website if it has one. */
+const businessSchema = z.object({
+  company: z.string().trim().min(1, "Give the company's name.").max(200, "Keep the company name under 200 characters."),
+  ...person,
+  website: z
+    .union([
+      z.literal(""),
+      z
+        .string()
+        .trim()
+        .max(200, "Keep the website under 200 characters.")
+        .regex(/^(https?:\/\/)?[^\s/.]+(\.[^\s/.]+)+(\/\S*)?$/i, "Give a website such as example.com.")
+    ])
+    .optional()
+})
 
 /** The schema for one answer: its kind's value, and an answer when the question is required. */
 export function fieldSchema(field: ProjectField) {
@@ -45,6 +85,15 @@ export function fieldSchema(field: ProjectField) {
       return required(z.union([z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Give a date."), z.literal(""), z.null()]))
     case "time":
       return required(z.union([z.string().regex(/^\d{2}:\d{2}$/, "Give a time."), z.literal(""), z.null()]))
+    case "signature":
+      return required(z.union([signatureSchema, z.null()]))
+    case "contact":
+      return required(z.union([field.isBusiness ? businessSchema : contactSchema, z.null()]))
+    case "fee":
+      // Confirming is the answer: a required fee must be confirmed, an optional one may be left.
+      return field.isRequired
+        ? z.literal(true, { error: () => "Confirm you'll pay this fee." })
+        : z.union([z.literal(true), z.null()])
     default:
       return required(z.union([z.string().max(4000), z.null()]))
   }
@@ -54,6 +103,12 @@ export function fieldSchema(field: ProjectField) {
 export function answerErrors(field: ProjectField, value: AnswerValue | undefined): string[] {
   const parsed = fieldSchema(field).safeParse(value ?? null)
   return parsed.success ? [] : [...new Set(parsed.error.issues.map((issue) => issue.message))]
+}
+
+/** The parts of a record answer (a contact's email) that are wrong; empty when the answer as a whole is. */
+export function invalidParts(field: ProjectField, value: AnswerValue | undefined): ReadonlySet<string> {
+  const parsed = fieldSchema(field).safeParse(value ?? null)
+  return new Set(parsed.success ? [] : parsed.error.issues.flatMap((issue) => issue.path.slice(0, 1).map(String)))
 }
 
 /** The Zod schema for a definition's answers: each group's items, each field's value. */
@@ -80,6 +135,47 @@ export const emptyAnswers = (definition: ProjectTypeDefinition): ProjectAnswers 
 export const blankItem = (group: ProjectGroup): Record<string, AnswerValue> =>
   Object.fromEntries(group.fields.map((field) => [field.property, null]))
 
+/** Whether a question is answered once for every item of its section, which only a section that repeats has. */
+export const isSharedIn = (group: ProjectGroup, field: ProjectField) => group.isRepeatable && field.isShared === true
+
+/** Paying a fee and signing close a form: homeowners do them last, after everything they sign for. */
+export const isClosing = (group: ProjectGroup, field: ProjectField) =>
+  !group.isRepeatable && (field.kind === "fee" || field.kind === "signature")
+
+/** A form's closing questions, fees before signatures and each in the form's order, with their sections. */
+export function closingQuestions(definition: ProjectTypeDefinition) {
+  const closing = definition.groups.flatMap((group) =>
+    group.fields.filter((field) => isClosing(group, field)).map((field) => ({ group, field }))
+  )
+  return [
+    ...closing.filter(({ field }) => field.kind === "fee"),
+    ...closing.filter(({ field }) => field.kind === "signature")
+  ]
+}
+
+/** The closing section's heading, from what it asks. */
+export function closingHeading(questions: readonly { field: ProjectField }[]) {
+  const hasFee = questions.some(({ field }) => field.kind === "fee")
+  const hasSignature = questions.some(({ field }) => field.kind === "signature")
+  if (hasFee && hasSignature) {
+    return "Fee and signature"
+  }
+  return hasFee ? "Fee" : "Signature"
+}
+
+/** A new item of a section: blank, but for the answers given once for every item, which it keeps. */
+export function nextItem(group: ProjectGroup, items: readonly Record<string, AnswerValue>[]) {
+  const first = items[0] ?? {}
+  return {
+    ...blankItem(group),
+    ...Object.fromEntries(
+      group.fields
+        .filter((field) => isSharedIn(group, field))
+        .map((field) => [field.property, first[field.property] ?? null])
+    )
+  }
+}
+
 /** An answer in words, as the homeowner gave it. */
 function answerText(field: ProjectField, value: AnswerValue): string | null {
   if (isBlank(value)) {
@@ -88,12 +184,20 @@ function answerText(field: ProjectField, value: AnswerValue): string | null {
   if (field.kind === "yes-no") {
     return value ? "Yes" : "No"
   }
+  if (field.kind === "fee") {
+    return `${moneyText(field.amount)}, ${value ? "will pay it" : "not confirmed"}`
+  }
   if (field.kind === "number") {
     return field.unit ? `${String(value)} ${field.unit.label}` : String(value)
   }
   if (field.kind === "choice") {
     const option = field.options.find((item) => item.value === value)
     return option ? option.label : `Other: ${String(value)}`
+  }
+  if (isAnswerRecord(value)) {
+    return field.kind === "signature"
+      ? `Signed by ${value.name ?? ""}${value.signedOn ? ` on ${value.signedOn}` : ""}`
+      : [value.company, value.name, value.phone, value.email, value.website].filter(Boolean).join(", ")
   }
   if (Array.isArray(value)) {
     const labels = value.map((item) =>
@@ -120,6 +224,55 @@ export function answerLines(definition: ProjectTypeDefinition, answers: ProjectA
       return lines.length > 0 ? [{ group, index, heading: itemName(group, index), lines }] : []
     })
   )
+}
+
+/**
+ * The answers as the homeowner and the committee read them back: like `answerLines`, but where a section repeats, an
+ * answer given once for every item shows once, above the items, when every item has it; and fees and signatures last.
+ */
+export function answerSections(definition: ProjectTypeDefinition, answers: ProjectAnswers) {
+  const all = answerLines(definition, answers)
+  const closing = closingQuestions(definition).flatMap(({ group, field }) => {
+    const line = all.find((section) => section.group === group)?.lines.find((item) => item.field === field)?.line
+    return line === undefined ? [] : [{ key: `${group.subject} ${field.property}`, line }]
+  })
+  const sections = all.map((section) => ({
+    ...section,
+    lines: section.lines.filter((item) => !isClosing(section.group, item.field))
+  }))
+  const body = definition.groups.flatMap((group) => {
+    const items = sections.filter((section) => section.group === group)
+    const lineOf = (section: (typeof items)[number], field: ProjectField) =>
+      section.lines.find((item) => item.field === field)?.line
+    const [first] = items
+    const once =
+      first && items.length > 1 && items.length === (answers[group.subject] ?? []).length
+        ? group.fields.filter(
+            (field) =>
+              isSharedIn(group, field) &&
+              lineOf(first, field) !== undefined &&
+              items.every((section) => lineOf(section, field) === lineOf(first, field))
+          )
+        : []
+    const shared = once.flatMap((field) => {
+      const line = first ? lineOf(first, field) : undefined
+      return line === undefined ? [] : [{ key: field.property, line }]
+    })
+    return [
+      ...(shared.length > 0
+        ? [{ key: `${group.subject} every`, heading: `Every ${group.itemLabel.toLowerCase()}`, lines: shared }]
+        : []),
+      ...items.flatMap((section) => {
+        const lines = section.lines
+          .filter((item) => !once.includes(item.field))
+          .map((item) => ({ key: item.field.property, line: item.line }))
+        return lines.length > 0 ? [{ key: `${group.subject} ${section.index}`, heading: section.heading, lines }] : []
+      })
+    ]
+  })
+  return closing.length > 0
+    ? [...body, { key: "closing", heading: closingHeading(closingQuestions(definition)), lines: closing }]
+    : body
 }
 
 /**
@@ -214,7 +367,7 @@ export function answerReadings(
     // Only bound questions are facts; the administrator's own are context on the answers page.
     return section.lines.flatMap(({ field, line }) => {
       const value = answers[section.group.subject]?.[section.index]?.[field.property] ?? null
-      if (field.binding === null || Array.isArray(value)) {
+      if (field.binding === null || Array.isArray(value) || isAnswerRecord(value)) {
         return []
       }
       const answer: FactAnswer = {

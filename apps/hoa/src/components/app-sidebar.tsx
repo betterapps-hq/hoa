@@ -1,24 +1,24 @@
 import type { ComponentProps, ReactNode } from "react"
+import { AssociationHeader } from "@/components/association-header"
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
-import { RoleSwitcher } from "@/components/role-switcher"
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from "@/components/ui/sidebar"
 import { useRole } from "@/features/role/RoleProvider"
 
 /**
- * The app's navigation. Collapsed, it keeps a rail of icons (each link's name as a tooltip), the workspace's icon and
+ * The app's navigation. Collapsed, it keeps a rail of icons (each link's name as a tooltip), the association's icon and
  * the user's avatar, so everything stays a click away. On a small screen the rail stays, and the header's toggle opens
  * the full navigation over the page.
  */
 export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
-  const { role } = useRole()
+  const { navigation: sections } = useRole()
   const navigation = (
     <>
       <SidebarHeader>
-        <RoleSwitcher />
+        <AssociationHeader />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain sections={role.navigation} />
+        <NavMain sections={sections} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
@@ -28,7 +28,7 @@ export function AppSidebar(props: ComponentProps<typeof Sidebar>) {
   return (
     <>
       <SmallScreenRail variant={props.variant}>{navigation}</SmallScreenRail>
-      <Sidebar collapsible="icon" {...props}>
+      <Sidebar collapsible="icon" className="top-(--banner-height) h-[calc(100svh-var(--banner-height))]" {...props}>
         {navigation}
         <SidebarRail />
       </Sidebar>
@@ -60,7 +60,7 @@ function SmallScreenRail({
       <div
         data-sidebar="sidebar"
         data-slot="sidebar-inner"
-        className="sticky top-0 flex h-svh w-(--sidebar-width-icon) flex-col bg-sidebar"
+        className="sticky top-(--banner-height) flex h-[calc(100svh-var(--banner-height))] w-(--sidebar-width-icon) flex-col bg-sidebar"
       >
         {children}
       </div>

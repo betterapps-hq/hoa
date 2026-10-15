@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest"
 import type { DashboardSummary } from "@/features/rulebook/rulebook.functions"
 import type { ActivityEvent } from "../activity"
 import { dashboardApplication as application, decision } from "../dashboard.test-data"
+import type { DashboardOverview } from "../overview"
 import { ManagementDashboard } from "./ManagementDashboard"
 
 vi.mock("@tanstack/react-router", () => ({
@@ -26,7 +27,7 @@ vi.mock("@tanstack/react-router", () => ({
 
 const asOf = "2026-10-09T12:00:00.000Z"
 const published: DashboardSummary = {
-  hoaName: "Sample Ridge HOA",
+  organizationName: "Sample Ridge HOA",
   publishedVersion: 3,
   publishedAt: "2026-10-07T12:00:00.000Z",
   ruleCount: 42,
@@ -88,6 +89,74 @@ const activity: ActivityEvent[] = [
   { id: "published", at: "2026-10-07T12:00:00.000Z", by: "Sam Rivera", type: "rulebook-published", version: 3 }
 ]
 
+/** An association with no units, dues or violations: only what the other areas have. */
+const quiet: DashboardOverview = {
+  today: "2026-10-09",
+  isBoard: true,
+  money: null,
+  dues: null,
+  violations: [],
+  homes: [],
+  upcoming: []
+}
+
+/** Three units, one past due, monthly dues, and a violation waiting on the board. */
+const busy: DashboardOverview = {
+  ...quiet,
+  money: {
+    owedCents: 114_500,
+    owingUnits: 3,
+    unitCount: 3,
+    pastDueCents: 2500,
+    pastDueUnits: 1,
+    pastDueSince: "2026-09-14",
+    aging: { current: 112_000, late30: 2500, late60: 0, late90: 0, over90: 0 },
+    months: [
+      { month: "2026-09", billedCents: 105_000, collectedCents: 100_000 },
+      { month: "2026-10", billedCents: 112_000, collectedCents: 50_000 }
+    ],
+    largest: [
+      {
+        unitId: "unit-31",
+        label: "31 Fir Court",
+        owners: ["Casey Morgan"],
+        balanceCents: 44_500,
+        pastDueCents: 2500,
+        pastDueSince: "2026-09-14"
+      }
+    ]
+  },
+  dues: { next: { name: "Monthly dues", dueOn: "2026-11-01", totalCents: 112_000 }, latest: null },
+  violations: [
+    {
+      id: "boat",
+      title: "A boat in the driveway",
+      unit: "31 Fir Court",
+      observedOn: "2026-10-02",
+      nextStep: { step: "notice", text: "Send the notice", on: null, waitsOn: "board" },
+      hearingOn: "2026-10-20"
+    }
+  ],
+  upcoming: [
+    {
+      id: "hearing:boat",
+      kind: "violation",
+      violationId: "boat",
+      on: "2026-10-20",
+      subject: "Hearing",
+      note: "A boat in the driveway, at 31 Fir Court."
+    },
+    {
+      id: "dues:dues:2026-11-01",
+      kind: "dues",
+      unitId: null,
+      on: "2026-11-01",
+      subject: "Monthly dues due",
+      note: "From 3 units."
+    }
+  ]
+}
+
 const card = (heading: string) => screen.getByRole("heading", { name: heading }).closest("[data-slot=card]")
 const rows = (heading: string) => within(card(heading) as HTMLElement).getAllByRole("listitem")
 /** A card's rows read from the app's records, leaving out the samples for the areas the app doesn't have yet. */
@@ -97,6 +166,8 @@ describe("ManagementDashboard", () => {
   it("lists what needs the HOA's management across its areas, longest waiting first", () => {
     render(
       <ManagementDashboard
+        userName="Sam Rivera"
+        overview={quiet}
         summary={published}
         nextRulebook={{ status: "draft", createdAt: "2026-10-08T00:00:00.000Z", rulesToReview: 12, openQuestions: 2 }}
         applications={applications}
@@ -125,6 +196,8 @@ describe("ManagementDashboard", () => {
   it("says where each area stands, each opening its page", () => {
     render(
       <ManagementDashboard
+        userName="Sam Rivera"
+        overview={quiet}
         summary={published}
         nextRulebook={null}
         applications={applications}
@@ -133,7 +206,9 @@ describe("ManagementDashboard", () => {
       />
     )
 
-    const [review, rulebook] = realRows("Sample Ridge HOA")
+    const [violations, review, rulebook] = realRows("Sample Ridge HOA")
+    expect(violations).toHaveTextContent("No violation is open.")
+    expect(within(violations!).getByRole("link")).toHaveAttribute("href", "/violations")
     expect(review).toHaveTextContent("Architectural review")
     expect(review).toHaveTextContent("2 applications wait for a decision, and 1 waits on its homeowner.")
     expect(within(review!).getByRole("link")).toHaveAttribute("href", "/applications")
@@ -144,6 +219,8 @@ describe("ManagementDashboard", () => {
   it("names each event's area and who did it in recent activity, and opens what it's about", () => {
     render(
       <ManagementDashboard
+        userName="Sam Rivera"
+        overview={quiet}
         summary={published}
         nextRulebook={null}
         applications={applications}
@@ -169,6 +246,8 @@ describe("ManagementDashboard", () => {
   it("says the documents are being processed into a new draft", () => {
     render(
       <ManagementDashboard
+        userName="Sam Rivera"
+        overview={quiet}
         summary={published}
         nextRulebook={{ status: "building" }}
         applications={[]}
@@ -177,7 +256,7 @@ describe("ManagementDashboard", () => {
       />
     )
 
-    const [, rulebook] = realRows("Sample Ridge HOA")
+    const [, , rulebook] = realRows("Sample Ridge HOA")
     expect(rulebook).toHaveTextContent("Your documents are being processed into a new draft.")
     expect(realRows("Needs your attention")).toEqual([])
   })
@@ -185,6 +264,8 @@ describe("ManagementDashboard", () => {
   it("says so when no application waits and no rulebook is in force", () => {
     render(
       <ManagementDashboard
+        userName="Sam Rivera"
+        overview={quiet}
         summary={{ ...published, publishedVersion: null, publishedAt: null, ruleCount: 0 }}
         nextRulebook={null}
         applications={[]}
@@ -201,21 +282,83 @@ describe("ManagementDashboard", () => {
   })
 
   it("shows the rest of the portal with sample data, each marked as a sample and opening nothing", () => {
-    render(<ManagementDashboard summary={published} nextRulebook={null} applications={[]} activity={[]} asOf={asOf} />)
+    render(
+      <ManagementDashboard
+        userName="Sam Rivera"
+        overview={quiet}
+        summary={published}
+        nextRulebook={null}
+        applications={[]}
+        activity={[]}
+        asOf={asOf}
+      />
+    )
 
     const samples = rows("Needs your attention")
-    expect(samples.map((row) => within(row).getByText("Sample"))).toHaveLength(4)
-    expect(samples[0]).toHaveTextContent("Late assessments")
-    expect(samples[0]).toHaveTextContent("Dues")
+    expect(samples.map((row) => within(row).getByText("Sample"))).toHaveLength(2)
+    expect(samples[0]).toHaveTextContent("Streetlight out on Birch Lane")
+    expect(samples[0]).toHaveTextContent("Maintenance requests")
     expect(rows("Sample Ridge HOA").map((row) => row.textContent)).toEqual(
-      expect.arrayContaining([expect.stringContaining("Violations and fines")])
+      expect.arrayContaining([expect.stringContaining("Meetings and votes")])
     )
-    const upcoming = rows("Coming up")
-    expect(upcoming[0]).toHaveTextContent("Board meeting")
-    expect(upcoming[0]).toHaveTextContent("Oct 18")
-    expect(rows("Recent activity")[0]).toHaveTextContent("Assessment paid")
+    const [meeting] = rows("Coming up")
+    expect(meeting).toHaveTextContent("Board meeting")
+    expect(meeting).toHaveTextContent("18")
+    expect(rows("Recent activity")[0]).toHaveTextContent("Request closed")
     for (const heading of ["Needs your attention", "Coming up", "Recent activity"]) {
       expect(within(card(heading) as HTMLElement).queryAllByRole("link")).toEqual([])
     }
+  })
+
+  it("greets the reader, and leads with what's owed, collected, open and waiting", () => {
+    render(
+      <ManagementDashboard
+        userName="Sam Rivera"
+        overview={busy}
+        summary={published}
+        nextRulebook={null}
+        applications={applications}
+        activity={[]}
+        asOf={asOf}
+      />
+    )
+
+    expect(screen.getByRole("heading", { name: "Welcome back, Sam" })).toBeInTheDocument()
+    expect(screen.getByText("Sample Ridge HOA. Friday, October 9, 2026.")).toBeInTheDocument()
+    expect(screen.getByText("$1,145.00")).toBeInTheDocument()
+    expect(screen.getByText("$25.00 late")).toBeInTheDocument()
+    expect(screen.getByText("Collected in October")).toBeInTheDocument()
+    expect(screen.getByText("-50%")).toBeInTheDocument()
+    expect(screen.getByText("1 waits on the board.")).toBeInTheDocument()
+    expect(screen.getByText("The oldest: waiting 19 days.")).toBeInTheDocument()
+  })
+
+  it("puts violations and late balances among what needs attention, and their dates among what's coming", () => {
+    render(
+      <ManagementDashboard
+        userName="Sam Rivera"
+        overview={busy}
+        summary={published}
+        nextRulebook={null}
+        applications={[]}
+        activity={[]}
+        asOf={asOf}
+      />
+    )
+
+    const [late, boat] = realRows("Needs your attention")
+    expect(late).toHaveTextContent("Past-due balances")
+    expect(within(late!).getByRole("link")).toHaveAttribute("href", "/ledger")
+    expect(boat).toHaveTextContent("A boat in the driveway")
+    expect(boat).toHaveTextContent("Send the notice.")
+    expect(within(boat!).getByRole("link")).toHaveAttribute("href", "/violations/boat")
+    const [hearing, dues] = realRows("Coming up")
+    expect(hearing).toHaveTextContent("Hearing")
+    expect(within(hearing!).getByRole("link")).toHaveAttribute("href", "/violations/boat")
+    expect(within(dues!).getByRole("link")).toHaveAttribute("href", "/dues")
+    expect(realRows("Sample Ridge HOA")[0]).toHaveTextContent(
+      "$1,145.00 owed by 3 units, $25.00 of it past due. Monthly dues, $1,120.00, due Nov 1, 2026."
+    )
+    expect(screen.getByText("Late since Sep 14, 2026")).toBeInTheDocument()
   })
 })

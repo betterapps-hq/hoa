@@ -56,7 +56,7 @@ const document = (overrides: Partial<GoverningDocument> = {}): GoverningDocument
   id: "doc-1",
   lineageId: "doc-1",
   version: 1,
-  hoaId: "hoa",
+  organizationId: "hoa",
   kind: "design-guidelines",
   amends: null,
   title: "Residential design guidelines",
@@ -75,7 +75,7 @@ const document = (overrides: Partial<GoverningDocument> = {}): GoverningDocument
 
 const job = (overrides: Partial<Job> = {}): Job => ({
   id: "job-1",
-  hoaId: "hoa",
+  organizationId: "hoa",
   kind: "document-ingest",
   subjectId: "doc-1",
   status: "running",

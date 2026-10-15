@@ -8,7 +8,7 @@ const upload = (id: string, overrides: Partial<GoverningDocument> = {}): Governi
   id,
   lineageId: id,
   version: 1,
-  hoaId: "hoa",
+  organizationId: "hoa",
   kind: "declaration",
   amends: null,
   title: `Document ${id}`,
@@ -27,7 +27,7 @@ const upload = (id: string, overrides: Partial<GoverningDocument> = {}): Governi
 
 const rulebook = (status: "draft" | "published", sourceDocumentIds: string[]) => ({
   id: status,
-  hoaId: "hoa",
+  organizationId: "hoa",
   version: status === "published" ? 2 : null,
   status,
   error: null,

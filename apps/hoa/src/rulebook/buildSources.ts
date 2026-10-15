@@ -21,10 +21,10 @@ export type LoadedSource = {
  * upload id: a new version of one document then leaves the others' order, and so the merged vocabulary and every
  * unit's cached context, as they were.
  */
-export async function loadBuildSources(db: Database, hoaId: string, documentIds: readonly string[]) {
+export async function loadBuildSources(db: Database, organizationId: string, documentIds: readonly string[]) {
   const [documents, structures] = await Promise.all([
-    Promise.all(documentIds.map((id) => getGoverningDocument(db, hoaId, id))),
-    getDocumentStructures(db, hoaId, documentIds)
+    Promise.all(documentIds.map((id) => getGoverningDocument(db, organizationId, id))),
+    getDocumentStructures(db, organizationId, documentIds)
   ])
   const sources = documents.flatMap((document): LoadedSource[] =>
     document?.status === "ready" && document.sha256 && document.pageCount
@@ -75,6 +75,6 @@ export function refusedDocuments(problems: readonly SourceProblem[]): RefusedDoc
 }
 
 /** What the current uploads would be refused for now; empty once they'd pass the check. */
-export async function checkCurrentSources(db: Database, hoaId: string, documentIds: readonly string[]) {
-  return refusedDocuments(checkSources(await loadBuildSources(db, hoaId, documentIds)))
+export async function checkCurrentSources(db: Database, organizationId: string, documentIds: readonly string[]) {
+  return refusedDocuments(checkSources(await loadBuildSources(db, organizationId, documentIds)))
 }

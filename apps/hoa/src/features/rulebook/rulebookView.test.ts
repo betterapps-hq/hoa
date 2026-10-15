@@ -25,7 +25,7 @@ const records: RulebookRecords = {
 }
 
 describe("describeBuildProblem", () => {
-  const job = newJob({ hoaId: "hoa", kind: "rulebook-build", subjectId: "r", now: "" })
+  const job = newJob({ organizationId: "hoa", kind: "rulebook-build", subjectId: "r", now: "" })
   const failure = { stage: "find-rules", itemId: "declaration:article-4", message: "Bad schema" }
 
   it("explains a failed build, and nothing for one that finished", () => {

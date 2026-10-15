@@ -1,7 +1,13 @@
 import { render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { createAdapter, type UploadAdapterContext } from "@uploadcn/core"
 import { describe, expect, it, vi } from "vitest"
-import type { ProjectField, ProjectTypeDefinition, ProjectTypeStatus } from "@/projectTypes/projectType"
+import type {
+  DocumentTemplate,
+  ProjectField,
+  ProjectTypeDefinition,
+  ProjectTypeStatus
+} from "@/projectTypes/projectType"
 import type { CitedProvision } from "../../rulebook/citedProvision"
 import type { ProjectTypeView } from "../projectTypes.functions"
 import { ProjectTypePage, type ProjectTypeChanges, type ProjectTypePageProps } from "./ProjectTypePage"
@@ -112,7 +118,7 @@ const definition: ProjectTypeDefinition = {
 const view: ProjectTypeView = {
   projectType: {
     id: "type-1",
-    hoaId: "hoa",
+    organizationId: "hoa",
     label: "Garden structure",
     description: "Building or changing a structure in the yard.",
     status: "active",
@@ -166,6 +172,13 @@ const view: ProjectTypeView = {
   ]
 }
 
+const uploadTemplate = vi.fn<(context: UploadAdapterContext) => Promise<DocumentTemplate>>(async ({ file }) => ({
+  id: "00000000-0000-4000-8000-000000000001",
+  fileName: file.name,
+  mediaType: file.type,
+  sizeBytes: file.size
+}))
+
 function setup(overrides: Partial<ProjectTypePageProps> = {}) {
   const props: ProjectTypePageProps = {
     view,
@@ -174,8 +187,10 @@ function setup(overrides: Partial<ProjectTypePageProps> = {}) {
     onSetStatus: vi.fn<(status: ProjectTypeStatus) => Promise<void>>(async () => undefined),
     onDelete: vi.fn<() => Promise<void>>(async () => undefined),
     loadProvisions: vi.fn<() => Promise<CitedProvision[]>>(async () => [heightLimit, colors, roofs]),
+    templateAdapter: createAdapter(uploadTemplate),
     ...overrides
   }
+  uploadTemplate.mockClear()
   render(<ProjectTypePage {...props} />)
   return { props, user: userEvent.setup() }
 }
@@ -223,11 +238,16 @@ describe("ProjectTypePage", () => {
     expect(props.onSave).not.toHaveBeenCalled()
   })
 
-  it("offers only edit, required or optional, and remove in a question's menu, each with an icon", async () => {
+  it("offers only edit, required or optional, asking once in a section that repeats, and remove, each with an icon", async () => {
     const { user } = setup()
     await user.click(screen.getByRole("button", { name: "Actions for How tall is it?" }))
     const items = await screen.findAllByRole("menuitem")
-    expect(items.map((item) => item.textContent)).toEqual(["Edit", "Make optional", "Remove"])
+    expect(items.map((item) => item.textContent)).toEqual([
+      "Edit",
+      "Make optional",
+      "Ask once for every structure",
+      "Remove"
+    ])
     expect(items.every((item) => item.querySelector("svg"))).toBe(true)
   })
 
@@ -236,6 +256,35 @@ describe("ProjectTypePage", () => {
     await chooseFromMenu(user, "Actions for How tall is it?", "Make optional")
     await waitFor(() => expect(savedDefinition(props)?.groups[0]!.fields[0]).toMatchObject({ isRequired: false }))
     expect(await screen.findByText("Saved")).toBeInTheDocument()
+  })
+
+  it("asks a question once for every item from its menu, and for each again from its dialog", async () => {
+    const { props, user } = setup()
+    await chooseFromMenu(user, "Actions for What color is it?", "Ask once for every structure")
+    await waitFor(() => expect(savedDefinition(props)?.groups[0]!.fields[1]).toMatchObject({ isShared: true }))
+    const sharedList = await screen.findByRole("region", { name: "Once for every structure" })
+    expect(within(sharedList).getByText("What color is it?")).toBeInTheDocument()
+    await chooseFromMenu(user, "Actions for What color is it?", "Edit")
+    const dialog = await screen.findByRole("dialog", { name: "Edit question" })
+    const once = within(dialog).getByRole("checkbox", { name: "Ask once for every structure" })
+    expect(once).toBeChecked()
+    await user.click(once)
+    await user.click(within(dialog).getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(savedDefinition(props)?.groups[0]!.fields[1]).toMatchObject({ isShared: false }))
+    expect(screen.queryByRole("region", { name: "Once for every structure" })).not.toBeInTheDocument()
+  })
+
+  it("lists the questions asked once first, under their own heading, and asks one for each again from its menu", async () => {
+    const { props, user } = setup()
+    await chooseFromMenu(user, "Actions for What color is it?", "Ask once for every structure")
+    const once = await screen.findByRole("region", { name: "Once for every structure" })
+    const each = screen.getByRole("region", { name: "For each structure" })
+    const regions = screen.getAllByRole("region")
+    expect(regions.indexOf(once)).toBeLessThan(regions.indexOf(each))
+    expect(within(each).getByText(/^How tall is it/)).toBeInTheDocument()
+    await chooseFromMenu(user, "Actions for What color is it?", "Ask for each structure")
+    await waitFor(() => expect(savedDefinition(props)?.groups[0]!.fields[1]).toMatchObject({ isShared: false }))
+    expect(screen.queryByRole("region", { name: "For each structure" })).not.toBeInTheDocument()
   })
 
   it("removes a question, which Add question then suggests again", async () => {
@@ -388,6 +437,58 @@ describe("ProjectTypePage", () => {
     )
   })
 
+  it("attaches a template to a document, uploaded only when it's saved, and links it to download", async () => {
+    const { props, user } = setup()
+    await chooseFromMenu(user, "Actions for Site plan", "Edit")
+    const dialog = await screen.findByRole("dialog", { name: "Edit document" })
+    const input = dialog.querySelector("input[type=file]")
+    if (!(input instanceof HTMLInputElement)) {
+      throw new Error("No template input")
+    }
+    await user.upload(input, new File(["%PDF"], "neighbor approval.pdf", { type: "application/pdf" }))
+    expect(await within(dialog).findByText("neighbor approval.pdf")).toBeInTheDocument()
+    expect(uploadTemplate).not.toHaveBeenCalled()
+    await user.click(within(dialog).getByRole("button", { name: "Save" }))
+    await waitFor(() =>
+      expect(savedDefinition(props)?.documents[0]?.template).toMatchObject({ fileName: "neighbor approval.pdf" })
+    )
+    expect(uploadTemplate).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole("link", { name: "Download neighbor approval.pdf" })).toHaveAttribute(
+      "href",
+      "/files/project-types/type-1/templates/00000000-0000-4000-8000-000000000001"
+    )
+    await chooseFromMenu(user, "Actions for Site plan", "Edit")
+    const again = await screen.findByRole("dialog", { name: "Edit document" })
+    await user.click(within(again).getByRole("button", { name: "Remove neighbor approval.pdf" }))
+    await user.click(within(again).getByRole("button", { name: "Save" }))
+    await waitFor(() => expect(savedDefinition(props)?.documents[0]?.template).toBeUndefined())
+    expect(uploadTemplate).toHaveBeenCalledTimes(1)
+  })
+
+  it("takes a template dropped or chosen on a document, and replaces or removes it from there", async () => {
+    const { props, user } = setup()
+    const row = () => {
+      const found = screen.getByText("Site plan").closest("[data-slot=upload]")
+      const input = found?.querySelector("input[type=file]")
+      if (!(found instanceof HTMLElement) || !(input instanceof HTMLInputElement)) {
+        throw new Error("No document row")
+      }
+      return { found, input }
+    }
+    await chooseFromMenu(user, "Actions for Site plan", "Add template")
+    await user.upload(row().input, new File(["%PDF"], "neighbor approval.pdf", { type: "application/pdf" }))
+    await waitFor(() =>
+      expect(savedDefinition(props)?.documents[0]?.template).toMatchObject({ fileName: "neighbor approval.pdf" })
+    )
+    await chooseFromMenu(user, "Actions for Site plan", "Replace template")
+    await user.upload(row().input, new File(["%PDF"], "signed approval.pdf", { type: "application/pdf" }))
+    await waitFor(() =>
+      expect(savedDefinition(props)?.documents[0]?.template).toMatchObject({ fileName: "signed approval.pdf" })
+    )
+    await user.click(await within(row().found).findByRole("button", { name: "Remove signed approval.pdf" }))
+    await waitFor(() => expect(savedDefinition(props)?.documents[0]?.template).toBeUndefined())
+  })
+
   it("shows the documents the application form provides as met by it, never among the uploads", async () => {
     const { user } = setup()
     const provided = screen.getByRole("region", { name: "Provided by the application form" })
@@ -417,6 +518,74 @@ describe("ProjectTypePage", () => {
         citations: [],
         accepts: ["pdf", "image"]
       })
+    )
+  })
+
+  it("writes a question homeowners sign by typing their name", async () => {
+    const { props, user } = setup()
+    await user.click(screen.getByRole("button", { name: "Add question" }))
+    await user.click(
+      within(await screen.findByRole("dialog", { name: "Add a question" })).getByRole("button", {
+        name: /^Write your own question/
+      })
+    )
+    const dialog = await screen.findByRole("dialog", { name: "Write a question" })
+    await user.type(within(dialog).getByLabelText(/^Question/), "I confirm the plans are complete")
+    await user.selectOptions(within(dialog).getByLabelText("Answer"), "signature")
+    expect(within(dialog).getByText(/they sign by typing their name/)).toBeInTheDocument()
+    await user.click(within(dialog).getByRole("button", { name: "Add question" }))
+    await waitFor(() =>
+      expect(
+        savedDefinition(props)
+          ?.groups.flatMap((group) => group.fields)
+          .find((field) => field.label === "I confirm the plans are complete")
+      ).toMatchObject({ kind: "signature", binding: null })
+    )
+  })
+
+  it("asks a business, such as a contractor, for its company and website too", async () => {
+    const { props, user } = setup()
+    await user.click(screen.getByRole("button", { name: "Add question" }))
+    await user.click(
+      within(await screen.findByRole("dialog", { name: "Add a question" })).getByRole("button", {
+        name: /^Write your own question/
+      })
+    )
+    const dialog = await screen.findByRole("dialog", { name: "Write a question" })
+    await user.type(within(dialog).getByLabelText(/^Question/), "Who is your contractor?")
+    await user.selectOptions(within(dialog).getByLabelText("Answer"), "contact")
+    await user.click(within(dialog).getByRole("checkbox", { name: "A business, such as a contractor" }))
+    await user.click(within(dialog).getByRole("button", { name: "Add question" }))
+    await waitFor(() =>
+      expect(
+        savedDefinition(props)
+          ?.groups.flatMap((group) => group.fields)
+          .find((field) => field.label === "Who is your contractor?")
+      ).toMatchObject({ kind: "contact", isBusiness: true, binding: null })
+    )
+  })
+
+  it("asks for a fee with its amount in dollars", async () => {
+    const { props, user } = setup()
+    await user.click(screen.getByRole("button", { name: "Add question" }))
+    await user.click(
+      within(await screen.findByRole("dialog", { name: "Add a question" })).getByRole("button", {
+        name: /^Write your own question/
+      })
+    )
+    const dialog = await screen.findByRole("dialog", { name: "Write a question" })
+    await user.type(within(dialog).getByLabelText(/^Question/), "Filing fee")
+    await user.selectOptions(within(dialog).getByLabelText("Answer"), "fee")
+    await user.click(within(dialog).getByRole("button", { name: "Add question" }))
+    expect(within(dialog).getByText("Give the fee in dollars, such as 50.")).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText("Amount"), "$1,250.50")
+    await user.click(within(dialog).getByRole("button", { name: "Add question" }))
+    await waitFor(() =>
+      expect(
+        savedDefinition(props)
+          ?.groups.flatMap((group) => group.fields)
+          .find((field) => field.label === "Filing fee")
+      ).toMatchObject({ kind: "fee", amount: 1250.5, binding: null })
     )
   })
 

@@ -11,6 +11,7 @@ Every run that calls a model needs the person's approval.
 | --- | --- | --- | --- | --- |
 | `encoding-evaluation` | Langfuse | One split of the sample Declaration (`encoding-dev`, `encoding-test`) | The golden encoding, `samples/declaration/rules.json` | `pnpm eval:encoding` runs the build; `pnpm eval:encoding:score <run> --record` records one dataset run per evaluation run, a score per measure code computes |
 | Encoding step datasets | Local | One input of one redesigned encoding step | Derived from the golden | `pnpm eval:step` builds and runs one step's items; `pnpm eval:datasets` writes every step's items ([below](#encoding-step-datasets)) |
+| Project type suggestions | Local | A saved rules file | None: code checks the keys and which subjects with rules go uncovered, and a person reads each suggestion | `pnpm eval:suggestions --rulebooks <rules.json>,... [--model] [--effort]`, the prompt's own text on another model, with latency and cost |
 | Review cases | Local | One application: its project type, answers, packet and expected review | Entities, facts, documents, findings per rule and entity, recommendation and action items | `pnpm eval:review` ([below](#review-cases)) |
 | `entity-facts` | Langfuse | One packet, entity and property, from a correction the review recorded | The settled fact, or null with `needsLabel` for a person to label | `pnpm review:corrections` ([application-review.md, Recognition](application-review.md#recognition)) |
 

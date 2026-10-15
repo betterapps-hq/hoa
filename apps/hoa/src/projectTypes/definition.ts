@@ -1,5 +1,12 @@
 import { workType } from "@/review/subjects"
-import type { ProjectDocument, ProjectField, ProjectGroup, ProjectTypeDefinition, UnaskedField } from "./projectType"
+import type {
+  DocumentTemplate,
+  ProjectDocument,
+  ProjectField,
+  ProjectGroup,
+  ProjectTypeDefinition,
+  UnaskedField
+} from "./projectType"
 
 // Editing a project type's definition (application-review.md, Project types): the administrator's moves, edits,
 // removals and additions, as pure functions over the definition. The order of sections, questions and documents is the
@@ -162,6 +169,17 @@ export const updateDocument = (definition: ProjectTypeDefinition, document: Proj
   withDocuments(
     definition,
     definition.documents.map((item) => (item.documentType === document.documentType ? document : item))
+  )
+
+/** A document with a new template, or none (undefined). */
+export const setDocumentTemplate = (
+  definition: ProjectTypeDefinition,
+  documentType: string,
+  template: DocumentTemplate | undefined
+) =>
+  withDocuments(
+    definition,
+    definition.documents.map((item) => (item.documentType === documentType ? { ...item, template } : item))
   )
 
 export const removeDocument = (definition: ProjectTypeDefinition, documentType: string) =>

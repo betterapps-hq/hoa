@@ -31,22 +31,25 @@ import { listGoverningDocuments } from "@/db/documentRepository"
 import { deleteJobsOf, getLatestJob, insertJob, newJob } from "@/db/jobRepository"
 import { getProjectType, listProjectTypes } from "@/db/projectTypeRepository"
 import { getPublishedRulesFile, type RulesFileRef } from "@/db/rulebookContentRepository"
+import { doesWorkOf } from "@/features/role/roles"
 import type { Job } from "@/jobs/job"
 import { answersSchema, emptyAnswers } from "@/projectTypes/answers"
 import { projectAnswers, type ProjectType } from "@/projectTypes/projectType"
 import { toEvidence } from "@/review/factSchema"
 import { hasOpenRequests, reviewSchema, type Recommendation, type Review } from "@/review/reviewModel"
+import type { RulesUpdate } from "@/review/ruleChanges"
 import { subjectsAnswerSchema } from "@/review/subjects"
 import { readRulesFile } from "@/rulebook/assemble"
 import type * as T from "@/schema/types"
-import { getRequestContext, requireAdministrator, type RequestContext } from "@/session/requestContext.server"
+import { getRequestContext, requireWorkOf, type RequestContext } from "@/session/requestContext.server"
 import { applicationKeys, jobOutputPrefix, jobStepKey, rulebookKeys } from "@/storage/keys"
 import { deleteObjectsUnder, getJson, toBase64 } from "@/storage/objects"
-import { getBucket, getPresigner } from "@/storage/storage.server"
+import { getBucket, presignerOrNull } from "@/storage/storage.server"
 import { validateUpload } from "@/storage/uploadRules"
 import { offerType, type OfferedProjectType, type PublishedRules } from "../projectTypes/offeredTypes"
 import type { SourceFile } from "../rulebook/rulebook.functions"
 import { reportRules, reviewTerms, type ReportRule } from "./applicationView"
+import { rulebookVersions, rulesUpdateOf } from "./rulesUpdate.server"
 
 // Applications (docs/design/platform.md, "Server functions"): the homeowner starts one as a draft, which keeps their
 // answers and files as they go, runs the review as often as they like and submits; the committee decides.
@@ -54,23 +57,18 @@ import { reportRules, reviewTerms, type ReportRule } from "./applicationView"
 /** Statuses in which the homeowner can change files and run the review. */
 const editableStatuses: readonly ApplicationStatus[] = ["draft", "reviewed", "information-requested"]
 
-function presignerOrNull() {
-  try {
-    return getPresigner()
-  } catch {
-    return null
-  }
-}
+/** Whether they review applications: an administrator, or someone on the architectural committee. */
+const reviewsApplications = (context: RequestContext) => doesWorkOf(context.role, context.committees, "architectural")
 
 /** Who's asking, for what they may see: the committee sees an application once it's submitted. */
 const viewerOf = (context: RequestContext) => ({
   userId: context.user.id,
-  isCommittee: context.role === "administrator"
+  isCommittee: reviewsApplications(context)
 })
 
 /** The application, if the requester may see it: its owner, or an administrator once it's been submitted. */
 async function loadApplication(context: RequestContext, applicationId: string) {
-  const application = await getApplication(getDb(), context.hoa.id, applicationId)
+  const application = await getApplication(getDb(), context.organization.id, applicationId)
   if (!application || !canSee(application, viewerOf(context))) {
     throw new Error("The application doesn't exist.")
   }
@@ -95,11 +93,11 @@ async function loadEditable(context: RequestContext, applicationId: string) {
  */
 async function revise(context: RequestContext, application: Application, patch: ApplicationPatch = {}) {
   const now = new Date().toISOString()
-  const [updated] = await transitionApplication(getDb(), context.hoa.id, application.id, editableStatuses, {
+  const [updated] = await transitionApplication(getDb(), context.organization.id, application.id, editableStatuses, {
     ...patch,
     revisedAt: now,
     updatedAt: now,
-    deleteAfter: deleteAfterFor({ ...application, updatedAt: now }, context.hoa.settings)
+    deleteAfter: deleteAfterFor({ ...application, updatedAt: now }, context.organization.settings)
   })
   if (!updated) {
     throw new Error("The application can't be changed while it's being reviewed.")
@@ -107,8 +105,10 @@ async function revise(context: RequestContext, application: Application, patch: 
 }
 
 /** The form of the application's project type; null for "Something else" or a type that's gone. */
-async function definitionOf(hoaId: string, application: Application) {
-  const type = application.projectTypeId ? await getProjectType(getDb(), hoaId, application.projectTypeId) : null
+async function definitionOf(organizationId: string, application: Application) {
+  const type = application.projectTypeId
+    ? await getProjectType(getDb(), organizationId, application.projectTypeId)
+    : null
   return type?.definition ?? null
 }
 
@@ -118,20 +118,22 @@ export const createApplication = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<Application> => {
     const context = await getRequestContext()
     const now = new Date().toISOString()
-    const type = data.projectTypeId ? await getProjectType(getDb(), context.hoa.id, data.projectTypeId) : null
+    const type = data.projectTypeId ? await getProjectType(getDb(), context.organization.id, data.projectTypeId) : null
     if (data.projectTypeId && type?.status !== "active") {
       throw new Error("That project type isn't offered. Choose another, or Something else.")
     }
     return createApplicationRecord(getDb(), {
-      hoaId: context.hoa.id,
+      organizationId: context.organization.id,
       projectTypeId: type?.id ?? null,
       answers: type ? emptyAnswers(type.definition) : null,
       description: null,
       createdBy: context.user.id,
       now,
       deleteAfter:
-        deleteAfterFor({ status: "draft", updatedAt: now, decision: null, submittedAt: null }, context.hoa.settings) ??
-        now
+        deleteAfterFor(
+          { status: "draft", updatedAt: now, decision: null, submittedAt: null },
+          context.organization.settings
+        ) ?? now
     })
   })
 
@@ -189,11 +191,11 @@ export const createApplicationUpload = createServerFn({ method: "POST" })
     if (!validation.isValid) {
       throw new Error(validation.message)
     }
-    const definition = await definitionOf(context.hoa.id, application)
+    const definition = await definitionOf(context.organization.id, application)
     const uploadedAs = data.uploadedAs && isUploadedAs(definition, data.uploadedAs) ? data.uploadedAs : null
     await revise(context, application)
     const file = await createApplicationFile(getDb(), {
-      hoaId: context.hoa.id,
+      organizationId: context.organization.id,
       applicationId: application.id,
       fileName: data.fileName,
       mediaType: validation.upload.mediaType,
@@ -202,13 +204,13 @@ export const createApplicationUpload = createServerFn({ method: "POST" })
       contextText: uploadContext(definition, uploadedAs),
       now: new Date().toISOString()
     })
-    const key = applicationKeys(context.hoa.id, application.id).source(file.id, file.fileName)
+    const key = applicationKeys(context.organization.id, application.id).source(file.id, file.fileName)
     const presigner = presignerOrNull()
     return { fileId: file.id, uploadUrl: presigner ? await presigner.upload(key) : null, contentType: file.mediaType }
   })
 
 async function loadUploadingFile(context: RequestContext, fileId: string) {
-  const file = await getApplicationFile(getDb(), context.hoa.id, fileId)
+  const file = await getApplicationFile(getDb(), context.organization.id, fileId)
   if (!file) {
     throw new Error("The file doesn't exist.")
   }
@@ -235,7 +237,7 @@ export const uploadApplicationFile = createServerFn({ method: "POST" })
     if (record.status !== "uploading") {
       throw new Error("This upload has already been completed.")
     }
-    const key = applicationKeys(context.hoa.id, record.applicationId).source(record.id, record.fileName)
+    const key = applicationKeys(context.organization.id, record.applicationId).source(record.id, record.fileName)
     await getBucket().put(key, data.file, { httpMetadata: { contentType: record.mediaType } })
   })
 
@@ -248,12 +250,12 @@ export const completeApplicationUpload = createServerFn({ method: "POST" })
     if (record.status !== "uploading") {
       return
     }
-    const key = applicationKeys(context.hoa.id, record.applicationId).source(record.id, record.fileName)
+    const key = applicationKeys(context.organization.id, record.applicationId).source(record.id, record.fileName)
     const object = await getBucket().head(key)
     if (!object || object.size !== record.sizeBytes) {
       throw new Error("The upload didn't finish. Try again.")
     }
-    await updateApplicationFile(getDb(), context.hoa.id, record.id, { status: "processing" })
+    await updateApplicationFile(getDb(), context.organization.id, record.id, { status: "processing" })
   })
 
 /** Says what a file is: one of the project type's documents, other, or nothing yet (null). */
@@ -261,17 +263,17 @@ export const setApplicationFileUploadedAs = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ fileId: z.string(), uploadedAs: z.string().nullable() }).parse(data))
   .handler(async ({ data }) => {
     const context = await getRequestContext()
-    const record = await getApplicationFile(getDb(), context.hoa.id, data.fileId)
+    const record = await getApplicationFile(getDb(), context.organization.id, data.fileId)
     if (!record || record.parentFileId) {
       throw new Error("The file can't be changed.")
     }
     const application = await loadEditable(context, record.applicationId)
-    const definition = await definitionOf(context.hoa.id, application)
+    const definition = await definitionOf(context.organization.id, application)
     if (data.uploadedAs !== null && !isUploadedAs(definition, data.uploadedAs)) {
       throw new Error("Choose one of the documents the project lists, or other.")
     }
     await revise(context, application)
-    await updateApplicationFile(getDb(), context.hoa.id, record.id, {
+    await updateApplicationFile(getDb(), context.organization.id, record.id, {
       uploadedAs: data.uploadedAs,
       contextText: uploadContext(definition, data.uploadedAs)
     })
@@ -282,14 +284,14 @@ export const removeApplicationFile = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ fileId: z.string() }).parse(data))
   .handler(async ({ data }) => {
     const context = await getRequestContext()
-    const record = await getApplicationFile(getDb(), context.hoa.id, data.fileId)
+    const record = await getApplicationFile(getDb(), context.organization.id, data.fileId)
     if (!record || record.parentFileId) {
       throw new Error("The file can't be removed.")
     }
     const application = await loadEditable(context, record.applicationId)
     await revise(context, application)
-    const removed = await deleteApplicationFile(getDb(), context.hoa.id, record.id)
-    const keys = applicationKeys(context.hoa.id, application.id)
+    const removed = await deleteApplicationFile(getDb(), context.organization.id, record.id)
+    const keys = applicationKeys(context.organization.id, application.id)
     for (const id of removed) {
       await deleteObjectsUnder(getBucket(), `${keys.root}files/${id}/`)
     }
@@ -305,13 +307,13 @@ export const deleteApplicationDraft = createServerFn({ method: "POST" })
       throw new Error("Only the homeowner who started the application can delete it.")
     }
     const db = getDb()
-    if (!(await deleteDraftApplication(db, context.hoa.id, application.id))) {
+    if (!(await deleteDraftApplication(db, context.organization.id, application.id))) {
       throw new Error("Only a draft that was never submitted can be deleted, and not while it's being reviewed.")
     }
-    const jobIds = await deleteJobsOf(db, context.hoa.id, application.id)
-    await deleteObjectsUnder(getBucket(), applicationKeys(context.hoa.id, application.id).root)
+    const jobIds = await deleteJobsOf(db, context.organization.id, application.id)
+    await deleteObjectsUnder(getBucket(), applicationKeys(context.organization.id, application.id).root)
     for (const jobId of jobIds) {
-      await deleteObjectsUnder(getBucket(), jobOutputPrefix(context.hoa.id, jobId))
+      await deleteObjectsUnder(getBucket(), jobOutputPrefix(context.organization.id, jobId))
     }
   })
 
@@ -322,7 +324,7 @@ export const runReview = createServerFn({ method: "POST" })
     const context = await getRequestContext()
     const application = await loadEditable(context, data.applicationId)
     const db = getDb()
-    const files = await listApplicationFiles(db, context.hoa.id, application.id)
+    const files = await listApplicationFiles(db, context.organization.id, application.id)
     if (files.some((file) => file.status === "uploading")) {
       throw new Error("Wait for every file to finish uploading.")
     }
@@ -330,17 +332,22 @@ export const runReview = createServerFn({ method: "POST" })
       throw new Error("Add at least one file first.")
     }
     // A draft keeps answers half done; the review needs them finished, as the form checks them.
-    const definition = await definitionOf(context.hoa.id, application)
+    const definition = await definitionOf(context.organization.id, application)
     if (definition && !answersSchema(definition).safeParse(application.answers ?? {}).success) {
       throw new Error("Answer the questions marked as required first.")
     }
-    if (!(await getPublishedRulesFile(db, context.hoa.id))) {
+    if (!(await getPublishedRulesFile(db, context.organization.id))) {
       throw new Error("The HOA hasn't published its rulebook yet, so applications can't be reviewed.")
     }
     const now = new Date().toISOString()
-    const job = newJob({ hoaId: context.hoa.id, kind: "application-review", subjectId: application.id, now })
+    const job = newJob({
+      organizationId: context.organization.id,
+      kind: "application-review",
+      subjectId: application.id,
+      now
+    })
     const [claimed] = await db.batch([
-      transitionApplication(db, context.hoa.id, application.id, editableStatuses, {
+      transitionApplication(db, context.organization.id, application.id, editableStatuses, {
         status: "reviewing",
         updatedAt: now
       }),
@@ -352,7 +359,7 @@ export const runReview = createServerFn({ method: "POST" })
     await bindings.APPLICATION_REVIEW.create({
       id: job.id,
       params: {
-        hoaId: context.hoa.id,
+        organizationId: context.organization.id,
         applicationId: application.id,
         jobId: job.id,
         previousStatus: application.status
@@ -361,8 +368,14 @@ export const runReview = createServerFn({ method: "POST" })
     return { jobId: job.id }
   })
 
-async function loadReview(hoaId: string, applicationId: string, reviewId: string | null): Promise<Review | null> {
-  return reviewId ? getJson(getBucket(), applicationKeys(hoaId, applicationId).review(reviewId), reviewSchema) : null
+async function loadReview(
+  organizationId: string,
+  applicationId: string,
+  reviewId: string | null
+): Promise<Review | null> {
+  return reviewId
+    ? getJson(getBucket(), applicationKeys(organizationId, applicationId).review(reviewId), reviewSchema)
+    : null
 }
 
 /** Sends the application to the committee with its latest review. Open requests need the homeowner's confirmation. */
@@ -371,12 +384,18 @@ export const submitApplication = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const context = await getRequestContext()
     const application = await loadEditable(context, data.applicationId)
-    const review = await loadReview(context.hoa.id, application.id, application.reviewId)
+    const review = await loadReview(context.organization.id, application.id, application.reviewId)
     if (!review || application.status === "draft") {
       throw new Error("Run the review before submitting.")
     }
     if (!reviewCoversLatest(application, review)) {
       throw new Error("You changed the application after the review. Run the review again before submitting.")
+    }
+    const type = application.projectTypeId
+      ? await getProjectType(getDb(), context.organization.id, application.projectTypeId)
+      : null
+    if (await rulesUpdateOf(context.organization.id, application, review, type?.definition ?? null)) {
+      throw new Error("The rules changed since your review. Run the review again before submitting.")
     }
     if (hasOpenRequests(review) && !data.confirmOpenRequests) {
       throw new Error("Confirm that you're submitting with open requests.")
@@ -384,7 +403,7 @@ export const submitApplication = createServerFn({ method: "POST" })
     const now = new Date().toISOString()
     const [updated] = await transitionApplication(
       getDb(),
-      context.hoa.id,
+      context.organization.id,
       application.id,
       ["reviewed", "information-requested"],
       { status: "submitted", submittedReviewId: review.id, submittedAt: now, updatedAt: now, deleteAfter: null }
@@ -406,15 +425,18 @@ export const recordDecision = createServerFn({ method: "POST" })
       .parse(data)
   )
   .handler(async ({ data }) => {
-    const context = await requireAdministrator()
+    const context = await requireWorkOf("architectural")
     const now = new Date().toISOString()
     const decision = { outcome: data.outcome, note: data.note || null, decidedBy: context.user.id, decidedAt: now }
     const status: ApplicationStatus = data.outcome === "information-requested" ? "information-requested" : "decided"
-    const [updated] = await transitionApplication(getDb(), context.hoa.id, data.applicationId, ["submitted"], {
+    const [updated] = await transitionApplication(getDb(), context.organization.id, data.applicationId, ["submitted"], {
       status,
       decision,
       updatedAt: now,
-      deleteAfter: deleteAfterFor({ status, updatedAt: now, decision, submittedAt: null }, context.hoa.settings)
+      deleteAfter: deleteAfterFor(
+        { status, updatedAt: now, decision, submittedAt: null },
+        context.organization.settings
+      )
     })
     if (!updated) {
       throw new Error("Only a submitted application can be decided.")
@@ -441,8 +463,8 @@ async function readRulesFileForDisplay(ref: RulesFileRef) {
 }
 
 /** The published rulebook's id and rules file, or null before the HOA publishes one. */
-async function loadPublishedRules(hoaId: string): Promise<PublishedRules | null> {
-  const published = await getPublishedRulesFile(getDb(), hoaId)
+async function loadPublishedRules(organizationId: string): Promise<PublishedRules | null> {
+  const published = await getPublishedRulesFile(getDb(), organizationId)
   const rulesFile = published ? await readRulesFileForDisplay(published) : null
   return published && rulesFile ? { id: published.rulebookId, rulesFile } : null
 }
@@ -460,14 +482,14 @@ export const listApplications = createServerFn({ method: "GET" }).handler(async 
   const applications = (
     await listApplicationRecords(
       db,
-      context.hoa.id,
-      context.role === "administrator" ? {} : { createdBy: context.user.id }
+      context.organization.id,
+      reviewsApplications(context) ? {} : { createdBy: context.user.id }
     )
   ).filter((application) => canSee(application, viewerOf(context)))
-  const types = await listProjectTypes(db, context.hoa.id)
+  const types = await listProjectTypes(db, context.organization.id)
   return Promise.all(
     applications.map(async (application) => {
-      const [latest] = await listReviewSummaries(db, context.hoa.id, application.id)
+      const [latest] = await listReviewSummaries(db, context.organization.id, application.id)
       return {
         ...application,
         recommendation: latest?.recommendation ?? null,
@@ -478,9 +500,9 @@ export const listApplications = createServerFn({ method: "GET" }).handler(async 
 })
 
 /** The rules file a review read, checked against the hash it recorded. */
-const reviewRulesFile = (hoaId: string, review: Review) =>
+const reviewRulesFile = (organizationId: string, review: Review) =>
   readRulesFileForDisplay({
-    fileKey: rulebookKeys(hoaId, review.rulebookId).file,
+    fileKey: rulebookKeys(organizationId, review.rulebookId).file,
     fileSha256: review.rulesFileSha256
   })
 
@@ -493,9 +515,9 @@ const subjectsStep = z.object({ answer: subjectsAnswerSchema })
  * The evidence that named each entity. The review record doesn't keep it, so it's read from the job's stored subjects
  * step; a review whose steps are gone shows its entities without it.
  */
-async function loadEntityEvidence(hoaId: string, review: Review): Promise<EntityEvidence[]> {
+async function loadEntityEvidence(organizationId: string, review: Review): Promise<EntityEvidence[]> {
   try {
-    const step = await getJson(getBucket(), jobStepKey(hoaId, review.jobId, "subjects"), subjectsStep)
+    const step = await getJson(getBucket(), jobStepKey(organizationId, review.jobId, "subjects"), subjectsStep)
     return (step?.answer.entities ?? []).map((entity) => ({
       entity: entity.id,
       evidence: entity.evidence.map(toEvidence)
@@ -507,8 +529,8 @@ async function loadEntityEvidence(hoaId: string, review: Review): Promise<Entity
 }
 
 /** The governing documents with pages, which the cited provisions' anchors point into. */
-async function loadSourceFiles(hoaId: string): Promise<SourceFile[]> {
-  const uploads = await listGoverningDocuments(getDb(), hoaId)
+async function loadSourceFiles(organizationId: string): Promise<SourceFile[]> {
+  const uploads = await listGoverningDocuments(getDb(), organizationId)
   return uploads.flatMap((upload) =>
     upload.status === "ready" && upload.pageCount
       ? [{ id: upload.id, title: upload.title, pageCount: upload.pageCount }]
@@ -536,6 +558,10 @@ export type ApplicationView = {
    */
   projectType: OfferedProjectType | null
   history: Pick<ReviewSummary, "id" | "recommendation" | "createdAt">[]
+  /** The rulebook the shown review read: its version, and whether it's still the one in force. */
+  reviewRulebook: { version: number | null; isInForce: boolean } | null
+  /** For the homeowner: what a newer rulebook changes about the rules their review applied, which needs it run again. */
+  rulesUpdate: RulesUpdate | null
   /** The latest review job, so the page can follow one in progress or show why it failed. */
   job: Job | null
   isOwner: boolean
@@ -550,22 +576,26 @@ export const getApplicationView = createServerFn({ method: "GET" })
     const application = await loadApplication(context, data.applicationId)
     const db = getDb()
     const isOwner = application.createdBy === context.user.id
-    const isCommittee = context.role === "administrator" && !isOwner
+    const isCommittee = reviewsApplications(context) && !isOwner
     const reviewId = isCommittee && application.submittedReviewId ? application.submittedReviewId : application.reviewId
     const canEdit = isOwner && editableStatuses.includes(application.status)
     const [files, review, history, job, sourceFiles, type] = await Promise.all([
-      listApplicationFiles(db, context.hoa.id, application.id),
-      loadReview(context.hoa.id, application.id, reviewId),
-      listReviewSummaries(db, context.hoa.id, application.id),
-      getLatestJob(db, context.hoa.id, application.id),
-      loadSourceFiles(context.hoa.id),
-      application.projectTypeId ? getProjectType(db, context.hoa.id, application.projectTypeId) : null
+      listApplicationFiles(db, context.organization.id, application.id),
+      loadReview(context.organization.id, application.id, reviewId),
+      listReviewSummaries(db, context.organization.id, application.id),
+      getLatestJob(db, context.organization.id, application.id),
+      loadSourceFiles(context.organization.id),
+      application.projectTypeId ? getProjectType(db, context.organization.id, application.projectTypeId) : null
     ])
-    const [rulesFile, entityEvidence, published] = await Promise.all([
-      review ? reviewRulesFile(context.hoa.id, review) : null,
-      review ? loadEntityEvidence(context.hoa.id, review) : [],
-      canEdit && type ? loadPublishedRules(context.hoa.id) : null
+    const [rulesFile, entityEvidence, published, versions, rulesUpdate] = await Promise.all([
+      review ? reviewRulesFile(context.organization.id, review) : null,
+      review ? loadEntityEvidence(context.organization.id, review) : [],
+      canEdit && type ? loadPublishedRules(context.organization.id) : null,
+      review ? rulebookVersions(context.organization.id) : new Map<string, number | null>(),
+      canEdit ? rulesUpdateOf(context.organization.id, application, review, type?.definition ?? null) : null
     ])
+    const latestVersion = Math.max(0, ...[...versions.values()].map((version) => version ?? 0))
+    const reviewVersion = review ? (versions.get(review.rulebookId) ?? null) : null
     const rules = review && rulesFile ? reportRules(rulesFile, review.selected) : []
     return {
       application,
@@ -578,10 +608,12 @@ export const getApplicationView = createServerFn({ method: "GET" })
       projectTypeLabel: type?.label ?? null,
       projectType: type ? offerType(type, published, today()) : null,
       history: history.map(({ id, recommendation, createdAt }) => ({ id, recommendation, createdAt })),
+      reviewRulebook: review ? { version: reviewVersion, isInForce: reviewVersion === latestVersion } : null,
+      rulesUpdate,
       job,
       isOwner,
       canEdit,
-      canDecide: context.role === "administrator" && application.status === "submitted"
+      canDecide: reviewsApplications(context) && application.status === "submitted"
     }
   })
 
@@ -594,11 +626,11 @@ export const getPacketImage = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const context = await getRequestContext()
     const application = await loadApplication(context, data.applicationId)
-    const file = await getApplicationFile(getDb(), context.hoa.id, data.fileId)
+    const file = await getApplicationFile(getDb(), context.organization.id, data.fileId)
     if (file?.applicationId !== application.id || !file.mediaType.startsWith("image/")) {
       throw new Error("That file isn't a photo in this application.")
     }
-    const key = applicationKeys(context.hoa.id, application.id).source(file.id, file.fileName)
+    const key = applicationKeys(context.organization.id, application.id).source(file.id, file.fileName)
     const presigner = presignerOrNull()
     if (presigner) {
       return { url: await presigner.download(key) }

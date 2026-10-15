@@ -44,7 +44,8 @@ Model results are cached per application, so re-running after adding one file pa
 ### 2. Load
 
 The application's organization must have a published rulebook. `load` reads its rules file from R2, checks the SHA-256
-against D1, and parses it with `rulesFile`. A 2 MB file parses in milliseconds; nothing is preloaded.
+against D1, and parses it with `rulesFile`. A 2 MB file parses in milliseconds; nothing is preloaded. A submitted
+application is reviewed against the rulebook it was submitted with, not a newer one ([Rulebook versions](#rulebook-versions)).
 
 **The request.** An application is an `architectural-application` request. Its governing date is the submission date
 (the request type's `governingDate`, `architectural-application.submitted-on`). A review before submission uses the
@@ -302,6 +303,24 @@ type Review = {
 type ActionItem = { id: string; ruleKey: RuleKey; entities: string[]; text: string }
 ```
 
+## Rulebook versions
+
+Published rulebooks never change, and each keeps its own rules file, so a review always reads back against the rulebook
+it read (`rulebookId`), whatever was published since. The application page names it in the details ("Rulebook:
+Version 1", and ", since replaced" once a newer one is published).
+
+- **Submitted applications** stay under the rulebook they were submitted with. The committee sees that review, and a
+  review run again for a submitted application reads the same rulebook.
+- **Drafts** follow the rulebook in force. When a newer rulebook is published, code compares the rules the latest
+  review applied (`selected`) with the rules the newer rulebook selects for the same request (its entities, the
+  form's cited passages, today), by key and content (`src/review/ruleChanges.ts`, `ruleChangesSince`). Nothing runs
+  on publish and no model reads anything; the comparison runs when the application or dashboard is read. A kind of
+  thing the review never identified can't be matched, so a newer rulebook's rules about it show once the review runs
+  again.
+- When rules changed, the homeowner's page leads with "The rules changed", naming up to three of them, the dashboard's
+  next step says to run the review again, and submitting is refused until it does. A newer rulebook that changes
+  nothing the review applied asks for nothing.
+
 ## Engine
 
 `src/engine/` implements [schema.md, Expressions](schema.md#3-expressions) and
@@ -386,7 +405,7 @@ units, and every organization's rulebook supplies its own labels and units.
 | `hoa-document-review` | `document-review` | `anthropic/claude-sonnet-5.5` (the prompt's `config.model`) | `requirements`, `parties`, `pages` | `{ documents: DocumentResult[] }` |
 | `hoa-judgment-check` | `judgment-check` | `anthropic/claude-haiku-5.5` (`config.model`) | `statement`, `question`, `subject`, `facts`, `evidencePages` | `{ answer, confidence, rationale, evidence }` |
 | `hoa-review-summary` | `review-summary` | `anthropic/claude-haiku-5.5` (`config.model`) | `recommendation`, `findings`, `actionItems`, `suggestions` | `{ assessment, feedback, items: { id, text }[] }` |
-| `hoa-project-type-suggestion` | `project-type-suggestion` | `anthropic/claude-sonnet-5.5` (`config.model`) | `rulebook`, `projectTypes` | project types with subjects, fields and documents, checked by code ([Project types](#project-types)) |
+| `hoa-project-type-suggestion` | `project-type-suggestion` | `anthropic/claude-haiku-5.5`, medium effort (`config.model`, `config.effort`) | `rulebook`, `projectTypes` | project types with subjects, fields and documents, checked by code ([Project types](#project-types)) |
 
 `projectKind` carries the chosen project type's label and description ("not given" for Something else). Every prompt
 is generic: it names no organization's terms, project type, product, place or sample case. What a stage needs to know
@@ -579,8 +598,12 @@ asks for in checklist order, the documents the form itself provides (`formDocume
 wording so adding one back keeps it).
 
 - **Questions.** Each has its wording, help, an answer type (text, long text, an amount with its unit and dimension, a
-  count, one choice, several choices, yes or no, a date, a time), an example for text, whether it's required, and the
-  passages it cites (`citations`). **A question's citations are what its answer is checked against.** Underneath, a
+  count, one choice, several choices, yes or no, a date, a time, a signature (the homeowner types their full name;
+  the answer keeps it with the day), contact details (a name, phone and email; for a business, such as a contractor, its company name
+  first and its website, optional, last), a fee (an amount in dollars the homeowner confirms they'll pay; paying
+  happens outside the app)), an example for text, whether it's required, in a
+  section that repeats whether it's asked once for every item (`isShared`: one material for every fence run) or for
+  each, and the passages it cites (`citations`). **A question's citations are what its answer is checked against.** Underneath, a
   question is bound (`binding`: the property a rule tests, its answer type and values from the vocabulary) or not
   (`binding: null`), and code alone decides which (`src/projectTypes/bind.ts`, `bindDefinition`, run on every change in
   the editor and on every save): a question whose citations include a passage of the rules testing a detail its answer
@@ -616,10 +639,18 @@ wording so adding one back keeps it).
   menu. Suggestions, once asked for, appear above the cards, each to add or dismiss.
 - **The editor** (`ProjectTypePage`): each question rendered exactly as homeowners see it (`QuestionField`, shared
   with the homeowner form), one info button for long help, its citations on a quiet line, a drag
-  handle (dnd-kit, keyboard sensor and announcements) and a menu (edit, required or optional, remove with undo).
+  handle (dnd-kit, keyboard sensor and announcements) and a menu (edit, required or optional, in a section that
+  repeats asked once for every item or for each, remove with undo). In a section that repeats, the questions asked
+  once are listed first under "Once for every fence run" and the rest under "For each fence run", as homeowners see
+  them. Fee and signature questions close the form, after every section, fees first, under "Fee and signature"; they
+  don't move. A document's template shows as an attached file to download or remove; a file dropped on a document,
+  or chosen from its menu (Add template, Replace template), becomes its template.
   Changes save as they're made. "Add question" suggests what the rules check and always lets the administrator write
   their own (a "File upload" answer becomes a document requirement); "Add document" suggests what the rules require and
-  always lets them create their own (name, what it must show, required, accepted file formats, citations). The edit
+  always lets them create their own (name, what it must show, required, accepted file formats, citations). Any
+  document can give a **template** homeowners download and fill in (a form for a neighbor to sign, a contractor's
+  affidavit): PDF or Word, attached in the document's dialog, uploaded when it's saved, and shown on the document's row
+  as a link to download. The edit
   dialog is a plain form builder: nothing in it names bindings, links or how the review uses an answer, and the
   answer type is a select of every type. Each citation in the edit dialogs is a link that opens the reader in the sheet
   over the editor, beside its own remove button.
@@ -641,31 +672,42 @@ wording so adding one back keeps it).
   words ("location described as “by the shed”") instead of asking the homeowner again; a finding met either way stays
   met, and one that also lacks another detail still asks for it (`src/engine/unlistedValues.test.ts`).
 - **The homeowner form**: the project type as cards, a description, the sections in order (amounts in the shared
-  quantity inputs by dimension, in the organization's unit system, `HoaSettings.unitSystem`), and one drop zone for
+  quantity inputs by dimension, in the organization's unit system, `OrganizationSettings.unitSystem`), and one drop zone for
   files, each file marked as one of the documents (guessed from its name only when clear) against a checklist that
-  names what's still missing. Each question's info button holds its help and, quietly, why it's asked: the rules that
+  names what's still missing; a document with a template offers "Download the template" under its name
+  (`/files/project-types/{id}/templates/{templateId}`, anyone in the organization). In a section that repeats, the questions asked once for every item come first, in their
+  own card ("Every fence run"), and each item's card holds only its own; the answer is kept on every item, a new item
+  starts with it, and the review reads each item whole. Fee and signature questions come last, in their own section, fees first
+  (`closingQuestions`). Read back, an answer every item shares shows once, above the items, and the fee and signature
+  last (`answerSections`). Each question's info button holds its help and, quietly, why it's asked: the rules that
   read it and its citations, opening in the document reader in a new tab.
 - **Suggested by a model** (`hoa-project-type-suggestion`): it reads the published rulebook as it applies to
-  applications and proposes types with a homeowner-facing description, the fields to ask and the rules they rest on.
+  applications and proposes types with a homeowner-facing description, the fields to ask (each required or not, and,
+  for a subject a project can have several of, whether one answer usually holds for all of them, which the form then
+  asks once) and the rules they rest on.
   Code keeps only subjects the rules apply to, fields those rules test, rule keys that exist, and every document the
   rules require (`checkSuggestions`); the administrator adds or dismisses each. Rewording questions with a model is
   deferred.
 - **Requirements**: a type's page lists every rule the published rulebook applies to that kind of project
   (`projectRequirements`), behind a disclosure; a document rule the application form meets says so.
 - **Out of date**: a type records the rulebook it was built against (`rulebookId`). Published rulebooks never change,
-  so a type is out of date exactly when a newer rulebook is published. Code works out what that changes for the form,
-  with no model (`src/projectTypes/updates.ts`, `rulebookChanges`): the form the earlier rulebook builds against the
-  one the published rulebook builds, applied to the stored form. It finds questions the rules now ask or no longer
+  so a type can only go out of date when a newer rulebook is published. Code works out what that changes for the
+  form, with no model (`src/projectTypes/updates.ts`, `rulebookChanges`): the form the earlier rulebook builds against
+  the one the published rulebook builds, applied to the stored form. It finds questions the rules now ask or no longer
   ask, answers and choice lists that changed, cited passages the rulebook no longer has, documents the rules now
   require, no longer require or want to show more, and the administrator's edits that now conflict (an added choice
-  the rulebook now lists). The list of types says it in one quiet line ("Out of date with the rulebook published Oct
-  12"); the type's page shows a callout with a one-sentence summary and "Review updates", a dialog where each change is
+  the rulebook now lists). Publishing moves every type it changes nothing for onto the new rulebook, bound against it
+  with the administrator's edits kept (`carriedForward`, `carryForwardProjectTypes`), so only a type with something
+  to review stays out of date. The list of types says it in one quiet line ("Out of date with the rulebook published
+  Oct 12"); the type's page shows a callout with a one-sentence summary and "Review updates", a dialog where each change is
   accepted or the administrator's version kept ("Accept all" for the lot), then saved (`applyChanges`,
   `applyProjectTypeUpdates`). Kept, a question stays as worded (its citations still decide what it's checked against),
   a document becomes the administrator's own, a missing passage stays cited, and a new question or document stays out
   of the form, offered by Add question or Add document. The administrator's own questions and documents, wording,
-  added choices, order, required flags and citations survive either way. Until then, edits are bound against the
-  rulebook the type was built with, homeowners apply with the saved form, and a cited passage the published rulebook
+  added choices, order, required and asked-once flags and citations survive either way. Until then, edits are bound
+  against the rulebook the type was built with (when it can't be read any more, an edit saves the form as it stands
+  and the type stays out of date: never bound against the published rules unreviewed, which would drop what they
+  don't test), homeowners apply with the saved form, and a cited passage the published rulebook
   doesn't have is left out of their "Why we ask"; reviews of applications already submitted are untouched. The
   HOA management dashboard lists them among what needs its attention ([dashboard.md](../dashboard.md)).
 - **Delete or archive**: from the list's or the page's menu. A type no application uses can be deleted after a

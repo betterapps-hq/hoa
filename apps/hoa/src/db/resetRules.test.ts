@@ -19,7 +19,7 @@ import { getRulebookContent, saveRulebookContent } from "./rulebookContentReposi
 import { insertRulebook } from "./rulebookRepository"
 import { governingDocuments, jobs, rulebooks, rules, sections } from "./schema"
 
-const hoaId = "demo-hoa"
+const organizationId = "demo-hoa"
 const now = "2026-10-09T00:00:00.000Z"
 const sample = sampleRulesFile()
 
@@ -37,7 +37,7 @@ describe("resetRulesData", { timeout: 30_000 }, () => {
   it("empties rulebooks, sections, provisions and reviews with their objects, and keeps uploads and applications", async () => {
     const { db } = database
     const upload = await createGoverningDocument(db, {
-      hoaId,
+      organizationId,
       kind: "declaration",
       title: "Declaration",
       effectiveDate: null,
@@ -52,9 +52,15 @@ describe("resetRulesData", { timeout: 30_000 }, () => {
       throw new Error("The sample has documents")
     }
     await db.update(governingDocuments).set({ key: declaration.key, document: declaration })
-    await saveReferencedDocuments(db, hoaId, [{ id: "bylaws", document: { ...bylaws, edition: null } }], "system", now)
-    await saveProvisions(db, hoaId, upload.id, sample.provisions.slice(0, 3))
-    await saveSections(db, hoaId, [
+    await saveReferencedDocuments(
+      db,
+      organizationId,
+      [{ id: "bylaws", document: { ...bylaws, edition: null } }],
+      "system",
+      now
+    )
+    await saveProvisions(db, organizationId, upload.id, sample.provisions.slice(0, 3))
+    await saveSections(db, organizationId, [
       {
         id: `${upload.id}:0`,
         documentId: upload.id,
@@ -72,7 +78,7 @@ describe("resetRulesData", { timeout: 30_000 }, () => {
     ])
     await insertRulebook(db, {
       id: "rb",
-      hoaId,
+      organizationId,
       version: null,
       status: "draft",
       error: null,
@@ -83,8 +89,8 @@ describe("resetRulesData", { timeout: 30_000 }, () => {
       publishedBy: null,
       publishedAt: null
     })
-    await db.insert(rules).values({ id: "old-rule", hoaId, rulebookId: "rb", ruleKey: "old", rule: {} })
-    await saveRulebookContent(db, hoaId, "rb", {
+    await db.insert(rules).values({ id: "old-rule", organizationId, rulebookId: "rb", ruleKey: "old", rule: {} })
+    await saveRulebookContent(db, organizationId, "rb", {
       settings: sample.settings,
       coverage: { provisions: 3, uncovered: [] },
       rules: sample.rules.slice(0, 2),
@@ -92,7 +98,7 @@ describe("resetRulesData", { timeout: 30_000 }, () => {
       questions: sample.questions.slice(0, 1)
     })
     const application = await createApplication(db, {
-      hoaId,
+      organizationId,
       projectTypeId: null,
       answers: null,
       description: null,
@@ -100,7 +106,7 @@ describe("resetRulesData", { timeout: 30_000 }, () => {
       now,
       deleteAfter: now
     })
-    await updateApplication(db, hoaId, application.id, {
+    await updateApplication(db, organizationId, application.id, {
       status: "submitted",
       reviewId: "review",
       submittedReviewId: "review",
@@ -108,7 +114,7 @@ describe("resetRulesData", { timeout: 30_000 }, () => {
     })
     await saveReviewSummary(db, {
       id: "review",
-      hoaId,
+      organizationId,
       applicationId: application.id,
       jobId: "review-job",
       rulebookId: "rb",
@@ -119,27 +125,27 @@ describe("resetRulesData", { timeout: 30_000 }, () => {
       createdAt: now
     })
     for (const job of [
-      newJob({ id: "build", hoaId, kind: "rulebook-build", subjectId: "rb", now }),
-      newJob({ id: "review-job", hoaId, kind: "application-review", subjectId: application.id, now }),
-      newJob({ id: "ingest", hoaId, kind: "document-ingest", subjectId: upload.id, now })
+      newJob({ id: "build", organizationId, kind: "rulebook-build", subjectId: "rb", now }),
+      newJob({ id: "review-job", organizationId, kind: "application-review", subjectId: application.id, now }),
+      newJob({ id: "ingest", organizationId, kind: "document-ingest", subjectId: upload.id, now })
     ]) {
       await insertJob(db, job)
     }
 
     const { bucket, stored } = createMemoryBucket(1)
     const kept = [
-      `hoas/${hoaId}/governing/${upload.id}/pages/1.json`,
-      `hoas/${hoaId}/jobs/ingest/ocr/pages.json`,
-      `hoas/${hoaId}/applications/${application.id}/files/f/source.pdf`,
-      `hoas/${hoaId}/cache/encode/abc.json`
+      `hoas/${organizationId}/governing/${upload.id}/pages/1.json`,
+      `hoas/${organizationId}/jobs/ingest/ocr/pages.json`,
+      `hoas/${organizationId}/applications/${application.id}/files/f/source.pdf`,
+      `hoas/${organizationId}/cache/encode/abc.json`
     ]
     const removed = [
-      `hoas/${hoaId}/rulebooks/rb/rules.json`,
-      `hoas/${hoaId}/jobs/build/encode/u1.json`,
-      `hoas/${hoaId}/jobs/build/merge/draft.json`,
-      `hoas/${hoaId}/jobs/review-job/facts/g1.json`,
-      `hoas/${hoaId}/governing/${upload.id}/sections/${upload.id}:0.md`,
-      `hoas/${hoaId}/applications/${application.id}/reviews/review.json`
+      `hoas/${organizationId}/rulebooks/rb/rules.json`,
+      `hoas/${organizationId}/jobs/build/encode/u1.json`,
+      `hoas/${organizationId}/jobs/build/merge/draft.json`,
+      `hoas/${organizationId}/jobs/review-job/facts/g1.json`,
+      `hoas/${organizationId}/governing/${upload.id}/sections/${upload.id}:0.md`,
+      `hoas/${organizationId}/applications/${application.id}/reviews/review.json`
     ]
     for (const key of [...kept, ...removed]) {
       await bucket.put(key, "{}")
@@ -151,12 +157,12 @@ describe("resetRulesData", { timeout: 30_000 }, () => {
     expect(await db.select().from(rulebooks)).toEqual([])
     expect(await db.select().from(rules)).toEqual([])
     expect(await db.select().from(sections)).toEqual([])
-    expect(await getRulebookContent(db, hoaId, "rb")).toBeNull()
-    expect(await listProvisions(db, hoaId, [upload.id])).toEqual([])
-    expect(await listDocumentRecords(db, hoaId)).toEqual([])
-    expect((await listGoverningDocuments(db, hoaId)).map((document) => document.id)).toEqual([upload.id])
+    expect(await getRulebookContent(db, organizationId, "rb")).toBeNull()
+    expect(await listProvisions(db, organizationId, [upload.id])).toEqual([])
+    expect(await listDocumentRecords(db, organizationId)).toEqual([])
+    expect((await listGoverningDocuments(db, organizationId)).map((document) => document.id)).toEqual([upload.id])
     expect(await db.select({ id: jobs.id }).from(jobs)).toEqual([{ id: "ingest" }])
-    expect(await getApplication(db, hoaId, application.id)).toMatchObject({
+    expect(await getApplication(db, organizationId, application.id)).toMatchObject({
       status: "draft",
       reviewId: null,
       submittedReviewId: null,

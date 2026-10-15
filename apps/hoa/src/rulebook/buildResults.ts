@@ -211,7 +211,7 @@ export type BuildResultsPage = {
 
 /**
  * The results of a build's steps written at or after `since` (an ISO time), from the outputs under `prefix`
- * (`hoas/{hoaId}/jobs/{jobId}/`). Lists every output, then reads only the new ones.
+ * (`hoas/{organizationId}/jobs/{jobId}/`). Lists every output, then reads only the new ones.
  */
 export async function buildResultsSince(
   bucket: ResultsBucket,

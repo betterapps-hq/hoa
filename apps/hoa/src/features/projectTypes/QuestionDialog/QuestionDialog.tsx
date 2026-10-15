@@ -2,6 +2,7 @@ import { useForm } from "@tanstack/react-form"
 import { PlusIcon, XIcon } from "lucide-react"
 import { useState } from "react"
 import { z } from "zod"
+import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldError,
   FieldGroup,
@@ -71,6 +73,9 @@ const answerTypes = [
   { value: "number", label: "Amount" },
   { value: "date", label: "Date" },
   { value: "time", label: "Time of day" },
+  { value: "signature", label: "Signature" },
+  { value: "contact", label: "Contact details" },
+  { value: "fee", label: "Fee" },
   { value: "file", label: "File upload" }
 ] as const
 type AnswerType = (typeof answerTypes)[number]["value"]
@@ -89,6 +94,9 @@ const dimensionNames: Record<string, string> = {
   "business-time": "Business days",
   "sound-level": "Sound level"
 }
+
+/** Dollars from what the administrator typed ("$1,250.50"); NaN when it isn't an amount. */
+const dollarsOf = (text: string) => (/\d/.test(text) ? Number(text.replaceAll(/[$,\s]/g, "")) : Number.NaN)
 
 /** "Count" for a number with no unit. */
 const countUnit = "(count)"
@@ -113,6 +121,7 @@ const valuesSchema = z.object({
   help: z.string().trim().max(300, "Keep the help under 300 characters."),
   example: z.string().trim().max(80, "Keep the example under 80 characters."),
   isRequired: z.boolean(),
+  isShared: z.boolean(),
   subject: z.string(),
   answerType: z.string(),
   options: z.string(),
@@ -120,7 +129,9 @@ const valuesSchema = z.object({
     z.object({ id: z.string(), value: z.string(), label: z.string(), isAdded: z.boolean(), isOffered: z.boolean() })
   ),
   allowsOther: z.boolean(),
+  isBusiness: z.boolean(),
   unit: z.string(),
+  fee: z.string(),
   citations: z.array(z.string())
 })
 type Values = z.infer<typeof valuesSchema>
@@ -128,13 +139,14 @@ type Values = z.infer<typeof valuesSchema>
 /** What a custom question's form starts from. */
 function customValues(field: ProjectField | null) {
   if (!field) {
-    return { answerType: "text", options: "", unit: countUnit }
+    return { answerType: "text", options: "", unit: countUnit, fee: "" }
   }
   const options = field.kind === "choice" || field.kind === "choices" ? field.options.map((option) => option.label) : []
   return {
     answerType: field.kind,
     options: options.join("\n"),
-    unit: field.kind === "number" ? (field.unit?.key ?? countUnit) : countUnit
+    unit: field.kind === "number" ? (field.unit?.key ?? countUnit) : countUnit,
+    fee: field.kind === "fee" ? String(field.amount) : ""
   }
 }
 
@@ -157,6 +169,9 @@ export function QuestionDialog({
   /** Whether the question stays the rules' detail: it was, and its answer type stays. */
   const staysBound = (answerType: string) => field !== null && field.binding !== null && answerType === field.kind
   const custom = customValues(field)
+  /** The section's item, when it repeats: only there can a question be asked once for every item. */
+  const itemOf = (subject: string) => sections.find((section) => section.subject === subject && section.isRepeatable)
+  const repeats = (subject: string) => itemOf(subject) !== undefined
   const known = new Map([
     ...Object.entries(citations),
     ...(provisions ?? []).map((provision) => [provision.provisionKey, provision] as const)
@@ -177,12 +192,15 @@ export function QuestionDialog({
     help: field?.help ?? "",
     example: field?.example ?? "",
     isRequired: field?.isRequired ?? true,
+    isShared: field?.isShared ?? false,
     subject: editing?.subject ?? sections[0]?.subject ?? "work",
     answerType: custom.answerType,
     options: custom.options,
     choices: field?.kind === "choice" ? choiceRows(field.options, listed) : [],
     allowsOther: field?.kind === "choice" ? field.allowsOther : false,
+    isBusiness: field?.kind === "contact" ? field.isBusiness === true : false,
     unit: custom.unit,
+    fee: custom.fee,
     citations: field?.citations ?? []
   }
   const form = useForm({
@@ -200,19 +218,24 @@ export function QuestionDialog({
         if ((value.answerType === "choice" || value.answerType === "choices") && linesOf(value.options).length < 2) {
           context.addIssue({ code: "custom", path: ["options"], message: "Write at least two choices, one per line." })
         }
+        if (value.answerType === "fee" && !(dollarsOf(value.fee) > 0)) {
+          context.addIssue({ code: "custom", path: ["fee"], message: "Give the fee in dollars, such as 50." })
+        }
       })
     },
     onSubmit: ({ value }) => {
+      const subject = editing?.subject ?? value.subject
       const wording = {
         label: value.label.trim(),
         help: value.help.trim() || null,
         example: value.example.trim() || null,
         isRequired: value.isRequired,
+        isShared: repeats(subject) && value.isShared,
         citations: value.citations
       }
       if (field && staysBound(value.answerType)) {
         onSave(
-          editing?.subject ?? value.subject,
+          subject,
           field.kind === "choice"
             ? {
                 ...field,
@@ -233,7 +256,7 @@ export function QuestionDialog({
           accepts: null
         })
       } else {
-        onSave(editing?.subject ?? value.subject, customField(value, wording))
+        onSave(subject, customField(value, wording))
       }
       onOpenChange(false)
     }
@@ -242,7 +265,7 @@ export function QuestionDialog({
   /** The administrator's own question from what they chose. */
   function customField(
     value: Values,
-    wording: Pick<ProjectField, "label" | "help" | "example" | "isRequired" | "citations">
+    wording: Pick<ProjectField, "label" | "help" | "example" | "isRequired" | "isShared" | "citations">
   ): ProjectField {
     const base = {
       ...wording,
@@ -287,6 +310,10 @@ export function QuestionDialog({
         return { ...base, kind: "choices", options: options() }
       case "file":
         return { ...base, kind: "text" }
+      case "fee":
+        return { ...base, kind: "fee", amount: dollarsOf(value.fee) }
+      case "contact":
+        return { ...base, kind: "contact", isBusiness: value.isBusiness }
       default:
         return { ...base, kind: type }
     }
@@ -325,9 +352,7 @@ export function QuestionDialog({
                 <Field data-invalid={item.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="question-label">
                     Question
-                    <span aria-hidden className="ml-0.5 text-destructive">
-                      *
-                    </span>
+                    <RequiredMark />
                   </FieldLabel>
                   <Input
                     id="question-label"
@@ -407,6 +432,35 @@ export function QuestionDialog({
                           {item.state.value === "file" ? (
                             <FieldDescription>It goes in the documents, with the other uploads.</FieldDescription>
                           ) : null}
+                          {item.state.value === "signature" ? (
+                            <FieldDescription>
+                              Write what homeowners sign as the question; they sign by typing their name.
+                            </FieldDescription>
+                          ) : null}
+                          {item.state.value === "contact" ? (
+                            <FieldDescription>Homeowners give a name, a phone and an email.</FieldDescription>
+                          ) : null}
+                          {item.state.value === "contact" ? (
+                            <form.Field name="isBusiness">
+                              {(business) => (
+                                <Field orientation="horizontal" className="mt-1">
+                                  <Checkbox
+                                    id="question-business"
+                                    checked={business.state.value}
+                                    onCheckedChange={(checked) => business.handleChange(checked)}
+                                  />
+                                  <FieldContent>
+                                    <FieldLabel htmlFor="question-business" className="font-normal">
+                                      A business, such as a contractor
+                                    </FieldLabel>
+                                    <FieldDescription>
+                                      Also asks for its company name and, if it has one, its website.
+                                    </FieldDescription>
+                                  </FieldContent>
+                                </Field>
+                              )}
+                            </form.Field>
+                          ) : null}
                           {field &&
                           item.state.value !== field.kind &&
                           (field.kind === "choice" || field.kind === "choices" || field.kind === "number") ? (
@@ -466,6 +520,27 @@ export function QuestionDialog({
                         )}
                       </form.Field>
                     ) : null}
+                    {isOwn && answerType === "fee" ? (
+                      <form.Field name="fee">
+                        {(item) => (
+                          <Field data-invalid={item.state.meta.errors.length > 0}>
+                            <FieldLabel htmlFor="question-fee">Amount</FieldLabel>
+                            <Input
+                              id="question-fee"
+                              inputMode="decimal"
+                              className="max-w-40"
+                              placeholder="$0.00"
+                              value={item.state.value}
+                              onBlur={item.handleBlur}
+                              onChange={(event) => item.handleChange(event.target.value)}
+                              aria-invalid={item.state.meta.errors.length > 0}
+                            />
+                            <FieldDescription>Say how to pay in the help.</FieldDescription>
+                            <FieldError errors={item.state.meta.errors} />
+                          </Field>
+                        )}
+                      </form.Field>
+                    ) : null}
                     {answerType === "text" || answerType === "long-text" ? (
                       <form.Field name="example">
                         {(item) => (
@@ -497,11 +572,37 @@ export function QuestionDialog({
                     onCheckedChange={(checked) => item.handleChange(checked)}
                   />
                   <FieldLabel htmlFor="question-required" className="font-normal">
-                    Homeowners must answer it
+                    Answer is required
                   </FieldLabel>
                 </Field>
               )}
             </form.Field>
+            <form.Subscribe selector={(state) => state.values.subject}>
+              {(subject) => {
+                const section = itemOf(editing?.subject ?? subject)
+                return section ? (
+                  <form.Field name="isShared">
+                    {(item) => (
+                      <Field orientation="horizontal">
+                        <Checkbox
+                          id="question-shared"
+                          checked={item.state.value}
+                          onCheckedChange={(checked) => item.handleChange(checked)}
+                        />
+                        <FieldContent>
+                          <FieldLabel htmlFor="question-shared" className="font-normal">
+                            Ask once for every {section.itemLabel.toLowerCase()}
+                          </FieldLabel>
+                          <FieldDescription>
+                            Homeowners answer it once, above the list, for all of them.
+                          </FieldDescription>
+                        </FieldContent>
+                      </Field>
+                    )}
+                  </form.Field>
+                ) : null
+              }}
+            </form.Subscribe>
             <form.Subscribe selector={(state) => state.values.answerType}>
               {(answerType) =>
                 field?.kind === "choice" && staysBound(answerType) ? (

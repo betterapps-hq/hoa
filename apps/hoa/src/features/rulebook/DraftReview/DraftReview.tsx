@@ -1,6 +1,7 @@
 import { ArrowLeftIcon, CheckCheckIcon, Trash2Icon } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
+import { match } from "ts-pattern"
 import { PageActions } from "@/components/PageActions/PageActions"
 import {
   AlertDialog,
@@ -18,12 +19,18 @@ import { CitationsOpenInSheet } from "@/features/documents/ReaderSheet/ReaderShe
 import type { JobFailure } from "@/jobs/job"
 import type { RulebookRecords } from "@/rulebook/assemble"
 import { coverageOf } from "@/rulebook/coverage"
+import type { RecordRef } from "@/rulebook/review"
 import { attempt } from "../attempt"
 import type { DraftChanges } from "../ChangesTab/ChangesTab"
 import { changeSummary } from "../RulebookPage/RulebookPage.utils"
 import { countOf } from "../rulebookRecords"
 import { RulebookWorkspace } from "../RulebookWorkspace/RulebookWorkspace"
-import { tabWork, workspaceTabs, type WorkspaceView } from "../RulebookWorkspace/RulebookWorkspace.utils"
+import {
+  tabWork,
+  workspaceTabs,
+  type WorkspaceTab,
+  type WorkspaceView
+} from "../RulebookWorkspace/RulebookWorkspace.utils"
 import { SkippedNotice } from "../SkippedNotice/SkippedNotice"
 import type { RulebookActions, RulebookSource } from "../useRulebookWorkspace"
 import { approvableRefs, draftProgress, skippedParts } from "./DraftReview.utils"
@@ -107,14 +114,21 @@ export function DraftReview({
     setIsBusy(true)
     const result = await attempt(() => actions.review(left.all, "approved", null), "Nothing was approved.")
     setIsBusy(false)
-    if (result) {
-      const [first] = result.skipped
-      toast.success(
-        first
-          ? `Approved ${numberFormat.format(result.updated)}. ${numberFormat.format(result.skipped.length)} still need you, such as one where: ${first.reasons[0] ?? ""}`
-          : `Approved ${numberFormat.format(result.updated)}.`
-      )
+    if (!result) {
+      return
     }
+    const [first] = result.skipped
+    if (!first) {
+      toast.success(`Approved ${numberFormat.format(result.updated)}.`)
+      return
+    }
+    // What couldn't be approved stays to review: open its tab, and say why so it can be fixed there.
+    setView((current) => ({ tab: tabOfRef(first.ref), filter: null, request: current.request + 1 }))
+    const count = result.skipped.length
+    toast.warning(
+      `Approved ${numberFormat.format(result.updated)}. ${countOf(count, "item", "items")} couldn't be and ${count === 1 ? "needs" : "need"} you: ${first.reasons[0] ?? ""}`,
+      { duration: 20_000 }
+    )
   }
   const leftWords = [
     left.rules.length > 0 ? countOf(left.rules.length, "rule", "rules") : null,
@@ -275,3 +289,12 @@ export function DraftReview({
 function listWords(words: string[]) {
   return new Intl.ListFormat("en-US", { style: "long", type: "conjunction" }).format(words)
 }
+
+/** The tab a record is reviewed in. */
+const tabOfRef = (ref: RecordRef): WorkspaceTab =>
+  match(ref)
+    .with({ type: "rule" }, () => "rules" as const)
+    .with({ type: "term" }, () => "terms" as const)
+    .with({ type: "settings" }, () => "settings" as const)
+    .with({ type: "provision" }, () => "coverage" as const)
+    .exhaustive()

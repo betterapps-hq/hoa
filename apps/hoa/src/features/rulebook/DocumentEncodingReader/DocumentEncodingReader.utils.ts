@@ -5,7 +5,7 @@ import { parseStatement } from "@/schema/statement"
 import type * as T from "@/schema/types"
 import { pluralOf } from "@/text/normalize"
 import type { Shown } from "./DocumentEncodingReader.piles"
-import { gridFit, type Box, type FindKind, type PilesLayout } from "./DocumentEncodingReader.piles"
+import { gridFit, type Box, type FindKind, type GridLayout, type PilesLayout } from "./DocumentEncodingReader.piles"
 
 // The picture of a build that reads along with it (encoding.md, UX, The build's progress): the document itself in a
 // window between two piles of finds, showing one thing at a time as the build's results name it. A term is marked where the document defines or first uses it; a passage is scanned and gets its
@@ -44,7 +44,8 @@ export type Verdict =
 
 /** One thing the reader shows. Its id stays the same as more results come in. */
 export type ReaderEvent =
-  | { kind: "term"; id: string; label: string; spot: WordSpot | null }
+  /** A term the documents define, or an entry the vocabulary adds for what the rules read (a kind, a detail, a value). */
+  | { kind: "term"; id: string; label: string; source: "definition" | "vocabulary"; spot: WordSpot | null }
   | { kind: "passage"; id: string; spot: Spot | null; verdict: Verdict }
   | {
       kind: "draft"
@@ -58,13 +59,17 @@ export type ReaderEvent =
       spot: Spot | null
     }
 
-const nothing: Shown = { terms: 0, rules: 0, drafted: 0 }
+const nothing: Shown = { terms: 0, vocabulary: 0, rules: 0, drafted: 0 }
+
+/** The pile a term goes to: the defined terms', or the vocabulary's. */
+export const termPile = (event: Extract<ReaderEvent, { kind: "term" }>): Exclude<FindKind, "rules"> =>
+  event.source === "definition" ? "terms" : "vocabulary"
 
 /** What an event adds to the piles: a term, the rules found in a passage, or a rule drafted for the first time. */
 export function findsOf(event: ReaderEvent): Shown {
   switch (event.kind) {
     case "term":
-      return { ...nothing, terms: 1 }
+      return { ...nothing, [termPile(event)]: 1 }
     case "passage":
       return { ...nothing, rules: event.verdict.kind === "rules" ? event.verdict.rules.length : 0 }
     case "draft":
@@ -76,6 +81,7 @@ export function countsOf(events: readonly ReaderEvent[]): Shown {
   return events.map(findsOf).reduce(
     (sum, finds) => ({
       terms: sum.terms + finds.terms,
+      vocabulary: sum.vocabulary + finds.vocabulary,
       rules: sum.rules + finds.rules,
       drafted: sum.drafted + finds.drafted
     }),
@@ -192,7 +198,8 @@ export function readerEvents(results: readonly BuildResult[], documents: readonl
             return []
           }
           terms.add(label)
-          return [{ kind: "term", id: `term:${label}`, label, spot: termSpot(label, documents) }]
+          const source = result.kind === "terms" ? "definition" : "vocabulary"
+          return [{ kind: "term", id: `term:${label}`, label, source, spot: termSpot(label, documents) }]
         })
       case "outlines":
         return newest.get(result.unitId) === result ? passageEvents(result, spots, definitions) : []
@@ -268,9 +275,11 @@ export function statementPieces(statement: string): StatementPiece[] {
 export const blankCount = (statement: string | null) =>
   statement === null ? 0 : statementPieces(statement).filter((piece) => piece.type === "blank").length
 
-/** Under this width the window takes the whole width, with the piles under it. */
-export const stackedBelow = 520
+/** Under this width the window takes the whole width, with the piles under it, so each side keeps room for its counts. */
+export const stackedBelow = 640
 const gap = 20
+/** Between the defined terms' grid and the vocabulary's. */
+const pileGap = 12
 /** The counts above each pile beside the window, and below each under it: a label, the count and what's drafted. */
 const header = 66
 const footer = 66
@@ -291,16 +300,43 @@ export type ReaderLayout = PilesLayout & {
 }
 
 /**
- * The picture at `width` for this many finds of each kind: the window in the middle with a pile on each side, terms to
- * the left and rules to the right, each under its count; or, on a phone, the window over the two piles, their counts
- * under them.
+ * How the left side's `width` splits between the defined terms, away from the window, and the vocabulary, beside it: in
+ * proportion to how many of each, so their piles rise alike, but neither under a third, so the vocabulary has its place
+ * before the build adds its entries.
+ */
+export function termWidths(width: number, counts: Record<FindKind, number>) {
+  const room = Math.max(0, width - pileGap)
+  const third = room / 3
+  const all = counts.terms + counts.vocabulary
+  const terms = all === 0 ? room / 2 : Math.min(2 * third, Math.max(third, (room * counts.terms) / all))
+  return { terms, vocabulary: room - terms }
+}
+
+/** The left side's two grids, `inner` its edge beside the window: the vocabulary's there, the defined terms' beyond. */
+function termGrids(inner: number, widths: { terms: number; vocabulary: number }, columns: Record<FindKind, number>) {
+  const terms: GridLayout = {
+    inner: inner - widths.vocabulary - pileGap,
+    side: -1,
+    columns: columns.terms
+  }
+  const vocabulary: GridLayout = { inner, side: -1, columns: columns.vocabulary }
+  return { terms, vocabulary }
+}
+
+/**
+ * The picture at `width` for this many finds of each kind: the window in the middle, the defined terms and the
+ * vocabulary to its left and the rules to its right, each under its count; or, on a phone, the window over the piles,
+ * their counts under them. The left side's counts sit at its two ends: the defined terms' on the outside, the
+ * vocabulary's beside the window.
  */
 export function readerLayout(width: number, counts: Record<FindKind, number>): ReaderLayout {
   if (width > 0 && width < stackedBelow) {
     const side = (width - gap) / 2
+    const widths = termWidths(side, counts)
     const gridTop = windowHeight + 16
-    const fit = gridFit(side, counts, stackedGrid)
+    const fit = gridFit({ ...widths, rules: side }, counts, stackedGrid)
     const gridBottom = gridTop + fit.height
+    const countBox = (x: number, boxWidth: number) => ({ x, y: gridBottom + 6, width: boxWidth, height: footer - 6 })
     return {
       width,
       height: gridBottom + footer,
@@ -309,18 +345,20 @@ export function readerLayout(width: number, counts: Record<FindKind, number>): R
       isStacked: true,
       window: { x: 0, y: 0, width, height: windowHeight },
       counts: {
-        terms: { x: 0, y: gridBottom + 6, width: side, height: footer - 6 },
-        rules: { x: side + gap, y: gridBottom + 6, width: side, height: footer - 6 }
+        terms: countBox(0, side / 2),
+        vocabulary: countBox(side / 2, side / 2),
+        rules: countBox(side + gap, side)
       },
       gridBottom,
-      terms: { inner: side, side: -1, columns: fit.columns },
-      rules: { inner: side + gap, side: 1, columns: fit.columns },
+      ...termGrids(side, widths, fit.columns),
+      rules: { inner: side + gap, side: 1, columns: fit.columns.rules },
       ceiling: 0
     }
   }
   const windowWidth = Math.min(340, Math.max(240, Math.round(width * 0.46)))
   const side = Math.max(0, (width - windowWidth - 2 * gap) / 2)
-  const fit = gridFit(side, counts, windowHeight - header)
+  const widths = termWidths(side, counts)
+  const fit = gridFit({ ...widths, rules: side }, counts, windowHeight - header)
   const gridBottom = header + fit.height
   return {
     width,
@@ -330,12 +368,13 @@ export function readerLayout(width: number, counts: Record<FindKind, number>): R
     isStacked: false,
     window: { x: side + gap, y: 0, width: windowWidth, height: windowHeight },
     counts: {
-      terms: { x: 0, y: 0, width: side, height: header },
+      terms: { x: 0, y: 0, width: side / 2, height: header },
+      vocabulary: { x: side / 2, y: 0, width: side / 2, height: header },
       rules: { x: width - side, y: 0, width: side, height: header }
     },
     gridBottom,
-    terms: { inner: side, side: -1, columns: fit.columns },
-    rules: { inner: width - side, side: 1, columns: fit.columns },
+    ...termGrids(side, widths, fit.columns),
+    rules: { inner: width - side, side: 1, columns: fit.columns.rules },
     ceiling: header - 4
   }
 }
@@ -391,7 +430,7 @@ export function beatPlan(event: ReaderEvent, speed = 1): { steps: BeatStep[]; le
       add(beatMs.move, { phase: "found", step: 1 }, beatMs.mark)
       add(
         beatMs.move + beatMs.mark,
-        { phase: "found", step: 1, launch: "terms" },
+        { phase: "found", step: 1, launch: termPile(event) },
         beatMs.term - beatMs.move - beatMs.mark
       )
       return { steps, length: ms(beatMs.term) }

@@ -35,7 +35,7 @@ const material: ProjectField = {
 /** A project type as an organization might define it: the work's own detail, a repeatable item and two documents. */
 export const gardenStructure: OfferedProjectType = {
   id: "type-1",
-  hoaId: "hoa",
+  organizationId: "hoa",
   label: "Garden structure",
   description: "Building or changing a structure in the yard.",
   status: "active",

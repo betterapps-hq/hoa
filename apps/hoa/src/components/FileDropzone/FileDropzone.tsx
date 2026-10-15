@@ -11,6 +11,7 @@ import {
   AttachmentTitle
 } from "@/components/ui/attachment"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { fileSizeText } from "@/lib/text"
 import { acceptedTypes, uploadHint, validateUpload, type UploadTarget } from "@/storage/uploadRules"
 import { FileTypeMedia } from "../FileTypeMedia/FileTypeMedia"
 
@@ -49,15 +50,6 @@ export type FileDropzoneProps = {
   /** "compact" fits in a row of actions: one line, a little padding. */
   size?: "default" | "compact"
   className?: string
-}
-
-const sizeFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 })
-
-function sizeText(bytes: number) {
-  if (bytes < 1024 * 1024) {
-    return `${sizeFormat.format(Math.max(bytes / 1024, 0.1))} KB`
-  }
-  return `${sizeFormat.format(bytes / (1024 * 1024))} MB`
 }
 
 /** Why a file was turned away, in the app's words. */
@@ -195,7 +187,7 @@ export function FileDropzone({
                 <FileTypeMedia fileName={item.file.name} mediaType={item.file.type} />
                 <AttachmentContent>
                   <AttachmentTitle title={item.file.name}>{item.file.name}</AttachmentTitle>
-                  <AttachmentDescription>{sizeText(item.file.size)}</AttachmentDescription>
+                  <AttachmentDescription>{fileSizeText(item.file.size)}</AttachmentDescription>
                 </AttachmentContent>
                 <AttachmentActions>
                   <AttachmentAction

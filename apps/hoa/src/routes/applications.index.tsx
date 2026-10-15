@@ -5,7 +5,6 @@ import { useRole } from "@/features/role/RoleProvider"
 
 export const Route = createFileRoute("/applications/")({
   staticData: { title: "Applications" },
-  head: () => ({ meta: [{ title: "Applications | HOA design review" }] }),
   loader: () => listApplications(),
   component: ApplicationsRoute
 })
@@ -13,11 +12,11 @@ export const Route = createFileRoute("/applications/")({
 function ApplicationsRoute() {
   const applications = Route.useLoaderData()
   const navigate = useNavigate()
-  const { role } = useRole()
+  const { doesWorkOf } = useRole()
   return (
     <ApplicationsPage
       applications={applications}
-      isCommittee={role.id === "administrator"}
+      isCommittee={doesWorkOf("architectural")}
       onOpen={(applicationId) => void navigate({ to: "/applications/$applicationId", params: { applicationId } })}
     />
   )

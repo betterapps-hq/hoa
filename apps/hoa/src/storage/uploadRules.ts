@@ -3,7 +3,7 @@
 const megabyte = 1024 * 1024
 const docxType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-export type UploadTarget = "governing" | "application"
+export type UploadTarget = "governing" | "application" | "template" | "photo"
 const uploadFormats = ["pdf", "docx", "image"] as const
 export type UploadFormat = (typeof uploadFormats)[number]
 
@@ -22,7 +22,11 @@ const formats: Record<
 
 const limits: Record<UploadTarget, Partial<Record<UploadFormat, number>>> = {
   governing: { pdf: 50 * megabyte, docx: 50 * megabyte },
-  application: { pdf: 25 * megabyte, docx: 25 * megabyte, image: 5 * megabyte }
+  application: { pdf: 25 * megabyte, docx: 25 * megabyte, image: 5 * megabyte },
+  /** A form a project type gives homeowners to fill in. */
+  template: { pdf: 10 * megabyte, docx: 10 * megabyte },
+  /** A violation's photo, as a phone takes it. */
+  photo: { image: 15 * megabyte }
 }
 
 /** The media types and extensions a target accepts, as a file picker's filter: { "application/pdf": [".pdf"] }. */
@@ -34,6 +38,17 @@ export function acceptedTypes(target: UploadTarget): Record<string, string[]> {
         formats[format].types.map((type) => [type, formats[format].extensions.map((extension) => `.${extension}`)])
       )
   )
+}
+
+/** A target's rules as UploadCN checks files: the types and extensions it takes, and the app's own check. */
+export function uploadValidation(target: UploadTarget) {
+  return {
+    accept: Object.entries(acceptedTypes(target)).flatMap(([type, extensions]) => [type, ...extensions]),
+    validate: (file: File) => {
+      const validation = validateUpload(file, target)
+      return validation.isValid ? null : validation.message
+    }
+  }
 }
 
 const formatNames: Record<UploadFormat, string> = { pdf: "PDF", docx: "Word", image: "JPEG or PNG" }
@@ -65,11 +80,11 @@ export function validateUpload(
   )
   const limit = format ? limits[target][format] : undefined
   if (!format || limit === undefined) {
-    const allowed = target === "governing" ? "PDF or Word" : "PDF, Word, JPEG or PNG"
-    const imageHint =
-      /^(heic|heif|tif|tiff|bmp|webp|gif)$/.test(extension) || file.type.startsWith("image/")
-        ? " Save photos as JPEG or PNG."
-        : ""
+    const allowed = target === "application" ? "PDF, Word, JPEG or PNG" : "PDF or Word"
+    const isImage = /^(heic|heif|tif|tiff|bmp|webp|gif|png|jpe?g)$/.test(extension) || file.type.startsWith("image/")
+    // Where photos are taken, say which; where they aren't, say what the file can be instead.
+    const photoHint = limits[target].image === undefined ? " Save it as a PDF." : " Save photos as JPEG or PNG."
+    const imageHint = isImage ? photoHint : ""
     return { isValid: false, message: `${file.name} isn't a ${allowed} file.${imageHint}` }
   }
   if (file.size > limit) {

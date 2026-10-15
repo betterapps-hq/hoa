@@ -22,7 +22,12 @@ export const suggestionAnswerSchema = z.object({
           property: z.string().describe("A property key listed under that subject."),
           label: z.string(),
           help: z.string().nullable(),
-          isRequired: z.boolean()
+          isRequired: z.boolean(),
+          isShared: z
+            .boolean()
+            .describe(
+              "For a subject a project can have several of: true when one answer usually holds for all of them."
+            )
         })
       ),
       documents: z.array(z.object({ documentType: z.string(), label: z.string() })),
@@ -137,16 +142,22 @@ export function checkSuggestions(
     const subjects = [...new Set(suggestion.subjects.filter((key) => subjectKeys.has(key)))]
     const built = buildDefinition(rulesFile, requestType, subjects, on)
     const chosen = new Map(suggestion.fields.map((field) => [`${field.subject} ${field.property}`, field]))
+    // A pick names a field by its key ("fence-run.height") or, as models often write it, without its subject's prefix
+    // ("height" under "fence-run"); otherwise none of its picks bind and the subject's whole form stands in.
+    const pickOf = (subject: string, property: string) =>
+      chosen.get(`${subject} ${property}`) ??
+      (property.startsWith(`${subject}.`) ? chosen.get(`${subject} ${property.slice(subject.length + 1)}`) : undefined)
     const groups = built.groups.map((group) => {
       const picked = group.fields.flatMap((field) => {
-        const pick = chosen.get(`${group.subject} ${field.property}`)
+        const pick = pickOf(group.subject, field.property)
         return pick
           ? [
               {
                 ...field,
                 label: pick.label.trim() || field.label,
                 help: pick.help?.trim() || field.help,
-                isRequired: pick.isRequired
+                isRequired: pick.isRequired,
+                ...(group.isRepeatable && pick.isShared ? { isShared: true } : {})
               }
             ]
           : []

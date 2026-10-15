@@ -13,6 +13,9 @@ type EventApplication = Pick<Application, "id" | "description"> & { projectTypeL
 /** A governing document upload as its events name it. */
 type EventDocument = { id: string; title: string; version: number }
 
+/** A violation as its events name it: what it is, and at which unit. */
+type EventViolation = { id: string; title: string; unit: string }
+
 /** Something that happened in one of the HOA's areas. */
 export type ActivityEvent = {
   /** Unique among the events. */
@@ -27,6 +30,12 @@ export type ActivityEvent = {
   | { type: "rulebook-published"; version: number }
   | { type: "documents-added"; documents: EventDocument[] }
   | { type: "documents-removed"; documents: EventDocument[] }
+  | { type: "payment-recorded"; unit: { id: string; label: string }; amountCents: number; method: string | null }
+  | { type: "dues-posted"; name: string; dueOn: string; units: number; totalCents: number }
+  | { type: "violation-reported"; violation: EventViolation }
+  | { type: "violation-noticed"; violation: EventViolation }
+  | { type: "violation-sanctioned"; violation: EventViolation; sanction: string; amountCents: number | null }
+  | { type: "violation-cured"; violation: EventViolation }
 )
 
 /** The area each kind of event belongs to; a new kind names its area here, or it doesn't compile. */
@@ -36,7 +45,13 @@ const eventAreas = {
   "project-type-added": "architectural-review",
   "rulebook-published": "rulebook",
   "documents-added": "rulebook",
-  "documents-removed": "rulebook"
+  "documents-removed": "rulebook",
+  "payment-recorded": "money",
+  "dues-posted": "money",
+  "violation-reported": "violations",
+  "violation-noticed": "violations",
+  "violation-sanctioned": "violations",
+  "violation-cured": "violations"
 } as const satisfies Record<ActivityEvent["type"], AreaId>
 
 /** The area of the HOA an event happened in. */
@@ -63,6 +78,27 @@ export type ActivitySources = {
   rulebooks: readonly { id: string; version: number | null; publishedBy: string | null; publishedAt: string | null }[]
   /** Every governing document upload, removed ones too. */
   documents: readonly DocumentUpload[]
+  /** Payments posted to the units the reader sees, by check, cash or online. */
+  payments: readonly {
+    id: string
+    unit: { id: string; label: string }
+    amountCents: number
+    method: string | null
+    createdBy: string
+    createdAt: string
+  }[]
+  /** Each dues schedule's charges for a due day, posted together by the daily job. */
+  duesPostings: readonly { id: string; name: string; dueOn: string; units: number; totalCents: number; at: string }[]
+  /** The steps of the violations the reader sees that are news to them. */
+  violationSteps: readonly {
+    id: string
+    kind: "reported" | "notice" | "sanction" | "cured"
+    violation: EventViolation
+    sanction: string | null
+    amountCents: number | null
+    recordedBy: string
+    at: string
+  }[]
   /** A person's name, from the user id a record keeps. */
   nameOf: (userId: string) => string
 }
@@ -100,7 +136,24 @@ export function recentActivity(sources: ActivitySources, limit = 8): ActivityEve
             }
           ]
     ),
-    ...documentEvents(sources.documents, byName)
+    ...documentEvents(sources.documents, byName),
+    ...sources.payments.map((payment): ActivityEvent => ({
+      id: `payment-recorded:${payment.id}`,
+      at: payment.createdAt,
+      by: byName(payment.createdBy),
+      type: "payment-recorded",
+      unit: payment.unit,
+      amountCents: payment.amountCents,
+      method: payment.method
+    })),
+    ...sources.duesPostings.map(({ id, at, ...posting }): ActivityEvent => ({
+      id: `dues-posted:${id}`,
+      at,
+      by: null,
+      type: "dues-posted",
+      ...posting
+    })),
+    ...sources.violationSteps.map((step) => violationEvent(step, byName))
   ]
     .toSorted(newestFirst)
     .slice(0, limit)
@@ -133,6 +186,30 @@ function applicationEvents(application: ActivitySources["applications"][number],
     })
   }
   return events
+}
+
+function violationEvent(step: ActivitySources["violationSteps"][number], byName: Namer): ActivityEvent {
+  const common = {
+    id: `violation-${step.kind}:${step.id}`,
+    at: step.at,
+    by: byName(step.recordedBy),
+    violation: step.violation
+  }
+  switch (step.kind) {
+    case "reported":
+      return { ...common, type: "violation-reported" }
+    case "notice":
+      return { ...common, type: "violation-noticed" }
+    case "cured":
+      return { ...common, type: "violation-cured" }
+    case "sanction":
+      return {
+        ...common,
+        type: "violation-sanctioned",
+        sanction: step.sanction ?? "sanction",
+        amountCents: step.amountCents
+      }
+  }
 }
 
 type DocumentHappening = { at: string; by: string | null; document: EventDocument }

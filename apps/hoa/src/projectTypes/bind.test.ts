@@ -80,6 +80,13 @@ describe("bindDefinition, by citations", () => {
     expect(bound(none)[0]?.binding).toBeNull()
   })
 
+  it("keeps a bound question asked once for every item, as the administrator set it", () => {
+    expect(bound({ ...placement, isShared: true }, { ...lit, label: "Lit", isShared: false })).toMatchObject([
+      { binding: "widget.placement", isShared: true },
+      { binding: "widget.lit", isShared: false }
+    ])
+  })
+
   it("picks the detail closest to the question's wording when several fit, and never one another question answers", () => {
     const question = own("How deep is it?", ["doc:1"], { ...length, label: "How much depth does it have?" })
     expect(bound(question)[0]?.binding).toBe("widget.depth")
@@ -101,5 +108,30 @@ describe("bindDefinition, by citations", () => {
     const asText = { ...base, property: "widget.lit", binding: null, label: "Is it lit?", citations: ["doc:3"] }
     expect(bound({ ...asText, kind: "text" })[0]?.binding).toBeNull()
     expect(bound({ ...asText, kind: "yes-no" })[0]?.binding).toBe("widget.lit")
+  })
+})
+
+describe("bindDefinition, documents", () => {
+  it("keeps a rule document's template, as the administrator attached it", () => {
+    const plan = {
+      documentType: "plan",
+      label: "Plan",
+      mustShow: ["the widget"],
+      ruleKeys: ["widget-plan"],
+      isRequired: true,
+      citations: [],
+      accepts: null
+    }
+    const template = {
+      id: "00000000-0000-4000-8000-000000000001",
+      fileName: "plan.docx",
+      mediaType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      sizeBytes: 10
+    }
+    const rebound = bindDefinition(
+      { ...built, documents: [{ ...plan, label: "Widget plan", template }] },
+      { ...built, documents: [plan] }
+    )
+    expect(rebound.documents).toEqual([{ ...plan, label: "Widget plan", template }])
   })
 })

@@ -38,7 +38,7 @@ and every Workflow step name starts with it.
 | 12 | Review | | Approved, edited and rejected records | Administrator |
 | 13 | Publish | | The rules file in R2, with its hash | Code, in a server function |
 
-Model results are cached per organization (`hoas/{hoaId}/cache/{stage}/{hash}.json`), so rebuilding after one
+Model results are cached per organization (`hoas/{organizationId}/cache/{stage}/{hash}.json`), so rebuilding after one
 document changes only pays for the calls whose prompt changed.
 
 The stages are one module, `buildRulebook` ([src/encoding/build.ts](../../src/encoding/build.ts)), with its step runner,
@@ -256,10 +256,10 @@ The partial unique indexes (one `building`, one `draft` rulebook per organizatio
 
 | Key | Contents |
 | --- | --- |
-| `hoas/{hoaId}/governing/{documentId}/…` | Source, OCR, pages, layout, figures |
-| `hoas/{hoaId}/rulebooks/{rulebookId}/rules.json` | The published rules file, immutable |
-| `hoas/{hoaId}/jobs/{jobId}/{stage}/{itemId}.json` | Every build step's output, by step name: `structure/{documentId}`, `find-rules/{unitId}`, `find-rules/{unitId}:rerun`, `structure-rules/{batchId}:retry-{round}`, and `{stage}/result` for steps without an item (`plan`, `merge`, `consolidate`) |
-| `hoas/{hoaId}/cache/{stage}/{hash}.json` | Model results |
+| `hoas/{organizationId}/governing/{documentId}/…` | Source, OCR, pages, layout, figures |
+| `hoas/{organizationId}/rulebooks/{rulebookId}/rules.json` | The published rules file, immutable |
+| `hoas/{organizationId}/jobs/{jobId}/{stage}/{itemId}.json` | Every build step's output, by step name: `structure/{documentId}`, `find-rules/{unitId}`, `find-rules/{unitId}:rerun`, `structure-rules/{batchId}:retry-{round}`, and `{stage}/result` for steps without an item (`plan`, `merge`, `consolidate`) |
+| `hoas/{organizationId}/cache/{stage}/{hash}.json` | Model results |
 
 A review records the rulebook id and the file's SHA-256, so it can always be reproduced against the exact file.
 
@@ -317,7 +317,11 @@ rules, 35–50 min left").
 **Counts as they arrive.** The steps say only where the build is: the current one has a spinner, and none counts what
 it found or the parts the build divides its work into (documents, sections, groups of sections, batches of rules).
 What the build finds belongs to the reader above the steps (`DocumentEncodingReader`, in `ProcessingStatus`), which
-shows each term, rule and draft in the document as it arrives and counts them. Its results come from
+shows each term, rule and draft in the document as it arrives and counts them, in three piles of dots: the terms the
+documents define (green, as the coverage tab shows the passages that define them) on the outside of the left side,
+the vocabulary's entries (vermilion; no passage holds an entry, so the coverage tab never shows them) beside the
+window, and the rules (blue, open when found and filled once drafted) to its right. Each pile's count sits over it, the
+two on the left at that side's two ends. Its results come from
 `getBuildResults` (administrators, the organization's own builds), which lists the build's step outputs in R2 and reads
 only those written since the page's cursor, polled every four seconds; its documents from `getBuildDocuments`, the
 structure step's output with each document's title, asked for every four seconds until the step has written it and
@@ -337,8 +341,9 @@ leads with the way back to the rules in force, one sentence on what the draft is
 that nothing is published yet), a bar of how much is decided and a sentence that says it ("2 of 292 decided."). Its
 page actions are **Publish** and, in the menu, **Approve everything left** and **Discard draft**. Approve everything
 left first says what it approves in counts (rules, terms, the settings and reasons for having no rule) and that
-anything with a problem, or that's a reading of an open question, stays to review with why; questions still need
-answers. Discard's confirmation says how many review decisions are lost and that the published version stays in
+anything with a problem, or that's a reading of an open question, stays to review; questions still need answers.
+When something stays, the page opens the tab it's in and a warning says how many and why, such as a passage that a
+rule already cites keeping a reason for having no rule. Discard's confirmation says how many review decisions are lost and that the published version stays in
 force. When the build
 that made the draft skipped items (a rule that still failed its checks, a section a call never answered), a notice
 ("4 parts weren't finished") shows the same steps the progress did, each done or, where it skipped something, with a
@@ -416,7 +421,9 @@ list is ordered by relevance; without, in its usual order. The other filters sti
 - **Questions:** the open questions one at a time (shadcn's Questionnaire, "Question 1 of 4"), each with its citations
   and readings, each reading naming the rules it keeps. Choosing a reading and moving on saves the answer; Skip leaves
   the question open, and finishing brings back the skipped ones as one line to answer later. Answered questions
-  follow, each with its chosen reading and a way to change it.
+  follow, each with a way to change it: the chosen reading outlined with a check and "Your answer", its rules and
+  the reason given; the others dashed and marked "Not chosen", saying their rules are left out of the rulebook rather
+  than naming rules that no longer exist.
 - **Settings:** the review, then each clause as a card that says what it's for, a small form in plain words and the
   passages it comes from, when the documents state it. Which document wins is a tier list: each rank (1st, 2nd) a row of
   the documents equal in it; a document is dragged by its handle onto another rank to rank equal (before or after a chosen document there), or into a gap to

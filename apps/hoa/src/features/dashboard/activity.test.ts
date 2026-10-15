@@ -8,6 +8,9 @@ const none: ActivitySources = {
   projectTypes: [],
   rulebooks: [],
   documents: [],
+  payments: [],
+  duesPostings: [],
+  violationSteps: [],
   nameOf: (userId) => people[userId] ?? userId
 }
 

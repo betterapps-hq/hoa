@@ -17,7 +17,7 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import { cn } from "cn"
 import { GripVerticalIcon } from "lucide-react"
-import type { ReactNode } from "react"
+import { useId, type ReactNode } from "react"
 import { movedText } from "@/projectTypes/definition"
 
 // A list the administrator reorders by dragging an item's handle, with the mouse, touch, or the keyboard (focus the
@@ -97,6 +97,8 @@ export function SortableList<Item>({
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
+  // dnd-kit numbers its described-by ids per page load; React's id is the same on the server and in the browser.
+  const id = useId()
   const ids = items.map(getId)
   const indexOf = (id: UniqueIdentifier) => ids.indexOf(String(id))
   const nameOf = (id: UniqueIdentifier) => {
@@ -119,6 +121,7 @@ export function SortableList<Item>({
   }
   return (
     <DndContext
+      id={id}
       sensors={sensors}
       collisionDetection={closestCenter}
       accessibility={{ announcements, screenReaderInstructions: { draggable: instructions } }}

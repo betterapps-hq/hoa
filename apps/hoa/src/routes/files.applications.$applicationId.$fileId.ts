@@ -19,16 +19,17 @@ export const Route = createFileRoute("/files/applications/$applicationId/$fileId
       GET: async ({ request, params }) => {
         const context = await getRequestContext()
         const db = getDb()
-        const application = await getApplication(db, context.hoa.id, params.applicationId)
+        const application = await getApplication(db, context.organization.id, params.applicationId)
         const canRead =
           application !== null &&
           canSee(application, { userId: context.user.id, isCommittee: context.role === "administrator" })
-        const file = application && canRead ? await getApplicationFile(db, context.hoa.id, params.fileId) : null
+        const file =
+          application && canRead ? await getApplicationFile(db, context.organization.id, params.fileId) : null
         if (!application || file?.applicationId !== application.id || file.status === "uploading") {
           return new Response("Not found", { status: 404 })
         }
         const object = await getBucket().get(
-          applicationKeys(context.hoa.id, application.id).source(file.id, file.fileName)
+          applicationKeys(context.organization.id, application.id).source(file.id, file.fileName)
         )
         if (!object) {
           return new Response("Not found", { status: 404 })

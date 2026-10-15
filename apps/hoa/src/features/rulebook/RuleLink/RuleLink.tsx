@@ -11,7 +11,8 @@ export function RuleLink({ ruleKey }: RuleLinkProps) {
   const { records, citations, source, openRule } = useRulebookWorkspace()
   const rule = records.rules.find((item) => item.key === ruleKey)
   if (!rule) {
-    return <span className="font-mono text-xs text-muted-foreground">{ruleKey} (not in this rulebook)</span>
+    // A rule rejected or replaced since: it has no card to open, so it reads as such rather than as its key.
+    return <span className="text-muted-foreground">A rule this version leaves out</span>
   }
   return (
     <RuleReference

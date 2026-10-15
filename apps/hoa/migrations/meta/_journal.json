@@ -78,6 +78,76 @@
       "when": 1791857771989,
       "tag": "0010_activity_actors",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1791940089835,
+      "tag": "0011_people",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1791943609591,
+      "tag": "0012_auth_safeguards",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1791946582115,
+      "tag": "0013_organizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1791957759303,
+      "tag": "0014_unit_addresses",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1791961159115,
+      "tag": "0015_seat_terms",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1791963900897,
+      "tag": "0016_organization_addresses",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1791980497945,
+      "tag": "0017_violations",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1791982867815,
+      "tag": "0018_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1791983701099,
+      "tag": "0019_assessment_schedules",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1791984039325,
+      "tag": "0020_mailing_addresses",
+      "breakpoints": true
     }
   ]
 }

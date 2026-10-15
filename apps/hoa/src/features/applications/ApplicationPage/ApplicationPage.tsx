@@ -1,4 +1,6 @@
 import { useForm } from "@tanstack/react-form"
+import type { Uploader } from "@uploadcn/core"
+import { useUploadProgress } from "@uploadcn/react"
 import { ArrowLeftIcon, RotateCwIcon, SendIcon, Trash2Icon } from "lucide-react"
 import { useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
@@ -10,7 +12,7 @@ import {
   type ApplicationFile,
   type ApplicationStatus
 } from "@/applications/application"
-import { FileDropzone } from "@/components/FileDropzone/FileDropzone"
+import { FileUpload, useFileUploader } from "@/components/FileUpload/FileUpload"
 import { PageActions, type PageAction } from "@/components/PageActions/PageActions"
 import type { RowAction } from "@/components/RowActions/RowActions"
 import { SaveStatus } from "@/components/SaveStatus/SaveStatus"
@@ -46,6 +48,7 @@ import { CitationsOpenInSheet } from "@/features/documents/ReaderSheet/ReaderShe
 import { JobProgress } from "@/features/jobs/JobProgress/JobProgress"
 import { useAutosave } from "@/hooks/useAutosave"
 import type { Job } from "@/jobs/job"
+import { sentenceCase } from "@/lib/text"
 import { cn } from "@/lib/utils"
 import { answersSchema } from "@/projectTypes/answers"
 import { hasOpenRequests, type Review } from "@/review/reviewModel"
@@ -67,12 +70,13 @@ import { createReviewContext, ruleName, type ReviewAudience } from "../reviewCon
 import { ReviewReport, type ReportTab } from "../ReviewReport/ReviewReport"
 import { verdictTones } from "../ReviewVerdict/ReviewVerdict"
 import { decisionTones, suggestedDecisions } from "../ReviewVerdict/ReviewVerdict.utils"
+import { applicationAdapter, type ApplicationUploadApi } from "../uploadApplicationFiles"
 
 export type ApplicationActions = {
   /** Keeps what the homeowner has written so far. */
   save: (content: DraftContent) => Promise<void>
-  /** Uploads files, each with what it was guessed to be. */
-  upload: (files: File[], uploadedAs: ReadonlyMap<File, string>) => Promise<void>
+  /** How the application's files upload. */
+  uploads: ApplicationUploadApi
   /** Says what a file is: one of the project type's documents, other, or nothing yet (null). */
   setUploadedAs: (fileId: string, uploadedAs: string | null) => Promise<void>
   removeFile: (fileId: string) => Promise<void>
@@ -255,20 +259,20 @@ function DecisionForm({ review, ruleTitle, onDecide }: DecisionFormProps) {
 
 type AddFilesProps = {
   id: string
+  uploader: Uploader<{ fileId: string }>
   size?: "default" | "compact"
   disabled: boolean
-  onAdd: (files: File[]) => void
 }
 
 /** Takes files by drop or browse, and they upload to the application. Files it can't take are named with why. */
-function AddFiles({ id, size = "default", disabled, onAdd }: AddFilesProps) {
+function AddFiles({ id, uploader, size = "default", disabled }: AddFilesProps) {
   return (
-    <FileDropzone
+    <FileUpload
       id={id}
+      uploader={uploader}
       target="application"
       size={size}
       disabled={disabled}
-      onFiles={onAdd}
       prompt={size === "compact" ? "Add files" : undefined}
       className="w-full"
     />
@@ -316,6 +320,32 @@ function ApplicationHeader({ view }: HeaderProps) {
   )
 }
 
+/** How many of a newer rulebook's changed rules the card names before saying how many more there are. */
+const namedChanges = 3
+
+/** A newer rulebook changed rules the review applied: which, and that the review must run again before submitting. */
+function RulesChangedCard({ update }: { update: NonNullable<ApplicationView["rulesUpdate"]> }) {
+  const titles = [...new Set(update.changes.map((change) => change.title))]
+  const named = titles.slice(0, namedChanges)
+  const rest = titles.length - named.length
+  const which = update.version ? `Version ${update.version} of the rulebook` : "A newer rulebook"
+  const when = update.publishedAt ? `, published ${dateFormat.format(new Date(update.publishedAt))},` : ""
+  const count = titles.length === 1 ? "a rule" : `${titles.length} rules`
+  return (
+    <NextCard
+      title="The rules changed"
+      description={`${which}${when} changes ${count} your review applied. Run the review again to check your project against the rules now in force, then submit it.`}
+    >
+      <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-muted-foreground">
+        {named.map((title) => (
+          <li key={title}>{sentenceCase(title)}</li>
+        ))}
+        {rest > 0 ? <li>{rest === 1 ? "1 more" : `${rest} more`}</li> : null}
+      </ul>
+    </NextCard>
+  )
+}
+
 /** The application's facts beside the review: its kind, its dates and its files. */
 function ApplicationDetails({ view }: HeaderProps) {
   const { application, review } = view
@@ -329,6 +359,13 @@ function ApplicationDetails({ view }: HeaderProps) {
   }
   if (review) {
     rows.push({ term: "Reviewed", value: `${date(review.createdAt)}${review.provisional ? ", provisional" : ""}` })
+  }
+  // The rulebook the review read; an application keeps it once submitted, even after a newer one is published.
+  if (view.reviewRulebook?.version) {
+    rows.push({
+      term: "Rulebook",
+      value: `Version ${view.reviewRulebook.version}${view.reviewRulebook.isInForce ? "" : ", since replaced"}`
+    })
   }
   if (application.decision) {
     rows.push({ term: "Decided", value: date(application.decision.decidedAt) })
@@ -428,7 +465,10 @@ export function ApplicationPage({
   const files = packetFiles(view.files)
   const fileCount = files.length
   const isReviewing = application.status === "reviewing"
-  const isStale = review !== null && (!reviewCoversLatest(application, review) || changedUnder === review.id)
+  // Out of date when the homeowner changed something since, or a newer rulebook changes the rules it applied.
+  const isStale =
+    review !== null &&
+    (!reviewCoversLatest(application, review) || changedUnder === review.id || view.rulesUpdate !== null)
   const canSubmit =
     view.isOwner &&
     review !== null &&
@@ -449,20 +489,22 @@ export function ApplicationPage({
     changed()
     draft.update(() => next)
   }
-  const addFiles = (added: File[]) =>
-    void busy(async () => {
-      // Each file starts as what its name says, where that's clear and its format suits.
-      const uploadedAs = new Map<File, string>()
-      for (const file of added) {
-        const guess = kinds ? guessKind(file.name, kinds) : ""
-        if (guess && !kindProblem(file, definition, guess)) {
-          uploadedAs.set(file, guess)
-        }
-      }
+  // Each file starts as what its name says, where that's clear and its format suits.
+  const adapter = applicationAdapter(actions.uploads, application.id, (file) => {
+    const guess = kinds ? guessKind(file.name, kinds) : ""
+    return guess && !kindProblem(file, definition, guess) ? guess : null
+  })
+  const uploader = useFileUploader("application", {
+    adapter,
+    onAdd: () => setFilesError(null),
+    // A stored file changes the application and joins the packet, which lists it from then on.
+    onSuccess: (item) => {
       changed()
-      setFilesError(null)
-      await actions.upload(added, uploadedAs)
-    }, "The files didn't upload.")
+      uploader.remove(item.id)
+      onChanged()
+    }
+  })
+  const { isUploading } = useUploadProgress(uploader)
   const chooseKind = async (file: ApplicationFile, kind: string | null) => {
     const problem = kind
       ? kindProblem({ name: file.fileName, type: file.mediaType, size: file.sizeBytes }, definition, kind)
@@ -497,7 +539,7 @@ export function ApplicationPage({
       setFilesError("Add your application packet.")
       return "Add your application packet first."
     }
-    if (files.some(({ file }) => file.status === "uploading")) {
+    if (isUploading || files.some(({ file }) => file.status === "uploading")) {
       return "Wait for every file to finish uploading."
     }
     return null
@@ -601,14 +643,15 @@ export function ApplicationPage({
   const documents = definition?.documents ?? []
   const filesSection = view.canEdit ? (
     <div className="flex flex-col gap-4">
-      {documents.length > 0 ? (
+      {documents.length > 0 && application.projectTypeId ? (
         <DocumentChecklist
+          projectTypeId={application.projectTypeId}
           documents={documents}
           files={files.map(({ file }) => ({ name: file.fileName, kind: file.uploadedAs }))}
         />
       ) : null}
       {packet}
-      <AddFiles id="add-files" size={fileCount > 0 ? "compact" : "default"} disabled={isBusy} onAdd={addFiles} />
+      <AddFiles id="add-files" uploader={uploader} size={fileCount > 0 ? "compact" : "default"} disabled={isBusy} />
       {filesError ? <FieldError>{filesError}</FieldError> : null}
     </div>
   ) : (
@@ -626,6 +669,9 @@ export function ApplicationPage({
           description="Your draft is saved as you go, so you can leave and come back. When it’s ready, run the review: it checks your project against the rules, so you can fix anything before you submit it to the committee."
         />
       )
+    }
+    if (view.rulesUpdate) {
+      return <RulesChangedCard update={view.rulesUpdate} />
     }
     if (isStale) {
       return (
@@ -646,9 +692,9 @@ export function ApplicationPage({
       >
         <AddFiles
           id="add-missing-files"
+          uploader={uploader}
           size={isSubmitFirst ? "compact" : "default"}
           disabled={isBusy}
-          onAdd={addFiles}
         />
       </NextCard>
     )

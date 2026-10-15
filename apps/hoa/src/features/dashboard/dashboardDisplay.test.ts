@@ -12,6 +12,7 @@ import {
   eventLine,
   homeownerAttentionLine,
   homeownerRulebookText,
+  moneyStandingText,
   nextStepText,
   recommendationText,
   reviewStandingText,
@@ -20,11 +21,26 @@ import {
   standingText,
   waitedText,
   waitingOnHomeowner,
+  violationsStandingText,
   waitingSince,
-  yourApplicationsText
+  yourApplicationsText,
+  yourMoneyText,
+  yourViolationsText
 } from "./dashboardDisplay"
+import type { HomeOverview, MoneyOverview, ViolationItem } from "./overview"
 
 const asOf = "2026-10-09T12:00:00.000Z"
+
+/** A violation at 31 Fir Court, seen Sep 30, with whatever the test overrides. */
+const violation = (overrides: Partial<ViolationItem>): ViolationItem => ({
+  id: "boat",
+  title: "A boat in the driveway",
+  unit: "31 Fir Court",
+  observedOn: "2026-09-30",
+  nextStep: null,
+  hearingOn: null,
+  ...overrides
+})
 const reviewed = (recommendation: "approve" | "deny" | "request-information") => [
   { recommendation, createdAt: "2026-10-03T10:00:00.000Z" }
 ]
@@ -49,6 +65,11 @@ describe("nextStepText", () => {
     })
     expect(nextStepText(changed)).toBe("You changed it after the review. Run the review again, then submit it.")
     expect(standingText(changed)).toBe("Draft")
+  })
+
+  it("asks for the review again once a newer rulebook changes the rules it applied", () => {
+    const outdated = application({ status: "reviewed", reviews: reviewed("approve"), rulesChanged: true })
+    expect(nextStepText(outdated)).toBe("The rules changed since your review. Run the review again, then submit it.")
   })
 
   it("asks for what the review's action items ask for", () => {
@@ -147,7 +168,7 @@ describe("grouping", () => {
       note: "Send a paint chip. Asked 2 days ago."
     })
     const summary = {
-      hoaName: "Sample Ridge HOA",
+      organizationName: "Sample Ridge HOA",
       publishedVersion: 3,
       publishedAt: "2026-10-07T12:00:00.000Z",
       ruleCount: 42,
@@ -194,7 +215,11 @@ describe("attention", () => {
       ],
       nextRulebook: { status: "draft", createdAt: "2026-10-01T00:00:00.000Z", rulesToReview: 1, openQuestions: 2 },
       projectTypesToUpdate: 2,
-      publishedAt: "2026-10-05T00:00:00.000Z"
+      publishedAt: "2026-10-05T00:00:00.000Z",
+      violations: [],
+      money: null,
+      dues: null,
+      asOf
     })
 
     expect(items.map((item) => [item.id, item.area])).toEqual([
@@ -212,13 +237,65 @@ describe("attention", () => {
   })
 
   it("leaves out what doesn't need the committee: a rulebook being built, project types up to date", () => {
-    const quiet = { applications: [], projectTypesToUpdate: 0, publishedAt: "2026-10-05T00:00:00.000Z" }
+    const quiet = {
+      applications: [],
+      projectTypesToUpdate: 0,
+      publishedAt: "2026-10-05T00:00:00.000Z",
+      violations: [],
+      money: null,
+      dues: null,
+      asOf
+    }
     expect(attentionItems({ ...quiet, nextRulebook: { status: "building" } })).toEqual([])
     const [ready] = attentionItems({
       ...quiet,
       nextRulebook: { status: "draft", createdAt: asOf, rulesToReview: 0, openQuestions: 0 }
     })
     expect(attentionLine(ready!).note).toBe("Ready to publish.")
+  })
+
+  it("lists violations waiting on the board, units past due, and dues not set up", () => {
+    const money: MoneyOverview = {
+      owedCents: 44_500,
+      owingUnits: 1,
+      unitCount: 3,
+      pastDueCents: 2500,
+      pastDueUnits: 1,
+      pastDueSince: "2026-09-14",
+      aging: { current: 42_000, late30: 2500, late60: 0, late90: 0, over90: 0 },
+      months: [],
+      largest: []
+    }
+    const items = attentionItems({
+      applications: [],
+      nextRulebook: null,
+      projectTypesToUpdate: 0,
+      publishedAt: null,
+      violations: [
+        violation({ id: "boat", nextStep: { step: "notice", text: "Send the notice", on: null, waitsOn: "board" } }),
+        violation({
+          id: "fence",
+          nextStep: { step: "cure", text: "Time to cure ends Nov 3, 2026", on: "2026-11-03", waitsOn: "owner" }
+        })
+      ],
+      money,
+      dues: { next: null, latest: null },
+      asOf
+    })
+    expect(items.map((item) => item.id)).toEqual(["past-due", "violation:boat", "no-dues"])
+    expect(items.map(attentionLine)).toEqual([
+      {
+        subject: "Past-due balances",
+        detail: "1 unit owes $25.00 past its due day.",
+        note: "Open the ledger to follow up, or record what's been paid."
+      },
+      { subject: "A boat in the driveway", detail: "31 Fir Court", note: "Send the notice." },
+      {
+        subject: "Dues",
+        detail: null,
+        note: "Set up the association's dues, and each charge posts to every unit's ledger."
+      }
+    ])
   })
 
   it("says how long something has waited", () => {
@@ -302,7 +379,7 @@ describe("area standing", () => {
 
   it("says where the rulebook stands and what's coming", () => {
     const published: DashboardSummary = {
-      hoaName: "Sample Ridge HOA",
+      organizationName: "Sample Ridge HOA",
       publishedVersion: 3,
       publishedAt: "2026-10-07T12:00:00.000Z",
       ruleCount: 42,
@@ -336,5 +413,57 @@ describe("time phrasing", () => {
     expect(agoText("2026-10-09T10:00:00.000Z", asOf)).toBe("2 hours ago")
     expect(agoText("2026-10-08T23:00:00.000Z", asOf)).toBe("yesterday")
     expect(agoText("2026-10-03T10:00:00.000Z", asOf)).toBe("6 days ago")
+  })
+})
+
+describe("standings", () => {
+  const open = [
+    violation({ id: "boat", nextStep: { step: "notice", text: "Send the notice", on: null, waitsOn: "board" } }),
+    violation({
+      id: "fence",
+      nextStep: { step: "correct", text: "Correct it by Nov 3, 2026", on: "2026-11-03", waitsOn: "owner" }
+    })
+  ]
+
+  it("says where violations stand for the board and for a homeowner", () => {
+    expect(violationsStandingText([])).toBe("No violation is open.")
+    expect(violationsStandingText(open)).toBe("2 open. 1 waits on the board and 1 is in the time to cure.")
+    expect(yourViolationsText([])).toBe("No violation is open at your home.")
+    expect(yourViolationsText(open)).toBe("2 open. Correct it by Nov 3, 2026.")
+  })
+
+  it("says what's owed, and what's due next", () => {
+    const money: MoneyOverview = {
+      owedCents: 114_500,
+      owingUnits: 3,
+      unitCount: 3,
+      pastDueCents: 2500,
+      pastDueUnits: 1,
+      pastDueSince: "2026-09-14",
+      aging: { current: 112_000, late30: 2500, late60: 0, late90: 0, over90: 0 },
+      months: [],
+      largest: []
+    }
+    const next = { name: "Monthly dues", dueOn: "2026-11-01", totalCents: 112_000 }
+    expect(moneyStandingText(money, { next, latest: null })).toBe(
+      "$1,145.00 owed by 3 units, $25.00 of it past due. Monthly dues, $1,120.00, due Nov 1, 2026."
+    )
+    expect(moneyStandingText({ ...money, owingUnits: 0 }, null)).toBe("Every unit is paid up.")
+    const home: HomeOverview = {
+      unitId: "unit-31",
+      label: "31 Fir Court",
+      address: null,
+      balanceCents: 44_500,
+      pastDueCents: 2500,
+      pastDueSince: "2026-09-14",
+      next: { name: "Monthly dues", dueOn: "2026-11-01", amountCents: 42_000, isPosted: true },
+      lastPayment: null
+    }
+    expect(yourMoneyText([home])).toBe(
+      "You owe $445.00, $25.00 of it past due. Monthly dues, $420.00, due Nov 1, 2026."
+    )
+    expect(yourMoneyText([{ ...home, balanceCents: -1000, pastDueCents: 0, next: null }])).toBe(
+      "You're paid up, with $10.00 in credit."
+    )
   })
 })

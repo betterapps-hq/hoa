@@ -16,16 +16,16 @@ export class BuildNotRunningError extends Error {
 
 export async function saveBuiltDraft(
   db: Database,
-  hoaId: string,
+  organizationId: string,
   draft: { rulebookId: string; documents: BuiltDocuments; content: RulebookContent; recordedBy: string; now: string }
 ) {
   // A build an administrator stopped saves nothing: the documents' provisions and the earlier draft stay as they are.
   // A retry after this rulebook became the draft writes the same again.
-  const status = (await getRulebook(db, hoaId, draft.rulebookId))?.status
+  const status = (await getRulebook(db, organizationId, draft.rulebookId))?.status
   if (status !== "building" && status !== "draft") {
     throw new BuildNotRunningError(draft.rulebookId)
   }
-  await saveBuiltDocuments(db, hoaId, draft.documents, draft.recordedBy, draft.now)
-  await saveRulebookContent(db, hoaId, draft.rulebookId, draft.content)
-  await promoteToDraft(db, hoaId, draft.rulebookId)
+  await saveBuiltDocuments(db, organizationId, draft.documents, draft.recordedBy, draft.now)
+  await saveRulebookContent(db, organizationId, draft.rulebookId, draft.content)
+  await promoteToDraft(db, organizationId, draft.rulebookId)
 }

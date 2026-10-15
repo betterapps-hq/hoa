@@ -9,6 +9,7 @@ import {
   ScaleIcon,
   ScanTextIcon,
   Settings2Icon,
+  TagIcon,
   type LucideIcon
 } from "lucide-react"
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react"
@@ -24,6 +25,7 @@ import { slotCenter, type Box, type FindKind, type Point } from "./DocumentEncod
 import {
   countsOf,
   nextSpot,
+  termPile,
   readerDocuments,
   readerEvents,
   readerLayout,
@@ -58,7 +60,7 @@ export function DocumentEncodingReader({ results, documents, isRunning }: Docume
   const read = useMemo(() => readerDocuments(documents), [documents])
   const events = useMemo(() => readerEvents(results, read), [results, read])
   const target = countsOf(events)
-  const layout = readerLayout(width, { terms: target.terms, rules: Math.max(target.rules, target.drafted) })
+  const layout = readerLayout(width, { ...target, rules: Math.max(target.rules, target.drafted) })
   const isAnimated = !isReduced && width > 0
   const {
     shown: landed,
@@ -76,23 +78,32 @@ export function DocumentEncodingReader({ results, documents, isRunning }: Docume
   return (
     <div ref={ref} className="relative" style={{ height: layout.height }}>
       <dl className={isMeasured ? undefined : "flex justify-center gap-12"}>
-        <div
-          className={cn("flex flex-col items-end text-right", isMeasured && "absolute")}
-          style={isMeasured ? boxStyle(layout.counts.terms) : undefined}
+        <Count
+          label="Defined terms"
+          count={shown.terms}
+          swatch={swatchClass.terms}
+          box={isMeasured ? layout.counts.terms : null}
+        />
+        <Count
+          label="Vocabulary"
+          count={shown.vocabulary}
+          swatch={swatchClass.vocabulary}
+          box={isMeasured ? layout.counts.vocabulary : null}
+          isEnd
+        />
+        <Count
+          label="Rules found"
+          count={Math.min(shown.rules, target.rules)}
+          swatch={swatchClass.rules}
+          box={isMeasured ? layout.counts.rules : null}
         >
-          <dt className="text-xs text-muted-foreground">Terms found</dt>
-          <dd className="text-xl font-semibold tabular-nums">{shown.terms}</dd>
-        </div>
-        <div
-          className={cn("flex flex-col", isMeasured && "absolute")}
-          style={isMeasured ? boxStyle(layout.counts.rules) : undefined}
-        >
-          <dt className="text-xs text-muted-foreground">Rules found</dt>
-          <dd className="text-xl font-semibold tabular-nums">{Math.min(shown.rules, target.rules)}</dd>
           {shown.drafted > 0 ? (
-            <dd className="text-xs text-muted-foreground tabular-nums">{shown.drafted} drafted</dd>
+            <dd className="flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
+              <span aria-hidden className={cn("size-2 shrink-0 rounded-full", swatchClass.drafted)} />
+              {shown.drafted} drafted
+            </dd>
           ) : null}
-        </div>
+        </Count>
       </dl>
       {isMeasured ? (
         <>
@@ -110,7 +121,8 @@ export function DocumentEncodingReader({ results, documents, isRunning }: Docume
             height={layout.height}
             className="pointer-events-none absolute inset-0 overflow-visible"
           >
-            <Pile layout={layout} kind="terms" count={shown.terms} drafted={shown.terms} />
+            <Pile layout={layout} kind="terms" count={shown.terms} drafted={0} />
+            <Pile layout={layout} kind="vocabulary" count={shown.vocabulary} drafted={0} />
             <Pile layout={layout} kind="rules" count={Math.max(shown.rules, shown.drafted)} drafted={shown.drafted} />
             <g ref={layerRef} />
           </svg>
@@ -122,6 +134,48 @@ export function DocumentEncodingReader({ results, documents, isRunning }: Docume
 
 const boxStyle = ({ x, y, width, height }: Box) => ({ left: x, top: y, width, height })
 
+/** Each count's swatch, as its pile's dots look: a rule found is open, and fills once it's drafted. */
+const swatchClass = {
+  terms: "bg-coverage-term",
+  vocabulary: "bg-vocabulary",
+  rules: "border border-coverage-rule bg-coverage-rule/15",
+  drafted: "bg-coverage-rule"
+}
+
+/**
+ * A pile's count: its label, then the number with a swatch of the pile's dots, and anything under it. At the end of a
+ * side it lines up with that end. Until the picture is measured it sits in a row with the others.
+ */
+function Count({
+  label,
+  count,
+  swatch,
+  box,
+  isEnd = false,
+  children
+}: {
+  label: string
+  count: number
+  swatch: string
+  box: Box | null
+  isEnd?: boolean
+  children?: ReactNode
+}) {
+  return (
+    <div
+      className={cn("flex flex-col", isEnd && "items-end text-right", box && "absolute")}
+      style={box ? boxStyle(box) : undefined}
+    >
+      <dt className="text-xs whitespace-nowrap text-muted-foreground">{label}</dt>
+      <dd className="flex items-center gap-1.5 text-xl font-semibold tabular-nums">
+        <span aria-hidden className={cn("size-2.5 shrink-0 rounded-full", swatch)} />
+        {count}
+      </dd>
+      {children}
+    </div>
+  )
+}
+
 /** The picture, the window's text and its caption, where finds leave from. */
 type PictureParts = Record<"picture" | "text" | "caption", RefObject<HTMLDivElement | null>>
 
@@ -132,7 +186,7 @@ type PictureParts = Record<"picture" | "text" | "caption", RefObject<HTMLDivElem
 function originOf({ picture, text, caption }: PictureParts, kind: FindKind): Point | null {
   const element = picture.current
   const view = text.current
-  const mark = kind === "terms" ? view?.querySelector("[data-term-mark]") : null
+  const mark = kind === "rules" ? null : view?.querySelector("[data-term-mark]")
   const from = mark ?? view?.querySelector("[data-active]") ?? caption.current
   if (!element || !view || !from) {
     return null
@@ -209,13 +263,14 @@ function useReaderMotion(
   return { shown, scene, parts: { picture, text, caption }, layerRef }
 }
 
-/** How a passage shows: being read, drifted over, holding a term found, or with its verdict. */
-type Tone = "reading" | "drifting" | "found" | "rule" | "settings" | "term" | "none" | "problem"
+/** How a passage shows: being read, drifted over, holding a term or a vocabulary entry found, or with its verdict. */
+type Tone = "reading" | "drifting" | "found" | "entry" | "rule" | "settings" | "term" | "none" | "problem"
 
 const toneClass: Record<Tone, string> = {
   reading: "bg-link/10 text-foreground before:bg-link",
   drifting: "bg-muted/60 text-foreground",
   found: "bg-muted/70 text-foreground before:bg-coverage-term",
+  entry: "bg-muted/70 text-foreground before:bg-vocabulary",
   rule: "bg-coverage-rule/15 text-foreground before:bg-coverage-rule dark:bg-coverage-rule/25",
   settings: "bg-coverage-settings/15 text-foreground before:bg-coverage-settings dark:bg-coverage-settings/30",
   term: "bg-coverage-term/15 text-foreground before:bg-coverage-term dark:bg-coverage-term/25",
@@ -237,7 +292,7 @@ function toneOf(scene: Scene): Tone | null {
   }
   switch (event.kind) {
     case "term":
-      return "found"
+      return event.source === "definition" ? "found" : "entry"
     case "passage":
       if (phase === "scan") {
         return "reading"
@@ -327,6 +382,7 @@ function ReaderWindow({ box, document, scene, isAnimated, textRef, captionRef }:
   const termSpot =
     scene.event?.kind === "term" && scene.event.spot?.documentKey === document?.key ? scene.event.spot : null
   const isMarked = termSpot !== null && scene.step > 0
+  const markPile = scene.event?.kind === "term" ? termPile(scene.event) : "terms"
 
   // The window moves to the passage, a little below its top, or on to a term further down it; to another document, at
   // once.
@@ -425,6 +481,7 @@ function ReaderWindow({ box, document, scene, isAnimated, textRef, captionRef }:
               block={block}
               tone={block.key === activeKey ? tone : null}
               mark={termSpot?.blockKey === block.key ? termSpot : null}
+              markPile={markPile}
               isMarked={isMarked}
               isAnimated={isAnimated}
             />
@@ -460,15 +517,25 @@ function DocumentTitle({ title }: { title: string }) {
   )
 }
 
-/** Text with a term's words marked green, swept on from the left as with a highlighter. */
+/** A term's mark in its pile's color: a defined term's green, a vocabulary entry's its own. */
+type TermPile = Exclude<FindKind, "rules">
+
+const markClass: Record<TermPile, string> = {
+  terms: "from-coverage-term/30 to-coverage-term/30 dark:from-coverage-term/40 dark:to-coverage-term/40",
+  vocabulary: "from-vocabulary/30 to-vocabulary/30 dark:from-vocabulary/40 dark:to-vocabulary/40"
+}
+
+/** Text with a term's words marked in its pile's color, swept on from the left as with a highlighter. */
 function Marked({
   text,
   range,
+  pile,
   isMarked,
   isAnimated
 }: {
   text: string
   range: MarkRange | null
+  pile: TermPile
   isMarked: boolean
   isAnimated: boolean
 }) {
@@ -502,7 +569,10 @@ function Marked({
         ref={ref}
         data-term-spot
         data-term-mark
-        className="-mx-0.5 rounded-[3px] bg-transparent bg-linear-to-r from-coverage-term/30 to-coverage-term/30 bg-no-repeat px-0.5 font-medium text-foreground dark:from-coverage-term/40 dark:to-coverage-term/40"
+        className={cn(
+          "-mx-0.5 rounded-[3px] bg-transparent bg-linear-to-r bg-no-repeat px-0.5 font-medium text-foreground",
+          markClass[pile]
+        )}
       >
         {text.slice(range.start, range.end)}
       </mark>
@@ -519,12 +589,14 @@ function Passage({
   block,
   tone,
   mark,
+  markPile,
   isMarked,
   isAnimated
 }: {
   block: ReadingBlock
   tone: Tone | null
   mark: WordSpot | null
+  markPile: TermPile
   isMarked: boolean
   isAnimated: boolean
 }) {
@@ -540,12 +612,19 @@ function Passage({
     )
   }
   const text = block.text ? (
-    <Marked text={block.text} range={mark?.part === "text" ? mark : null} isMarked={isMarked} isAnimated={isAnimated} />
+    <Marked
+      text={block.text}
+      range={mark?.part === "text" ? mark : null}
+      pile={markPile}
+      isMarked={isMarked}
+      isAnimated={isAnimated}
+    />
   ) : null
   const intro = block.intro ? (
     <Marked
       text={block.intro}
       range={mark?.part === "intro" ? mark : null}
+      pile={markPile}
       isMarked={isMarked}
       isAnimated={isAnimated}
     />
@@ -638,7 +717,11 @@ function CaptionBody({
     case "term":
       return (
         <>
-          <CaptionLabel icon={BookOpenIcon} tone="text-coverage-term" label="Term found" />
+          <CaptionLabel
+            icon={event.source === "definition" ? BookOpenIcon : TagIcon}
+            tone={event.source === "definition" ? "text-coverage-term" : "text-vocabulary"}
+            label={event.source === "definition" ? "Defined term" : "Vocabulary entry"}
+          />
           <p className="truncate text-sm font-medium">{event.label}</p>
         </>
       )

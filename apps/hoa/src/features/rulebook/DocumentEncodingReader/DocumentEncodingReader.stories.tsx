@@ -14,7 +14,7 @@ const meta = {
   // A story sets `width` to show it at another width.
   decorators: [
     (Story, { parameters }) => (
-      <div className={typeof parameters.width === "string" ? parameters.width : "max-w-xl"}>
+      <div className={typeof parameters.width === "string" ? parameters.width : "max-w-3xl"}>
         <Story />
       </div>
     )

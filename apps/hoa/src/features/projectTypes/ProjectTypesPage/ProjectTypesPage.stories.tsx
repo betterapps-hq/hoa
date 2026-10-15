@@ -53,7 +53,7 @@ const type = (
   more: Partial<ProjectTypesOverview["projectTypes"][number]> = {}
 ): ProjectTypesOverview["projectTypes"][number] => ({
   id,
-  hoaId: "hoa",
+  organizationId: "hoa",
   label,
   description,
   status: "active",

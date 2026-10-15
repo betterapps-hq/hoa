@@ -4,8 +4,10 @@ import {
   answerLines,
   answerReadings,
   answersFileId,
+  answerSections,
   answersSchema,
   emptyAnswers,
+  nextItem,
   withAnswersPage
 } from "./answers"
 import type { ProjectTypeDefinition } from "./projectType"
@@ -86,6 +88,15 @@ const definition: ProjectTypeDefinition = {
   unasked: []
 }
 
+const emptyDefinition: ProjectTypeDefinition = { ...definition, groups: [] }
+const definitionGroup = {
+  subject: "work",
+  label: "The project",
+  itemLabel: "The project",
+  help: null,
+  isRepeatable: false
+}
+
 const answers = {
   work: [{ "work.replaces-existing": true, "work.starts-on": "2026-11-01" }],
   item: [
@@ -119,6 +130,153 @@ describe("answerLines", () => {
       "Replaces something: Yes",
       "Start date: 2026-11-01"
     ])
+  })
+})
+
+describe("answers given once for every item", () => {
+  // The items' color asked once for all of them.
+  const items = definition.groups[1]!
+  const shared = {
+    ...definition,
+    groups: [
+      definition.groups[0]!,
+      {
+        ...items,
+        fields: items.fields.map((field) => (field.kind === "choice" ? { ...field, isShared: true } : field))
+      }
+    ]
+  }
+  const same = {
+    ...answers,
+    item: [
+      { "item.height": 72, "item.color": "color.grey" },
+      { "item.height": 48, "item.color": "color.grey" }
+    ]
+  }
+
+  it("start a new item with the answers it shares, and nothing else", () => {
+    expect(nextItem(shared.groups[1]!, same.item)).toEqual({ "item.height": null, "item.color": "color.grey" })
+    expect(nextItem(definition.groups[1]!, same.item)).toEqual({ "item.height": null, "item.color": null })
+  })
+
+  it("read back once, above the items, while the review still reads each item whole", () => {
+    expect(
+      answerSections(shared, same).map((section) => [section.heading, section.lines.map((item) => item.line)])
+    ).toEqual([
+      ["The project", ["Replaces something: Yes", "Start date: 2026-11-01"]],
+      ["Every item", ["Color: grey"]],
+      ["Item 1", ["Height: 72 inches"]],
+      ["Item 2", ["Height: 48 inches"]]
+    ])
+    expect(answerLines(shared, same)[1]!.lines.map((item) => item.line)).toEqual(["Height: 72 inches", "Color: grey"])
+  })
+
+  it("read back under each item when the items' answers differ, or the question isn't shared", () => {
+    const differ = { ...same, item: [same.item[0]!, { ...same.item[1]!, "item.color": null }] }
+    expect(answerSections(shared, differ).map((section) => section.heading)).toEqual([
+      "The project",
+      "Item 1",
+      "Item 2"
+    ])
+    expect(answerSections(definition, same).map((section) => section.heading)).toEqual([
+      "The project",
+      "Item 1",
+      "Item 2"
+    ])
+  })
+})
+
+describe("signatures and contacts", () => {
+  const own = {
+    property: "custom.question",
+    binding: null,
+    label: "I confirm the plans are complete",
+    help: null,
+    example: null,
+    isRequired: true,
+    answeredBy: "applicant" as const,
+    citations: null
+  }
+  const signature = { ...own, kind: "signature" as const }
+  const contact = { ...own, property: "custom.builder", label: "Who is building it?", kind: "contact" as const }
+
+  it("take a typed name with the day it was signed, and a person's name with a phone or email", () => {
+    expect(answerErrors(signature, { name: "Jordan Avery", signedOn: "2026-10-13" })).toEqual([])
+    expect(answerErrors(signature, null)).toEqual(["Answer this question."])
+    expect(answerErrors(contact, { name: "Pat Lee", phone: "", email: "pat@example.com" })).toEqual([])
+    expect(answerErrors(contact, { name: "", phone: "555-0100", email: "" })).toEqual(["Give the person's name."])
+    expect(answerErrors(contact, { name: "Pat Lee", phone: "", email: "pat" })).toEqual([
+      "Give an email address such as name@example.com."
+    ])
+  })
+
+  it("take a business's company name, and its website when it has one", () => {
+    const business = { ...contact, label: "Who is your contractor?", isBusiness: true }
+    const person = { name: "Pat Lee", phone: "555-0100", email: "" }
+    expect(answerErrors(business, { ...person, company: "Lee Builders", website: "" })).toEqual([])
+    expect(answerErrors(business, { ...person, company: "Lee Builders", website: "leebuilders.com" })).toEqual([])
+    expect(answerErrors(business, { ...person, company: "", website: "" })).toEqual(["Give the company's name."])
+    expect(answerErrors(business, { ...person, company: "Lee Builders", website: "lee builders" })).toEqual([
+      "Give a website such as example.com."
+    ])
+    const definition: ProjectTypeDefinition = {
+      ...emptyDefinition,
+      groups: [{ ...definitionGroup, fields: [business] }]
+    }
+    const answers = {
+      work: [{ "custom.builder": { ...person, company: "Lee Builders", website: "https://leebuilders.com" } }]
+    }
+    expect(answerLines(definition, answers)[0]!.lines.map((item) => item.line)).toEqual([
+      "Who is your contractor? Lee Builders, Pat Lee, 555-0100, https://leebuilders.com"
+    ])
+  })
+
+  it("read back in words, and never as facts of a property", () => {
+    const definition: ProjectTypeDefinition = {
+      ...emptyDefinition,
+      groups: [{ ...definitionGroup, fields: [signature, contact] }]
+    }
+    const answers = {
+      work: [
+        {
+          "custom.question": { name: "Jordan Avery", signedOn: "2026-10-13" }
+        }
+      ]
+    }
+    expect(answerLines(definition, answers)[0]!.lines.map((item) => item.line)).toEqual([
+      "I confirm the plans are complete: Signed by Jordan Avery on 2026-10-13"
+    ])
+    const contactAnswers = { work: [{ "custom.builder": { name: "Pat Lee", phone: "555-0100", email: "" } }] }
+    const contactOnly = { ...definition, groups: [{ ...definitionGroup, fields: [contact] }] }
+    expect(answerLines(contactOnly, contactAnswers)[0]!.lines.map((item) => item.line)).toEqual([
+      "Who is building it? Pat Lee, 555-0100"
+    ])
+    expect(answerReadings(definition, answers, [{ id: "w", type: "work" }], (key) => key)).toEqual([])
+  })
+})
+
+describe("fees", () => {
+  const fee = {
+    property: "custom.filing-fee",
+    binding: null,
+    label: "Filing fee",
+    help: "Pay by check to the association.",
+    example: null,
+    isRequired: true,
+    answeredBy: "applicant" as const,
+    citations: null,
+    kind: "fee" as const,
+    amount: 50
+  }
+
+  it("must be confirmed when required, and read back with the amount", () => {
+    expect(answerErrors(fee, true)).toEqual([])
+    expect(answerErrors(fee, null)).toEqual(["Confirm you'll pay this fee."])
+    expect(answerErrors({ ...fee, isRequired: false }, null)).toEqual([])
+    const definition: ProjectTypeDefinition = { ...emptyDefinition, groups: [{ ...definitionGroup, fields: [fee] }] }
+    expect(
+      answerLines(definition, { work: [{ "custom.filing-fee": true }] })[0]!.lines.map((item) => item.line)
+    ).toEqual(["Filing fee: $50.00, will pay it"])
   })
 })
 
