@@ -17,6 +17,7 @@ applications against it. It's written for a product that many HOAs onboard to, s
 | [implementation-plan.md](implementation-plan.md) | The phased tasks that build the schema, both pipelines and their UX |
 | [implementation-log.md](implementation-log.md) | Progress, decisions, open questions and evaluation results while the plan is built |
 | [document-requirements.md](document-requirements.md) | Design: document requirements, form templates and the answer choices administrators make when the documents don't settle them |
+| [rule-engine.md](rule-engine.md) | The proposal behind the rules schema: one rule record every feature reads, anchored citations, per-rule review, vocabulary as data |
 | [documents.md](documents.md) | What lives where, the records and D1 tables, storage layout, uploads, access, privacy and retention |
 | [people.md](people.md) | People, accounts and organizations: the roll and Better Auth's organization plugin, joining, access, committee work and homes |
 | [violations.md](violations.md) | Violations and fines: the records, what the documents allow at each step (cure, notice, hearing, sanctions), and who sees what |
