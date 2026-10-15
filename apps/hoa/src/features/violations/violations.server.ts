@@ -47,7 +47,7 @@ export type SanctionView = Omit<SanctionResult, "inputs" | "precondition"> & {
   /** What's been imposed under it for this violation already, in cents. */
   imposedCents: number
   /** Its parties, the body that imposes it and the privileges it suspends, in words. */
-  labels: { against: string[]; imposedBy: string; suspends: string[] }
+  labels: { against: string[]; imposedBy: string[]; suspends: string[] }
   /**
    * When it waits on a procedure the documents require first: the board's steps that would meet it, or null when its
    * steps can't (it turns on something else). Null when it doesn't wait on one.
@@ -491,7 +491,7 @@ export async function violationView(context: RequestContext, loaded: LoadedViola
           const label = (key: T.TermKey) => vocabulary.label(key)
           const labels = {
             against: sanction.against.map(label),
-            imposedBy: label(sanction.imposedBy),
+            imposedBy: sanction.imposedBy.map(label),
             suspends: sanction.suspends.map(label)
           }
           const procedure = precondition ? { steps: stepsFor(precondition) } : null

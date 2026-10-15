@@ -373,7 +373,10 @@ describe("content cache", () => {
       }
     }
     const model = objectModel({ recommendation: "approve" })
-    const run = (applicant: string, schema = z.object({ recommendation: z.string() })) =>
+    const run = (
+      applicant: string,
+      schema: z.ZodType<{ recommendation: string }> = z.object({ recommendation: z.string() })
+    ) =>
       runObjectPrompt({
         loadPrompt: langfusePrompt,
         createModel: () => model,

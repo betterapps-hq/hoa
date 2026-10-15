@@ -81,7 +81,7 @@ export function factValue(property: Property, text: string, vocabulary: Vocabula
 
 /** Whether the engine evaluates the rule on its own: norms that aren't permissions, about a named kind of thing. */
 export const isPreviewable = (rule: T.Rule) =>
-  rule.kind === "norm" && rule.modality !== "permission" && rule.appliesTo !== null
+  rule.kind === "norm" && rule.modality !== "permission" && rule.appliesTo.length > 0
 
 /** Evaluates the rule on one subject with the typed facts; gives its findings, or why it couldn't. */
 export function previewRule(

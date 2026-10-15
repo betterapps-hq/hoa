@@ -32,7 +32,7 @@ const fine: SanctionView = {
   occurrence: 1,
   amount: { type: "fixed", each: 10_000, repeats: null, total: 10_000, cappedBy: null },
   against: ["owner"],
-  imposedBy: "board",
+  imposedBy: ["board"],
   suspends: [],
   lasts: null,
   limitedBy: [],
@@ -43,7 +43,7 @@ const fine: SanctionView = {
     reference: { key: "declaration:7.4#fine", title: "Fines for violations", citations: [] }
   },
   imposedCents: 0,
-  labels: { against: ["owner"], imposedBy: "board", suspends: [] },
+  labels: { against: ["owner"], imposedBy: ["board"], suspends: [] },
   procedure: null
 }
 

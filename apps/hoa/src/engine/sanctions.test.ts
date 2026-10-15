@@ -191,7 +191,7 @@ describe("the sample declaration's enforcement", () => {
     expect(fineFor(violation("2026-04-20"))).toMatchObject({ outcome: "pending" })
     expect(fineFor(violation("2026-04-20", noticed))).toMatchObject({
       outcome: "available",
-      imposedBy: "board",
+      imposedBy: ["board"],
       amount: { type: "set-by-imposer", maxEach: null, maxTotal: null }
     })
   })

@@ -24,6 +24,7 @@ import { attempt } from "@/lib/attempt"
 import { dayText } from "@/lib/days"
 import { money } from "@/lib/money"
 import { sentenceCase } from "@/lib/text"
+import { orList } from "@/text/list"
 import { violationStatusLabels, type FactValue, type ViolationParty } from "@/violations/violation"
 import {
   FactDialog,
@@ -547,7 +548,8 @@ function detailOf(sanction: SanctionView) {
   const { against, imposedBy, suspends } = sanction.labels
   const on = against.length > 0 ? `, on the ${list(against)}` : ""
   const suspended = suspends.length > 0 ? ` It suspends ${list(suspends)}.` : ""
-  return `The ${imposedBy} imposes it${on}.${suspended}`
+  const by = sentenceCase(orList(imposedBy.map((name) => `the ${name}`)))
+  return `${by} imposes it${on}.${suspended}`
 }
 
 /** A unit as people find it: its label, with its address when that says more. */

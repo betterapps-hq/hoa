@@ -86,7 +86,8 @@ export type SanctionResult = {
   amount: SanctionAmount
   /** Who it's imposed on: its parties, and whoever answers for them. */
   against: T.TermKey[]
-  imposedBy: T.TermKey
+  /** Who may impose it, any of them. */
+  imposedBy: T.TermKey[]
   suspends: T.TermKey[]
   lasts: T.Sanction["lasts"]
   /** The limits that cap or forbid it. */
@@ -193,8 +194,11 @@ export function curePeriodOf(context: Context, rule: T.NormRule): CurePeriod {
 
 function curePeriodIn(reading: Context, rule: T.NormRule): CurePeriod {
   const base = { ruleKey: rule.key, startsOn: null, endsOn: null, curedOn: null, needs: [] }
-  const thing = rule.appliesTo ? reading.vocabulary.get(reading.vocabulary.thingOf(rule.appliesTo)) : undefined
-  if (thing?.kind === "thing" && thing.nature === "event") {
+  const isEvent = (key: T.TermKey) => {
+    const thing = reading.vocabulary.get(reading.vocabulary.thingOf(key))
+    return thing?.kind === "thing" && thing.nature === "event"
+  }
+  if (rule.appliesTo.length > 0 && rule.appliesTo.every(isEvent)) {
     return { ...base, status: "none", reason: "It's about an event that's over, so it can't be cured.", citations: [] }
   }
   if (rule.cure === "none") {
