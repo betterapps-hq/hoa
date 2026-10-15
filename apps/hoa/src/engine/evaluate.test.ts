@@ -217,7 +217,7 @@ describe("evaluating a request (schema.md, Evaluating a request)", () => {
     const returnHeight: RuleDraft = {
       ...ex.maxHeight,
       key: "guidelines:5.5.1(i)#return-height",
-      appliesTo: "return-fence",
+      appliesTo: ["return-fence"],
       appliesWhen: null
     }
     const stricter: RuleDraft = {
@@ -227,7 +227,7 @@ describe("evaluating a request (schema.md, Evaluating a request)", () => {
       scope: null,
       authority: null,
       effectiveFrom: "2025-11-12",
-      appliesTo: null,
+      appliesTo: [],
       overrides: { documents: ["guidelines"], provisions: [], adoptedAfter: null, except: [] }
     }
     const file: RulesFile = { ...examples, rules: [storedRule(returnHeight), storedRule(stricter)] }

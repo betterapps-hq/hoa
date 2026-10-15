@@ -92,7 +92,8 @@ export function previewRule(
   const isLive = (record: { review: T.Review }) => record.review.status !== "rejected"
   const terms = records.terms.filter(isLive)
   const rules = records.rules.filter(isLive).map((item) => (item.key === rule.key ? rule : item))
-  const subjectType = rule.appliesTo ?? ""
+  // The preview tries the rule on one subject: the first it applies to.
+  const subjectType = rule.appliesTo[0] ?? ""
   // The subject is the lot, the community or the request itself when the rule is about one of them.
   const subjectId = match(subjectType)
     .with("lot", "community", (root) => root)

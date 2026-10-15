@@ -104,7 +104,7 @@ describe("from findings to a recommendation (schema.md; application-review.md, D
       ...ex.quorum,
       key: "declaration:4.2(d)#fee",
       requestTypes: ["architectural-application"],
-      appliesTo: "architectural-application"
+      appliesTo: ["architectural-application"]
     })
     const file: RulesFile = { ...examples, rules: [...examples.rules, fee] }
     expect(recommend([finding(fee.key, "request", "not-met")], file)).toBe("deny")

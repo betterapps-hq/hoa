@@ -15,8 +15,11 @@ import { z } from "zod"
 import type { PromptConfig, PromptLoader, PromptTemplate } from "./promptLoader"
 import type { PromptDefinition, PromptVariables } from "./prompts"
 
-/** Builds a model by id. The prompt version's `config.model` picks the id, else the stage's default. */
-export type ModelFactory = (modelId: string) => LanguageModel
+/**
+ * Builds a model by id. The prompt version's `config.model` picks the id, else the stage's default; its
+ * `config.provider` pins the calls to one OpenRouter provider or tier.
+ */
+export type ModelFactory = (modelId: string, pin?: { providers: readonly string[] }) => LanguageModel
 
 /** Content sent alongside the prompt: an uploaded file (PDF or image) or extracted text. */
 export type PromptAttachment =
@@ -139,6 +142,8 @@ type Generator<T> = {
   encode: (value: T) => unknown
   /** Validates a cached value. */
   decode: (value: unknown) => T
+  /** The answer format an object prompt sends (its JSON schema): part of the cache key, so a new format is a new call. */
+  format?: unknown
 }
 
 const openRouterCost = z.object({ openrouter: z.object({ usage: z.object({ cost: z.number() }) }) })
@@ -174,9 +179,16 @@ async function streamed(start: (options: StreamOptions) => StreamedCall) {
   return { text, toolCalls, usage, providerMetadata }
 }
 
-/** Whether a failed call is worth retrying: a rate limit, an overloaded or failing provider, or a timeout. */
+/**
+ * Whether a failed call is worth retrying: a rate limit, an overloaded or failing provider, a timeout, or a connection
+ * that dropped mid-answer (workerd's "Network connection lost.", a reset socket). A dropped connection otherwise fails
+ * the whole Workflow step, and the step's retries rerun every call in it.
+ */
 export function isRetryableCall(error: unknown) {
-  return APICallError.isInstance(error) && (error.statusCode === 429 || error.isRetryable)
+  if (APICallError.isInstance(error)) {
+    return error.statusCode === 429 || error.isRetryable
+  }
+  return error instanceof Error && /network connection lost|ECONNRESET|socket hang up|fetch failed/i.test(error.message)
 }
 
 /** How long the provider asks to wait, from `retry-after-ms` or `retry-after` (seconds or a date), if it says. */
@@ -229,7 +241,11 @@ export async function runTextPrompt<Prompt extends PromptDefinition>(
   return { ...metrics, text: value }
 }
 
-/** Writes `oneOf` as `anyOf`, and drops the properties code fills in from every object and its required list. */
+/**
+ * Writes `oneOf` as `anyOf` and a `const` as a one-value `enum`, and drops the properties code fills in from every object
+ * and its required list. OpenAI's models ignore `const`: a union whose branches differ by a `const` discriminator
+ * (Zod's literals) gets answered only from its branches with an `enum`.
+ */
 function forModel(value: unknown, hidden: ReadonlySet<string>): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => forModel(item, hidden))
@@ -245,6 +261,9 @@ function forModel(value: unknown, hidden: ReadonlySet<string>): unknown {
       }
       if (key === "required" && Array.isArray(item)) {
         return [key, item.filter((name) => typeof name !== "string" || !hidden.has(name))]
+      }
+      if (key === "const") {
+        return ["enum", [item]]
       }
       return [key === "oneOf" ? "anyOf" : key, forModel(item, hidden)]
     })
@@ -472,7 +491,8 @@ function runObject<T>(options: ObjectPromptOptions<T>, keepsInvalid: boolean) {
       return { value: check(answerOf(result)), usage: result.usage, providerMetadata: result.providerMetadata }
     },
     encode: (checked: CheckedAnswer<T>) => (checked.isValid ? checked.object : checked.answer),
-    decode: check
+    decode: check,
+    format: inputSchema.jsonSchema
   })
 }
 
@@ -512,13 +532,15 @@ function promptCacheKey(
   modelId: string,
   effort: PromptConfig["effort"],
   compiled: string,
-  attachments: readonly PromptAttachment[]
+  attachments: readonly PromptAttachment[],
+  format: string | undefined
 ) {
   return sha256([
     traceName,
     modelId,
     // Only when set, so answers cached at the model's default effort keep their keys.
     ...(effort === undefined ? [] : [`effort:${effort}`]),
+    ...(format === undefined ? [] : [`format:${format}`]),
     compiled,
     ...attachments.map((attachment) => (attachment.type === "file" ? attachment.data : attachment.text))
   ])
@@ -535,7 +557,7 @@ async function runInSpan<T>(
   )
   const promptVersion = template.version
   const modelId = template.config.model ?? options.defaultModelId
-  const { effort } = template.config
+  const { effort, provider } = template.config
   const isTraced = isSpanContextValid(span.otelSpan.spanContext())
   const traceId = isTraced ? span.traceId : undefined
   const attachments = options.attachments ?? []
@@ -551,7 +573,14 @@ async function runInSpan<T>(
   })
 
   const cacheKey = options.cache
-    ? await promptCacheKey(options.traceName, modelId, effort, compiled, attachments)
+    ? await promptCacheKey(
+        options.traceName,
+        modelId,
+        effort,
+        compiled,
+        attachments,
+        generator.format === undefined ? undefined : JSON.stringify(await generator.format)
+      )
     : undefined
   if (options.cache && cacheKey) {
     const hit = await options.cache.get(cacheKey)
@@ -572,7 +601,7 @@ async function runInSpan<T>(
 
   const startedAt = performance.now()
   const request: GenerateRequest = {
-    model: options.createModel(modelId),
+    model: options.createModel(modelId, provider === undefined ? undefined : { providers: [provider] }),
     ...requestMessages(template, options.prompt, options.variables, compiled, attachments),
     providerOptions: {
       openrouter: {

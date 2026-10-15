@@ -195,7 +195,7 @@ export const rulebookRules = sqliteTable(
     ruleKey: text("rule_key").notNull(),
     kind: text("kind").notNull(),
     requestTypes: json<string[]>("request_types").notNull(),
-    appliesTo: text("applies_to"),
+    appliesTo: json<string[]>("applies_to"),
     reviewStatus: text("review_status").notNull(),
     contentHash: text("content_hash").notNull(),
     rule: json<unknown>("rule_json").notNull()

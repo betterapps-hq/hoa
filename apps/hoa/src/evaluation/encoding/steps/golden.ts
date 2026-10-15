@@ -131,16 +131,15 @@ export function outlinesAsFound(
 ): Outline[] {
   const vocabulary = createVocabulary(goldenTerms(golden))
   const named = (key: string) => (coreKeys.has(key) || given.has(key) ? key : vocabulary.label(key))
-  const name = (key: string | null) => (key === null ? null : named(key))
   return outlines.map((outline) => ({
     ...outline,
-    bearer: name(outline.bearer),
-    appliesTo: name(outline.appliesTo),
-    decidedBy: name(outline.decidedBy),
+    bearer: outline.bearer.map(named),
+    appliesTo: outline.appliesTo.map(named),
+    decidedBy: outline.decidedBy.map(named),
     sanction: outline.sanction
       ? {
           ...outline.sanction,
-          imposedBy: named(outline.sanction.imposedBy),
+          imposedBy: outline.sanction.imposedBy.map(named),
           against: outline.sanction.against.map(named)
         }
       : null
@@ -271,8 +270,8 @@ export function expectedVocabulary(
     for (const key of outline.readKeys) {
       add(key, outline.key)
     }
-    for (const subject of [outline.appliesTo, outline.bearer]) {
-      if (subject && byKey.has(subject)) {
+    for (const subject of [...outline.appliesTo, ...outline.bearer]) {
+      if (byKey.has(subject)) {
         add(subject, outline.key)
       }
     }

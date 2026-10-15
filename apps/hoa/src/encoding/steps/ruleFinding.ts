@@ -47,6 +47,14 @@ export function ruleFindingAnswer(keys: ReturnType<typeof findingKeys>) {
   const label = z.strictObject({ label: z.string().min(1) })
   const party = z.union([keyEnum(keys.parties), label])
   const subject = z.union([keyEnum(keys.subjects), label])
+  const parties = z
+    .array(party)
+    .min(1)
+    .describe('each party the text names, one entry each: "owners or occupants" is two entries, never one label')
+  const alike =
+    'what each evaluation is about, usually one; several only as alternatives the rule treats alike ("a fence or wall"), never other things it mentions'
+  const subjects = z.array(subject).min(1).describe(alike)
+  const anySubjects = z.array(subject).describe(`${alike}; empty when it applies to whatever its targets apply to`)
   const requestType = keyEnum(keys.requestTypes)
   const requestTypes = z.array(requestType)
   const read = z.object({ about: z.string().min(1), fact: z.string().min(1) })
@@ -63,50 +71,51 @@ export function ruleFindingAnswer(keys: ReturnType<typeof findingKeys>) {
     reads: z.array(read),
     interpretation: z.boolean()
   }
+  // The kind comes first in every branch: a model writing the answer in order picks the branch before anything else.
   const outline = z.discriminatedUnion("kind", [
     z.strictObject({
-      ...common,
       kind: z.enum(["obligation", "recommendation", "prohibition"]),
-      bearer: party,
-      appliesTo: subject,
+      ...common,
+      bearer: parties,
+      appliesTo: subjects,
       requestTypes
     }),
     z.strictObject({
-      ...common,
       kind: z.enum(["obligation-judged", "recommendation-judged"]),
-      bearer: party,
-      decidedBy: party,
-      appliesTo: subject,
+      ...common,
+      bearer: parties,
+      decidedBy: parties,
+      appliesTo: subjects,
       requestTypes
     }),
-    z.strictObject({ ...common, kind: z.literal("requirement"), appliesTo: subject, requestTypes }),
+    z.strictObject({ kind: z.literal("requirement"), ...common, appliesTo: subjects, requestTypes }),
     z.strictObject({
-      ...common,
       kind: z.literal("permission"),
-      bearer: party,
-      appliesTo: subject.nullable(),
+      ...common,
+      bearer: parties,
+      appliesTo: anySubjects,
       requestTypes,
       overrides: targets
     }),
     z.strictObject({
-      ...common,
       kind: z.literal("discretion"),
-      decidedBy: party,
-      appliesTo: subject.nullable(),
+      ...common,
+      decidedBy: parties,
+      appliesTo: anySubjects,
       requestTypes,
       overrides: targets
     }),
     z.strictObject({
-      ...common,
       kind: z.literal("sanction"),
+      ...common,
       modality: sanctionModality,
       requestType,
       sanctionType: sanction.shape.type,
-      imposedBy: party,
-      against: z.array(party).min(1),
+      imposedBy: parties,
+      against: parties,
       enforces: targets
     }),
-    z.strictObject({ ...common, kind: z.literal("limit"), appliesTo: subject, requestTypes, limits: targets })
+    z.strictObject({ kind: z.literal("limit"), ...common, appliesTo: subjects, requestTypes, limits: targets })
   ])
   const noRule = z.discriminatedUnion("reason", [
     z.object({ reason: z.enum(["heading", "recital", "reserved"]) }),
@@ -145,6 +154,7 @@ const noTargets: OutlineTargets = { rules: [], provisions: [], documents: [] }
 
 /** A key, or a new label as its text: code resolves labels against B's terms (`keyedOutline`). */
 const nameOf = (value: Named) => (typeof value === "string" ? value : value.label)
+const namesOf = (values: readonly Named[]) => values.map(nameOf)
 
 /** One drafted outline as an outline: the key composed, the kind split into the schema's kind and modality. */
 function outlineOf(provision: ProvisionKey, unitId: string, draft: DraftOutline): Outline {
@@ -163,7 +173,7 @@ function outlineOf(provision: ProvisionKey, unitId: string, draft: DraftOutline)
     resolved: null,
     selector: null,
     check: null,
-    decidedBy: null,
+    decidedBy: [],
     targets: null
   }
   switch (draft.kind) {
@@ -174,8 +184,8 @@ function outlineOf(provision: ProvisionKey, unitId: string, draft: DraftOutline)
         ...base,
         kind: "norm",
         modality: draft.kind,
-        bearer: nameOf(draft.bearer),
-        appliesTo: nameOf(draft.appliesTo),
+        bearer: namesOf(draft.bearer),
+        appliesTo: namesOf(draft.appliesTo),
         requestTypes: draft.requestTypes
       }
     case "obligation-judged":
@@ -184,19 +194,19 @@ function outlineOf(provision: ProvisionKey, unitId: string, draft: DraftOutline)
         ...base,
         kind: "norm",
         modality: draft.kind === "obligation-judged" ? "obligation" : "recommendation",
-        bearer: nameOf(draft.bearer),
-        appliesTo: nameOf(draft.appliesTo),
+        bearer: namesOf(draft.bearer),
+        appliesTo: namesOf(draft.appliesTo),
         requestTypes: draft.requestTypes,
         check: "judgment",
-        decidedBy: nameOf(draft.decidedBy)
+        decidedBy: namesOf(draft.decidedBy)
       }
     case "requirement":
       return {
         ...base,
         kind: "norm",
         modality: "requirement",
-        bearer: null,
-        appliesTo: nameOf(draft.appliesTo),
+        bearer: [],
+        appliesTo: namesOf(draft.appliesTo),
         requestTypes: draft.requestTypes
       }
     case "permission":
@@ -204,8 +214,8 @@ function outlineOf(provision: ProvisionKey, unitId: string, draft: DraftOutline)
         ...base,
         kind: "norm",
         modality: "permission",
-        bearer: nameOf(draft.bearer),
-        appliesTo: draft.appliesTo === null ? null : nameOf(draft.appliesTo),
+        bearer: namesOf(draft.bearer),
+        appliesTo: namesOf(draft.appliesTo),
         requestTypes: draft.requestTypes,
         targets: draft.overrides
       }
@@ -214,10 +224,10 @@ function outlineOf(provision: ProvisionKey, unitId: string, draft: DraftOutline)
         ...base,
         kind: "discretion",
         modality: null,
-        bearer: null,
-        appliesTo: draft.appliesTo === null ? null : nameOf(draft.appliesTo),
+        bearer: [],
+        appliesTo: namesOf(draft.appliesTo),
         requestTypes: draft.requestTypes,
-        decidedBy: nameOf(draft.decidedBy),
+        decidedBy: namesOf(draft.decidedBy),
         targets: draft.overrides
       }
     case "sanction":
@@ -225,20 +235,20 @@ function outlineOf(provision: ProvisionKey, unitId: string, draft: DraftOutline)
         ...base,
         kind: "sanction",
         modality: draft.modality,
-        bearer: null,
-        appliesTo: draft.requestType,
+        bearer: [],
+        appliesTo: [draft.requestType],
         requestTypes: [draft.requestType],
         targets: draft.enforces,
         except: noTargets,
-        sanction: { type: draft.sanctionType, imposedBy: nameOf(draft.imposedBy), against: draft.against.map(nameOf) }
+        sanction: { type: draft.sanctionType, imposedBy: namesOf(draft.imposedBy), against: namesOf(draft.against) }
       }
     case "limit":
       return {
         ...base,
         kind: "limit",
         modality: null,
-        bearer: null,
-        appliesTo: nameOf(draft.appliesTo),
+        bearer: [],
+        appliesTo: namesOf(draft.appliesTo),
         requestTypes: draft.requestTypes,
         targets: draft.limits
       }
@@ -288,18 +298,14 @@ export function subjectKey(text: string, vocabulary: readonly TermContent[]) {
 
 /** An outline with its subjects and parties as keys where B's terms (or the core) have them. */
 export function keyedOutline(outline: Outline, vocabulary: readonly TermContent[]): Outline {
-  const key = (text: string | null) => (text === null ? null : (subjectKey(text, vocabulary) ?? text))
+  const keys = (texts: readonly string[]) => texts.map((text) => subjectKey(text, vocabulary) ?? text)
   return {
     ...outline,
-    bearer: key(outline.bearer),
-    appliesTo: key(outline.appliesTo),
-    decidedBy: key(outline.decidedBy),
+    bearer: keys(outline.bearer),
+    appliesTo: keys(outline.appliesTo),
+    decidedBy: keys(outline.decidedBy),
     sanction: outline.sanction
-      ? {
-          ...outline.sanction,
-          imposedBy: key(outline.sanction.imposedBy) ?? outline.sanction.imposedBy,
-          against: outline.sanction.against.map((item) => key(item) ?? item)
-        }
+      ? { ...outline.sanction, imposedBy: keys(outline.sanction.imposedBy), against: keys(outline.sanction.against) }
       : null
   }
 }

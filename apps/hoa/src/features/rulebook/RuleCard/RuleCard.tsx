@@ -135,6 +135,13 @@ export function RuleCard({ rule }: RuleCardProps) {
     topRef.current?.scrollIntoView({ block: "start" })
   }, [isEditing])
   const chip = (key: T.TermKey | null) => (key ? <TermChip termKey={key} vocabulary={vocabulary} /> : "None")
+  const chips = (keys: readonly T.TermKey[]) => (
+    <span className="flex flex-wrap gap-x-2">
+      {keys.map((key) => (
+        <TermChip key={key} termKey={key} vocabulary={vocabulary} />
+      ))}
+    </span>
+  )
   const related = relatedRules(rule, records.rules)
   const blockers = approval ? approvalBlockers(approval, { type: "rule", key: rule.key }) : []
   const found = issues.get(rule.key) ?? []
@@ -229,7 +236,7 @@ export function RuleCard({ rule }: RuleCardProps) {
             <dl className="grid gap-3 sm:grid-cols-2">
               <Detail label="Kind">{kindLabel(rule)}</Detail>
               <Detail label="Applies to">
-                {rule.appliesTo ? chip(rule.appliesTo) : "The subjects of the rules it overrides"}
+                {rule.appliesTo.length > 0 ? chips(rule.appliesTo) : "The subjects of the rules it overrides"}
               </Detail>
               <Detail label="Request types">
                 <span className="flex flex-wrap gap-x-2">
@@ -240,24 +247,20 @@ export function RuleCard({ rule }: RuleCardProps) {
               </Detail>
               {rule.kind === "norm" ? (
                 <>
-                  <Detail label="Bearer">{rule.bearer ? chip(rule.bearer) : "None: a requirement binds no one"}</Detail>
+                  <Detail label="Bearer">
+                    {rule.bearer.length > 0 ? chips(rule.bearer) : "None: a requirement binds no one"}
+                  </Detail>
                   {rule.beneficiary ? <Detail label="Owed to">{chip(rule.beneficiary)}</Detail> : null}
-                  {rule.decidedBy ? <Detail label="Decided by">{chip(rule.decidedBy)}</Detail> : null}
+                  {rule.decidedBy.length > 0 ? <Detail label="Decided by">{chips(rule.decidedBy)}</Detail> : null}
                   <Detail label="Remedy">{rule.remedy ? remedyLabels[rule.remedy] : "None"}</Detail>
                   <Detail label="Cure period">{cureLabel(rule.cure, vocabulary)}</Detail>
                 </>
               ) : null}
-              {rule.kind === "discretion" ? <Detail label="Decided by">{chip(rule.decidedBy)}</Detail> : null}
+              {rule.kind === "discretion" ? <Detail label="Decided by">{chips(rule.decidedBy)}</Detail> : null}
               {rule.kind === "sanction" ? (
                 <>
-                  <Detail label="Imposed by">{chip(rule.imposedBy)}</Detail>
-                  <Detail label="Against">
-                    <span className="flex flex-wrap gap-x-2">
-                      {rule.against.map((key) => (
-                        <TermChip key={key} termKey={key} vocabulary={vocabulary} />
-                      ))}
-                    </span>
-                  </Detail>
+                  <Detail label="Imposed by">{chips(rule.imposedBy)}</Detail>
+                  <Detail label="Against">{chips(rule.against)}</Detail>
                 </>
               ) : null}
               <Detail label="In effect from">{rule.effectiveFrom}</Detail>

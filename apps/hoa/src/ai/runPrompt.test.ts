@@ -317,13 +317,13 @@ describe("runCheckedObjectPrompt", () => {
 })
 
 describe("model and version selection", () => {
-  it("uses the prompt version's model when it names one, and loads a pinned version", async () => {
+  it("uses the prompt version's model and provider when it names them, and loads a pinned version", async () => {
     const model = createModel()
-    const createModelFor = vi.fn<(modelId: string) => typeof model>(() => model)
+    const createModelFor = vi.fn<(modelId: string, pin?: { providers: readonly string[] }) => typeof model>(() => model)
     const loadPrompt = vi.fn<PromptLoader>(async (prompt) => ({
       name: prompt.name,
       version: 9,
-      config: { model: "anthropic/claude-sonnet-5.5" },
+      config: { model: "anthropic/claude-sonnet-5.5", provider: "google-vertex" },
       compile: () => "Pinned"
     }))
 
@@ -339,7 +339,7 @@ describe("model and version selection", () => {
     })
 
     expect(loadPrompt).toHaveBeenCalledWith(prompt, { version: 9 })
-    expect(createModelFor).toHaveBeenCalledWith("anthropic/claude-sonnet-5.5")
+    expect(createModelFor).toHaveBeenCalledWith("anthropic/claude-sonnet-5.5", { providers: ["google-vertex"] })
     expect(result).toMatchObject({ modelId: "anthropic/claude-sonnet-5.5", promptVersion: 9 })
   })
 
@@ -364,7 +364,7 @@ describe("model and version selection", () => {
 })
 
 describe("content cache", () => {
-  it("answers a repeated call from the cache and misses when the input changes", async () => {
+  it("answers a repeated call from the cache and misses when the input or the answer format changes", async () => {
     const stored = new Map<string, unknown>()
     const cache = {
       get: async (key: string) => stored.get(key),
@@ -373,13 +373,13 @@ describe("content cache", () => {
       }
     }
     const model = objectModel({ recommendation: "approve" })
-    const run = (applicant: string) =>
+    const run = (applicant: string, schema = z.object({ recommendation: z.string() })) =>
       runObjectPrompt({
         loadPrompt: langfusePrompt,
         createModel: () => model,
         defaultModelId: "test-model",
         prompt: applicantPrompt,
-        schema: z.object({ recommendation: z.string() }),
+        schema,
         variables: { applicant },
         attachments: [{ type: "text", text: "Packet" }],
         traceName: "application-review",
@@ -394,8 +394,10 @@ describe("content cache", () => {
     expect(first).toMatchObject({ isCached: false, object: { recommendation: "approve" } })
     expect(second).toMatchObject({ isCached: true, costUsd: 0, object: { recommendation: "approve" } })
     expect(third.isCached).toBe(false)
-    expect(model.doStreamCalls).toHaveLength(2)
-    expect(stored.size).toBe(2)
+    const reformatted = await run("Lot 12", z.object({ recommendation: z.enum(["approve", "deny"]) }))
+    expect(reformatted.isCached).toBe(false)
+    expect(model.doStreamCalls).toHaveLength(3)
+    expect(stored.size).toBe(3)
   })
 })
 
@@ -410,11 +412,13 @@ describe("outputSchema", () => {
     expect(shared).toContain('"additionalProperties":false')
   })
 
-  it("writes unions as anyOf, which every provider accepts, and still validates with Zod", async () => {
+  it("writes unions as anyOf and literals as one-value enums, which every provider accepts, and still validates", async () => {
     const schema = outputSchema(z.object({ rules: z.array(ruleDraft) }))
     const json = JSON.stringify(await schema.jsonSchema)
     expect(json).not.toContain("oneOf")
     expect(json).toContain("anyOf")
+    expect(json).not.toContain('"const"')
+    expect(json).toContain('"enum":["discretion"]')
     expect(await schema.validate?.({ rules: [] })).toEqual({ success: true, value: { rules: [] } })
     expect((await schema.validate?.({ rules: [{}] }))?.success).toBe(false)
   })
@@ -670,5 +674,9 @@ describe("retries", () => {
     await expect(run(refused)).rejects.toThrow("Bad request")
     expect(refused.doStreamCalls).toHaveLength(1)
     expect(isRetryableCall(badRequest)).toBe(false)
+
+    const dropped = failing(new Error("Network connection lost."))
+    await expect(run(dropped)).rejects.toThrow("Network connection lost.")
+    expect(dropped.doStreamCalls).toHaveLength(3)
   })
 })

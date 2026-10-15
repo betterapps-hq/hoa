@@ -377,6 +377,9 @@ export function scoreFinding(
     (golden !== null &&
       given !== null &&
       (byKey.get(golden)?.labels ?? []).some((label) => matchLabel(given, label)?.kind === "exact"))
+  // Lists of parties or subjects agree when each names the same ones, in any order.
+  const sameAll = (golden: readonly string[], given: readonly string[]) =>
+    golden.length === given.length && golden.every((key) => given.some((item) => same(key, item)))
   const entries = new Map(output.provisions.map((entry) => [entry.key, entry]))
   // A provision is covered by a reason, or by an outline citing it (as its main provision or in support).
   const cited = new Set(
@@ -467,8 +470,8 @@ export function scoreFinding(
     "rule-recall": share(pairs.length + splitCount, expectedCount),
     "rule-precision": share(pairs.length + partCount, outputCount),
     "kind-agreement": agreeing((pair) => kindName(pair.expected) === kindName(pair.output), "kind"),
-    "bearer-agreement": agreeing((pair) => same(pair.expected.bearer, pair.output.bearer), "bearer"),
-    "subject-agreement": agreeing((pair) => same(pair.expected.appliesTo, pair.output.appliesTo), "subject"),
+    "bearer-agreement": agreeing((pair) => sameAll(pair.expected.bearer, pair.output.bearer), "bearer"),
+    "subject-agreement": agreeing((pair) => sameAll(pair.expected.appliesTo, pair.output.appliesTo), "subject"),
     "request-type-agreement": agreeing(
       (pair) => [...pair.expected.requestTypes].sort().join() === [...pair.output.requestTypes].sort().join(),
       "request types"
@@ -482,11 +485,16 @@ export function scoreFinding(
 
 export type VocabularyOutput = { terms: TermContent[] }
 
-/** C's terms against the golden's, with the pairs the coding agent judged the same under another name. */
+/**
+ * C's terms against the golden's, with the pairs the coding agent judged the same under another name, and the faults
+ * the build's check still finds after the rerun: an outline's subject or party no term is (F can't name it, so the rule
+ * is lost) and an outline that reads facts no term serves.
+ */
 export function scoreVocabulary(
   item: SharedVocabularyItem,
   output: VocabularyOutput | null,
-  paired: readonly TermPair[] = []
+  paired: readonly TermPair[] = [],
+  problems: readonly { code: string }[] = []
 ): ItemScore {
   if (output === null) {
     return missing("no vocabulary")
@@ -501,13 +509,16 @@ export function scoreVocabulary(
     "property-recall": recall(["property"]),
     "value-recall": recall(["value-set", "value"]),
     "thing-recall": recall(["thing", "category"]),
-    duplicates: duplicates.length
+    duplicates: duplicates.length,
+    "unresolved-subjects": problems.filter((problem) => problem.code === "unresolved-subject").length,
+    "unserved-outlines": problems.filter((problem) => problem.code === "unserved-outline").length
   }
   const notes = [
     ...item.expected.terms.filter((term) => !matches.has(term.key)).map((term) => `missing ${term.kind} ${term.key}`),
     ...duplicates.map((pair) => `${pair.keys[0]} and ${pair.keys[1]} share a label`)
   ]
-  return { verdict: verdictOf(metrics, "property-recall", ["duplicates"]), metrics, notes }
+  const faults = ["duplicates", "unresolved-subjects", "unserved-outlines"]
+  return { verdict: verdictOf(metrics, "property-recall", faults), metrics, notes }
 }
 
 // ─── C-merge ─────────────────────────────────────────────────────────────────────────────────────

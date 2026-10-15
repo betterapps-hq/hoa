@@ -45,13 +45,13 @@ describe("resolving overrides", () => {
     const guidelinesPermission: RuleDraft = {
       ...ex.grandfathered,
       key: "guidelines:1.4#prior-approval-waived",
-      appliesTo: "work",
+      appliesTo: ["work"],
       overrides: [ex.priorApproval.key]
     }
     const lawPermission: RuleDraft = {
       ...ex.solarLaw,
       key: "property-code:202.010#fences",
-      appliesTo: "fence-run",
+      appliesTo: ["fence-run"],
       overrides: [ex.maxHeight.key]
     }
     const file: RulesFile = {

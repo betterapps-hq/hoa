@@ -47,11 +47,11 @@ describe("assembleRulesFile", () => {
 
   it("refuses records that don't make a valid rulebook", async () => {
     const [first, ...rest] = records.rules
-    const broken = { ...records, rules: first ? [{ ...first, appliesTo: "residense" }, ...rest] : rest }
+    const broken = { ...records, rules: first ? [{ ...first, appliesTo: ["residense"] }, ...rest] : rest }
     const error = await assembleRulesFile(broken).catch((reason: unknown) => reason)
     expect(error).toBeInstanceOf(InvalidRulesFileError)
     expect(error instanceof InvalidRulesFileError && error.issues).toEqual([
-      { code: "undefined-term", message: "residense isn't a term", recordKey: first?.key, path: ["appliesTo"] }
+      { code: "undefined-term", message: "residense isn't a term", recordKey: first?.key, path: ["appliesTo", 0] }
     ])
   })
 })

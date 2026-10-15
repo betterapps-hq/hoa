@@ -223,8 +223,8 @@ function draftOutline(outline: Outline) {
     reads: outline.reads,
     interpretation: false
   }
-  const party = (key: string | null) => named(key ?? "owner", keys.parties)
-  const subject = (key: string | null) => named(key, keys.subjects)
+  const party = (key: string) => named(key, keys.parties)
+  const subject = (key: string) => named(key, keys.subjects)
   const kind = kindName(outline)
   switch (kind) {
     case "obligation":
@@ -233,8 +233,8 @@ function draftOutline(outline: Outline) {
       return {
         ...common,
         kind,
-        bearer: party(outline.bearer),
-        appliesTo: subject(outline.appliesTo),
+        bearer: outline.bearer.map(party),
+        appliesTo: outline.appliesTo.map(subject),
         requestTypes: outline.requestTypes
       }
     case "obligation-judged":
@@ -242,19 +242,19 @@ function draftOutline(outline: Outline) {
       return {
         ...common,
         kind,
-        bearer: party(outline.bearer),
-        decidedBy: party(outline.decidedBy),
-        appliesTo: subject(outline.appliesTo),
+        bearer: outline.bearer.map(party),
+        decidedBy: outline.decidedBy.map(party),
+        appliesTo: outline.appliesTo.map(subject),
         requestTypes: outline.requestTypes
       }
     case "requirement":
-      return { ...common, kind, appliesTo: subject(outline.appliesTo), requestTypes: outline.requestTypes }
+      return { ...common, kind, appliesTo: outline.appliesTo.map(subject), requestTypes: outline.requestTypes }
     case "permission":
       return {
         ...common,
         kind,
-        bearer: party(outline.bearer),
-        appliesTo: outline.appliesTo === null ? null : subject(outline.appliesTo),
+        bearer: outline.bearer.map(party),
+        appliesTo: outline.appliesTo.map(subject),
         requestTypes: outline.requestTypes,
         overrides: targetsOf(outline)
       }
@@ -262,8 +262,8 @@ function draftOutline(outline: Outline) {
       return {
         ...common,
         kind,
-        decidedBy: party(outline.decidedBy),
-        appliesTo: outline.appliesTo === null ? null : subject(outline.appliesTo),
+        decidedBy: outline.decidedBy.map(party),
+        appliesTo: outline.appliesTo.map(subject),
         requestTypes: outline.requestTypes,
         overrides: targetsOf(outline)
       }
@@ -274,7 +274,7 @@ function draftOutline(outline: Outline) {
         modality: outline.modality,
         requestType: outline.requestTypes[0],
         sanctionType: outline.sanction?.type,
-        imposedBy: party(outline.sanction?.imposedBy ?? null),
+        imposedBy: (outline.sanction?.imposedBy ?? []).map(party),
         against: (outline.sanction?.against ?? []).map(party),
         enforces: targetsOf(outline)
       }
@@ -282,7 +282,7 @@ function draftOutline(outline: Outline) {
       return {
         ...common,
         kind: "limit",
-        appliesTo: subject(outline.appliesTo),
+        appliesTo: outline.appliesTo.map(subject),
         requestTypes: outline.requestTypes,
         limits: targetsOf(outline)
       }
@@ -495,6 +495,16 @@ describe("drafted steps on their golden datasets, answered as the golden says", 
     },
     slow
   )
+
+  it("C's score faults the subjects and outlines the check still finds unresolved", () => {
+    const [item] = datasets["shared-vocabulary"]
+    invariant(item, "The golden has a shared-vocabulary item.")
+    const output = { terms: item.expected.terms }
+    expect(scoreVocabulary(item, output).metrics).toMatchObject({ "unresolved-subjects": 0, "unserved-outlines": 0 })
+    const faulted = scoreVocabulary(item, output, [], [{ code: "unresolved-subject" }, { code: "unserved-outline" }])
+    expect(faulted.metrics).toMatchObject({ "unresolved-subjects": 1, "unserved-outlines": 1 })
+    expect(faulted.verdict).not.toBe("correct")
+  })
 
   it(
     "C-merge folds the planted duplicates back, renames the collisions and keeps lookalikes apart",

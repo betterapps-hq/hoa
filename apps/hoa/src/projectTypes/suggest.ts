@@ -57,8 +57,7 @@ export function rulebookForPrompt(rulesFile: T.RulesFile, requestType: T.TermKey
       (rule) =>
         (rule.kind === "norm" || rule.kind === "discretion") &&
         rule.requestTypes.includes(requestType) &&
-        rule.appliesTo !== null &&
-        vocabulary.thingOf(rule.appliesTo) === subject
+        rule.appliesTo.some((key) => vocabulary.thingOf(key) === subject)
     )
   const detailsOf = (definition: ProjectTypeDefinition, subject: T.TermKey) =>
     definition.groups

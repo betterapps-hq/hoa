@@ -34,7 +34,7 @@ export function selectRules(rulesFile: T.RulesFile, input: SelectionInput): T.Ru
     considered
       .filter(
         (rule) =>
-          (rule.appliesTo !== null && types.has(vocabulary.thingOf(rule.appliesTo))) ||
+          rule.appliesTo.some((key) => types.has(vocabulary.thingOf(key))) ||
           rule.citations.some((citation) => cited.has(citation.provisionKey))
       )
       .map((rule) => rule.key)

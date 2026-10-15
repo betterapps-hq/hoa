@@ -19,7 +19,6 @@ import { ProblemList } from "../ProblemList/ProblemList"
 import { draftOf, ruleProblems } from "../ruleProblems"
 import { Statement } from "../Statement/Statement"
 import { TermListPicker } from "../TermListPicker/TermListPicker"
-import { TermPicker } from "../TermPicker/TermPicker"
 import { termFilters, termOptions } from "../TermPicker/TermPicker.utils"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
 import {
@@ -143,14 +142,13 @@ export function RuleForm({ rule, onSave, onCancel }: RuleFormProps) {
           {(field) => (
             <Field data-invalid={field.state.meta.errors.length > 0}>
               <FieldLabel htmlFor="rule-applies-to">Applies to</FieldLabel>
-              <TermPicker
+              <TermListPicker
                 id="rule-applies-to"
                 label="Applies to"
-                value={field.state.value}
+                values={field.state.value}
                 options={termOptions(catalog, termFilters.subjects)}
                 onChange={field.handleChange}
-                isClearable
-                isInvalid={field.state.meta.errors.length > 0}
+                placeholder="Add what it applies to"
               />
               <FieldError errors={errorsOf(field.state.meta.errors)} />
             </Field>
@@ -175,7 +173,7 @@ export function RuleForm({ rule, onSave, onCancel }: RuleFormProps) {
                   value={structure.appliesWhen}
                   onChange={(appliesWhen) => setStructure((current) => ({ ...current, appliesWhen }))}
                   catalog={catalog}
-                  subject={subject}
+                  subject={subject[0] ?? null}
                 />
               ) : null}
             </Field>
@@ -200,17 +198,15 @@ export function RuleForm({ rule, onSave, onCancel }: RuleFormProps) {
               {(field) => (
                 <Field data-invalid={field.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="rule-bearer">Bearer</FieldLabel>
-                  <TermPicker
+                  <TermListPicker
                     id="rule-bearer"
                     label="Bearer"
-                    value={field.state.value}
+                    values={field.state.value}
                     options={parties}
                     onChange={field.handleChange}
-                    isClearable
-                    isInvalid={field.state.meta.errors.length > 0}
-                    placeholder="Who must comply"
+                    placeholder="Add who must comply"
                   />
-                  <FieldDescription>A requirement has no bearer; every other rule has one.</FieldDescription>
+                  <FieldDescription>A requirement has no bearer; every other rule has at least one.</FieldDescription>
                   <FieldError errors={errorsOf(field.state.meta.errors)} />
                 </Field>
               )}
@@ -233,14 +229,13 @@ export function RuleForm({ rule, onSave, onCancel }: RuleFormProps) {
               {(field) => (
                 <Field data-invalid={field.state.meta.errors.length > 0}>
                   <FieldLabel htmlFor="rule-decided-by">Decided by</FieldLabel>
-                  <TermPicker
+                  <TermListPicker
                     id="rule-decided-by"
                     label="Decided by"
-                    value={field.state.value}
+                    values={field.state.value}
                     options={parties}
                     onChange={field.handleChange}
-                    isClearable
-                    placeholder="Who decides a judgment"
+                    placeholder="Add who decides a judgment"
                   />
                   <FieldError errors={errorsOf(field.state.meta.errors)} />
                 </Field>
@@ -252,7 +247,12 @@ export function RuleForm({ rule, onSave, onCancel }: RuleFormProps) {
                   <span className="text-sm font-medium">Check</span>
                   {structure.check ? (
                     <>
-                      <CheckEditor value={structure.check} onChange={setCheck} catalog={catalog} subject={subject} />
+                      <CheckEditor
+                        value={structure.check}
+                        onChange={setCheck}
+                        catalog={catalog}
+                        subject={subject[0] ?? null}
+                      />
                       {needsCheck(modality) ? null : (
                         <Button variant="outline" size="sm" className="w-fit" onClick={() => setCheck(null)}>
                           Remove the check: a {modality} has none

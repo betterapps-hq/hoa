@@ -370,7 +370,8 @@ function translateValue(context: SideContext, owner: SideName, value: T.FactValu
 
 function sideRequest(context: SideContext, probes: readonly JointProbe[], indexes: readonly number[]) {
   const { vocabulary, side } = context
-  const appliesTo = side.rule.appliesTo ?? ""
+  // A probe evaluates the rule on one subject: the first it applies to.
+  const appliesTo = side.rule.appliesTo[0] ?? ""
   const is = (type: T.TermKey) => vocabulary.isKindOf(appliesTo, type)
   const roots: Record<T.Root, string> = {
     subject: "subject",
@@ -524,7 +525,8 @@ export function outcomeClass(outcome: T.Outcome | "none" | "error") {
 }
 
 /** Whether a rule is one the engine evaluates on its own: a norm other than a permission, with a subject type. */
-const isEvaluated = (rule: T.Rule) => rule.kind === "norm" && rule.modality !== "permission" && rule.appliesTo !== null
+const isEvaluated = (rule: T.Rule) =>
+  rule.kind === "norm" && rule.modality !== "permission" && rule.appliesTo.length > 0
 
 function isolated(rule: T.Rule): T.Rule {
   return rule.kind === "norm" || rule.kind === "discretion" ? { ...rule, overrides: [] } : rule

@@ -8,7 +8,7 @@ import type { RuleContent, TermContent } from "@/schema/zod"
 import { candidateRulePairs } from "../consolidate"
 import { documentLine } from "../promptVariables"
 import { keyEnum } from "./drafts"
-import type { UnresolvedTarget } from "./outline"
+import { namesText, sharesSubject, type UnresolvedTarget } from "./outline"
 import type { stepPrompts } from "./prompts"
 
 // Consolidation over the merged rules (hoa-consolidation, prompt drafts v2): each rule line shows its existing
@@ -55,7 +55,7 @@ export function ruleLine(rule: RuleContent, vocabulary: ReturnType<typeof create
     rule.key,
     kind,
     rule.requestTypes.join(", "),
-    rule.appliesTo ?? "-",
+    namesText(rule.appliesTo),
     mainCitation(rule),
     overrides,
     reading ? `one reading of an ambiguous passage: ${statement}` : statement
@@ -115,8 +115,7 @@ export function exceptionLines(input: {
         (other) =>
           other.kind === "norm" &&
           other.modality !== "permission" &&
-          other.appliesTo !== null &&
-          other.appliesTo === rule.appliesTo &&
+          sharesSubject(other, rule) &&
           input.sectionOf(mainCitation(other)) !== section &&
           other.requestTypes.some((type) => rule.requestTypes.includes(type))
       )

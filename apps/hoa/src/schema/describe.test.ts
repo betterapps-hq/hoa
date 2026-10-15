@@ -180,7 +180,7 @@ describe("every other form", () => {
       rules.push(
         {
           ...norm,
-          appliesTo: null,
+          appliesTo: [],
           modality: "prohibition",
           check: null,
           overrides: { documents: [], provisions: ["guidelines:5"], adoptedAfter: null, except: [norm.key] }

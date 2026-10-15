@@ -52,7 +52,9 @@ export function decide(findings: T.Finding[], rulesFile: T.RulesFile, requestTyp
       return false
     }
     const { bearer } = rule
-    return bearer === null || applicants.some((party) => vocabulary.isKindOf(bearer, party))
+    return (
+      bearer.length === 0 || applicants.some((party) => bearer.some((bearing) => vocabulary.isKindOf(bearing, party)))
+    )
   }
 
   const groups = (outcome: T.Outcome) => {

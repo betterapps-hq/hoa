@@ -182,9 +182,8 @@ export function planFacts(rulesFile: T.RulesFile, selected: readonly T.RuleKey[]
   const found: Found = { paths: new Set(), texts: [] }
   const seen = new Set<T.TermKey>()
   for (const rule of rulesFile.rules.filter((item) => keys.has(item.key))) {
-    const subjects = rule.appliesTo
-      ? [rule.appliesTo]
-      : rulebook.targetsOf(rule).flatMap((target) => (target.appliesTo ? [target.appliesTo] : []))
+    const subjects =
+      rule.appliesTo.length > 0 ? rule.appliesTo : rulebook.targetsOf(rule).flatMap((target) => target.appliesTo)
     const context = { types: [...new Set(subjects.map((key) => vocabulary.thingOf(key)))], ruleKey: rule.key }
     const expressions = rule.kind === "norm" || rule.kind === "discretion" ? [rule.appliesWhen, rule.overrides] : []
     walk([...expressions, rule.kind === "norm" ? rule.check : null], vocabulary, found, context, seen)

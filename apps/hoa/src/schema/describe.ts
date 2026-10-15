@@ -281,11 +281,17 @@ function describer(vocabulary: Vocabulary, { linkTerms = false }: DescribeOption
   }
 
   function rule(value: RuleContent) {
-    const subject = value.appliesTo ? `each ${label(value.appliesTo)}` : "the subjects of the rules it overrides"
+    const subject =
+      value.appliesTo.length > 0
+        ? `each ${joinWith(
+            value.appliesTo.map((key) => label(key)),
+            "or"
+          )}`
+        : "the subjects of the rules it overrides"
     const scope = `${subject}${where(value.appliesWhen)}`
     const sentence = match(value)
       .with({ kind: "norm" }, (norm) => {
-        const bearer = norm.bearer ? the(norm.bearer) : "the request"
+        const bearer = norm.bearer.length > 0 ? parties(norm.bearer, "any") : "the request"
         const overrides =
           Array.isArray(norm.overrides) && norm.overrides.length === 0
             ? ""
@@ -302,7 +308,7 @@ function describer(vocabulary: Vocabulary, { linkTerms = false }: DescribeOption
       .with(
         { kind: "discretion" },
         (discretion) =>
-          `${capitalize(the(discretion.decidedBy))} decides case by case for ${scope}, over ${selection(discretion.overrides)}.`
+          `${capitalize(parties(discretion.decidedBy, "any"))} decides case by case for ${scope}, over ${selection(discretion.overrides)}.`
       )
       .with({ kind: "sanction" }, (sanction) => {
         const verb = sanction.modality === "obligation" ? "must" : "may"
@@ -320,7 +326,7 @@ function describer(vocabulary: Vocabulary, { linkTerms = false }: DescribeOption
           : ""
         const cap = sanction.sanction.cap ? `, up to ${operand(sanction.sanction.cap)}` : ""
         return (
-          `${capitalize(the(sanction.imposedBy))} ${verb} impose ${article(sanction.sanction.type.replaceAll("-", " "))}` +
+          `${capitalize(parties(sanction.imposedBy, "any"))} ${verb} impose ${article(sanction.sanction.type.replaceAll("-", " "))}` +
           `${amounts}${repeats}${cap} ` +
           `on ${parties(sanction.against, "any")} when ${joinWith(enforced, "or")} isn't met, for ${scope}.`
         )

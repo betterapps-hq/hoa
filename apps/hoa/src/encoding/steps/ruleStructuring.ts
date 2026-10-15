@@ -24,7 +24,7 @@ import {
 import { coreRequestTypes } from "../plan"
 import { coreTermsText, documentLine, provisionBlock, termLines } from "../promptVariables"
 import { citationsOf, propertyFields } from "./drafts"
-import { kindName, structuringLine, type Outline } from "./outline"
+import { kindName, namesText, structuringLine, type Outline } from "./outline"
 import { none, type stepPrompts } from "./prompts"
 
 // F. Structure the rules (hoa-rule-structuring, prompt drafts v2): for a batch of fixed outlines, the checks,
@@ -188,13 +188,13 @@ export function draftOf(outline: Outline, rule: StructuredRule, effectiveFrom: s
       const requestType = outline.requestTypes[0] ?? null
       return {
         ...base,
-        appliesTo: requestType,
+        appliesTo: requestType ? [requestType] : [],
         requestTypes: requestType ? [requestType] : outline.requestTypes,
         kind: "sanction",
         modality: outline.modality,
         enforces: rule.enforces,
         against: outline.sanction?.against ?? [],
-        imposedBy: outline.sanction?.imposedBy,
+        imposedBy: outline.sanction?.imposedBy ?? [],
         sanction: rule.sanction
       }
     }
@@ -212,7 +212,7 @@ export function draftOf(outline: Outline, rule: StructuredRule, effectiveFrom: s
         ...base,
         kind: "norm",
         modality: outline.modality,
-        bearer: outline.modality === "requirement" ? null : outline.bearer,
+        bearer: outline.modality === "requirement" ? [] : outline.bearer,
         beneficiary: rule.beneficiary,
         decidedBy: outline.decidedBy,
         overrides: rule.overrides,
@@ -322,7 +322,7 @@ export function ruleStructuringVariables(input: {
             outline.key,
             kindName(outline),
             outline.requestTypes.join(", "),
-            outline.appliesTo ?? "-",
+            namesText(outline.appliesTo),
             outline.summary
           ].join(" | ")
         )

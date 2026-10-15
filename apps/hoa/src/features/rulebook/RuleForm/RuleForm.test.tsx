@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react"
+import { screen, within } from "@testing-library/react"
 import { describe, expect, it, vi } from "vitest"
 import type { RuleDraft } from "@/schema/zod"
 import { renderInWorkspace, ruleIn, sampleWithTermsApproved } from "@/tests/rulebookWorkspace"
@@ -19,8 +19,10 @@ describe("RuleForm", () => {
     setup()
     expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue(leaseRule.title)
     expect(screen.getByRole("combobox", { name: "Modality" })).toHaveValue("obligation")
-    expect(screen.getByRole("combobox", { name: "Bearer" })).toHaveValue("Owner")
-    expect(screen.getByRole("button", { name: "Remove lease registration" })).toBeInTheDocument()
+    expect(within(screen.getByRole("list", { name: "Bearer" })).getByText("Owner")).toBeInTheDocument()
+    const requestTypes = within(screen.getByRole("list", { name: "Request types" }))
+    expect(requestTypes.getByRole("button", { name: "Remove lease registration" })).toBeInTheDocument()
+    expect(within(screen.getByRole("list", { name: "Applies to" })).getByText("lease registration")).toBeInTheDocument()
     expect(screen.getByRole("combobox", { name: "Complies when: comparison" })).toHaveValue(">=")
   })
 
@@ -28,7 +30,7 @@ describe("RuleForm", () => {
     const { user } = setup()
     await user.clear(screen.getByRole("textbox", { name: "Title" }))
     expect(await screen.findByText("Give the rule a title.")).toBeInTheDocument()
-    await user.click(screen.getByRole("button", { name: "Clear Bearer" }))
+    await user.click(within(screen.getByRole("list", { name: "Bearer" })).getByRole("button", { name: "Remove Owner" }))
     expect(await screen.findAllByText("a requirement has no bearer, and every other norm has one")).not.toHaveLength(0)
     expect(screen.getByRole("button", { name: "Save the rule" })).toBeDisabled()
   })

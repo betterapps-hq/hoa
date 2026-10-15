@@ -115,14 +115,14 @@ export const outlineSchema: z.ZodType<Outline> = z.object({
   readKeys: z.array(z.string()),
   kind: z.enum(["norm", "discretion", "sanction", "limit"]),
   modality: z.string().nullable(),
-  bearer: z.string().nullable(),
-  appliesTo: z.string().nullable(),
+  bearer: z.array(z.string()),
+  appliesTo: z.array(z.string()),
   requestTypes: z.array(z.string()),
   check: z.enum(["test", "table", "document", "deadline", "approval", "judgment"]).nullable(),
-  decidedBy: z.string().nullable(),
+  decidedBy: z.array(z.string()),
   targets: outlineTargets.nullable(),
   except: outlineTargets.nullable(),
-  sanction: z.object({ type: z.string(), imposedBy: z.string(), against: z.array(z.string()) }).nullable(),
+  sanction: z.object({ type: z.string(), imposedBy: z.array(z.string()), against: z.array(z.string()) }).nullable(),
   resolved: z
     .object({ rules: z.array(z.string()), documents: z.array(z.string()), except: z.array(z.string()) })
     .nullable(),

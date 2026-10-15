@@ -71,7 +71,7 @@ export function heightRule(key: string, citation: string, feet = 10): RuleDraft 
     statement: `A {{shed}} is at most ${feet} feet tall.`,
     citations: [cite(citation)],
     requestTypes: ["architectural-application"],
-    appliesTo: "shed",
+    appliesTo: ["shed"],
     effectiveFrom: "2025-01-01",
     kind: "norm",
     modality: "requirement",
@@ -94,11 +94,11 @@ export const allowedRule: RuleDraft = {
   statement: "An {{owner}} may build a {{shed}}.",
   citations: [cite("declaration:4.1")],
   requestTypes: ["architectural-application"],
-  appliesTo: "shed",
+  appliesTo: ["shed"],
   effectiveFrom: "2025-01-01",
   kind: "norm",
   modality: "permission",
-  bearer: "owner"
+  bearer: ["owner"]
 }
 
 export const firstDraft: EncodingDraft = {

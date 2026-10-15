@@ -412,7 +412,7 @@ const ruleBase = {
   statement: z.string().min(1),
   citations: z.array(citation),
   requestTypes: z.array(termKey),
-  appliesTo: termKey.nullable(),
+  appliesTo: z.array(termKey),
   appliesWhen: condition.nullable(),
   scope: scope.nullable(),
   authority: citation.nullable(),
@@ -456,8 +456,8 @@ export const sanction = z.object({
 function checkRule(rule: RuleWithoutBookkeeping, context: z.RefinementCtx) {
   const fail = (message: string, ...path: string[]) => context.addIssue({ code: "custom", message, path })
   const hasSelector = (rule.kind === "norm" || rule.kind === "discretion") && !Array.isArray(rule.overrides)
-  if (rule.appliesTo === null && !hasSelector) {
-    fail("appliesTo is null only with an overrides selector", "appliesTo")
+  if (rule.appliesTo.length === 0 && !hasSelector) {
+    fail("appliesTo is empty only with an overrides selector", "appliesTo")
   }
   if (rule.kind === "discretion" && Array.isArray(rule.overrides) && rule.overrides.length === 0) {
     fail("a discretion rule overrides at least one rule", "overrides")
@@ -466,14 +466,14 @@ function checkRule(rule: RuleWithoutBookkeeping, context: z.RefinementCtx) {
     if (rule.enforces.rules.length === 0 && rule.enforces.documents.length === 0) {
       fail("a sanction enforces at least one rule or document", "enforces")
     }
-    if (rule.appliesTo === null || !rule.requestTypes.includes(rule.appliesTo)) {
+    if (rule.appliesTo.length !== 1 || !rule.appliesTo.every((key) => rule.requestTypes.includes(key))) {
       fail("a sanction's appliesTo is one of its request types", "appliesTo")
     }
   }
   if (rule.kind !== "norm") {
     return
   }
-  if ((rule.bearer === null) !== (rule.modality === "requirement")) {
+  if ((rule.bearer.length === 0) !== (rule.modality === "requirement")) {
     fail("a requirement has no bearer, and every other norm has one", "bearer")
   }
   const needsCheck =
@@ -484,7 +484,7 @@ function checkRule(rule: RuleWithoutBookkeeping, context: z.RefinementCtx) {
   if (!needsCheck && rule.check !== null) {
     fail(`a ${rule.modality} never has a check`, "check")
   }
-  if (rule.check?.type === "judgment" && rule.decidedBy === null) {
+  if (rule.check?.type === "judgment" && rule.decidedBy.length === 0) {
     fail("a judgment check needs decidedBy", "decidedBy")
   }
   if (rule.modality === "requirement" && (rule.remedy !== null || rule.cure !== null)) {
@@ -501,9 +501,9 @@ export const rule = z
       ...ruleBase,
       kind: z.literal("norm"),
       modality: normModality,
-      bearer: termKey.nullable(),
+      bearer: z.array(termKey),
       beneficiary: termKey.nullable(),
-      decidedBy: termKey.nullable(),
+      decidedBy: z.array(termKey),
       overrides: ruleSelection,
       noExceptions: citation.nullable(),
       check: check.nullable(),
@@ -511,14 +511,19 @@ export const rule = z
       recurs: operand.nullable(),
       cure: z.union([cure, z.literal("none")]).nullable()
     }),
-    z.object({ ...ruleBase, kind: z.literal("discretion"), decidedBy: termKey, overrides: ruleSelection }),
+    z.object({
+      ...ruleBase,
+      kind: z.literal("discretion"),
+      decidedBy: z.array(termKey).min(1),
+      overrides: ruleSelection
+    }),
     z.object({
       ...ruleBase,
       kind: z.literal("sanction"),
       modality: sanctionModality,
       enforces: z.object({ rules: z.array(ruleKey), documents: z.array(documentKey), except: z.array(ruleKey) }),
       against: z.array(termKey).min(1),
-      imposedBy: termKey,
+      imposedBy: z.array(termKey).min(1),
       sanction
     }),
     z.object({
@@ -776,7 +781,7 @@ const draftBase = {
   statement: statementDraft,
   citations: z.array(citation).min(1),
   requestTypes: z.array(termKey),
-  appliesTo: d(termKey),
+  appliesTo: list(termKey),
   appliesWhen: d(condition),
   scope: d(scope),
   authority: d(citation),
@@ -789,9 +794,9 @@ export const ruleDraft = z
       ...draftBase,
       kind: z.literal("norm"),
       modality: normModality,
-      bearer: d(termKey),
+      bearer: list(termKey),
       beneficiary: d(termKey),
-      decidedBy: d(termKey),
+      decidedBy: list(termKey),
       overrides: ruleSelection.default([]),
       noExceptions: d(citation),
       check: d(check),
@@ -799,14 +804,19 @@ export const ruleDraft = z
       recurs: d(operand),
       cure: d(z.union([cure, z.literal("none")]))
     }),
-    z.object({ ...draftBase, kind: z.literal("discretion"), decidedBy: termKey, overrides: ruleSelection }),
+    z.object({
+      ...draftBase,
+      kind: z.literal("discretion"),
+      decidedBy: z.array(termKey).min(1),
+      overrides: ruleSelection
+    }),
     z.object({
       ...draftBase,
       kind: z.literal("sanction"),
       modality: sanctionModality,
       enforces: z.object({ rules: list(ruleKey), documents: list(documentKey), except: list(ruleKey) }),
       against: z.array(termKey).min(1).default(["owner"]),
-      imposedBy: termKey,
+      imposedBy: z.array(termKey).min(1),
       sanction: sanctionDraft
     }),
     z.object({

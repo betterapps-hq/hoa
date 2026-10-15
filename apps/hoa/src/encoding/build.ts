@@ -46,6 +46,7 @@ import {
   buildGroupVocabulary,
   checkFindings,
   checkStructured,
+  isOutlineProblem,
   consolidateRules,
   consolidationInputOf,
   definedTermsInput,
@@ -730,9 +731,10 @@ export async function buildRulebook(input: BuildInput) {
           provisions,
           documents: governing
         })
+        // A rule faulted only in fields code copies from its outline isn't retried: no answer of F can fix it.
         const rules = state.structured.flatMap((item) => {
           const problems = found.get(item.outline.key) ?? []
-          return problems.length > 0 ? [{ key: item.outline.key, problems }] : []
+          return problems.some((problem) => !isOutlineProblem(problem)) ? [{ key: item.outline.key, problems }] : []
         })
         return rules.length > 0 ? [{ batchId: state.batch.id, rules }] : []
       })
@@ -797,10 +799,22 @@ export async function buildRulebook(input: BuildInput) {
       failures.push({ stage: "structure-rules", itemId: outline.key, message: "The rule got no structure." })
     }
     for (const item of state.structured.filter((found) => found.rule === null)) {
+      const field = item.issues
+        .map((issue) => ({ code: "zod", message: issue, path: [] }))
+        .find(isOutlineProblem)
+        ?.message.split(":")[1]
+        ?.trim()
+      // A path like appliesTo.0: the field, and the entry in its list.
+      const [name = "", index = "0"] = field?.split(".") ?? []
+      const value = item.draft[name]
+      const named = Array.isArray(value) ? value[Number(index)] : value
       failures.push({
         stage: "structure-rules",
         itemId: item.outline.key,
-        message: `The rule still fails Zod: ${item.issues[0] ?? "no structure"}`
+        message:
+          typeof named === "string"
+            ? `The rule's ${name} names "${named}", which no term of the vocabulary is.`
+            : `The rule still fails Zod: ${item.issues[0] ?? "no structure"}`
       })
     }
   }

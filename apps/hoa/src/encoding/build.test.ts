@@ -56,13 +56,16 @@ const prohibitionOutline = (aspect: string, citations: string[] = []) => ({
   citations,
   reads: [],
   interpretation: false,
-  bearer: "owner",
-  appliesTo: "lot",
+  bearer: ["owner"],
+  appliesTo: ["lot"],
   requestTypes: ["violation"]
 })
 
-/** Options for how the mock answers E for the conduct rules: a permission across sections, or a first answer short. */
-type Finding = { permits?: boolean; leavesOut?: string }
+/**
+ * Options for how the mock answers E for the conduct rules: a permission across sections, a first answer short, or a
+ * subject no term of the vocabulary is.
+ */
+type Finding = { permits?: boolean; leavesOut?: string; unknownSubject?: string }
 
 /** Answers E: a rule for 3.1(a)(ii) (citing a definition), 3.1(b) and the conduct rules' (a); a reason for the rest. */
 function findRules(text: string, options: Finding = {}) {
@@ -77,7 +80,12 @@ function findRules(text: string, options: Finding = {}) {
             overrides: { rules: [], provisions: ["declaration:3.1(b)"], documents: [] }
           }
         ]
-      : [prohibitionOutline("no-noise")]
+      : [
+          {
+            ...prohibitionOutline("no-noise"),
+            ...(options.unknownSubject ? { appliesTo: [{ label: options.unknownSubject }] } : {})
+          }
+        ]
   }
   const isFirstTry = variableOf(text, "problems") === "none"
   const keys = listedKeys(text, "provisions").filter((key) => !(isFirstTry && key === options.leavesOut))
@@ -457,6 +465,20 @@ describe("buildRulebook", () => {
     const scores = buildScores(result)
     expect(scores.find((score) => score.name === "rules-retried")?.value).toBe(1)
     expect(scores.find((score) => score.name === "problems-before-retry")?.value).toBeGreaterThan(0)
+  })
+
+  it("doesn't retry a rule faulted only in a field its outline gives it, and names the label", async () => {
+    const { step, names } = stepRunner()
+    const subject = "Owner or another resident of the Unit"
+    const result = await buildRulebook(withModel(() => model({ unknownSubject: subject }), { step }))
+    expect(names.filter((name) => name.includes(":retry-"))).toEqual([])
+    expect(result.failures).toEqual([
+      expect.objectContaining({
+        stage: "structure-rules",
+        itemId: noise,
+        message: `The rule's appliesTo names "${subject}", which no term of the vocabulary is.`
+      })
+    ])
   })
 
   it("keeps at most `concurrency` model calls in flight", async () => {

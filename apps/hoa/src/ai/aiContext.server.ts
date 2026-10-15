@@ -1,6 +1,6 @@
 import { LangfuseClient } from "@langfuse/client"
 import { env } from "@/env.server"
-import { createChatModel } from "./openrouter.server"
+import { createChatModel, type ProviderPin } from "./openrouter.server"
 import { createPromptLoader } from "./promptLoader"
 import { startTelemetry } from "./telemetry.server"
 
@@ -27,7 +27,7 @@ export function createAiContext() {
 
   return {
     isConfigured: true as const,
-    createModel: (modelId: string) => createChatModel(apiKey, modelId),
+    createModel: (modelId: string, pin?: ProviderPin) => createChatModel(apiKey, modelId, pin),
     /** The main model, used when a prompt version doesn't name one. */
     modelId: env.OPENROUTER_MODEL,
     /** The cheaper model for routing, structure and classification. */

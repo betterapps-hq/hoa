@@ -533,6 +533,13 @@ export async function structureFirstPass(input: Parameters<typeof structureBatch
 
 export type RuleProblem = { code: string; message: string; path: (string | number)[] }
 
+/** The draft fields code copies from the outline (`draftOf`), which no answer of F can change. */
+const outlineFields = new Set(["appliesTo", "bearer", "decidedBy", "imposedBy", "against", "requestTypes"])
+
+/** Whether a problem lies in a field F doesn't write, so retrying F can't fix it. */
+export const isOutlineProblem = (problem: RuleProblem) =>
+  problem.code === "zod" && outlineFields.has(problem.message.split(":")[1]?.trim().split(".")[0] ?? "")
+
 /**
  * The validator's problems with each structured rule, read with its batch's vocabulary, every rule structured so far
  * and other rules it may target (those of batches outside a partial run).

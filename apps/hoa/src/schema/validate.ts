@@ -721,11 +721,9 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
     }
     statement(at, rule.statement)
     rule.requestTypes.forEach((key, i) => requestType(at, key, ["requestTypes", i]))
-    if (rule.appliesTo) {
-      expectTerm(at, rule.appliesTo, ["appliesTo"], isThingOrCategory, "a thing or category")
-    }
+    rule.appliesTo.forEach((key, i) => expectTerm(at, key, ["appliesTo", i], isThingOrCategory, "a thing or category"))
     const scope: Scope = {
-      subject: thing(rule.appliesTo ? [rule.appliesTo] : "any"),
+      subject: thing(rule.appliesTo.length > 0 ? rule.appliesTo : "any"),
       request: rule.requestTypes,
       isApplicability: false
     }
@@ -748,7 +746,7 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
     match(rule)
       .with({ kind: "norm" }, (norm) => normRecord(at, scope, norm))
       .with({ kind: "discretion" }, (discretion) => {
-        party(at, discretion.decidedBy, ["decidedBy"])
+        discretion.decidedBy.forEach((key, i) => party(at, key, ["decidedBy", i]))
         selection(at, scope, discretion.overrides, ["overrides"])
       })
       .with({ kind: "sanction" }, (sanction) => sanctionRecord(at, scope, sanction))
@@ -765,15 +763,11 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
   }
 
   function normRecord(at: Site, scope: Scope, norm: Extract<RuleContent, { kind: "norm" }>) {
-    if (norm.bearer) {
-      party(at, norm.bearer, ["bearer"])
-    }
+    norm.bearer.forEach((key, i) => party(at, key, ["bearer", i]))
     if (norm.beneficiary) {
       term(at, norm.beneficiary, ["beneficiary"])
     }
-    if (norm.decidedBy) {
-      party(at, norm.decidedBy, ["decidedBy"])
-    }
+    norm.decidedBy.forEach((key, i) => party(at, key, ["decidedBy", i]))
     selection(at, scope, norm.overrides, ["overrides"])
     if (norm.noExceptions) {
       citation(at, norm.noExceptions, ["noExceptions"])
@@ -784,7 +778,7 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
     // A remedy exactly when the rule runs in applications and binds the owner or applicant (schema.md, Invariants 7).
     const runsInApplications = norm.requestTypes.some((key) => flowOf(key) === "application")
     const isRemedied = norm.modality !== "permission" && norm.modality !== "requirement"
-    const needsRemedy = runsInApplications && applicants.has(norm.bearer ?? "") && isRemedied
+    const needsRemedy = runsInApplications && norm.bearer.some((key) => applicants.has(key)) && isRemedied
     if (needsRemedy && norm.remedy === null) {
       at.report("invariant", "runs in applications and binds the owner or applicant, so it needs a remedy", ["remedy"])
     }
@@ -806,7 +800,7 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
   }
 
   function sanctionRecord(at: Site, scope: Scope, rule: Extract<RuleContent, { kind: "sanction" }>) {
-    party(at, rule.imposedBy, ["imposedBy"])
+    rule.imposedBy.forEach((key, i) => party(at, key, ["imposedBy", i]))
     rule.against.forEach((key, i) => party(at, key, ["against", i]))
     rule.enforces.rules.forEach((key, i) => {
       const target = ruleReference(at, key, ["enforces", "rules", i])

@@ -15,17 +15,17 @@ describe("ruleDraft", () => {
       statement: "No boats.",
       citations: [{ provisionKey: "rules:3.2", highlight: null, region: null }],
       requestTypes: ["violation"],
-      appliesTo: "vehicle",
+      appliesTo: ["vehicle"],
       effectiveFrom: "2025-11-12",
       modality: "prohibition",
-      bearer: "owner"
+      bearer: ["owner"]
     })
     expect(parsed).toMatchObject({
       appliesWhen: null,
       scope: null,
       authority: null,
       beneficiary: null,
-      decidedBy: null,
+      decidedBy: [],
       overrides: [],
       noExceptions: null,
       check: null,
@@ -47,21 +47,21 @@ describe("ruleDraft", () => {
   it.each([
     [{ ...ex.maxHeight, check: null }, "an obligation needs a check"],
     [{ ...ex.noSolar, check: ex.maxHeight.check }, "a prohibition never has a check"],
-    [{ ...ex.maxHeight, bearer: null }, "a requirement has no bearer, and every other norm has one"],
-    [{ ...ex.quorum, bearer: "owner" }, "a requirement has no bearer, and every other norm has one"],
+    [{ ...ex.maxHeight, bearer: [] }, "a requirement has no bearer, and every other norm has one"],
+    [{ ...ex.quorum, bearer: ["owner"] }, "a requirement has no bearer, and every other norm has one"],
     [{ ...ex.quorum, remedy: "redesign" }, "a requirement has no remedy or cure"],
-    [{ ...ex.sightLines, decidedBy: null }, "a judgment check needs decidedBy"],
+    [{ ...ex.sightLines, decidedBy: [] }, "a judgment check needs decidedBy"],
     [{ ...ex.maintainLandscaping, remedy: "none" }, "remedy none can't have a cure period"],
-    [{ ...ex.maxHeight, appliesTo: null }, "appliesTo is null only with an overrides selector"],
+    [{ ...ex.maxHeight, appliesTo: [] }, "appliesTo is empty only with an overrides selector"],
     [{ ...ex.metalVariations, overrides: [] }, "a discretion rule overrides at least one rule"],
     [{ ...ex.lateFee, enforces: { rules: [], documents: [] } }, "a sanction enforces at least one rule or document"],
-    [{ ...ex.lateFee, appliesTo: "violation" }, "a sanction's appliesTo is one of its request types"]
+    [{ ...ex.lateFee, appliesTo: ["violation"] }, "a sanction's appliesTo is one of its request types"]
   ])("rejects a rule that breaks an invariant: %#", (draft, message) => {
     expect(messages(ruleDraft.safeParse(draft))).toEqual([message])
   })
 
-  it("allows appliesTo null with an overrides selector", () => {
-    expect(ruleDraft.safeParse({ ...ex.grandfathered, appliesTo: null }).error).toBeUndefined()
+  it("allows appliesTo empty with an overrides selector", () => {
+    expect(ruleDraft.safeParse({ ...ex.grandfathered, appliesTo: [] }).error).toBeUndefined()
   })
 })
 

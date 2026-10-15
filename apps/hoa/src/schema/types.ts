@@ -289,7 +289,7 @@ export type RuleBase = {
   statement: string // house style, with term links: "Each {{fence-run}} must …"
   citations: Citation[] // at least one; the first is the main citation
   requestTypes: TermKey[] // the kinds of request it's evaluated in
-  appliesTo: TermKey | null // the thing or category it's evaluated on; null only with an overrides selector
+  appliesTo: TermKey[] // the things or categories it's evaluated on, any of them; empty only with an overrides selector
   appliesWhen: Condition | null
   scope: { lotId: Id; subjectId: Id | null } | null // decision rules: the lot, and the approved improvement, it covers
   authority: Citation | null // decision rules: the provision granting the power used, such as the variance power
@@ -302,9 +302,9 @@ export type RuleBase = {
 export type NormRule = RuleBase & {
   kind: "norm"
   modality: "obligation" | "prohibition" | "permission" | "recommendation" | "requirement"
-  bearer: TermKey | null // the party that must comply; null for a requirement
+  bearer: TermKey[] // the parties that must comply, each of them; empty for a requirement
   beneficiary: TermKey | null // the party it's owed to or involves
-  decidedBy: TermKey | null // required for judgment checks
+  decidedBy: TermKey[] // who may decide, any of them; required for judgment checks
   overrides: RuleSelection
   noExceptions: Citation | null // the passage that rules out exceptions and variances; only law overrides it
   check: Check | null // null: a permission, or a prohibition of the subject itself
@@ -315,7 +315,7 @@ export type NormRule = RuleBase & {
 
 export type DiscretionRule = RuleBase & {
   kind: "discretion" // "considered case by case", "variations may be considered"
-  decidedBy: TermKey
+  decidedBy: TermKey[] // at least one
   overrides: RuleSelection
 }
 
@@ -324,7 +324,7 @@ export type SanctionRule = RuleBase & {
   modality: "obligation" | "permission" // shall impose, or may impose
   enforces: { rules: RuleKey[]; documents: string[]; except: RuleKey[] } // rules, and whole documents by key
   against: TermKey[] // the parties it can be imposed on; the liability settings add whoever answers for them
-  imposedBy: TermKey
+  imposedBy: TermKey[] // who may impose it, any of them; at least one
   sanction: Sanction
 }
 

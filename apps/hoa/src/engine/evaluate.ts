@@ -1,5 +1,6 @@
 import { match } from "ts-pattern"
 import type * as T from "@/schema/types"
+import { orList } from "@/text/list"
 import { appliesOn, isConsidered } from "./applicability"
 import { type CheckResult, evaluateCheck } from "./checks"
 import { isA } from "./conditions"
@@ -49,9 +50,8 @@ const verdictOf = (outcome: T.Outcome, reason: string, details: Partial<Verdict>
 
 function subjectsOf(context: Context, rulebook: Rulebook, rule: EvaluatedRule) {
   const scratch = { ...context, reads: [] }
-  const types = rule.appliesTo
-    ? [rule.appliesTo]
-    : rulebook.targetsOf(rule).flatMap((target) => (target.appliesTo ? [target.appliesTo] : []))
+  const types =
+    rule.appliesTo.length > 0 ? rule.appliesTo : rulebook.targetsOf(rule).flatMap((target) => target.appliesTo)
   return context.request.entities
     .filter((entity) => types.some((type) => isA(scratch, entity.id, type) !== false))
     .map((entity) => entity.id)
@@ -100,6 +100,8 @@ function verdict(
   overrides: Overrides
 ): Verdict {
   const label = (key: T.TermKey) => context.vocabulary.label(key)
+  // Whoever decides: any of the rule's deciders, the committee when it names none.
+  const deciders = (keys: readonly T.TermKey[]) => orList((keys.length > 0 ? keys : ["committee"]).map(label))
   const applying = (effect: Override["effect"]) => overrides.applying.find((override) => override.effect === effect)
 
   const displacer = applying("displaced")
@@ -143,7 +145,7 @@ function verdict(
       }
       const discretion = applying("decided-by")
       if (discretion?.rule.kind === "discretion") {
-        const reason = `Doesn't meet ${rule.title}; the ${label(discretion.rule.decidedBy)} decides case by case (${discretion.rule.key}).`
+        const reason = `Doesn't meet ${rule.title}; the ${deciders(discretion.rule.decidedBy)} decides case by case (${discretion.rule.key}).`
         return verdictOf("committee", reason, { check, override: discretion })
       }
       if (rule.modality === "recommendation") {
@@ -155,8 +157,7 @@ function verdict(
     })
     .with("unknown", () => {
       if (rule.check?.type === "judgment") {
-        const decider = label(rule.decidedBy ?? "committee")
-        return verdictOf("committee", `The ${decider} decides: ${rule.check.question}`, { check })
+        return verdictOf("committee", `The ${deciders(rule.decidedBy)} decides: ${rule.check.question}`, { check })
       }
       return missingInformation(rule.check?.type === "document" && applies !== null)
     })

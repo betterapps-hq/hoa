@@ -52,8 +52,11 @@ scored in code and judged by the coding agent, and Langfuse datasets only where 
   relevant rules, the rulebook's vocabulary); what's known about one organization lives in its rulebook's terms (definitions,
   scope notes, value meanings) and its project types. Before adding any mechanism, ask what it costs with 5, 10 and 100
   customers.
-- The rulebook build's term extraction, provision encoding, repair and consolidation run on `anthropic/claude-opus-5.5`
-  at high effort, the review's document review and the project type suggestions on `anthropic/claude-sonnet-5.5` and
+- The rulebook build's steps run on the models that matched Opus 5.5 on their step tests: defined terms and
+  vocabulary merge on `anthropic/claude-haiku-5.5` (medium effort), rule finding on `openai/gpt-6-luna` (high effort,
+  `openai/fast` tier), shared vocabulary on `deepseek/deepseek-v4.1-flash` (medium), rule structuring on
+  `openai/gpt-6.1-sol` (medium); repair and consolidation stay on `anthropic/claude-opus-5.5` at high effort. The
+  review's document review and the project type suggestions on `anthropic/claude-sonnet-5.5` and
   the review's other stages on `anthropic/claude-haiku-5.5`, through their prompts' `config.model`; a stage whose
   prompt names no model uses `OPENROUTER_MODEL` or `OPENROUTER_SMALL_MODEL`.
 - A prompt whose contract changes (new variables or output) gets a new name, so two contracts never share a label.
@@ -97,8 +100,9 @@ evaluators are deferred.
   `resolvePromptVersions`, and pass `promptVersion` to each call.
 - **Model per prompt.** `runTextPrompt` and `runObjectPrompt` take a model factory and a default model id, and build
   the model after loading the prompt: the version's `config.model` when it names one, else the default
-  (`OPENROUTER_MODEL`, or `OPENROUTER_SMALL_MODEL` for the review's page classification). Results report the
-  `modelId` used. A stage that escalates a disputed answer runs the same version on its `config.escalationModel` (the
+  (`OPENROUTER_MODEL`, or `OPENROUTER_SMALL_MODEL` for the review's page classification). A version's
+  `config.provider` keeps its calls on one OpenRouter provider or tier, such as `openai/fast`, with no fallback. Results
+  report the `modelId` used. A stage that escalates a disputed answer runs the same version on its `config.escalationModel` (the
   review's facts: design/application-review.md, Recognition).
 - **Content cache.** Pass a `cache` to reuse results: the key covers the trace name, model, compiled prompt and
   attachments, so only a real change triggers a new model call. Cached results report `isCached` and cost 0.

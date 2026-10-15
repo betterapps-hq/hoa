@@ -47,11 +47,11 @@ const outline = (key: string, overrides: Partial<Outline> = {}): Outline => ({
   readKeys: [],
   kind: "norm",
   modality: "obligation",
-  bearer: "owner",
-  appliesTo: "lot",
+  bearer: ["owner"],
+  appliesTo: ["lot"],
   requestTypes: ["violation"],
   check: null,
-  decidedBy: null,
+  decidedBy: [],
   targets: null,
   except: null,
   sanction: null,
@@ -341,8 +341,8 @@ describe("E", () => {
               reads: [],
               interpretation: false,
               kind: "permission",
-              bearer: "owner",
-              appliesTo: { label: "storage shed" },
+              bearer: ["owner"],
+              appliesTo: [{ label: "storage shed" }],
               requestTypes: ["violation"],
               overrides: { rules: [], provisions: [], documents: [] }
             },
@@ -354,8 +354,8 @@ describe("E", () => {
               reads: [],
               interpretation: false,
               kind: "obligation",
-              bearer: "owner",
-              appliesTo: "lot",
+              bearer: ["owner"],
+              appliesTo: ["lot"],
               requestTypes: ["violation"]
             }
           ],
@@ -389,11 +389,11 @@ describe("E", () => {
     const sanction = outline("rules:5#fine", {
       kind: "sanction",
       modality: "permission",
-      bearer: null,
-      appliesTo: "violation",
+      bearer: [],
+      appliesTo: ["violation"],
       targets: { rules: ["rules:1#limit", "rules:2#gone"], provisions: ["rules:3"], documents: [] },
       except: { rules: [], provisions: [], documents: [] },
-      sanction: { type: "fine", imposedBy: "board", against: ["owner"] }
+      sanction: { type: "fine", imposedBy: ["board"], against: ["owner"] }
     })
     const resolved = resolveOutlines(
       [outline("rules:1#limit"), outline("rules:3#meeting", { requestTypes: ["meeting"] }), sanction],
@@ -435,7 +435,7 @@ describe("C", () => {
       groupId: "g1",
       terms: [shed],
       serves: new Map([["shed", ["rules:1#a"]]]),
-      outlines: [outline("rules:1#a", { appliesTo })],
+      outlines: [outline("rules:1#a", { appliesTo: [appliesTo] })],
       problems: []
     })
     const codes = (appliesTo: string) =>
@@ -445,7 +445,10 @@ describe("C", () => {
     const sanction = (imposedBy: string) => ({
       ...group("shed"),
       outlines: [
-        outline("rules:1#a", { appliesTo: "shed", sanction: { type: "legal-action", imposedBy, against: ["shed"] } })
+        outline("rules:1#a", {
+          appliesTo: ["shed"],
+          sanction: { type: "legal-action", imposedBy: [imposedBy], against: ["shed"] }
+        })
       ]
     })
     const sanctionCodes = (imposedBy: string) =>
@@ -722,13 +725,13 @@ describe("consolidation", () => {
       statement: "S.",
       citations: [{ provisionKey: key.slice(0, key.indexOf("#")), highlight: null, region: null }],
       requestTypes: ["violation"],
-      appliesTo: "lot",
+      appliesTo: ["lot"],
       appliesWhen: null,
       scope: null,
       authority: null,
       effectiveFrom: "2024-01-01",
       kind: "discretion" as const,
-      decidedBy: "board",
+      decidedBy: ["board"],
       overrides: []
     })
     const lines = crossReferenceLines({
@@ -746,14 +749,14 @@ describe("consolidation", () => {
       title: "T",
       statement: "S.",
       requestTypes: ["violation"],
-      appliesTo: "lot",
+      appliesTo: ["lot"],
       appliesWhen: null,
       scope: null,
       authority: null,
       effectiveFrom: "2024-01-01",
       beneficiary: null,
       noExceptions: null,
-      decidedBy: null,
+      decidedBy: [],
       check: null,
       remedy: null,
       recurs: null,
@@ -766,17 +769,17 @@ describe("consolidation", () => {
       citations: cite("rules:1#may"),
       kind: "norm" as const,
       modality: "permission" as const,
-      bearer: "owner",
+      bearer: ["owner"],
       overrides: []
     }
     const norm = (key: string, appliesTo: string) => ({
       ...base,
       key,
-      appliesTo,
+      appliesTo: [appliesTo],
       citations: cite(key),
       kind: "norm" as const,
       modality: "obligation" as const,
-      bearer: "owner",
+      bearer: ["owner"],
       overrides: [],
       check: { type: "test" as const, test: { type: "text" as const, text: "ok" } }
     })

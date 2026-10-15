@@ -20,11 +20,11 @@ describe("the sample rules file", () => {
     const broken = structuredClone(sample)
     const [first] = broken.rules
     if (first) {
-      first.appliesTo = "residense"
+      first.appliesTo = ["residense"]
     }
     const issues = validateRulebook(broken)
     expect(issues).toEqual([
-      { code: "undefined-term", message: "residense isn't a term", recordKey: first?.key, path: ["appliesTo"] }
+      { code: "undefined-term", message: "residense isn't a term", recordKey: first?.key, path: ["appliesTo", 0] }
     ])
   })
 })

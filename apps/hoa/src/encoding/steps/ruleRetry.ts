@@ -69,18 +69,18 @@ export function outlineOfRecord(item: ProblemRecord): Outline {
     readKeys: [],
     kind: ruleKind,
     modality: text(record.modality),
-    bearer: ruleKind === "norm" ? text(record.bearer) : null,
-    appliesTo: text(record.appliesTo),
+    bearer: ruleKind === "norm" ? texts(record.bearer) : [],
+    appliesTo: texts(record.appliesTo),
     requestTypes: ruleKind === "sanction" ? requestTypes.slice(0, 1) : requestTypes,
     check: ruleKind === "norm" ? check : null,
-    decidedBy: text(record.decidedBy),
+    decidedBy: texts(record.decidedBy),
     targets: null,
     except: null,
     sanction:
       ruleKind === "sanction"
         ? {
             type: text(sanction.type) ?? "fine",
-            imposedBy: text(record.imposedBy) ?? "",
+            imposedBy: texts(record.imposedBy),
             against: texts(record.against)
           }
         : null,

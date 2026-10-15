@@ -28,11 +28,11 @@ export type RuleFields = {
   statement: string
   domain: T.Domain
   requestTypes: string[]
-  appliesTo: string | null
+  appliesTo: string[]
   modality: T.NormRule["modality"]
-  bearer: string | null
+  bearer: string[]
   remedy: T.RuleRemedy | null
-  decidedBy: string | null
+  decidedBy: string[]
 }
 
 /** The structured parts of a rule, edited beside the fields. */
@@ -47,9 +47,9 @@ export function fieldsOf(rule: RuleContent): RuleFields {
     requestTypes: rule.requestTypes,
     appliesTo: rule.appliesTo,
     modality: norm?.modality ?? "obligation",
-    bearer: norm?.bearer ?? null,
+    bearer: norm?.bearer ?? [],
     remedy: norm?.remedy ?? null,
-    decidedBy: norm?.decidedBy ?? null
+    decidedBy: norm?.decidedBy ?? []
   }
 }
 

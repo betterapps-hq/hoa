@@ -39,15 +39,16 @@ export type Outline = {
   kind: RuleContent["kind"]
   /** A norm's or a sanction's modality. */
   modality: string | null
-  bearer: TermKey | null
-  appliesTo: TermKey | null
+  /** Its parties and subjects, each a key or, before the vocabulary has it, a label; any of them, empty when none. */
+  bearer: TermKey[]
+  appliesTo: TermKey[]
   requestTypes: TermKey[]
   check: CheckType | null
-  decidedBy: TermKey | null
+  decidedBy: TermKey[]
   /** What a permission or discretion overrides, a sanction enforces or a limit limits, as E names it. */
   targets: OutlineTargets | null
   except: OutlineTargets | null
-  sanction: { type: string; imposedBy: TermKey; against: TermKey[] } | null
+  sanction: { type: string; imposedBy: TermKey[]; against: TermKey[] } | null
   resolved: ResolvedTargets | null
   /** A selector the outline keeps as it is (a golden or recorded rule's). */
   selector: Selector | null
@@ -92,7 +93,7 @@ export function outlineOfRule(rule: RuleContent, unitId: string, summary: string
       return {
         ...base,
         modality: null,
-        bearer: null,
+        bearer: [],
         check: null,
         decidedBy: rule.decidedBy,
         sanction: null,
@@ -102,9 +103,9 @@ export function outlineOfRule(rule: RuleContent, unitId: string, summary: string
       return {
         ...base,
         modality: rule.modality,
-        bearer: null,
+        bearer: [],
         check: null,
-        decidedBy: null,
+        decidedBy: [],
         sanction: { type: rule.sanction.type, imposedBy: rule.imposedBy, against: rule.against },
         resolved: { rules: rule.enforces.rules, documents: rule.enforces.documents, except: rule.enforces.except },
         selector: null
@@ -113,9 +114,9 @@ export function outlineOfRule(rule: RuleContent, unitId: string, summary: string
       return {
         ...base,
         modality: null,
-        bearer: null,
+        bearer: [],
         check: null,
-        decidedBy: null,
+        decidedBy: [],
         sanction: null,
         resolved: { rules: rule.limits, documents: [], except: [] },
         selector: null
@@ -226,7 +227,7 @@ export function remedyRequired(outline: Outline, flowOf: (requestType: TermKey) 
     outline.kind === "norm" &&
     outline.modality !== "permission" &&
     outline.modality !== "requirement" &&
-    applicants.has(outline.bearer ?? "") &&
+    outline.bearer.some((key) => applicants.has(key)) &&
     outline.requestTypes.some((type) => flowOf(type) === "application")
   )
 }
@@ -247,11 +248,18 @@ export function targetsText(outline: Outline) {
     : ""
 }
 
+/** Whether two rules or outlines name a subject in common. */
+export const sharesSubject = (a: { appliesTo: readonly string[] }, b: { appliesTo: readonly string[] }) =>
+  a.appliesTo.some((key) => b.appliesTo.includes(key))
+
+/** Parties or subjects as a prompt line shows them: any of them, "-" for none. */
+export const namesText = (names: readonly string[]) => names.join(" or ") || "-"
+
 /** The kind with who decides a judged or discretionary rule, and who imposes a sanction on whom. */
 function kindText(outline: Outline) {
-  const decider = outline.decidedBy ? `, decided by ${outline.decidedBy}` : ""
+  const decider = outline.decidedBy.length > 0 ? `, decided by ${namesText(outline.decidedBy)}` : ""
   const sanction = outline.sanction
-    ? ` ${outline.modality ?? ""}, ${outline.sanction.type} imposed by ${outline.sanction.imposedBy} on ${outline.sanction.against.join(", ")}`
+    ? ` ${outline.modality ?? ""}, ${outline.sanction.type} imposed by ${namesText(outline.sanction.imposedBy)} on ${outline.sanction.against.join(", ")}`
     : ""
   return `${kindName(outline)}${decider}${sanction}`
 }
@@ -266,8 +274,8 @@ export function vocabularyLine(outline: Outline) {
   return [
     outline.key,
     kindText(outline),
-    outline.bearer ?? "-",
-    outline.appliesTo ?? "-",
+    namesText(outline.bearer),
+    namesText(outline.appliesTo),
     outline.requestTypes.join(", "),
     outline.summary,
     `reads: ${reads || "none"}`,
@@ -284,8 +292,8 @@ export function structuringLine(outline: Outline, flowOf: (requestType: TermKey)
   return [
     outline.key,
     kindText(outline),
-    outline.bearer ?? "-",
-    outline.appliesTo ?? "-",
+    namesText(outline.bearer),
+    namesText(outline.appliesTo),
     outline.requestTypes.join(", "),
     remedyRequired(outline, flowOf) ? "remedy required" : "no remedy",
     targetsText(outline) || "-",

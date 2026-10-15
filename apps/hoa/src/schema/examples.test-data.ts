@@ -321,7 +321,7 @@ const ruleBase = {
 const normBase = {
   ...ruleBase,
   beneficiary: null,
-  decidedBy: null,
+  decidedBy: [],
   overrides: [],
   noExceptions: null,
   cure: null,
@@ -348,10 +348,10 @@ export const compositeColors: NormDraft = {
   title: "Composite colors by manufacturer",
   statement:
     "A composite {{fence-run}} must use a {{fence-run.color}} its {{fence-run.manufacturer}} offers on this list: Trex in Winchester Grey or Saddle, Frame It All in River Birch or Teak, Neoline in Honey Oak or Desert Sage.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   appliesWhen: composite,
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: {
     type: "table",
     inputs: [ref("fence-run.manufacturer"), ref("fence-run.color")],
@@ -394,10 +394,10 @@ export const manufacturers: NormDraft = {
   domain: "architectural",
   title: "Composite manufacturers",
   statement: "A composite {{fence-run}} must come from Trex, Frame It All or Neoline.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   appliesWhen: composite,
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: { type: "test", test: { type: "in", left: ref("fence-run.manufacturer"), values: listedManufacturers } },
   remedy: "change-detail"
 }
@@ -411,7 +411,7 @@ export const otherManufacturers: DiscretionDraft = {
   title: "Other composite manufacturers case by case",
   statement:
     "The {{committee}} may consider a composite {{fence-run}} from another {{fence-run.manufacturer}} case by case.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   appliesWhen: {
     type: "all",
     of: [
@@ -419,7 +419,7 @@ export const otherManufacturers: DiscretionDraft = {
       { type: "not", of: { type: "in", left: ref("fence-run.manufacturer"), values: listedManufacturers } }
     ]
   },
-  decidedBy: "committee",
+  decidedBy: ["committee"],
   overrides: ["guidelines:5.4.2(i)#colors", "guidelines:5.3.2#manufacturers"]
 }
 
@@ -432,7 +432,7 @@ export const maxHeight: NormDraft = {
   title: "Boundary and return fences at most 72 inches",
   statement:
     "A wood or composite {{fence-run}} on a {{lot}} boundary, or a {{return-fence}}, must have a {{fence-run.height}} of at most 72 inches, not counting lattice or an arbor.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   appliesWhen: {
     type: "all",
     of: [
@@ -451,7 +451,7 @@ export const maxHeight: NormDraft = {
     ]
   },
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: { type: "test", test: { type: "compare", left: ref("fence-run.height"), op: "<=", right: inches(72) } },
   remedy: "change-detail"
 }
@@ -484,9 +484,9 @@ export const fenceAndLattice: NormDraft = {
   domain: "architectural",
   title: "Fence plus lattice at most 90 inches",
   statement: "A {{fence-run}}'s {{fence-run.height}} plus its {{fence-run.lattice-height}} must be at most 90 inches.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: {
     type: "test",
     test: {
@@ -507,10 +507,10 @@ export const metalHeight: NormDraft = {
   domain: "architectural",
   title: "Metal fences 48 to 72 inches",
   statement: "A metal {{fence-run}} must have a {{fence-run.height}} of at least 48 and at most 72 inches.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   appliesWhen: { type: "compare", left: ref("fence-run.material"), op: "=", right: val("fence-material.metal") },
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: {
     type: "test",
     test: {
@@ -533,9 +533,9 @@ export const metalVariations: DiscretionDraft = {
   domain: "architectural",
   title: "Metal height variations considered",
   statement: "The {{committee}} may consider variations from the metal fence heights.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   appliesWhen: { type: "compare", left: ref("fence-run.material"), op: "=", right: val("fence-material.metal") },
-  decidedBy: "committee",
+  decidedBy: ["committee"],
   overrides: ["guidelines:5.5.2#metal-height"]
 }
 
@@ -547,14 +547,14 @@ export const frontSetback: NormDraft = {
   domain: "architectural",
   title: "Front fences set back 5 feet",
   statement: "A front or return {{fence-run}} should be set back at least 5 feet from the front corner of the house.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   appliesWhen: {
     type: "in",
     left: ref("fence-run.location"),
     values: [val("fence-location.front"), val("fence-location.return")]
   },
   modality: "recommendation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: {
     type: "test",
     test: {
@@ -576,10 +576,10 @@ export const neighborApproval: NormDraft = {
   title: "Neighbor approval for shared boundaries",
   statement:
     "A {{fence-run}} on a boundary with another {{lot}} needs the {{neighbor}}'s signed approval of its placement, height and materials.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   appliesWhen: { type: "compare", left: ref("fence-run.boundary-with"), op: "=", right: val("boundary.lot") },
   modality: "obligation",
-  bearer: "applicant",
+  bearer: ["applicant"],
   beneficiary: "neighbor",
   check: {
     type: "document",
@@ -604,11 +604,11 @@ export const sightLines: NormDraft = {
   domain: "architectural",
   title: "Front fences keep drivers' view clear",
   statement: "A front {{fence-run}} must not interfere with a driver's ability to see objects in the roadway.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   appliesWhen: { type: "compare", left: ref("fence-run.location"), op: "=", right: val("fence-location.front") },
   modality: "obligation",
-  bearer: "owner",
-  decidedBy: "committee",
+  bearer: ["owner"],
+  decidedBy: ["committee"],
   check: {
     type: "judgment",
     question: "Does the fence leave a driver a clear view of objects in the roadway?",
@@ -625,7 +625,7 @@ export const gateColor: NormDraft = {
   domain: "architectural",
   title: "Gates match a composite fence's color",
   statement: "A {{gate}} in a composite {{fence-run}} must match the fence's {{fence-run.color}}.",
-  appliesTo: "gate",
+  appliesTo: ["gate"],
   appliesWhen: {
     type: "compare",
     left: ref("gate.fence-run", "fence-run.material"),
@@ -633,7 +633,7 @@ export const gateColor: NormDraft = {
     right: val("fence-material.composite")
   },
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: {
     type: "test",
     test: { type: "compare", left: ref("gate.color"), op: "=", right: ref("gate.fence-run", "fence-run.color") }
@@ -651,9 +651,9 @@ export const committeeResponse: NormDraft = {
   statement:
     "The {{committee}} must decide an {{architectural-application}} within 30 days after it's submitted, or it is deemed approved.",
   requestTypes: ["architectural-application"],
-  appliesTo: "architectural-application",
+  appliesTo: ["architectural-application"],
   modality: "obligation",
-  bearer: "committee",
+  bearer: ["committee"],
   beneficiary: "applicant",
   check: {
     type: "deadline",
@@ -681,7 +681,7 @@ export const grandfathered: NormDraft = {
   title: "Existing fences may remain until replaced",
   statement:
     "A {{fence-run}} installed before November 12, 2025 with the {{committee}}'s approval may remain until it's replaced.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   appliesWhen: {
     type: "all",
     of: [
@@ -690,7 +690,7 @@ export const grandfathered: NormDraft = {
     ]
   },
   modality: "permission",
-  bearer: "owner",
+  bearer: ["owner"],
   overrides: {
     documents: ["guidelines"],
     provisions: [],
@@ -709,12 +709,12 @@ export const variance: NormDraft = {
   domain: "architectural",
   title: "Variance: 84-inch rear fence on Unit 42",
   statement: "The approved rear {{fence-run}} on {{lot}} 42 may be up to 84 inches tall.",
-  appliesTo: "fence-run",
+  appliesTo: ["fence-run"],
   scope: { lotId: "lot-42", subjectId: "improvement-0193" },
   authority: { provisionKey: "declaration:4.5", highlight: null, region: null },
   effectiveFrom: "2026-05-01",
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   overrides: ["guidelines:5.5.1(i)#max-height"],
   check: { type: "test", test: { type: "compare", left: ref("fence-run.height"), op: "<=", right: inches(84) } },
   remedy: "change-detail"
@@ -728,9 +728,9 @@ export const noSolar: NormDraft = {
   domain: "architectural",
   title: "No solar panels",
   statement: "A {{lot}} must not have a {{solar-device}}.",
-  appliesTo: "solar-device",
+  appliesTo: ["solar-device"],
   modality: "prohibition",
-  bearer: "owner",
+  bearer: ["owner"],
   check: null,
   remedy: "redesign"
 }
@@ -744,10 +744,10 @@ export const solarLaw: NormDraft = {
   title: "Solar devices can't be prohibited",
   statement:
     "An {{organization}} may not prohibit an {{owner}} from installing a {{solar-device}} on the owner's roof.",
-  appliesTo: "solar-device",
+  appliesTo: ["solar-device"],
   appliesWhen: { type: "compare", left: ref("solar-device.mounting"), op: "=", right: val("mounting.roof") },
   modality: "permission",
-  bearer: "owner",
+  bearer: ["owner"],
   overrides: ["guidelines:8.2#no-solar"],
   check: null,
   remedy: null
@@ -762,7 +762,7 @@ export const overnightParking: NormDraft = {
   title: "No commercial vehicles on the street overnight",
   statement: "A commercial {{vehicle}} must not be parked on the street between 2:00 and 5:00 a.m.",
   requestTypes: ["violation"],
-  appliesTo: "parking",
+  appliesTo: ["parking"],
   appliesWhen: {
     type: "all",
     of: [
@@ -776,7 +776,7 @@ export const overnightParking: NormDraft = {
     ]
   },
   modality: "obligation",
-  bearer: "occupant",
+  bearer: ["occupant"],
   check: {
     type: "test",
     test: {
@@ -803,9 +803,9 @@ export const trashContainers: NormDraft = {
   statement:
     "A trash container may be at the curb only from 6:00 p.m. the day before pickup until 9:00 p.m. on pickup day.",
   requestTypes: ["violation"],
-  appliesTo: "curbside-placement",
+  appliesTo: ["curbside-placement"],
   modality: "obligation",
-  bearer: "occupant",
+  bearer: ["occupant"],
   check: {
     type: "test",
     test: {
@@ -833,9 +833,9 @@ export const petLimit: NormDraft = {
   title: "At most three dogs and cats",
   statement: "A {{lot}} may have at most three dogs and cats in total.",
   requestTypes: ["violation"],
-  appliesTo: "lot",
+  appliesTo: ["lot"],
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: {
     type: "test",
     test: {
@@ -861,9 +861,9 @@ export const minimumLease: NormDraft = {
   title: "Leases at least 12 months",
   statement: "A lease must have a {{lease-registration.term}} of at least 12 months.",
   requestTypes: ["lease-registration"],
-  appliesTo: "lease-registration",
+  appliesTo: ["lease-registration"],
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: {
     type: "test",
     test: {
@@ -885,9 +885,9 @@ export const rentalCap: NormDraft = {
   title: "At most 20 percent of lots leased",
   statement: "No more than 20 percent of {{lot:plural}} may be leased at one time.",
   requestTypes: ["lease-registration"],
-  appliesTo: "lease-registration",
+  appliesTo: ["lease-registration"],
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: {
     type: "test",
     test: {
@@ -921,9 +921,9 @@ export const assessmentDue: NormDraft = {
   title: "Annual assessment due January 1",
   statement: "Each {{owner}} must pay the annual {{assessment}} by January 1.",
   requestTypes: ["assessment"],
-  appliesTo: "assessment",
+  appliesTo: ["assessment"],
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: {
     type: "deadline",
     act: ref("assessment.paid-on"),
@@ -951,11 +951,11 @@ export const lateFee: SanctionDraft = {
   statement:
     "If an {{assessment}} is unpaid 15 days after it's due, the {{organization}} charges the greater of $25 and 10 percent of the unpaid amount.",
   requestTypes: ["assessment"],
-  appliesTo: "assessment",
+  appliesTo: ["assessment"],
   modality: "obligation",
   enforces: { rules: ["declaration:6.4#annual-due"], documents: [], except: [] },
   against: ["owner"],
-  imposedBy: "organization",
+  imposedBy: ["organization"],
   sanction: {
     type: "late-fee",
     amounts: [
@@ -989,11 +989,11 @@ export const fineSchedule: SanctionDraft = {
   statement:
     "After notice, the time to cure, and a hearing if the owner asks for one, the {{board}} may fine $100 for a first violation, $200 for a second within 12 months, and $25 a day while a violation continues, up to $1,000.",
   requestTypes: ["violation"],
-  appliesTo: "violation",
+  appliesTo: ["violation"],
   modality: "permission",
   enforces: { rules: [], documents: ["rules"], except: [] },
   against: ["owner"],
-  imposedBy: "board",
+  imposedBy: ["board"],
   sanction: {
     type: "fine",
     amounts: [usd(100), usd(200)],
@@ -1015,7 +1015,7 @@ export const fineLimit: LimitDraft = {
   title: "Fines capped at $500 per violation",
   statement: "Fines for one violation may not total more than $500.",
   requestTypes: ["violation"],
-  appliesTo: "violation",
+  appliesTo: ["violation"],
   limits: ["rules:12.1#fines"],
   forbids: false,
   maxAmount: null,
@@ -1031,10 +1031,10 @@ export const maintainLandscaping: NormDraft = {
   title: "Keep landscaping maintained",
   statement: "Each {{owner}} must keep the {{lot}}'s landscaping neat, trimmed and free of weeds.",
   requestTypes: ["violation"],
-  appliesTo: "lot",
+  appliesTo: ["lot"],
   modality: "obligation",
-  bearer: "owner",
-  decidedBy: "board",
+  bearer: ["owner"],
+  decidedBy: ["board"],
   check: {
     type: "judgment",
     question: "Is the lot's landscaping neat, trimmed and free of weeds?",
@@ -1059,12 +1059,12 @@ export const selfHelp: SanctionDraft = {
   statement:
     "If an {{owner}} doesn't cure a maintenance violation in time, the {{organization}} may do the work and charge its cost to the {{owner}}.",
   requestTypes: ["violation"],
-  appliesTo: "violation",
+  appliesTo: ["violation"],
   appliesWhen: { type: "exists", from: "request", path: ["violation.notice-delivered-on"] },
   modality: "permission",
   enforces: { rules: ["declaration:7.1#landscaping"], documents: [], except: [] },
   against: ["owner"],
-  imposedBy: "organization",
+  imposedBy: ["organization"],
   sanction: {
     type: "self-help",
     amounts: [req("violation.cost-of-work")],
@@ -1086,9 +1086,9 @@ export const meetingNotice: NormDraft = {
   title: "Meeting notice 10 to 60 days ahead",
   statement: "The {{board}} must send notice of a members' {{meeting}} at least 10 and no more than 60 days before it.",
   requestTypes: ["meeting"],
-  appliesTo: "meeting",
+  appliesTo: ["meeting"],
   modality: "obligation",
-  bearer: "board",
+  bearer: ["board"],
   beneficiary: "members",
   check: {
     type: "deadline",
@@ -1111,9 +1111,9 @@ export const quorum: NormDraft = {
   statement:
     "A members' {{meeting}} needs members holding at least 10 percent of the total votes present, in person or by proxy.",
   requestTypes: ["meeting"],
-  appliesTo: "meeting",
+  appliesTo: ["meeting"],
   modality: "requirement",
-  bearer: null,
+  bearer: [],
   check: {
     type: "test",
     test: {
@@ -1142,7 +1142,7 @@ export const amendmentVote: NormDraft = {
   statement:
     "An amendment to the Declaration needs the approval of {{owner:plural}} holding at least 67 percent of the total votes, not just of the votes cast.",
   requestTypes: ["meeting"],
-  appliesTo: "vote",
+  appliesTo: ["vote"],
   appliesWhen: {
     type: "compare",
     left: ref("vote.subject"),
@@ -1150,7 +1150,7 @@ export const amendmentVote: NormDraft = {
     right: val("vote-subject.declaration-amendment")
   },
   modality: "requirement",
-  bearer: null,
+  bearer: [],
   check: {
     type: "test",
     test: {
@@ -1175,9 +1175,9 @@ export const recordsRequest: NormDraft = {
   title: "Records produced within 10 business days",
   statement: "The {{organization}} must produce requested records within 10 business days after a written request.",
   requestTypes: ["records-request"],
-  appliesTo: "records-request",
+  appliesTo: ["records-request"],
   modality: "obligation",
-  bearer: "organization",
+  bearer: ["organization"],
   beneficiary: "owner",
   check: {
     type: "deadline",
@@ -1199,9 +1199,9 @@ export const candidateOwnership: NormDraft = {
   title: "Board candidates own a lot for 12 months",
   statement: "A {{board}} candidate must have owned a {{lot}} for at least 12 months when the {{nomination}} is filed.",
   requestTypes: ["nomination"],
-  appliesTo: "nomination",
+  appliesTo: ["nomination"],
   modality: "requirement",
-  bearer: null,
+  bearer: [],
   check: {
     type: "test",
     test: {
@@ -1222,9 +1222,9 @@ export const priorApproval: NormDraft = {
   domain: "architectural",
   title: "Work needs the committee's prior written approval",
   statement: "No {{work}} may start on a {{lot}} without the {{committee}}'s prior written approval.",
-  appliesTo: "work",
+  appliesTo: ["work"],
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: { type: "approval", by: ["committee"], needs: "all", prior: true, written: true },
   remedy: "redesign"
 }
@@ -1239,9 +1239,9 @@ export const eitherApproval: NormDraft = {
   title: "Vehicles stored outside a garage need the board's or the committee's approval",
   statement:
     "A {{vehicle}} may be stored outside a garage only with the {{board}}'s or the {{committee}}'s written approval.",
-  appliesTo: "vehicle",
+  appliesTo: ["vehicle"],
   modality: "obligation",
-  bearer: "owner",
+  bearer: ["owner"],
   check: { type: "approval", by: ["board", "committee"], needs: "any", prior: false, written: true },
   remedy: null
 }
@@ -1255,9 +1255,9 @@ export const annualMeeting: NormDraft = {
   title: "An annual meeting each year",
   statement: "The {{board}} must hold an annual meeting of the {{members}} each year.",
   requestTypes: ["compliance-period"],
-  appliesTo: "compliance-period",
+  appliesTo: ["compliance-period"],
   modality: "obligation",
-  bearer: "board",
+  bearer: ["board"],
   recurs: { type: "ref", from: "community", path: ["community.annual-meeting"] },
   check: {
     type: "deadline",

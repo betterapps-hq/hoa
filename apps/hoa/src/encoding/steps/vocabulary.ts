@@ -330,9 +330,9 @@ export function checkSharedVocabulary(groups: readonly GroupVocabulary[], known:
     // can't name it: a sanction's imposer and the parties it's against too.
     const named = [...all.values()]
     for (const outline of group.outlines) {
-      const parties = outline.sanction ? [outline.sanction.imposedBy, ...outline.sanction.against] : []
-      for (const text of [outline.appliesTo, outline.bearer, outline.decidedBy, ...parties]) {
-        if (text && subjectKey(text, named) === null) {
+      const parties = outline.sanction ? [...outline.sanction.imposedBy, ...outline.sanction.against] : []
+      for (const text of [...outline.appliesTo, ...outline.bearer, ...outline.decidedBy, ...parties]) {
+        if (subjectKey(text, named) === null) {
           report(group.groupId, {
             recordKey: outline.key,
             code: "unresolved-subject",

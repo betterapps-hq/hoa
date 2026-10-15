@@ -34,7 +34,7 @@ export function appliesOn(
   if (rule.scope?.subjectId && context.entities.get(subject)?.ref !== rule.scope.subjectId) {
     return false
   }
-  const membership = rule.appliesTo ? isA(context, subject, rule.appliesTo) : true
+  const membership = rule.appliesTo.length > 0 ? V.any(rule.appliesTo.map((type) => isA(context, subject, type))) : true
   if (membership === false) {
     return false
   }

@@ -169,8 +169,8 @@ const fenceBase = {
   kind: "norm" as const,
   domain: "architectural" as const,
   modality: "obligation" as const,
-  bearer: "owner",
-  appliesTo: "fence-run"
+  bearer: ["owner"],
+  appliesTo: ["fence-run"]
 }
 const material = (...materials: string[]): T.Condition =>
   materials.length === 1
@@ -257,7 +257,7 @@ const guidelineRules: (NormDraft | DiscretionDraft)[] = [
     statement: "The {{committee}} may consider other styles of composite {{fence-run}} case by case.",
     kind: "discretion",
     appliesWhen: material("composite"),
-    decidedBy: "committee",
+    decidedBy: ["committee"],
     overrides: ["guidelines:5.2.2#k-style"]
   },
   {
@@ -283,7 +283,7 @@ const guidelineRules: (NormDraft | DiscretionDraft)[] = [
     citations: cite("guidelines:5.4.2(iii)"),
     title: "Gates match a composite fence's material",
     statement: "A {{gate}} in a composite {{fence-run}} must match the fence's {{fence-run.material}}.",
-    appliesTo: "gate",
+    appliesTo: ["gate"],
     appliesWhen: gateFence("composite"),
     check: {
       type: "test",
@@ -368,7 +368,7 @@ const guidelineRules: (NormDraft | DiscretionDraft)[] = [
     citations: cite("guidelines:5.9.1"),
     title: "Gate boards coordinate with the fence",
     statement: "A {{gate}} on a wood or composite {{fence-run}} must have boards oriented like the fence's.",
-    appliesTo: "gate",
+    appliesTo: ["gate"],
     appliesWhen: gateFence("wood", "composite"),
     check: {
       type: "test",
@@ -387,7 +387,7 @@ const guidelineRules: (NormDraft | DiscretionDraft)[] = [
     citations: cite("guidelines:5.9.2"),
     title: "Gates without an arbor at most 90 inches",
     statement: "A wood or composite {{gate}} without an arbor must have a {{gate.height}} of at most 90 inches.",
-    appliesTo: "gate",
+    appliesTo: ["gate"],
     appliesWhen: {
       type: "all",
       of: [gateFence("wood", "composite"), { type: "not", of: { type: "exists", path: ["gate.arbor-height"] } }]
@@ -401,7 +401,7 @@ const guidelineRules: (NormDraft | DiscretionDraft)[] = [
     citations: cite("guidelines:5.9.2"),
     title: "Gates with an arbor at most 96 inches",
     statement: "A wood or composite {{gate}} with an arbor must total at most 96 inches.",
-    appliesTo: "gate",
+    appliesTo: ["gate"],
     appliesWhen: { type: "all", of: [gateFence("wood", "composite"), { type: "exists", path: ["gate.arbor-height"] }] },
     check: atMost({ type: "sum", of: [ref("gate.height"), ref("gate.arbor-height")] }, 96),
     remedy: "change-detail"
@@ -412,7 +412,7 @@ const guidelineRules: (NormDraft | DiscretionDraft)[] = [
     citations: cite("guidelines:5.9.5"),
     title: "No new gates in fences on the Common Area",
     statement: "An {{owner}} must not alter a fence between a {{lot}} and the Common Area to install a {{gate}}.",
-    appliesTo: "gate",
+    appliesTo: ["gate"],
     modality: "prohibition",
     appliesWhen: {
       type: "all",
@@ -455,10 +455,10 @@ const packet = (aspect: string, title: string, check: T.Check, extra: Partial<No
   statement: `An {{architectural-application}} must include ${title.toLowerCase()}.`,
   citations: cite("guidelines:3.1.5", "guidelines:3.4.1"),
   requestTypes: ["architectural-application"],
-  appliesTo: "architectural-application",
+  appliesTo: ["architectural-application"],
   effectiveFrom: "2025-11-12",
   modality: "obligation",
-  bearer: "applicant",
+  bearer: ["applicant"],
   check,
   remedy: "change-detail",
   ...extra

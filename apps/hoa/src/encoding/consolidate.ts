@@ -8,6 +8,7 @@ import { encodingDraft, questionDraft, ruleDraft, termDraft, type RuleContent, t
 import { matchLabel, similarity } from "@/text/match"
 import type { MergedRulebook } from "./merge"
 import { uniqueCitations } from "./records"
+import { sharesSubject } from "./steps/outline"
 
 // Consolidate (encoding.md, Consolidate): candidate pairs of near-duplicate terms and rules, and applying
 // hoa-consolidation's answer: duplicates merged keeping every citation, overrides added when precedence allows them,
@@ -78,7 +79,9 @@ export function candidateRulePairs(rules: readonly RuleContent[], terms: readonl
   const pairs: RulePair[] = []
   rules.forEach((a, i) => {
     rules.forEach((b, j) => {
-      const shares = a.appliesTo === b.appliesTo && a.requestTypes.some((type) => b.requestTypes.includes(type))
+      // Rules on the same subjects, or both on whatever their targets apply to.
+      const isSameSubject = sharesSubject(a, b) || (a.appliesTo.length === 0 && b.appliesTo.length === 0)
+      const shares = isSameSubject && a.requestTypes.some((type) => b.requestTypes.includes(type))
       if (j <= i || !shares) {
         return
       }

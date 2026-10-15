@@ -57,13 +57,13 @@ export function documentRequirements(
   const label = (key: T.TermKey, plural: boolean) => vocabulary.label(key, plural)
   return rules
     .flatMap((rule) => {
-      if (rule.kind !== "norm" || rule.check?.type !== "document" || !rule.appliesTo) {
+      if (rule.kind !== "norm" || rule.check?.type !== "document" || rule.appliesTo.length === 0) {
         return []
       }
       const { check } = rule
-      const subject = vocabulary.thingOf(rule.appliesTo)
+      const subjects = rule.appliesTo.map((key) => vocabulary.thingOf(key))
       return entities
-        .filter((entity) => vocabulary.isKindOf(entity.type, subject))
+        .filter((entity) => subjects.some((subject) => vocabulary.isKindOf(entity.type, subject)))
         .map((entity) => ({
           ruleKey: rule.key,
           rule: renderStatement(rule.statement, label),

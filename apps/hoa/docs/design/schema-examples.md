@@ -362,7 +362,7 @@ A table keyed by manufacturer. Trex in River Birch matches no row, so it's not m
   "title": "Composite colors by manufacturer",
   "statement": "A composite {{fence-run}} must use a {{fence-run.color}} its {{fence-run.manufacturer}} offers on this list: Trex in Winchester Grey or Saddle, Frame It All in River Birch or Teak, Neoline in Honey Oak or Desert Sage.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "appliesWhen": {
     "type": "compare",
     "left": { "type": "ref", "path": ["fence-run.material"] },
@@ -371,7 +371,7 @@ A table keyed by manufacturer. Trex in River Birch matches no row, so it's not m
   },
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": {
     "type": "table",
     "inputs": [
@@ -438,7 +438,7 @@ committee.
   "title": "Other composite manufacturers case by case",
   "statement": "The {{committee}} may consider a composite {{fence-run}} from another {{fence-run.manufacturer}} case by case.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "appliesWhen": {
     "type": "all",
     "of": [
@@ -463,7 +463,7 @@ committee.
     ]
   },
   "effectiveFrom": "2025-11-12",
-  "decidedBy": "committee",
+  "decidedBy": ["committee"],
   "overrides": ["guidelines:5.4.2(i)#colors", "guidelines:5.3.2#manufacturers"]
 }
 ```
@@ -480,7 +480,7 @@ The other rule the discretion rule covers.
   "title": "Composite manufacturers",
   "statement": "A composite {{fence-run}} must come from Trex, Frame It All or Neoline.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "appliesWhen": {
     "type": "compare",
     "left": { "type": "ref", "path": ["fence-run.material"] },
@@ -489,7 +489,7 @@ The other rule the discretion rule covers.
   },
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": {
     "type": "test",
     "test": {
@@ -519,7 +519,7 @@ rule.
   "title": "Boundary and return fences at most 72 inches",
   "statement": "A wood or composite {{fence-run}} on a {{lot}} boundary, or a {{return-fence}}, must have a {{fence-run.height}} of at most 72 inches, not counting lattice or an arbor.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "appliesWhen": {
     "type": "all",
     "of": [
@@ -542,7 +542,7 @@ rule.
   },
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": {
     "type": "test",
     "test": {
@@ -568,10 +568,10 @@ A sum. Lattice that isn't mentioned counts as 0, and a 95-inch fence fails even 
   "title": "Fence plus lattice at most 90 inches",
   "statement": "A {{fence-run}}'s {{fence-run.height}} plus its {{fence-run.lattice-height}} must be at most 90 inches.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": {
     "type": "test",
     "test": {
@@ -603,7 +603,7 @@ A closed range.
   "title": "Metal fences 48 to 72 inches",
   "statement": "A metal {{fence-run}} must have a {{fence-run.height}} of at least 48 and at most 72 inches.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "appliesWhen": {
     "type": "compare",
     "left": { "type": "ref", "path": ["fence-run.material"] },
@@ -612,7 +612,7 @@ A closed range.
   },
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": {
     "type": "test",
     "test": {
@@ -640,7 +640,7 @@ The same sentence's exception, as a discretion rule with the same citation.
   "title": "Metal height variations considered",
   "statement": "The {{committee}} may consider variations from the metal fence heights.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "appliesWhen": {
     "type": "compare",
     "left": { "type": "ref", "path": ["fence-run.material"] },
@@ -648,7 +648,7 @@ The same sentence's exception, as a discretion rule with the same citation.
     "right": { "type": "value", "term": "fence-material.metal" }
   },
   "effectiveFrom": "2025-11-12",
-  "decidedBy": "committee",
+  "decidedBy": ["committee"],
   "overrides": ["guidelines:5.5.2#metal-height"]
 }
 ```
@@ -665,7 +665,7 @@ The same sentence's exception, as a discretion rule with the same citation.
   "title": "Front fences set back 5 feet",
   "statement": "A front or return {{fence-run}} should be set back at least 5 feet from the front corner of the house.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "appliesWhen": {
     "type": "in",
     "left": { "type": "ref", "path": ["fence-run.location"] },
@@ -676,7 +676,7 @@ The same sentence's exception, as a discretion rule with the same citation.
   },
   "effectiveFrom": "2025-11-12",
   "modality": "recommendation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": {
     "type": "test",
     "test": {
@@ -703,7 +703,7 @@ off the boundary.
   "title": "Neighbor approval for shared boundaries",
   "statement": "A {{fence-run}} on a boundary with another {{lot}} needs the {{neighbor}}'s signed approval of its placement, height and materials.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "appliesWhen": {
     "type": "compare",
     "left": { "type": "ref", "path": ["fence-run.boundary-with"] },
@@ -712,7 +712,7 @@ off the boundary.
   },
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "applicant",
+  "bearer": ["applicant"],
   "beneficiary": "neighbor",
   "check": {
     "type": "document",
@@ -742,7 +742,7 @@ A judgment, phrased so that yes complies. A model answers from the evidence; the
   "title": "Front fences keep drivers' view clear",
   "statement": "A front {{fence-run}} must not interfere with a driver's ability to see objects in the roadway.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "appliesWhen": {
     "type": "compare",
     "left": { "type": "ref", "path": ["fence-run.location"] },
@@ -751,8 +751,8 @@ A judgment, phrased so that yes complies. A model answers from the evidence; the
   },
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
-  "decidedBy": "committee",
+  "bearer": ["owner"],
+  "decidedBy": ["committee"],
   "check": {
     "type": "judgment",
     "question": "Does the fence leave a driver a clear view of objects in the roadway?",
@@ -775,10 +775,10 @@ decision yet, it goes to the committee; in a violation, no recorded approval is 
   "title": "Work needs the committee's prior written approval",
   "statement": "No {{work}} may start on a {{lot}} without the {{committee}}'s prior written approval.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "work",
+  "appliesTo": ["work"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": { "type": "approval", "by": ["committee"], "needs": "all", "prior": true, "written": true },
   "remedy": "redesign"
 }
@@ -796,10 +796,10 @@ Illustrative: needs any one of the parties in by. With needs all, every one of t
   "title": "Vehicles stored outside a garage need the board's or the committee's approval",
   "statement": "A {{vehicle}} may be stored outside a garage only with the {{board}}'s or the {{committee}}'s written approval.",
   "requestTypes": ["violation"],
-  "appliesTo": "vehicle",
+  "appliesTo": ["vehicle"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": { "type": "approval", "by": ["board", "committee"], "needs": "any", "prior": false, "written": true }
 }
 ```
@@ -816,7 +816,7 @@ A path that follows the gate's reference to its fence run.
   "title": "Gates match a composite fence's color",
   "statement": "A {{gate}} in a composite {{fence-run}} must match the fence's {{fence-run.color}}.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "gate",
+  "appliesTo": ["gate"],
   "appliesWhen": {
     "type": "compare",
     "left": { "type": "ref", "path": ["gate.fence-run", "fence-run.material"] },
@@ -825,7 +825,7 @@ A path that follows the gate's reference to its fence run.
   },
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": {
     "type": "test",
     "test": {
@@ -852,10 +852,10 @@ records it.
   "title": "Committee decides within 30 days",
   "statement": "The {{committee}} must decide an {{architectural-application}} within 30 days after it's submitted, or it is deemed approved.",
   "requestTypes": ["architectural-application"],
-  "appliesTo": "architectural-application",
+  "appliesTo": ["architectural-application"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "committee",
+  "bearer": ["committee"],
   "beneficiary": "applicant",
   "check": {
     "type": "deadline",
@@ -886,7 +886,7 @@ was installed, including rules added later.
   "title": "Existing fences may remain until replaced",
   "statement": "A {{fence-run}} installed before November 12, 2025 with the {{committee}}'s approval may remain until it's replaced.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "appliesWhen": {
     "type": "all",
     "of": [
@@ -901,7 +901,7 @@ was installed, including rules added later.
   },
   "effectiveFrom": "2025-11-12",
   "modality": "permission",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "overrides": { "documents": ["guidelines"], "adoptedAfter": { "path": ["fence-run.installed-on"] } }
 }
 ```
@@ -918,12 +918,12 @@ A rule from a decision, scoped to the approved improvement on Unit 42 and ranked
   "title": "Variance: 84-inch rear fence on Unit 42",
   "statement": "The approved rear {{fence-run}} on {{lot}} 42 may be up to 84 inches tall.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "fence-run",
+  "appliesTo": ["fence-run"],
   "scope": { "lotId": "lot-42", "subjectId": "improvement-0193" },
   "authority": { "provisionKey": "declaration:4.5" },
   "effectiveFrom": "2026-05-01",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "overrides": ["guidelines:5.5.1(i)#max-height"],
   "check": {
     "type": "test",
@@ -950,10 +950,10 @@ No check: every solar device it applies to is not met.
   "title": "No solar panels",
   "statement": "A {{lot}} must not have a {{solar-device}}.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "solar-device",
+  "appliesTo": ["solar-device"],
   "effectiveFrom": "2025-11-12",
   "modality": "prohibition",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "remedy": "redesign"
 }
 ```
@@ -970,7 +970,7 @@ A permission from law. It exempts roof-mounted devices from the organization's p
   "title": "Solar devices can't be prohibited",
   "statement": "An {{organization}} may not prohibit an {{owner}} from installing a {{solar-device}} on the owner's roof.",
   "requestTypes": ["architectural-application", "violation"],
-  "appliesTo": "solar-device",
+  "appliesTo": ["solar-device"],
   "appliesWhen": {
     "type": "compare",
     "left": { "type": "ref", "path": ["solar-device.mounting"] },
@@ -979,7 +979,7 @@ A permission from law. It exempts roof-mounted devices from the organization's p
   },
   "effectiveFrom": "2025-11-12",
   "modality": "permission",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "overrides": ["guidelines:8.2#no-solar"]
 }
 ```
@@ -998,7 +998,7 @@ A daily window over an event's start and end. An event is over, so it can't be c
   "title": "No commercial vehicles on the street overnight",
   "statement": "A commercial {{vehicle}} must not be parked on the street between 2:00 and 5:00 a.m.",
   "requestTypes": ["violation"],
-  "appliesTo": "parking",
+  "appliesTo": ["parking"],
   "appliesWhen": {
     "type": "all",
     "of": [
@@ -1018,7 +1018,7 @@ A daily window over an event's start and end. An event is over, so it can't be c
   },
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "occupant",
+  "bearer": ["occupant"],
   "check": {
     "type": "test",
     "test": {
@@ -1047,10 +1047,10 @@ A window around each date of the community's pickup schedule.
   "title": "Trash containers out only around pickup",
   "statement": "A trash container may be at the curb only from 6:00 p.m. the day before pickup until 9:00 p.m. on pickup day.",
   "requestTypes": ["violation"],
-  "appliesTo": "curbside-placement",
+  "appliesTo": ["curbside-placement"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "occupant",
+  "bearer": ["occupant"],
   "check": {
     "type": "test",
     "test": {
@@ -1081,10 +1081,10 @@ A count with a filter. If the list of pets isn't complete, the count can only fa
   "title": "At most three dogs and cats",
   "statement": "A {{lot}} may have at most three dogs and cats in total.",
   "requestTypes": ["violation"],
-  "appliesTo": "lot",
+  "appliesTo": ["lot"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": {
     "type": "test",
     "test": {
@@ -1117,10 +1117,10 @@ Months compare with months and years.
   "title": "Leases at least 12 months",
   "statement": "A lease must have a {{lease-registration.term}} of at least 12 months.",
   "requestTypes": ["lease-registration"],
-  "appliesTo": "lease-registration",
+  "appliesTo": ["lease-registration"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": {
     "type": "test",
     "test": {
@@ -1146,10 +1146,10 @@ requests.
   "title": "At most 20 percent of lots leased",
   "statement": "No more than 20 percent of {{lot:plural}} may be leased at one time.",
   "requestTypes": ["lease-registration"],
-  "appliesTo": "lease-registration",
+  "appliesTo": ["lease-registration"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": {
     "type": "test",
     "test": {
@@ -1188,11 +1188,11 @@ A judgment the board decides, with a cure period counted from the notice.
   "title": "Keep landscaping maintained",
   "statement": "Each {{owner}} must keep the {{lot}}'s landscaping neat, trimmed and free of weeds.",
   "requestTypes": ["violation"],
-  "appliesTo": "lot",
+  "appliesTo": ["lot"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
-  "decidedBy": "board",
+  "bearer": ["owner"],
+  "decidedBy": ["board"],
   "check": {
     "type": "judgment",
     "question": "Is the lot's landscaping neat, trimmed and free of weeds?",
@@ -1219,11 +1219,11 @@ A sanction: once the cure period passes, the organization may do the work and ch
   "title": "Organization may maintain and charge the owner",
   "statement": "If an {{owner}} doesn't cure a maintenance violation in time, the {{organization}} may do the work and charge its cost to the {{owner}}.",
   "requestTypes": ["violation"],
-  "appliesTo": "violation",
+  "appliesTo": ["violation"],
   "appliesWhen": { "type": "exists", "from": "request", "path": ["violation.notice-delivered-on"] },
   "effectiveFrom": "2025-11-12",
   "modality": "permission",
-  "imposedBy": "organization",
+  "imposedBy": ["organization"],
   "enforces": { "rules": ["declaration:7.1#landscaping"] },
   "sanction": {
     "type": "self-help",
@@ -1245,10 +1245,10 @@ A deadline on the owner, with 15 days to cure counted from the due date.
   "title": "Annual assessment due January 1",
   "statement": "Each {{owner}} must pay the annual {{assessment}} by January 1.",
   "requestTypes": ["assessment"],
-  "appliesTo": "assessment",
+  "appliesTo": ["assessment"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "owner",
+  "bearer": ["owner"],
   "check": {
     "type": "deadline",
     "act": { "type": "ref", "path": ["assessment.paid-on"] },
@@ -1276,10 +1276,10 @@ The greater of $25 and 10 percent of the unpaid balance, once the assessment rul
   "title": "Late fee after 15 days",
   "statement": "If an {{assessment}} is unpaid 15 days after it's due, the {{organization}} charges the greater of $25 and 10 percent of the unpaid amount.",
   "requestTypes": ["assessment"],
-  "appliesTo": "assessment",
+  "appliesTo": ["assessment"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "imposedBy": "organization",
+  "imposedBy": ["organization"],
   "enforces": { "rules": ["declaration:6.4#annual-due"] },
   "sanction": {
     "type": "late-fee",
@@ -1316,10 +1316,10 @@ document; notice and hearing come from the settings, and the cure period applies
   "title": "Fines for violations of the Rules",
   "statement": "After notice, the time to cure, and a hearing if the owner asks for one, the {{board}} may fine $100 for a first violation, $200 for a second within 12 months, and $25 a day while a violation continues, up to $1,000.",
   "requestTypes": ["violation"],
-  "appliesTo": "violation",
+  "appliesTo": ["violation"],
   "effectiveFrom": "2025-11-12",
   "modality": "permission",
-  "imposedBy": "board",
+  "imposedBy": ["board"],
   "enforces": { "documents": ["rules"] },
   "sanction": {
     "type": "fine",
@@ -1355,7 +1355,7 @@ A limit rule (illustrative): it caps the fine schedule's total at $500 per viola
   "title": "Fines capped at $500 per violation",
   "statement": "Fines for one violation may not total more than $500.",
   "requestTypes": ["violation"],
-  "appliesTo": "violation",
+  "appliesTo": ["violation"],
   "effectiveFrom": "2025-11-12",
   "limits": ["rules:12.1#fines"],
   "forbids": false,
@@ -1377,10 +1377,10 @@ A window before the meeting.
   "title": "Meeting notice 10 to 60 days ahead",
   "statement": "The {{board}} must send notice of a members' {{meeting}} at least 10 and no more than 60 days before it.",
   "requestTypes": ["meeting"],
-  "appliesTo": "meeting",
+  "appliesTo": ["meeting"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "board",
+  "bearer": ["board"],
   "beneficiary": "members",
   "check": {
     "type": "deadline",
@@ -1405,7 +1405,7 @@ on the community.
   "title": "Quorum is 10 percent of the votes",
   "statement": "A members' {{meeting}} needs members holding at least 10 percent of the total votes present, in person or by proxy.",
   "requestTypes": ["meeting"],
-  "appliesTo": "meeting",
+  "appliesTo": ["meeting"],
   "effectiveFrom": "2025-11-12",
   "modality": "requirement",
   "check": {
@@ -1438,7 +1438,7 @@ on the community.
   "title": "Declaration amendments need 67 percent of all votes",
   "statement": "An amendment to the Declaration needs the approval of {{owner:plural}} holding at least 67 percent of the total votes, not just of the votes cast.",
   "requestTypes": ["meeting"],
-  "appliesTo": "vote",
+  "appliesTo": ["vote"],
   "appliesWhen": {
     "type": "compare",
     "left": { "type": "ref", "path": ["vote.subject"] },
@@ -1477,10 +1477,10 @@ Business days skip weekends and holidays.
   "title": "Records produced within 10 business days",
   "statement": "The {{organization}} must produce requested records within 10 business days after a written request.",
   "requestTypes": ["records-request"],
-  "appliesTo": "records-request",
+  "appliesTo": ["records-request"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "organization",
+  "bearer": ["organization"],
   "beneficiary": "owner",
   "check": {
     "type": "deadline",
@@ -1503,10 +1503,10 @@ A recurring duty: the portal creates a compliance period for each scheduled date
   "title": "An annual meeting each year",
   "statement": "The {{board}} must hold an annual meeting of the {{members}} each year.",
   "requestTypes": ["compliance-period"],
-  "appliesTo": "compliance-period",
+  "appliesTo": ["compliance-period"],
   "effectiveFrom": "2025-11-12",
   "modality": "obligation",
-  "bearer": "board",
+  "bearer": ["board"],
   "check": {
     "type": "deadline",
     "act": { "type": "ref", "from": "request", "path": ["compliance-period.completed-on"] },
@@ -1529,7 +1529,7 @@ Judged as of the governing date, the day the nomination was filed, so it gives t
   "title": "Board candidates own a lot for 12 months",
   "statement": "A {{board}} candidate must have owned a {{lot}} for at least 12 months when the {{nomination}} is filed.",
   "requestTypes": ["nomination"],
-  "appliesTo": "nomination",
+  "appliesTo": ["nomination"],
   "effectiveFrom": "2025-11-12",
   "modality": "requirement",
   "check": {

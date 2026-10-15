@@ -62,16 +62,16 @@ const rule = {
   authority: null,
   effectiveFrom: "2025-01-01",
   beneficiary: null,
-  decidedBy: null,
+  decidedBy: [],
   overrides: [],
   noExceptions: null,
   cure: null,
   recurs: null,
   kind: "norm" as const,
   domain: "architectural" as const,
-  appliesTo: "widget",
+  appliesTo: ["widget"],
   modality: "obligation" as const,
-  bearer: "owner",
+  bearer: ["owner"],
   remedy: "change-detail" as const
 }
 

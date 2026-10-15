@@ -27,7 +27,7 @@ export function candidateTypes(rulesFile: T.RulesFile, requestType: T.TermKey): 
   const terms = [...rulesFile.proposedCore, ...rulesFile.terms]
   const rules = rulesInRequestType(rulesFile, requestType)
   const roots = new Set(rootTypes(requestType))
-  const subjects = rules.flatMap((rule) => (rule.appliesTo ? [rule.appliesTo] : []))
+  const subjects = rules.flatMap((rule) => rule.appliesTo)
   const signers = new Set(
     rules.flatMap((rule) => (rule.kind === "norm" && rule.check?.type === "document" ? rule.check.signedBy : []))
   )

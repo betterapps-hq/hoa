@@ -6,7 +6,8 @@ export type PromptSelector = { label: string } | { version: number }
 
 /**
  * A prompt version's settings in Langfuse. `model` chooses the model for that version, and `effort` how much it
- * reasons before answering (OpenRouter's `reasoning.effort`); without it the model's default applies. `escalationModel`
+ * reasons before answering (OpenRouter's `reasoning.effort`); without it the model's default applies. `provider` keeps
+ * the version's calls on one OpenRouter provider or tier (such as `openai/fast`), with no fallback. `escalationModel`
  * is the stronger model a stage escalates a disputed answer to (the review's facts: application-review.md,
  * Recognition).
  */
@@ -15,6 +16,7 @@ const promptConfigSchema = z
   .object({
     model: z.string().min(1).optional(),
     effort: promptEffort.optional(),
+    provider: z.string().min(1).optional(),
     escalationModel: z.string().min(1).optional()
   })
   .catch({})

@@ -32,7 +32,7 @@ describe("withTermsReplaced", () => {
     }
     const swapped = withTermsReplaced(rule, new Map([["residence", "dwelling"]]))
     expect(swapped.statement).toBe("Each {{dwelling}} needs {{dwelling:plural}} and {{owner}}.")
-    expect(swapped.appliesTo).toBe("dwelling")
+    expect(swapped.appliesTo).toEqual(["dwelling"])
     expect(swapped.provenance).toEqual(rule.provenance)
     // A detail is its own term: swapping the thing leaves the keys of its details alone.
     expect(termKeysOf(swapped)).toContain("residence.occupants")
@@ -124,7 +124,7 @@ describe("changeRuleTerm", () => {
       { ruleKey: ageRule, from: "residence", change: { type: "copy", label: "Senior residence", definition: null } },
       stamp
     )
-    expect(rule.appliesTo).toBe("senior-residence")
+    expect(rule.appliesTo).toEqual(["senior-residence"])
     expect(rule.statement).toContain("{{senior-residence}}")
     expect(termKeysOf(rule)).toContain("senior-residence.occupants")
     expect(rule.review.status).toBe("proposed")

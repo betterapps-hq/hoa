@@ -155,7 +155,7 @@ describe("rule invariants", () => {
 
   it("needs parties where parties are required", () => {
     const issues = issuesAfter(
-      withRule({ ...ex.sightLines, decidedBy: "photo" }),
+      withRule({ ...ex.sightLines, decidedBy: ["photo"] }),
       withRule({
         ...ex.priorApproval,
         check: { type: "approval", by: ["work"], needs: "all", prior: true, written: true }
@@ -164,19 +164,19 @@ describe("rule invariants", () => {
         ...ex.grandfathered,
         appliesWhen: { type: "approved", path: [], by: ["lot"], needs: "all", prior: false, written: false }
       }),
-      withRule({ ...ex.fineSchedule, against: ["fence-run"], imposedBy: "rules" })
+      withRule({ ...ex.fineSchedule, against: ["fence-run"], imposedBy: ["rules"] })
     )
     expect(issues).toEqual([
-      issue("type-mismatch", ex.sightLines.key, "decidedBy"),
+      issue("type-mismatch", ex.sightLines.key, "decidedBy.0"),
       issue("type-mismatch", ex.priorApproval.key, "check.by.0"),
       issue("type-mismatch", ex.grandfathered.key, "appliesWhen.by.0"),
-      issue("type-mismatch", ex.fineSchedule.key, "imposedBy"),
+      issue("type-mismatch", ex.fineSchedule.key, "imposedBy.0"),
       issue("type-mismatch", ex.fineSchedule.key, "against.0")
     ])
   })
 
   it("accepts a category of parties as a party", () => {
-    expect(issuesAfter(withRule({ ...ex.neighborApproval, bearer: "neighbor", remedy: null }))).toEqual([])
+    expect(issuesAfter(withRule({ ...ex.neighborApproval, bearer: ["neighbor"], remedy: null }))).toEqual([])
   })
 
   it("has a remedy exactly when the rule runs in applications and binds the owner or applicant", () => {

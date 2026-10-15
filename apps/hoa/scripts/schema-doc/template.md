@@ -288,8 +288,12 @@ rule.
 
 ### Parties, domains, request types and remedies
 
-- **`bearer`** is who must comply, and must be a party; a `requirement` has none. **`beneficiary`** is who the rule is owed to or involves: the
+- **`bearer`** is who must comply, and each entry must be a party; a `requirement` has none. **`beneficiary`** is who the rule is owed to or involves: the
   neighbor who signs, the owner who asked for records. **`decidedBy`** is who decides a judged or case-by-case finding.
+- **Several parties or subjects.** `appliesTo`, `bearer`, `decidedBy` and `imposedBy` are lists, so a rule names each
+  party or subject the text does: "the Owner or occupant must…" is one rule with `bearer: ["owner", "occupant"]`, never
+  a made-up term for the pair. A rule applies to each entity of any type in `appliesTo`, binds each party in `bearer`,
+  and any party in `decidedBy` or `imposedBy` may decide or impose.
   Who answers for a violation by someone else (a tenant, a guest) is a setting, not a rule field.
 - **Domains:** `architectural` (changes to lots and buildings, and the review process), `use` (conduct and how lots are
   used: parking, pets, leasing, nuisance), `maintenance` (upkeep and who maintains what), `financial` (assessments,
@@ -317,7 +321,7 @@ periods instead.
 
 `overrides` lists rule keys, or a **selector**: every rule from some `documents`, or under some `provisions` (and
 their descendants), optionally only rules whose `effectiveFrom` is after the date at `adoptedAfter` (grandfathering: "existing
-improvements aren't affected by later amendments"), minus `except`. A selector is resolved at evaluation; findings record the resolved keys. A rule with a selector may leave `appliesTo` null, meaning the
+improvements aren't affected by later amendments"), minus `except`. A selector is resolved at evaluation; findings record the resolved keys. A rule with a selector may leave `appliesTo` empty, meaning the
 subjects of whichever rules it selects.
 
 When rules override rule B on a subject, only the ones that apply to that subject count, and a rule that is itself
@@ -395,19 +399,19 @@ Checked by code whenever a rule is saved:
 1. At least one citation before approval. When a rule is created, its key starts with its main citation's provision
    key.
 2. `obligation`, `recommendation` and `requirement` have a check; `permission` and `prohibition` never do. A
-   `requirement` has no bearer, remedy or cure, and no sanction enforces it; every other norm has a bearer.
+   `requirement` has no bearer, remedy or cure, and no sanction enforces it; every other norm has at least one.
 3. A `discretion` rule has a `decidedBy` and at least one override. A `judgment` check has a `decidedBy`.
 4. Every term key resolves (`undefined-term`); every path step is a property of the thing before it; arithmetic and
    comparisons follow the typing rules (`type-mismatch`); values belong to their property's set (`invalid-value` for
    complete sets).
-5. `bearer`, `decidedBy` and `imposedBy` are parties: things of nature `party`, or categories of them.
+5. Every entry of `bearer`, `decidedBy` and `imposedBy` is a party: a thing of nature `party`, or a category of them.
 6. Overrides are valid and acyclic (`override-not-allowed`), and table rows don't overlap (`table-overlap`).
 7. A remedy is present exactly when the rule runs in applications and binds the owner or applicant.
-8. A sanction's `appliesTo` is one of its request types; it enforces at least one rule or document, every document
+8. A sanction's `appliesTo` is one of its request types, alone; it enforces at least one rule or document, every document
    key resolves (`undefined-document`), and every enforced rule is an obligation or prohibition sharing that request
    type. A limit names only sanction rules, and so does a sanction precondition's or a liability's `except` list (a
    selector there counts only the sanctions it selects). `appliesTo`
-   is null only with an overrides selector.
+   is empty only with an overrides selector.
 9. Decision rules have a `scope` and an `authority`; no other rule has either.
 10. A `text` condition raises `text-condition`, and a property that's `absent` when unstated in the `appliesWhen` of an
     overriding rule raises `absent-in-exception`, because silence would quietly deny the exception. Neither blocks
@@ -447,7 +451,7 @@ __TYPES:Checks__
 
 1. **Rules.** The rules whose `requestTypes` include the request's type and whose `effectiveFrom` is on or before the
    governing date. Decision rules apply to their scope from approval, whatever the date.
-2. **Subjects.** Each entity whose type is the rule's `appliesTo`. When `appliesTo` is a category, each entity of the
+2. **Subjects.** Each entity whose type is any of the rule's `appliesTo`. When an entry is a category, each entity of the
    category's underlying thing, with membership decided by its criteria. A decision rule only sees the entity its
    scope names.
 3. **Applies.** The request's lot is one the rule's document governs, and `appliesWhen` holds. False is

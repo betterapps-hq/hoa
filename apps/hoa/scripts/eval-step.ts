@@ -3,6 +3,7 @@ import { join } from "node:path"
 import { parseArgs } from "node:util"
 import { z } from "zod"
 import { createAiContext } from "../src/ai/aiContext.server.ts"
+import { promptEffort } from "../src/ai/promptLoader.ts"
 import { findTermCandidates } from "../src/encoding/definedTerms.ts"
 import { crossReferenceLines, exceptionLines } from "../src/encoding/steps/consolidation.ts"
 import { structuringBatchesOf } from "../src/encoding/steps/pipeline.ts"
@@ -82,6 +83,11 @@ import { readFinder, withFinder } from "./stepFinder.ts"
 // --expect all scores B against every term the golden defines in the document (stepFinder.ts), to compare finders.
 // --reruns reruns a failing item of B, E or C once with its problems (as the pipeline does); --retries runs F's retry
 // on the rules still failing, at most twice.
+// --model <OpenRouter id> and --effort <none|minimal|low|medium|high|xhigh> replace the model and effort the pinned
+// prompt versions name, so a cheaper model is measured on exactly the prompt the build's model had; --provider <name>
+// keeps every call on one OpenRouter provider (no fallback), so a model several hosts serve is measured on one.
+// --data-collection allow also admits providers that may store or train on prompts (governing documents only).
+// --concurrency <n> sets how many calls run at once (default 16, the build's ENCODING_CONCURRENCY default).
 // Steps: defined-terms, rule-finding, shared-vocabulary, vocabulary-merge, rule-structuring, consolidation.
 const { values } = parseArgs({
   options: {
@@ -97,6 +103,11 @@ const { values } = parseArgs({
     golden: { type: "string", default: "declaration" },
     finder: { type: "string" },
     expect: { type: "string", default: "picked" },
+    model: { type: "string" },
+    effort: { type: "string" },
+    provider: { type: "string" },
+    concurrency: { type: "string", default: "16" },
+    "data-collection": { type: "string", default: "deny" },
     yes: { type: "boolean", default: false }
   }
 })
@@ -127,6 +138,14 @@ const pinned = Object.fromEntries(
   })
 )
 
+/** The model, effort and provider this run uses in place of what the pinned versions name; empty to keep theirs. */
+const override = {
+  ...(values.model ? { model: values.model } : {}),
+  ...(values.effort ? { effort: promptEffort.parse(values.effort) } : {}),
+  ...(values.provider ? { provider: values.provider } : {}),
+  ...(values["data-collection"] === "allow" ? { dataCollection: "allow" as const } : {})
+}
+
 let context: ReturnType<typeof createAiContext> | null = null
 
 /** The models and Langfuse, created only once the run is confirmed. */
@@ -136,14 +155,23 @@ function stepAi(): StepAi {
   if (!ai.isConfigured) {
     throw new Error(`Missing settings: ${ai.missing.join(", ")}`)
   }
+  const { provider, dataCollection, ...config } = override
   return {
-    loadPrompt: ai.loadPrompt,
-    createModel: ai.createModel,
+    loadPrompt: async (prompt, selector) => {
+      const template = await ai.loadPrompt(prompt, selector)
+      return { ...template, config: { ...template.config, ...config } }
+    },
+    createModel: (modelId) =>
+      ai.createModel(
+        modelId,
+        provider ? { providers: [provider], ...(dataCollection ? { dataCollection } : {}) } : undefined
+      ),
     modelId: ai.modelId,
     environment: ai.environment,
     sessionId: runId,
     promptVersions: pinned,
-    cache: (name) => fileCache(name)
+    // The cache key holds the model and effort but not the provider, so a pinned provider keeps its own answers.
+    cache: (name) => fileCache(provider ? `${name}@${provider}` : name)
   }
 }
 
@@ -152,6 +180,9 @@ function confirm(calls: number, what: string) {
     `${stage}: ${what}; about ${calls} model call${calls === 1 ? "" : "s"} per repeat, ${repeats} repeat(s).`
   )
   console.warn(`Prompts pinned: ${JSON.stringify(pinned)} (others by label). Cached answers cost nothing.`)
+  if (Object.keys(override).length > 0) {
+    console.warn(`In place of the versions' own model and effort: ${JSON.stringify(override)}.`)
+  }
   if (!values.yes) {
     console.warn("Dry run: pass --yes to call the models (each run needs the person's approval).")
     process.exit(0)
@@ -221,6 +252,10 @@ function savedRuns<I extends DatasetItem<unknown, unknown>, O>(
   }))
 }
 
+/** The problems a run's check left on one item. */
+const problemsOf = (run: { problems: readonly StepProblem[] }, item: { id: string }) =>
+  run.problems.filter((problem) => problem.itemId === item.id)
+
 /**
  * Runs a drafted step over its items `repeats` times (each repeat with its own content cache), or reads a saved run's
  * outputs (--rescore), scores every output whose item has an expected output, and writes the run's folder.
@@ -230,7 +265,8 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
   calls: number
   source: string
   run: (items: readonly I[], cacheStage: string) => Promise<StepRun<O>>
-  score: ((item: I, output: O | null) => ItemScore) | null
+  /** Scores one output; `problems` are what the step's check left on the item in that run. */
+  score: ((item: I, output: O | null, problems: readonly StepProblem[]) => ItemScore) | null
   previous: Handoff
   /** The output's shape, for reading it back (--rescore). */
   output?: z.ZodType<O>
@@ -261,12 +297,18 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
     tags: item.tags,
     ...(input.score && runs.length > 1
       ? {
-          repeats: repeatSpread(runs.map((run) => input.score?.(item, run.outputs.get(item.id) ?? null).metrics ?? {}))
+          repeats: repeatSpread(
+            runs.map(
+              (run) => input.score?.(item, run.outputs.get(item.id) ?? null, problemsOf(run, item)).metrics ?? {}
+            )
+          )
         }
       : {}),
     results: Object.fromEntries(
       runs.flatMap((run, index) =>
-        input.score ? [[labels[index] ?? "", input.score(item, run.outputs.get(item.id) ?? null)] as const] : []
+        input.score
+          ? [[labels[index] ?? "", input.score(item, run.outputs.get(item.id) ?? null, problemsOf(run, item))] as const]
+          : []
       )
     )
   }))
@@ -287,6 +329,7 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
     stage,
     from: source,
     promptVersions,
+    ...(rescored ? {} : { override, concurrency }),
     repeats,
     calls,
     problems
@@ -327,6 +370,8 @@ async function runDrafted<I extends DatasetItem<unknown, unknown>, O>(input: {
 }
 
 const reruns = Number(values.reruns)
+/** Calls in flight at once within a step, as the build's ENCODING_CONCURRENCY. */
+const concurrency = z.coerce.number().int().min(1).max(64).parse(values.concurrency)
 /** B's terms for E's label resolution and C's input: from the step run handed on, else the golden's. */
 const definedTerms = fromStep?.definedTerms ?? datasets["shared-vocabulary"][0]?.input.definedTerms ?? []
 
@@ -359,7 +404,7 @@ switch (stage) {
       items,
       calls: 0,
       source: fromBuild ? `build run ${fromBuild.runId}` : "the golden dataset",
-      run: (selected, cacheStage) => runDefinedTerms(selected, { ai: stepAi(), cacheStage, reruns }),
+      run: (selected, cacheStage) => runDefinedTerms(selected, { ai: stepAi(), cacheStage, reruns, concurrency }),
       score: (item, output) => scoreDefinedTerms(item, output, confirmedGaps(judgments, item.id)),
       previous: {},
       output: termsOutput,
@@ -391,6 +436,7 @@ switch (stage) {
           ai: stepAi(),
           cacheStage,
           reruns,
+          concurrency,
           definedTerms,
           provisions: fromBuild?.provisions ?? goldenProvisions
         }),
@@ -436,8 +482,8 @@ switch (stage) {
       items,
       calls: 0,
       source: fromStep ? `step run ${values.from}` : "the golden dataset",
-      run: (selected, cacheStage) => runSharedVocabulary(selected, { ai: stepAi(), cacheStage, reruns }),
-      score: (item, output) => scoreVocabulary(item, output, judgedTermPairs(judgments, item.id)),
+      run: (selected, cacheStage) => runSharedVocabulary(selected, { ai: stepAi(), cacheStage, reruns, concurrency }),
+      score: (item, output, problems) => scoreVocabulary(item, output, judgedTermPairs(judgments, item.id), problems),
       previous: fromStep ?? { outlines: goldenOutlines(golden, sections), settingsFlags: settingsFlags(golden) },
       output: termsOutput
     })
@@ -459,7 +505,7 @@ switch (stage) {
       items,
       calls: items.length,
       source: fromStep ? `step run ${values.from}` : "the synthetic duplicate set",
-      run: (selected, cacheStage) => runVocabularyMerge(selected, { ai: stepAi(), cacheStage }),
+      run: (selected, cacheStage) => runVocabularyMerge(selected, { ai: stepAi(), cacheStage, concurrency }),
       score: fromStep ? null : scoreMerge,
       previous: fromStep ?? {}
     })
@@ -494,6 +540,7 @@ switch (stage) {
         runRuleStructuring(selected, {
           ai: stepAi(),
           cacheStage,
+          concurrency,
           provisions: goldenProvisions,
           documents: goldenDocuments,
           retries: Number(values.retries),
@@ -534,7 +581,7 @@ switch (stage) {
       items,
       calls: 0,
       source: fromStep ? `step run ${values.from}` : "the golden dataset",
-      run: (selected, cacheStage) => runConsolidation(selected, { ai: stepAi(), cacheStage }),
+      run: (selected, cacheStage) => runConsolidation(selected, { ai: stepAi(), cacheStage, concurrency }),
       score: scoreConsolidation,
       previous: fromStep ?? {}
     })

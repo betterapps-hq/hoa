@@ -107,7 +107,7 @@ describe("approvalBlockers", () => {
       ...records,
       rules: records.rules.map((rule) =>
         rule.key === ageRule
-          ? { ...rule, appliesTo: "residense", issues: [issue("conflict"), issue("avoided-label")] }
+          ? { ...rule, appliesTo: ["residense"], issues: [issue("conflict"), issue("avoided-label")] }
           : rule
       )
     }

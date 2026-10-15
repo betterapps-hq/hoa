@@ -140,7 +140,7 @@ describe("RuleCard", () => {
     const broken = {
       ...records,
       rules: records.rules.map((rule) =>
-        rule.key === approvalRule ? { ...rule, bearer: "gazebo", issues: [issue] } : rule
+        rule.key === approvalRule ? { ...rule, bearer: ["gazebo"], issues: [issue] } : rule
       )
     }
     const { user, actions } = renderCard(broken)
