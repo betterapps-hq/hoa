@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm"
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
+import type { Address } from "@/places/address"
 
 // The D1 tables from docs/design/documents.md. JSON columns hold domain objects; repositories validate them with the
 // domain's Zod schemas when they read them.
@@ -506,8 +507,8 @@ export const people = sqliteTable(
     // Lowercased; how an account finds its person when it signs in. Null for someone with no email on file.
     email: text("email"),
     phone: text("phone"),
-    // Where mail reaches them, when it isn't their unit.
-    mailingAddress: text("mailing_address"),
+    // Where mail reaches them, when it isn't their unit: an Address.
+    mailingAddress: json<Address>("mailing_address_json"),
     // The account that signed in with their email; null until they do. Their role is on its membership (members).
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at"),
@@ -594,4 +595,177 @@ export const committeeMembers = sqliteTable(
     index("committee_members_committee").on(table.committeeId),
     index("committee_members_person").on(table.personId)
   ]
+)
+
+// Violations (docs/design/violations.md): a broken rule on a unit, the rules it breaks, who answers for it, its photos,
+// and what happened, in order. Events are only ever added.
+export const violations = sqliteTable(
+  "violations",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    unitId: text("unit_id").notNull(),
+    // What was seen, in a line, and anything more.
+    title: text("title").notNull(),
+    description: text("description"),
+    observedOn: text("observed_on").notNull(),
+    // "open", "closed" or "dismissed".
+    status: text("status").notNull(),
+    // The rulebook in force on the day it was observed, whose rules it cites.
+    rulebookId: text("rulebook_id").notNull(),
+    reportedBy: text("reported_by").notNull(),
+    createdAt: timestamp("created_at"),
+    updatedAt: timestamp("updated_at")
+  },
+  (table) => [
+    index("violations_organization_status").on(table.organizationId, table.status),
+    index("violations_unit").on(table.unitId)
+  ]
+)
+
+export const violationRules = sqliteTable(
+  "violation_rules",
+  {
+    organizationId: text("organization_id").notNull(),
+    violationId: text("violation_id").notNull(),
+    ruleKey: text("rule_key").notNull()
+  },
+  (table) => [primaryKey({ columns: [table.violationId, table.ruleKey] })]
+)
+
+export const violationPeople = sqliteTable(
+  "violation_people",
+  {
+    organizationId: text("organization_id").notNull(),
+    violationId: text("violation_id").notNull(),
+    personId: text("person_id").notNull(),
+    // The party they are to the documents: "owner", "occupant", "tenant" or "guest".
+    party: text("party").notNull()
+  },
+  (table) => [
+    primaryKey({ columns: [table.violationId, table.personId] }),
+    index("violation_people_person").on(table.personId)
+  ]
+)
+
+export const violationPhotos = sqliteTable(
+  "violation_photos",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    violationId: text("violation_id").notNull(),
+    fileName: text("file_name").notNull(),
+    mediaType: text("media_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at")
+  },
+  (table) => [index("violation_photos_violation").on(table.violationId)]
+)
+
+export const violationEvents = sqliteTable(
+  "violation_events",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    violationId: text("violation_id").notNull(),
+    // What happened: reported, notice, reply, hearing-requested, hearing-set, hearing-held, cured, sanction,
+    // dismissed, closed, reopened, note or fact.
+    kind: text("kind").notNull(),
+    // The day it happened, in the association's time zone.
+    occurredOn: text("occurred_on").notNull(),
+    note: text("note"),
+    details: json<unknown>("details_json"),
+    recordedBy: text("recorded_by").notNull(),
+    createdAt: timestamp("created_at")
+  },
+  (table) => [index("violation_events_violation").on(table.violationId, table.createdAt)]
+)
+
+// The ledger (docs/design/money.md): each unit's charges, payments and credits, never edited or deleted.
+export const ledgerEntries = sqliteTable(
+  "ledger_entries",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    unitId: text("unit_id").notNull(),
+    // "charge", "payment", "credit", or "reversal" of another entry.
+    kind: text("kind").notNull(),
+    // What it does to the balance, in cents: a charge adds, a payment or credit takes off, a reversal undoes.
+    amountCents: integer("amount_cents").notNull(),
+    // The day it posts, and a charge's due day, in the association's time zone.
+    postedOn: text("posted_on").notNull(),
+    dueOn: text("due_on"),
+    // A charge's category: dues, special-assessment, fine, late-fee, interest or fee. A payment's method: card, bank,
+    // check, cash or other.
+    category: text("category"),
+    description: text("description").notNull(),
+    // A check number, or the payment's id at the processor.
+    reference: text("reference"),
+    // The rule it cites, in the rulebook it was posted under.
+    ruleKey: text("rule_key"),
+    rulebookId: text("rulebook_id"),
+    // Where it came from: "violation", "schedule", "payment" or "manual", and that record's id.
+    sourceType: text("source_type").notNull(),
+    sourceId: text("source_id"),
+    // The entry a reversal undoes.
+    reversesId: text("reverses_id"),
+    // Posts it once however many times it's asked for: "sanction:{eventId}", "schedule:{id}:{unitId}:{dueOn}".
+    postingKey: text("posting_key"),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at")
+  },
+  (table) => [
+    index("ledger_entries_unit").on(table.organizationId, table.unitId, table.postedOn),
+    index("ledger_entries_source").on(table.sourceType, table.sourceId),
+    uniqueIndex("ledger_entries_posting_key").on(table.organizationId, table.postingKey),
+    uniqueIndex("ledger_entries_reverses").on(table.reversesId)
+  ]
+)
+
+// Which charges each payment, credit or reversal paid or undid, and by how much; a payment's reversal takes its
+// allocations back with negative amounts.
+export const ledgerAllocations = sqliteTable(
+  "ledger_allocations",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    unitId: text("unit_id").notNull(),
+    fromEntryId: text("from_entry_id").notNull(),
+    toEntryId: text("to_entry_id").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    createdAt: timestamp("created_at")
+  },
+  (table) => [
+    index("ledger_allocations_from").on(table.fromEntryId),
+    index("ledger_allocations_to").on(table.toEntryId),
+    index("ledger_allocations_unit").on(table.organizationId, table.unitId)
+  ]
+)
+
+// Dues and special assessments (docs/design/money.md, Dues): what each unit owes, how often, from when.
+export const assessmentSchedules = sqliteTable(
+  "assessment_schedules",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    name: text("name").notNull(),
+    // "dues" or "special-assessment".
+    category: text("category").notNull(),
+    // "once", "monthly", "quarterly", "semiannual" or "annual".
+    frequency: text("frequency").notNull(),
+    // What each unit owes each time, in cents, unless it has its own amount.
+    amountCents: integer("amount_cents").notNull(),
+    unitAmounts: json<Record<string, number>>("unit_amounts_json"),
+    firstDueOn: text("first_due_on").notNull(),
+    lastDueOn: text("last_due_on"),
+    // The day it was set up: it never posts charges due before then.
+    postsFrom: text("posts_from").notNull(),
+    // "active", or "ended" once it stops posting.
+    status: text("status").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: timestamp("created_at"),
+    updatedAt: timestamp("updated_at")
+  },
+  (table) => [index("assessment_schedules_organization").on(table.organizationId, table.status)]
 )

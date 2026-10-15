@@ -16,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item"
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { AddressFields } from "@/features/places/AddressFields/AddressFields"
 import { ChoiceSelect } from "@/features/rulebook/ChoiceSelect/ChoiceSelect"
 import { saveThenClose, useAppForm } from "@/lib/form"
 import {
@@ -34,6 +35,7 @@ import {
   type UnitRelation
 } from "@/people/people"
 import { phoneText } from "@/people/phone"
+import { addressValues, type AddressInput } from "@/places/address"
 import { RollPicker, type RollChoice } from "../RollPicker/RollPicker"
 import { SeatFields, seatValues } from "../SeatFields/SeatFields"
 import { UnitFields, unitValues } from "../UnitFields/UnitFields"
@@ -42,7 +44,7 @@ import { UnitFields, unitValues } from "../UnitFields/UnitFields"
 export type NewSeat = { committeeId: string; seat: SeatInput }
 
 export type PersonSave = {
-  person: { name: string; email: string; phone: string; mailingAddress: string; access: Access }
+  person: { name: string; email: string; phone: string; mailingAddress: AddressInput; access: Access }
   /**
    * Units to put them in, as an owner, resident or tenant: one on the roll by its id, or a new one to add; and their time
    * in units they're in (by link) to end today.
@@ -116,7 +118,7 @@ export function PersonDialog({
       name: person?.name ?? "",
       email: person?.email ?? "",
       phone: person?.phone ? phoneText(person.phone) : "",
-      mailingAddress: person?.mailingAddress ?? "",
+      mailingAddress: addressValues(person?.mailingAddress ?? null),
       access: access ?? ("member" as Access),
       leavingHomes: [] as string[],
       newHomes: person ? [] : [newHome(firstHomeKey)],
@@ -151,7 +153,7 @@ export function PersonDialog({
       )
   })
   const text = (
-    name: "name" | "email" | "phone" | "mailingAddress",
+    name: "name" | "email" | "phone",
     label: string,
     extra: Partial<{ type: string; autoComplete: string; required: boolean; description: string }> = {}
   ) => (
@@ -200,7 +202,14 @@ export function PersonDialog({
               ...(person ? { description: "Changing it unlinks their account." } : {})
             })}
             {text("phone", "Phone", { type: "tel" })}
-            {text("mailingAddress", "Mailing address", { description: "If not their unit." })}
+            <AddressFields
+              form={form}
+              fields="mailingAddress"
+              idPrefix="person-mailing"
+              legend="Mailing address"
+              description="Only if their mail should go somewhere other than their unit."
+              addLabel="Add a mailing address"
+            />
             <FieldSet>
               <FieldLegend variant="label">Units</FieldLegend>
               <div className="flex flex-col gap-3">

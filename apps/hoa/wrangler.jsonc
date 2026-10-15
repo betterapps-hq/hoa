@@ -9,6 +9,8 @@
   // Gives each pull request's Worker Preview a workers.dev URL. Takes effect after a production deploy.
   "preview_urls": true,
   "observability": { "enabled": true },
+  // The daily job: posts dues 30 days before they're due (docs/design/money.md). Every environment inherits it.
+  "triggers": { "crons": ["0 10 * * *"] },
   // Nothing at the top level reaches `previews` or an `env` block: each repeats every var and binding it needs.
   //
   // Production: the demo. Secrets (OPENROUTER_API_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY,

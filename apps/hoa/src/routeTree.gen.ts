@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
+import { Route as DuesRouteImport } from './routes/dues'
 import { Route as PeopleRouteImport } from './routes/people'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -21,13 +22,19 @@ import { Route as ApplicationsApplicationIdRouteImport } from './routes/applicat
 import { Route as ApplicationsNewRouteImport } from './routes/applications.new'
 import { Route as DocumentsIndexRouteImport } from './routes/documents.index'
 import { Route as DocumentsDocumentIdRouteImport } from './routes/documents.$documentId'
+import { Route as LedgerIndexRouteImport } from './routes/ledger.index'
+import { Route as LedgerUnitIdRouteImport } from './routes/ledger.$unitId'
 import { Route as ProjectTypesIndexRouteImport } from './routes/project-types.index'
 import { Route as ProjectTypesProjectTypeIdRouteImport } from './routes/project-types.$projectTypeId'
 import { Route as RulesReviewRouteImport } from './routes/rules_.review'
+import { Route as ViolationsIndexRouteImport } from './routes/violations.index'
+import { Route as ViolationsViolationIdRouteImport } from './routes/violations.$violationId'
+import { Route as ViolationsNewRouteImport } from './routes/violations.new'
 import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as FilesGoverningDocumentIdRouteImport } from './routes/files.governing.$documentId'
 import { Route as FilesApplicationsApplicationIdFileIdRouteImport } from './routes/files.applications.$applicationId.$fileId'
 import { Route as FilesOrganizationsOrganizationIdLogoRouteImport } from './routes/files.organizations.$organizationId.logo'
+import { Route as FilesViolationsViolationIdPhotoIdRouteImport } from './routes/files.violations.$violationId.$photoId'
 import { Route as FilesProjectTypesProjectTypeIdTemplatesTemplateIdRouteImport } from './routes/files.project-types.$projectTypeId.templates.$templateId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -38,6 +45,11 @@ const IndexRoute = IndexRouteImport.update({
 const AccountRoute = AccountRouteImport.update({
   id: '/account',
   path: '/account',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DuesRoute = DuesRouteImport.update({
+  id: '/dues',
+  path: '/dues',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PeopleRoute = PeopleRouteImport.update({
@@ -91,6 +103,16 @@ const DocumentsDocumentIdRoute = DocumentsDocumentIdRouteImport.update({
   path: '/documents/$documentId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LedgerIndexRoute = LedgerIndexRouteImport.update({
+  id: '/ledger/',
+  path: '/ledger/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LedgerUnitIdRoute = LedgerUnitIdRouteImport.update({
+  id: '/ledger/$unitId',
+  path: '/ledger/$unitId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProjectTypesIndexRoute = ProjectTypesIndexRouteImport.update({
   id: '/project-types/',
   path: '/project-types/',
@@ -105,6 +127,21 @@ const ProjectTypesProjectTypeIdRoute =
 const RulesReviewRoute = RulesReviewRouteImport.update({
   id: '/rules_/review',
   path: '/rules/review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ViolationsIndexRoute = ViolationsIndexRouteImport.update({
+  id: '/violations/',
+  path: '/violations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ViolationsViolationIdRoute = ViolationsViolationIdRouteImport.update({
+  id: '/violations/$violationId',
+  path: '/violations/$violationId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ViolationsNewRoute = ViolationsNewRouteImport.update({
+  id: '/violations/new',
+  path: '/violations/new',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -130,6 +167,12 @@ const FilesOrganizationsOrganizationIdLogoRoute =
     path: '/files/organizations/$organizationId/logo',
     getParentRoute: () => rootRouteImport,
   } as any)
+const FilesViolationsViolationIdPhotoIdRoute =
+  FilesViolationsViolationIdPhotoIdRouteImport.update({
+    id: '/files/violations/$violationId/$photoId',
+    path: '/files/violations/$violationId/$photoId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute =
   FilesProjectTypesProjectTypeIdTemplatesTemplateIdRouteImport.update({
     id: '/files/project-types/$projectTypeId/templates/$templateId',
@@ -140,6 +183,7 @@ const FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/dues': typeof DuesRoute
   '/people': typeof PeopleRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
@@ -148,20 +192,27 @@ export interface FileRoutesByFullPath {
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
   '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/ledger/$unitId': typeof LedgerUnitIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules/review': typeof RulesReviewRoute
+  '/violations/$violationId': typeof ViolationsViolationIdRoute
+  '/violations/new': typeof ViolationsNewRoute
   '/applications/': typeof ApplicationsIndexRoute
   '/documents/': typeof DocumentsIndexRoute
+  '/ledger/': typeof LedgerIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
+  '/violations/': typeof ViolationsIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
   '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
   '/files/organizations/$organizationId/logo': typeof FilesOrganizationsOrganizationIdLogoRoute
+  '/files/violations/$violationId/$photoId': typeof FilesViolationsViolationIdPhotoIdRoute
   '/files/project-types/$projectTypeId/templates/$templateId': typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/dues': typeof DuesRoute
   '/people': typeof PeopleRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
@@ -170,21 +221,28 @@ export interface FileRoutesByTo {
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
   '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/ledger/$unitId': typeof LedgerUnitIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules/review': typeof RulesReviewRoute
+  '/violations/$violationId': typeof ViolationsViolationIdRoute
+  '/violations/new': typeof ViolationsNewRoute
   '/applications': typeof ApplicationsIndexRoute
   '/documents': typeof DocumentsIndexRoute
+  '/ledger': typeof LedgerIndexRoute
   '/project-types': typeof ProjectTypesIndexRoute
+  '/violations': typeof ViolationsIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
   '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
   '/files/organizations/$organizationId/logo': typeof FilesOrganizationsOrganizationIdLogoRoute
+  '/files/violations/$violationId/$photoId': typeof FilesViolationsViolationIdPhotoIdRoute
   '/files/project-types/$projectTypeId/templates/$templateId': typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
+  '/dues': typeof DuesRoute
   '/people': typeof PeopleRoute
   '/rules': typeof RulesRoute
   '/settings': typeof SettingsRoute
@@ -193,15 +251,21 @@ export interface FileRoutesById {
   '/applications/$applicationId': typeof ApplicationsApplicationIdRoute
   '/applications/new': typeof ApplicationsNewRoute
   '/documents/$documentId': typeof DocumentsDocumentIdRoute
+  '/ledger/$unitId': typeof LedgerUnitIdRoute
   '/project-types/$projectTypeId': typeof ProjectTypesProjectTypeIdRoute
   '/rules_/review': typeof RulesReviewRoute
+  '/violations/$violationId': typeof ViolationsViolationIdRoute
+  '/violations/new': typeof ViolationsNewRoute
   '/applications/': typeof ApplicationsIndexRoute
   '/documents/': typeof DocumentsIndexRoute
+  '/ledger/': typeof LedgerIndexRoute
   '/project-types/': typeof ProjectTypesIndexRoute
+  '/violations/': typeof ViolationsIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/files/governing/$documentId': typeof FilesGoverningDocumentIdRoute
   '/files/applications/$applicationId/$fileId': typeof FilesApplicationsApplicationIdFileIdRoute
   '/files/organizations/$organizationId/logo': typeof FilesOrganizationsOrganizationIdLogoRoute
+  '/files/violations/$violationId/$photoId': typeof FilesViolationsViolationIdPhotoIdRoute
   '/files/project-types/$projectTypeId/templates/$templateId': typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 export interface FileRouteTypes {
@@ -209,6 +273,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/account'
+    | '/dues'
     | '/people'
     | '/rules'
     | '/settings'
@@ -217,20 +282,27 @@ export interface FileRouteTypes {
     | '/applications/$applicationId'
     | '/applications/new'
     | '/documents/$documentId'
+    | '/ledger/$unitId'
     | '/project-types/$projectTypeId'
     | '/rules/review'
+    | '/violations/$violationId'
+    | '/violations/new'
     | '/applications/'
     | '/documents/'
+    | '/ledger/'
     | '/project-types/'
+    | '/violations/'
     | '/api/auth/$'
     | '/files/governing/$documentId'
     | '/files/applications/$applicationId/$fileId'
     | '/files/organizations/$organizationId/logo'
+    | '/files/violations/$violationId/$photoId'
     | '/files/project-types/$projectTypeId/templates/$templateId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/account'
+    | '/dues'
     | '/people'
     | '/rules'
     | '/settings'
@@ -239,20 +311,27 @@ export interface FileRouteTypes {
     | '/applications/$applicationId'
     | '/applications/new'
     | '/documents/$documentId'
+    | '/ledger/$unitId'
     | '/project-types/$projectTypeId'
     | '/rules/review'
+    | '/violations/$violationId'
+    | '/violations/new'
     | '/applications'
     | '/documents'
+    | '/ledger'
     | '/project-types'
+    | '/violations'
     | '/api/auth/$'
     | '/files/governing/$documentId'
     | '/files/applications/$applicationId/$fileId'
     | '/files/organizations/$organizationId/logo'
+    | '/files/violations/$violationId/$photoId'
     | '/files/project-types/$projectTypeId/templates/$templateId'
   id:
     | '__root__'
     | '/'
     | '/account'
+    | '/dues'
     | '/people'
     | '/rules'
     | '/settings'
@@ -261,21 +340,28 @@ export interface FileRouteTypes {
     | '/applications/$applicationId'
     | '/applications/new'
     | '/documents/$documentId'
+    | '/ledger/$unitId'
     | '/project-types/$projectTypeId'
     | '/rules_/review'
+    | '/violations/$violationId'
+    | '/violations/new'
     | '/applications/'
     | '/documents/'
+    | '/ledger/'
     | '/project-types/'
+    | '/violations/'
     | '/api/auth/$'
     | '/files/governing/$documentId'
     | '/files/applications/$applicationId/$fileId'
     | '/files/organizations/$organizationId/logo'
+    | '/files/violations/$violationId/$photoId'
     | '/files/project-types/$projectTypeId/templates/$templateId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
+  DuesRoute: typeof DuesRoute
   PeopleRoute: typeof PeopleRoute
   RulesRoute: typeof RulesRoute
   SettingsRoute: typeof SettingsRoute
@@ -284,15 +370,21 @@ export interface RootRouteChildren {
   ApplicationsApplicationIdRoute: typeof ApplicationsApplicationIdRoute
   ApplicationsNewRoute: typeof ApplicationsNewRoute
   DocumentsDocumentIdRoute: typeof DocumentsDocumentIdRoute
+  LedgerUnitIdRoute: typeof LedgerUnitIdRoute
   ProjectTypesProjectTypeIdRoute: typeof ProjectTypesProjectTypeIdRoute
   RulesReviewRoute: typeof RulesReviewRoute
+  ViolationsViolationIdRoute: typeof ViolationsViolationIdRoute
+  ViolationsNewRoute: typeof ViolationsNewRoute
   ApplicationsIndexRoute: typeof ApplicationsIndexRoute
   DocumentsIndexRoute: typeof DocumentsIndexRoute
+  LedgerIndexRoute: typeof LedgerIndexRoute
   ProjectTypesIndexRoute: typeof ProjectTypesIndexRoute
+  ViolationsIndexRoute: typeof ViolationsIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   FilesGoverningDocumentIdRoute: typeof FilesGoverningDocumentIdRoute
   FilesApplicationsApplicationIdFileIdRoute: typeof FilesApplicationsApplicationIdFileIdRoute
   FilesOrganizationsOrganizationIdLogoRoute: typeof FilesOrganizationsOrganizationIdLogoRoute
+  FilesViolationsViolationIdPhotoIdRoute: typeof FilesViolationsViolationIdPhotoIdRoute
   FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute: typeof FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute
 }
 
@@ -310,6 +402,13 @@ declare module '@tanstack/react-router' {
       path: '/account'
       fullPath: '/account'
       preLoaderRoute: typeof AccountRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dues': {
+      id: '/dues'
+      path: '/dues'
+      fullPath: '/dues'
+      preLoaderRoute: typeof DuesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/people': {
@@ -382,6 +481,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DocumentsDocumentIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ledger/': {
+      id: '/ledger/'
+      path: '/ledger'
+      fullPath: '/ledger/'
+      preLoaderRoute: typeof LedgerIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ledger/$unitId': {
+      id: '/ledger/$unitId'
+      path: '/ledger/$unitId'
+      fullPath: '/ledger/$unitId'
+      preLoaderRoute: typeof LedgerUnitIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/project-types/': {
       id: '/project-types/'
       path: '/project-types'
@@ -401,6 +514,27 @@ declare module '@tanstack/react-router' {
       path: '/rules/review'
       fullPath: '/rules/review'
       preLoaderRoute: typeof RulesReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/violations/': {
+      id: '/violations/'
+      path: '/violations'
+      fullPath: '/violations/'
+      preLoaderRoute: typeof ViolationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/violations/$violationId': {
+      id: '/violations/$violationId'
+      path: '/violations/$violationId'
+      fullPath: '/violations/$violationId'
+      preLoaderRoute: typeof ViolationsViolationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/violations/new': {
+      id: '/violations/new'
+      path: '/violations/new'
+      fullPath: '/violations/new'
+      preLoaderRoute: typeof ViolationsNewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -431,6 +565,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FilesOrganizationsOrganizationIdLogoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/files/violations/$violationId/$photoId': {
+      id: '/files/violations/$violationId/$photoId'
+      path: '/files/violations/$violationId/$photoId'
+      fullPath: '/files/violations/$violationId/$photoId'
+      preLoaderRoute: typeof FilesViolationsViolationIdPhotoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/files/project-types/$projectTypeId/templates/$templateId': {
       id: '/files/project-types/$projectTypeId/templates/$templateId'
       path: '/files/project-types/$projectTypeId/templates/$templateId'
@@ -444,6 +585,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
+  DuesRoute: DuesRoute,
   PeopleRoute: PeopleRoute,
   RulesRoute: RulesRoute,
   SettingsRoute: SettingsRoute,
@@ -452,17 +594,24 @@ const rootRouteChildren: RootRouteChildren = {
   ApplicationsApplicationIdRoute: ApplicationsApplicationIdRoute,
   ApplicationsNewRoute: ApplicationsNewRoute,
   DocumentsDocumentIdRoute: DocumentsDocumentIdRoute,
+  LedgerUnitIdRoute: LedgerUnitIdRoute,
   ProjectTypesProjectTypeIdRoute: ProjectTypesProjectTypeIdRoute,
   RulesReviewRoute: RulesReviewRoute,
+  ViolationsViolationIdRoute: ViolationsViolationIdRoute,
+  ViolationsNewRoute: ViolationsNewRoute,
   ApplicationsIndexRoute: ApplicationsIndexRoute,
   DocumentsIndexRoute: DocumentsIndexRoute,
+  LedgerIndexRoute: LedgerIndexRoute,
   ProjectTypesIndexRoute: ProjectTypesIndexRoute,
+  ViolationsIndexRoute: ViolationsIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   FilesGoverningDocumentIdRoute: FilesGoverningDocumentIdRoute,
   FilesApplicationsApplicationIdFileIdRoute:
     FilesApplicationsApplicationIdFileIdRoute,
   FilesOrganizationsOrganizationIdLogoRoute:
     FilesOrganizationsOrganizationIdLogoRoute,
+  FilesViolationsViolationIdPhotoIdRoute:
+    FilesViolationsViolationIdPhotoIdRoute,
   FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute:
     FilesProjectTypesProjectTypeIdTemplatesTemplateIdRoute,
 }

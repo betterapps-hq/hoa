@@ -7,10 +7,10 @@ INSERT OR IGNORE INTO users (id, name, email, email_verified, role, created_at, 
   ('demo-administrator', 'Sam Rivera', 'sam@example.com', 1, 'admin', 1791936000000, 1791936000000),
   ('demo-homeowner', 'Jordan Avery', 'jordan@example.com', 1, NULL, 1791936000000, 1791936000000);
 
-INSERT OR IGNORE INTO people (id, organization_id, name, email, phone, mailing_address, user_id, created_at, updated_at, removed_at) VALUES
+INSERT OR IGNORE INTO people (id, organization_id, name, email, phone, mailing_address_json, user_id, created_at, updated_at, removed_at) VALUES
   ('person-sam', 'demo-hoa', 'Sam Rivera', 'sam@example.com', '360-555-0101', NULL, 'demo-administrator', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
   ('person-jordan', 'demo-hoa', 'Jordan Avery', 'jordan@example.com', '360-555-0102', NULL, 'demo-homeowner', '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
-  ('person-casey', 'demo-hoa', 'Casey Morgan', 'casey@example.com', NULL, '88 Harbor Road, Bellingham, WA 98226', NULL, '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
+  ('person-casey', 'demo-hoa', 'Casey Morgan', 'casey@example.com', NULL, '{"street":"88 Harbor Road","unitNumber":null,"city":"Bellingham","state":"WA","postalCode":"98226","place":null}', NULL, '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL),
   ('person-riley', 'demo-hoa', 'Riley Chen', NULL, '360-555-0104', NULL, NULL, '2026-10-13T00:00:00.000Z', '2026-10-13T00:00:00.000Z', NULL);
 
 -- Their memberships: Sam administers the association, Jordan is a member.

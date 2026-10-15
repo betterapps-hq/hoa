@@ -1,6 +1,6 @@
 import { match, P } from "ts-pattern"
 import type { Answers } from "@/engine/context"
-import { evaluate } from "@/engine/evaluate"
+import { evaluator } from "@/engine/evaluate"
 import type * as T from "@/schema/types"
 import { createVocabulary } from "@/schema/vocabulary"
 import type { TermContent } from "@/schema/zod"
@@ -586,25 +586,27 @@ export function checkAgreement(input: {
       requestType: keys.toPipeline(requestType) ?? requestType
     }
   }
+  // Every case evaluates each side's rules file, so each is indexed and its vocabulary built once.
+  const evaluatorOf = (side: Side) =>
+    evaluator({
+      organization: { id: "evaluation", name: "Evaluation" },
+      documents: [...side.documents],
+      provisions: [],
+      terms: [...side.terms],
+      proposedCore: [],
+      rules: [isolated(side.rule)],
+      settings: input.settings,
+      questions: []
+    })
+  const evaluators: Record<SideName, ReturnType<typeof evaluator>> = {
+    reference: evaluatorOf(sides.reference),
+    pipeline: evaluatorOf(sides.pipeline)
+  }
   const outcome = (name: SideName, indexes: readonly number[]) => {
-    const { rule, terms, documents } = sides[name]
+    const { rule } = sides[name]
     const { request, answers } = sideRequest(contexts[name], probes, indexes)
     try {
-      const findings = evaluate({
-        rulesFile: {
-          organization: { id: "evaluation", name: "Evaluation" },
-          documents: [...documents],
-          provisions: [],
-          terms: [...terms],
-          proposedCore: [],
-          rules: [isolated(rule)],
-          settings: input.settings,
-          questions: []
-        },
-        request,
-        answers,
-        evaluatedAt
-      })
+      const findings = evaluators[name]({ request, answers, evaluatedAt })
       return findings.find((finding) => finding.ruleKey === rule.key && finding.entity === "subject")?.outcome ?? "none"
     } catch {
       return "error"

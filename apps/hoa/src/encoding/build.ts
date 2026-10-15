@@ -56,7 +56,6 @@ import {
   findingRerunProblems,
   findRules,
   freezeVocabulary,
-  hasClusters,
   mergeVocabulary,
   readingsOf,
   resolveFindings,
@@ -77,7 +76,7 @@ import type { RuleFindingAnswer } from "./steps/ruleFinding"
 import { clausesOf, type RuleStructuringAnswer } from "./steps/ruleStructuring"
 import { stepPromptTraceNames, type StepAi } from "./steps/run"
 import { checkSharedVocabulary, vocabularyGroups, withReadKeys, type GroupVocabulary } from "./steps/vocabulary"
-import type { VocabularyMergeAnswer } from "./steps/vocabularyMerge"
+import { mergeClusters, type VocabularyMergeAnswer } from "./steps/vocabularyMerge"
 import { repairStructure, structureRepairAnswer } from "./structureRepair"
 
 // The rulebook build (encoding.md, Stages): structure and analyze the uploads, then the reordered step pipeline
@@ -618,6 +617,7 @@ export async function buildRulebook(input: BuildInput) {
   // 8. C-merge: exact keys merge, clusters of near-duplicates and collisions go to one call, and the vocabulary
   // freezes with what each term serves. With no clusters there's nothing to decide and no call.
   const entries = vocabularyEntries({ definedTerms, previous }, builtGroups())
+  const clusters = mergeClusters(entries)
   const mergeReport: StageReport = {
     stage: "vocabulary-merge",
     items: 0,
@@ -627,7 +627,7 @@ export async function buildRulebook(input: BuildInput) {
     problemsLeft: 0
   }
   let mergeAnswer: VocabularyMergeAnswer | null = null
-  if (hasClusters(entries)) {
+  if (clusters.length > 0) {
     mergeReport.items = 1
     await progress("vocabulary-merge", 0, 1)
     try {
@@ -635,7 +635,13 @@ export async function buildRulebook(input: BuildInput) {
         "vocabulary-merge",
         vocabularyMergeOutput,
         async () => {
-          const merged = await mergeVocabulary({ ai, cacheStage: "vocabulary-merge", itemId: "vocabulary", entries })
+          const merged = await mergeVocabulary({
+            ai,
+            cacheStage: "vocabulary-merge",
+            itemId: "vocabulary",
+            entries,
+            clusters
+          })
           invariant(merged, "The vocabulary has clusters to merge.")
           return merged
         },
@@ -656,7 +662,7 @@ export async function buildRulebook(input: BuildInput) {
   } else {
     await progress("vocabulary-merge", 0, 0)
   }
-  const frozen = freezeVocabulary(entries, mergeAnswer)
+  const frozen = freezeVocabulary(entries, clusters, mergeAnswer)
   mergeReport.problems += frozen.problems.length
   mergeReport.problemsLeft = frozen.problems.length
   stages.push(mergeReport)
@@ -726,6 +732,7 @@ export async function buildRulebook(input: BuildInput) {
       const all = done().flatMap((state) => state.structured)
       return done().flatMap((state) => {
         const found = checkStructured({
+          checked: state.structured,
           structured: all,
           vocabulary: [...state.batch.vocabulary, ...state.proposed],
           provisions,

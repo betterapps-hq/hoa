@@ -46,7 +46,6 @@ import {
 } from "./vocabulary"
 import {
   applyVocabularyMerge,
-  mergeClusters,
   mergeExactKeys,
   vocabularyMergeAnswer,
   vocabularyMergeVariables,
@@ -381,16 +380,18 @@ export function vocabularyEntries(
 
 const noMerges: VocabularyMergeAnswer = { merges: [], renames: [], distinct: [], notes: [] }
 
-/** Whether C-merge has anything to decide: clusters of near-duplicates or collisions. */
-export const hasClusters = (entries: readonly VocabularyEntry[]) => mergeClusters(entries).length > 0
-
-/** C-merge's call over the entries' clusters; null when there are none. */
-export async function mergeVocabulary(input: Call & { entries: readonly VocabularyEntry[] }) {
-  const clusters = mergeClusters(input.entries)
+/**
+ * C-merge's call over the entries' clusters (`mergeClusters`, which the caller finds once: matching every pair of
+ * labels takes long, and freezing the vocabulary needs them too); null when there are none.
+ */
+export async function mergeVocabulary(
+  input: Call & { entries: readonly VocabularyEntry[]; clusters: readonly number[][] }
+) {
+  const { entries, clusters } = input
   if (clusters.length === 0) {
     return null
   }
-  const { variables } = vocabularyMergeVariables(input.entries, clusters)
+  const { variables } = vocabularyMergeVariables(entries, clusters)
   const result = await runStepPrompt({
     ai: input.ai,
     cacheStage: input.cacheStage,
@@ -405,11 +406,15 @@ export async function mergeVocabulary(input: Call & { entries: readonly Vocabula
 }
 
 /**
- * The frozen vocabulary: C-merge's answer applied to the entries (no answer merges nothing), exact keys merged again,
- * with what each term serves.
+ * The frozen vocabulary: C-merge's answer, about the entries' clusters, applied to the entries (no answer merges
+ * nothing), exact keys merged again, with what each term serves.
  */
-export function freezeVocabulary(entries: readonly VocabularyEntry[], answer: VocabularyMergeAnswer | null) {
-  const { ids } = vocabularyMergeVariables(entries, mergeClusters(entries))
+export function freezeVocabulary(
+  entries: readonly VocabularyEntry[],
+  clusters: readonly number[][],
+  answer: VocabularyMergeAnswer | null
+) {
+  const { ids } = vocabularyMergeVariables(entries, clusters)
   return applyVocabularyMerge({ entries, ids, answer: answer ?? noMerges })
 }
 
@@ -541,10 +546,14 @@ export const isOutlineProblem = (problem: RuleProblem) =>
   problem.code === "zod" && outlineFields.has(problem.message.split(":")[1]?.trim().split(".")[0] ?? "")
 
 /**
- * The validator's problems with each structured rule, read with its batch's vocabulary, every rule structured so far
- * and other rules it may target (those of batches outside a partial run).
+ * The validator's problems with each of a batch's structured rules, read with its vocabulary, every rule structured so
+ * far and other rules it may target (those of batches outside a partial run). Only the batch's own rules are checked:
+ * each batch's check would otherwise check every rule of the run again.
  */
 export function checkStructured(input: {
+  /** The batch's rules. */
+  checked: readonly Structured[]
+  /** Every rule structured so far, the batch's included. */
   structured: readonly Structured[]
   vocabulary: readonly TermContent[]
   provisions: readonly Provision[]
@@ -554,20 +563,26 @@ export function checkStructured(input: {
   const own = input.structured.flatMap((item) => (item.rule ? [item.rule] : []))
   const keys = new Set(input.structured.map((item) => item.outline.key))
   const rules = [...own, ...(input.otherRules ?? []).filter((rule) => !keys.has(rule.key))]
-  const found = recordProblems({
-    terms: input.vocabulary,
-    rules,
-    provisions: input.provisions,
-    documents: input.documents
-  })
+  const found = Map.groupBy(
+    recordProblems({
+      terms: input.vocabulary,
+      rules,
+      provisions: input.provisions,
+      documents: input.documents,
+      about: new Set(input.checked.map((item) => item.outline.key))
+    }),
+    (problem) => problem.recordKey
+  )
   return new Map(
-    input.structured.map((item) => [
+    input.checked.map((item) => [
       item.outline.key,
       [
         ...item.issues.map((issue) => ({ code: issue.split(":")[0] ?? "zod", message: issue, path: [] })),
-        ...found
-          .filter((problem) => problem.recordKey === item.outline.key)
-          .map((problem) => ({ code: problem.code, message: problem.message, path: problem.path }))
+        ...(found.get(item.outline.key) ?? []).map((problem) => ({
+          code: problem.code,
+          message: problem.message,
+          path: problem.path
+        }))
       ]
     ])
   )

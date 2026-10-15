@@ -40,11 +40,17 @@ const unknownType: Type = { type: "unknown" }
 const timeDimensions = new Set<T.Dimension>(["elapsed-time", "calendar-period", "business-time"])
 const applicants = new Set(["owner", "applicant"])
 
-export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
+/**
+ * The rulebook's issues. With `about`, only those records are checked (a build step's own drafts, among every record
+ * they may reference), and coverage, which needs every record checked, isn't.
+ */
+export function validateRulebook(rulebook: Rulebook, about?: ReadonlySet<string>): RulebookIssue[] {
   const issues: RulebookIssue[] = []
   const site = (recordKey: string): Site => ({
     report: (code, message, path) => issues.push({ code, message, recordKey, path })
   })
+  const isChecked = (key: string) => about === undefined || about.has(key)
+  const checked = <R extends { key: string }>(records: R[]) => records.filter((record) => isChecked(record.key))
   const vocabulary = createVocabulary([...rulebook.proposedCore, ...rulebook.terms])
   const cited = new Set<string>()
 
@@ -588,7 +594,7 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
 
   // ─── Documents and provisions ────────────────────────────────────────────────────────────────────
 
-  for (const governing of rulebook.documents) {
+  for (const governing of checked(rulebook.documents)) {
     const at = site(governing.key)
     if (governing.issuedBy) {
       party(at, governing.issuedBy, ["issuedBy"])
@@ -598,7 +604,7 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
     }
   }
 
-  for (const provision of rulebook.provisions) {
+  for (const provision of checked(rulebook.provisions)) {
     const at = site(provision.key)
     const separator = provision.key.indexOf(":")
     const documentKey = provision.key.slice(0, separator)
@@ -707,8 +713,8 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
       .otherwise(() => undefined)
   }
 
-  rulebook.terms.forEach((value) => termRecord(value, rulebook.organization.id))
-  rulebook.proposedCore.forEach((value) => termRecord(value, null))
+  checked(rulebook.terms).forEach((value) => termRecord(value, rulebook.organization.id))
+  checked(rulebook.proposedCore).forEach((value) => termRecord(value, null))
 
   // ─── Rules ───────────────────────────────────────────────────────────────────────────────────────
 
@@ -845,12 +851,13 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
     }
   }
 
-  rulebook.rules.forEach(ruleRecord)
+  checked(rulebook.rules).forEach(ruleRecord)
 
   // ─── Settings ────────────────────────────────────────────────────────────────────────────────────
 
   const settings = site("settings")
-  const clauses = rulebook.settings.clauses
+  // Settings left out of `about` are read as having no clauses, so nothing in them is checked.
+  const clauses: Rulebook["settings"]["clauses"] = isChecked("settings") ? rulebook.settings.clauses : {}
   const anyRequest: Scope = { subject: thing("any"), request: "any", isApplicability: false }
   if (clauses.precedence) {
     citations(settings, clauses.precedence.citations, ["clauses", "precedence", "citations"])
@@ -905,7 +912,11 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
   // ─── Questions ───────────────────────────────────────────────────────────────────────────────────
 
   rulebook.questions.forEach((question, i) => {
-    const at = site(question.id ?? `question ${i + 1}`)
+    const recordKey = question.id ?? `question ${i + 1}`
+    if (!isChecked(recordKey)) {
+      return
+    }
+    const at = site(recordKey)
     citations(at, question.citations, ["citations"])
     question.about.rules.forEach((key, j) => ruleReference(at, key, ["about", "rules", j]))
     question.about.terms.forEach((key, j) => term(at, key, ["about", "terms", j]))
@@ -916,6 +927,9 @@ export function validateRulebook(rulebook: Rulebook): RulebookIssue[] {
 
   // ─── Coverage (schema.md, Sources) ───────────────────────────────────────────────────────────────
 
+  if (about) {
+    return issues
+  }
   for (const provision of rulebook.provisions) {
     const isCited = cited.has(provision.key)
     if (!isCited && provision.noRule === null) {

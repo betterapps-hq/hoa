@@ -21,7 +21,6 @@ import {
   removePerson,
   removeUnit,
   startNextTerm,
-  unitsCenter,
   updateCommittee,
   updateCommitteeMember,
   updatePerson,
@@ -38,7 +37,6 @@ import {
   unitLinkInputSchema
 } from "@/people/people"
 import { accountOf, isLastAdministrator } from "@/people/roll"
-import { isAddressSearchOn, lookUpAddress, suggestAddresses } from "@/places/places.server"
 import { requireAdministrator, requireWorkOf } from "@/session/requestContext.server"
 
 // The People page's reads and changes (docs/design/people.md): administrators; and the board, which reads the roll,
@@ -171,25 +169,6 @@ export const saveUnit = createServerFn({ method: "POST" })
     }
     await updateUnit(db, context.organization.id, data.id, data.unit, now)
     return { id: data.id, organizationId: context.organization.id, ...data.unit }
-  })
-
-/** Addresses the search suggests for what's been typed, near the association's units first; none while it's off. */
-export const suggestUnitAddresses = createServerFn({ method: "POST" })
-  .validator(parse(z.object({ input: z.string().trim().min(3).max(200), sessionToken: z.uuid() })))
-  .handler(async ({ data }) => {
-    const context = await requireAdministrator()
-    if (!isAddressSearchOn()) {
-      return []
-    }
-    return suggestAddresses(data.input, data.sessionToken, await unitsCenter(getDb(), context.organization.id))
-  })
-
-/** A suggested address's parts and where it is. */
-export const lookUpUnitAddress = createServerFn({ method: "POST" })
-  .validator(parse(z.object({ placeId: z.string().min(1).max(300), sessionToken: z.uuid() })))
-  .handler(async ({ data }) => {
-    await requireAdministrator()
-    return lookUpAddress(data.placeId, data.sessionToken)
   })
 
 export const removeUnitFromRoll = createServerFn({ method: "POST" })

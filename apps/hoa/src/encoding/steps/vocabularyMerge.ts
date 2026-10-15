@@ -5,8 +5,7 @@ import { coreTerms } from "@/schema/coreTerms"
 import type { TermKey } from "@/schema/types"
 import { createVocabulary } from "@/schema/vocabulary"
 import { termDraft, type TermContent } from "@/schema/zod"
-import { matchLabel } from "@/text/match"
-import { labelForms } from "@/text/normalize"
+import { labelsMatch, preparedLabel } from "@/text/match"
 import { valueTypeText } from "../promptVariables"
 import { mergeLabels, uniqueCitations } from "../records"
 import type { stepPrompts } from "./prompts"
@@ -86,7 +85,10 @@ export function mergeClusters(entries: readonly VocabularyEntry[]) {
   const join = (a: number, b: number) => {
     parent[find(a)] = find(b)
   }
-  const forms = entries.map((entry) => new Set(shown(entry.term).flatMap(labelForms)))
+  // Each entry's labels and scope, prepared once for the pairs it's in.
+  const labels = entries.map((entry) => shown(entry.term).map(preparedLabel))
+  const forms = labels.map((prepared) => new Set(prepared.flatMap((label) => label.forms)))
+  const scopes = entries.map((entry) => scopeOf(entry.term, vocabulary))
   entries.forEach((a, i) => {
     entries.forEach((b, j) => {
       if (j <= i || (isFixed(a) && isFixed(b))) {
@@ -99,10 +101,8 @@ export function mergeClusters(entries: readonly VocabularyEntry[]) {
       if (a.term.kind !== b.term.kind) {
         return
       }
-      if (scopeOf(a.term, vocabulary) === scopeOf(b.term, vocabulary)) {
-        const matches = shown(a.term).some((left) =>
-          shown(b.term).some((right) => matchLabel(left.text, right) !== null || matchLabel(right.text, left) !== null)
-        )
+      if (scopes[i] === scopes[j]) {
+        const matches = (labels[i] ?? []).some((left) => (labels[j] ?? []).some((right) => labelsMatch(left, right)))
         if (matches) {
           join(i, j)
         }

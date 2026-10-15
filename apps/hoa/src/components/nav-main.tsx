@@ -1,10 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router"
 import {
+  CalendarSyncIcon,
   ClipboardCheckIcon,
   LayersIcon,
   LayoutDashboardIcon,
   ScrollTextIcon,
   SettingsIcon,
+  TriangleAlertIcon,
+  WalletIcon,
   UsersIcon
 } from "lucide-react"
 import {
@@ -24,6 +27,9 @@ const icons: Record<NavItem["to"], typeof LayoutDashboardIcon> = {
   "/rules": ScrollTextIcon,
   "/project-types": LayersIcon,
   "/applications": ClipboardCheckIcon,
+  "/violations": TriangleAlertIcon,
+  "/ledger": WalletIcon,
+  "/dues": CalendarSyncIcon,
   "/people": UsersIcon,
   "/settings": SettingsIcon
 }

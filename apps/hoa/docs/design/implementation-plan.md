@@ -16,7 +16,7 @@ Each finished phase in one line. Task ids that code and other docs cite are kept
 | --- | --- |
 | 0 Spikes and decisions | The encoding draft's JSON Schema measured and accepted inline by both models; the data reset (0.4, `pnpm db:reset:rules`); the decisions in [README.md](README.md). Recognition replaced the planned text-analysis service. |
 | 1 Schema in the app | `src/schema/`: types, Zod validators and drafts, core terms, `validateRulebook` with typing checks, `describe`, statement links; the 57 examples and the sample tested; `pnpm docs:schema`. |
-| 2 Engine | `src/engine/`: exact numbers, vocabulary, three-valued values, calendar, paths, operands, conditions, derived properties, checks, deadlines, overrides, evaluate and decide; the fence fixture `src/tests/fenceSchemaFixture.ts` (2.13) and the fence and garage enclosure expected results as tests. Sanctions (2.15) wait for the violations work. |
+| 2 Engine | `src/engine/`: exact numbers, vocabulary, three-valued values, calendar, paths, operands, conditions, derived properties, checks, deadlines, overrides, evaluate and decide; the fence fixture `src/tests/fenceSchemaFixture.ts` (2.13) and the fence and garage enclosure expected results as tests; sanctions (2.15) in `engine/sanctions.ts`, with the violations work. |
 | 3 Storage | Additive migrations for provisions, rulebook rules, terms and questions, rulebook file and coverage columns and the review's rules file hash; `src/rulebook/assemble.ts` and `carryForward.ts`; the sample seed (3.11, `pnpm db:seed:sample`). |
 | 4 Encoding pipeline | `src/encoding/` and `src/text/`: clean, numbering, provisions, check, references, defined terms, plan, prompt variables, merge, consolidate, and the `RulebookBuild` Workflow with `ENCODING_CONCURRENCY` calls in flight (default 16), the check stage, build scores, stop, step progress and results as they arrive. |
 | 5 Rules UX | `RuleReference`, `TermChip`, `Statement`, `RuleTable`, `RuleCard`, the rule form and check editors, the Vocabulary, Coverage, Questions and Settings tabs, publish, the rule preview (5.15) and the coverage report (`src/rulebook/coverage.ts`). |
@@ -169,7 +169,6 @@ Deferred until the demo works end to end on the fence and garage enclosure:
 | Amendments | Consolidate an amended document's current text from the original and its separately recorded amendments before structure |
 | Large allowed-value lists | Above about 50 allowed values (paint palettes), ask the model for the stated value and match in code instead of listing them |
 | State law | Load a state's HOA statute as documents so statutory overrides (solar, flags, EV chargers, fine caps) are exercised |
-| Sanctions | `engine/sanctions.ts` (2.15): cure, preconditions, liability, amounts, repeats, caps and limits, with the violations work |
 
 ## Order
 

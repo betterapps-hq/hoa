@@ -13,6 +13,7 @@ import {
   type UnitLink,
   type UnitRelation
 } from "@/people/people"
+import { storedAddressSchema, type Address } from "@/places/address"
 import { addressRow, toAddress } from "./addresses"
 import type { Database } from "./database"
 import { cancelingInvitations } from "./membershipRepository"
@@ -27,7 +28,7 @@ const toPerson = (row: typeof people.$inferSelect): Person => ({
   name: row.name,
   email: row.email,
   phone: row.phone,
-  mailingAddress: row.mailingAddress,
+  mailingAddress: row.mailingAddress ? storedAddressSchema.parse(row.mailingAddress) : null,
   userId: row.userId
 })
 
@@ -170,7 +171,7 @@ type PersonFields = {
   name: string
   email: string | null
   phone: string | null
-  mailingAddress: string | null
+  mailingAddress: Address | null
 }
 
 /** Adds someone to the roll; with `userId`, a member who wasn't on it, linked to their account. */

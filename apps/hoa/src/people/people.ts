@@ -2,7 +2,7 @@ import { z } from "zod"
 import type { RoleId } from "@/features/role/roles"
 import { addDays, dayText } from "@/lib/days"
 import { optionalText } from "@/lib/fields"
-import { addressInputSchema, type Address } from "@/places/address"
+import { addressInputSchema, optionalAddressSchema, type Address } from "@/places/address"
 import { optionalPhone } from "./phone"
 
 // The association's people (docs/design/people.md): everyone on its roll, with or without an account, the units they
@@ -29,7 +29,8 @@ export type Person = {
   name: string
   email: string | null
   phone: string | null
-  mailingAddress: string | null
+  /** Where mail reaches them, when it isn't their unit. */
+  mailingAddress: Address | null
   /** The account that signed in with their email; null until they do. Its membership holds their access. */
   userId: string | null
 }
@@ -105,7 +106,7 @@ export const isCurrent = (link: Pick<UnitLink, "startedOn" | "endedOn">, today: 
 export const myDetailsSchema = z.object({
   name: z.string().trim().min(1, "Give your name.").max(200, "Keep your name under 200 characters."),
   phone: optionalPhone,
-  mailingAddress: optionalText(300)
+  mailingAddress: optionalAddressSchema
 })
 
 /** A person as an administrator adds or edits them; their access changes only once they've joined. */
@@ -115,7 +116,7 @@ export const personInputSchema = z.object({
     .union([z.literal(""), z.email("Give an email address such as name@example.com.")])
     .transform((email) => emailKey(email)),
   phone: optionalPhone,
-  mailingAddress: optionalText(300),
+  mailingAddress: optionalAddressSchema,
   access: z.enum(accessLevels)
 })
 

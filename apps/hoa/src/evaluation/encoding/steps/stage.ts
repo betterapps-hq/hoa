@@ -30,7 +30,7 @@ import {
 } from "@/encoding/steps/pipeline"
 import type { StepAi } from "@/encoding/steps/run"
 import { checkSharedVocabulary, type GroupVocabulary } from "@/encoding/steps/vocabulary"
-import { mergeExactKeys } from "@/encoding/steps/vocabularyMerge"
+import { mergeClusters, mergeExactKeys } from "@/encoding/steps/vocabularyMerge"
 import type { ModelCall } from "@/jobs/steps"
 import type * as T from "@/schema/types"
 import { ruleDraft, termDraft, type RuleContent, type TermContent } from "@/schema/zod"
@@ -271,13 +271,20 @@ export async function runVocabularyMerge(
   for (const item of items) {
     // Exact keys merge again first, so what C handed over is merged by the current rules.
     const entries = mergeExactKeys(item.input.entries)
-    const merged = await mergeVocabulary({ ai: context.ai, cacheStage: context.cacheStage, itemId: item.id, entries })
+    const clusters = mergeClusters(entries)
+    const merged = await mergeVocabulary({
+      ai: context.ai,
+      cacheStage: context.cacheStage,
+      itemId: item.id,
+      entries,
+      clusters
+    })
     if (merged) {
       calls.push(merged.call)
       problems.push(...ofItem(item.id, merged.problems))
     }
     // An answer that fails Zod merges nothing, as in the build.
-    const frozen = freezeVocabulary(entries, merged?.answer ?? null)
+    const frozen = freezeVocabulary(entries, clusters, merged?.answer ?? null)
     problems.push(...ofItem(item.id, frozen.problems))
     outputs.set(
       item.id,
@@ -332,8 +339,9 @@ export async function runRuleStructuring(
     ...entry.proposed
   ]
   const allStructured = () => entries().flatMap(({ entry }) => entry.structured)
-  const check = (entry: { batch: StructuringBatch; proposed: TermContent[] }) =>
+  const check = (entry: { batch: StructuringBatch; structured: Structured[]; proposed: TermContent[] }) =>
     checkStructured({
+      checked: entry.structured,
       structured: allStructured(),
       vocabulary: vocabularyOf(entry),
       provisions: context.provisions,

@@ -1,6 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import { toast } from "sonner"
 import { z } from "zod"
+import { DialogForm } from "@/components/DialogForm/DialogForm"
 import { RequiredMark } from "@/components/RequiredMark/RequiredMark"
 import { Button } from "@/components/ui/button"
 import {
@@ -14,13 +15,15 @@ import {
 } from "@/components/ui/dialog"
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import { RollPicker, type RollChoice } from "@/features/people/RollPicker/RollPicker"
+import { AddressFields } from "@/features/places/AddressFields/AddressFields"
 import { messageOf } from "@/lib/attempt"
+import { useAppForm } from "@/lib/form"
 import { myDetailsSchema } from "@/people/people"
+import type { AddressInput } from "@/places/address"
 
-/** Someone's own details as the dialog edits them; empty text for none. */
-export type Details = { name: string; phone: string; mailingAddress: string }
+/** Someone's own details as the dialog edits them; empty text, or an empty address, for none. */
+export type Details = { name: string; phone: string; mailingAddress: AddressInput }
 
 type DetailsDialogProps = {
   details: Details
@@ -32,7 +35,7 @@ type DetailsDialogProps = {
 
 /** Edits someone's own name, and the phone and mailing address their association has for them. */
 export function DetailsDialog({ details, hasContact, onSave, onOpenChange }: DetailsDialogProps) {
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: details,
     validators: { onSubmit: myDetailsSchema },
     onSubmit: async ({ value }) => {
@@ -45,95 +48,69 @@ export function DetailsDialog({ details, hasContact, onSave, onOpenChange }: Det
     }
   })
   return (
-    <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <form
-          noValidate
-          className="flex flex-col gap-6"
-          onSubmit={(event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            void form.handleSubmit()
-          }}
+    <form.Subscribe selector={(state) => state.isSubmitting}>
+      {(isSubmitting) => (
+        <DialogForm
+          title="Edit details"
+          description={hasContact ? "Your name, and how the association reaches you." : undefined}
+          submitLabel="Save"
+          isWide={hasContact}
+          isSubmitting={isSubmitting}
+          onSubmit={() => void form.handleSubmit()}
+          onOpenChange={onOpenChange}
         >
-          <DialogHeader>
-            <DialogTitle>Edit details</DialogTitle>
-            <DialogDescription className="sr-only">Your name and how to reach you.</DialogDescription>
-          </DialogHeader>
-          <FieldGroup>
-            <form.Field name="name">
-              {(field) => (
-                <Field data-invalid={field.state.meta.errors.length > 0}>
-                  <FieldLabel htmlFor="details-name">
-                    Name
-                    <RequiredMark />
-                  </FieldLabel>
-                  <Input
-                    id="details-name"
-                    required
-                    autoComplete="name"
-                    value={field.state.value}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    aria-invalid={field.state.meta.errors.length > 0}
-                  />
-                  <FieldError errors={field.state.meta.errors} />
-                </Field>
-              )}
-            </form.Field>
-            {hasContact ? (
-              <>
-                <form.Field name="phone">
-                  {(field) => (
-                    <Field data-invalid={field.state.meta.errors.length > 0}>
-                      <FieldLabel htmlFor="details-phone">Phone</FieldLabel>
-                      <Input
-                        id="details-phone"
-                        type="tel"
-                        autoComplete="tel"
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(event) => field.handleChange(event.target.value)}
-                        aria-invalid={field.state.meta.errors.length > 0}
-                      />
-                      <FieldError errors={field.state.meta.errors} />
-                    </Field>
-                  )}
-                </form.Field>
-                <form.Field name="mailingAddress">
-                  {(field) => (
-                    <Field data-invalid={field.state.meta.errors.length > 0}>
-                      <FieldLabel htmlFor="details-mailing-address">Mailing address</FieldLabel>
-                      <Textarea
-                        id="details-mailing-address"
-                        autoComplete="street-address"
-                        rows={3}
-                        value={field.state.value}
-                        onBlur={field.handleBlur}
-                        onChange={(event) => field.handleChange(event.target.value)}
-                        aria-invalid={field.state.meta.errors.length > 0}
-                      />
-                      <FieldDescription>If not your home.</FieldDescription>
-                      <FieldError errors={field.state.meta.errors} />
-                    </Field>
-                  )}
-                </form.Field>
-              </>
-            ) : null}
-          </FieldGroup>
-          <DialogFooter>
-            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
-            <form.Subscribe selector={(state) => state.isSubmitting}>
-              {(isSubmitting) => (
-                <Button type="submit" disabled={isSubmitting}>
-                  Save
-                </Button>
-              )}
-            </form.Subscribe>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+          <form.Field name="name">
+            {(field) => (
+              <Field data-invalid={field.state.meta.errors.length > 0}>
+                <FieldLabel htmlFor="details-name">
+                  Name
+                  <RequiredMark />
+                </FieldLabel>
+                <Input
+                  id="details-name"
+                  required
+                  autoComplete="name"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  aria-invalid={field.state.meta.errors.length > 0}
+                />
+                <FieldError errors={field.state.meta.errors} />
+              </Field>
+            )}
+          </form.Field>
+          {hasContact ? (
+            <>
+              <form.Field name="phone">
+                {(field) => (
+                  <Field data-invalid={field.state.meta.errors.length > 0}>
+                    <FieldLabel htmlFor="details-phone">Phone</FieldLabel>
+                    <Input
+                      id="details-phone"
+                      type="tel"
+                      autoComplete="tel"
+                      value={field.state.value}
+                      onBlur={field.handleBlur}
+                      onChange={(event) => field.handleChange(event.target.value)}
+                      aria-invalid={field.state.meta.errors.length > 0}
+                    />
+                    <FieldError errors={field.state.meta.errors} />
+                  </Field>
+                )}
+              </form.Field>
+              <AddressFields
+                form={form}
+                fields="mailingAddress"
+                idPrefix="details-mailing"
+                legend="Mailing address"
+                description="Only if your mail should go somewhere other than your home."
+                addLabel="Add a mailing address"
+              />
+            </>
+          ) : null}
+        </DialogForm>
+      )}
+    </form.Subscribe>
   )
 }
 

@@ -72,11 +72,14 @@ the board is never left with nobody on it.
 
 ## Addresses
 
-A unit's address, and the association's mailing address, are kept in parts: street, unit number, city, state and ZIP
-code (`addressColumns`). Typing the street searches Google's Places API (New) from the server, near the association's
-other units first; picking a suggestion fills the other parts and keeps the place's id and coordinates for the map. A
-unit's name follows the house number until someone types one. Without `GOOGLE_MAPS_API_KEY` the search is off and the
-parts are typed.
+Every address is kept in parts: street, unit number, city, state and ZIP code. A unit's and the association's are
+columns (`addressColumns`); a person's mailing address, which they need only when mail shouldn't go to their unit, is
+JSON (`mailing_address_json`), null without one. Every form edits one with the same fields (`AddressFields`): typing
+the street searches Google's Places API (New) from the server, near the association's other units first; picking a
+suggestion fills the other parts and keeps the place's id and coordinates for the map. It searches only once someone
+types, so opening a form doesn't. A mailing address starts as a button that opens its fields, and removing it empties
+them. A unit's name follows the house number until someone types one. Without `GOOGLE_MAPS_API_KEY` the search is off
+and the parts are typed.
 
 ## Settings
 

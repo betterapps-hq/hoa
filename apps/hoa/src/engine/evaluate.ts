@@ -249,38 +249,49 @@ function judgedAcrossReferences(context: Context, rulebook: Rulebook, rule: Eval
   return { found: { ...settled.found, reason }, reads: [...first.reads, ...ways.flatMap((way) => way.reads)] }
 }
 
-export function evaluate({ rulesFile, request, answers = {}, evaluatedAt }: EvaluationInput): T.Finding[] {
-  const rulebook = indexRulebook(rulesFile)
-  const shared = createContext({
-    vocabulary: createEngineVocabulary([...rulesFile.proposedCore, ...rulesFile.terms]),
-    request,
-    settings: rulesFile.settings,
-    answers: { documentReviews: [], judgments: [], conditionAnswers: [], ...answers },
-    derive: deriveProperty
-  })
+export function evaluate({ rulesFile, ...input }: EvaluationInput): T.Finding[] {
+  return evaluator(rulesFile)(input)
+}
 
-  return rulesFile.rules
-    .filter(isEvaluated)
-    .filter((rule) => isConsidered(shared, rule))
-    .flatMap((rule) =>
-      subjectsOf(shared, rulebook, rule).map((subject): T.Finding => {
-        const context: Context = { ...shared, reads: [], deriving: new Set() }
-        const { found, reads } = judgedAcrossReferences(context, rulebook, rule, subject)
-        return {
-          ruleKey: rule.key,
-          entity: subject,
-          outcome: found.outcome,
-          remedy: remedyOf(rule, found),
-          reason: found.reason,
-          inputs: uniqueInputs(reads),
-          modifiedBy: modifiedBy(found),
-          judgment: found.check?.judgment ?? null,
-          statements: found.check?.statements ?? [],
-          effects: found.check?.effects ?? [],
-          sanction: null,
-          asOf: request.governingDate,
-          evaluatedAt
-        }
-      })
-    )
+/**
+ * Evaluates requests against one rules file, its rules indexed and its vocabulary built once for all of them: a caller
+ * evaluating many requests (generated cases, one fact changed at a time) would otherwise rebuild both for each.
+ */
+export function evaluator(rulesFile: T.RulesFile) {
+  const rulebook = indexRulebook(rulesFile)
+  const vocabulary = createEngineVocabulary([...rulesFile.proposedCore, ...rulesFile.terms])
+  return ({ request, answers = {}, evaluatedAt }: Omit<EvaluationInput, "rulesFile">): T.Finding[] => {
+    const shared = createContext({
+      vocabulary,
+      request,
+      settings: rulesFile.settings,
+      answers: { documentReviews: [], judgments: [], conditionAnswers: [], ...answers },
+      derive: deriveProperty
+    })
+
+    return rulesFile.rules
+      .filter(isEvaluated)
+      .filter((rule) => isConsidered(shared, rule))
+      .flatMap((rule) =>
+        subjectsOf(shared, rulebook, rule).map((subject): T.Finding => {
+          const context: Context = { ...shared, reads: [], deriving: new Set() }
+          const { found, reads } = judgedAcrossReferences(context, rulebook, rule, subject)
+          return {
+            ruleKey: rule.key,
+            entity: subject,
+            outcome: found.outcome,
+            remedy: remedyOf(rule, found),
+            reason: found.reason,
+            inputs: uniqueInputs(reads),
+            modifiedBy: modifiedBy(found),
+            judgment: found.check?.judgment ?? null,
+            statements: found.check?.statements ?? [],
+            effects: found.check?.effects ?? [],
+            sanction: null,
+            asOf: request.governingDate,
+            evaluatedAt
+          }
+        })
+      )
+  }
 }

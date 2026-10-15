@@ -12,8 +12,6 @@ import {
   filterSubjects,
   termSearchSetup,
   termSections,
-  termSubjects,
-  termUsage,
   type ShownSubject,
   type TermFilters
 } from "./VocabularyTab.utils"
@@ -45,12 +43,11 @@ const noKeys: ReadonlySet<string> = new Set()
  * what it holds together. A term is approved here, or with the first rule approved that reads it.
  */
 export function VocabularyTab() {
-  const { records, vocabulary, actions } = useRulebookWorkspace()
+  const { records, termSubjects: subjects, actions } = useRulebookWorkspace()
   const defaultStatus: TermFilters["status"] =
     actions && records.terms.some((term) => term.review.status === "proposed") ? "proposed" : "all"
   const [filters, setFilters] = useState<TermFilters>({ query: "", status: defaultStatus })
   const search = useSearch(records.terms, termSearchSetup)
-  const subjects = termSubjects(records.terms, { vocabulary, usage: termUsage(records.rules) })
   const foundKeys = search.ids(filters.query)
   const isSearching = foundKeys !== null
   const shown = filterSubjects(subjects, filters, foundKeys)

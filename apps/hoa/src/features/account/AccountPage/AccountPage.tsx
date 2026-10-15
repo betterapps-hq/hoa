@@ -37,6 +37,7 @@ import { attempt, messageOf } from "@/lib/attempt"
 import { localToday } from "@/lib/days"
 import { relationLabels, resignedText, seatTermLabel } from "@/people/people"
 import { phoneText } from "@/people/phone"
+import { addressLine, addressValues } from "@/places/address"
 import { initialsOf } from "@/session/users"
 import type { AccountDetails, AccountDevice, AccountMembership } from "../account.functions"
 import { lastUsedText, type DeviceKind } from "../devices"
@@ -179,15 +180,15 @@ function Row({
   )
 }
 
-/** A label above its value, for the details card's rows. */
-function Labeled({ label, value }: { label: string; value: string | null }) {
+/** A label above its value, for the details card's rows; `empty` says what having none means. */
+function Labeled({ label, value, empty = "None" }: { label: string; value: string | null; empty?: string }) {
   return (
     <ItemContent className="min-w-0">
       <ItemDescription>{label}</ItemDescription>
       <ItemTitle
         className={value ? "line-clamp-none break-words whitespace-pre-line" : "font-normal text-muted-foreground"}
       >
-        {value ?? "None"}
+        {value ?? empty}
       </ItemTitle>
     </ItemContent>
   )
@@ -221,7 +222,11 @@ function DetailsCard({ account, actions }: { account: AccountDetails; actions: A
             </Item>
             <ItemSeparator className="my-0" />
             <Item>
-              <Labeled label="Mailing address" value={membership.mailingAddress} />
+              <Labeled
+                label="Mailing address"
+                value={membership.mailingAddress ? addressLine(membership.mailingAddress) : null}
+                empty="Same as your home"
+              />
             </Item>
           </>
         ) : null}
@@ -231,7 +236,7 @@ function DetailsCard({ account, actions }: { account: AccountDetails; actions: A
           details={{
             name: account.name,
             phone: membership?.phone ? phoneText(membership.phone) : "",
-            mailingAddress: membership?.mailingAddress ?? ""
+            mailingAddress: addressValues(membership?.mailingAddress ?? null)
           }}
           hasContact={membership !== null}
           onSave={async (details) => {

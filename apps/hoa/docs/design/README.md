@@ -19,6 +19,8 @@ applications against it. It's written for a product that many HOAs onboard to, s
 | [document-requirements.md](document-requirements.md) | Design: document requirements, form templates and the answer choices administrators make when the documents don't settle them |
 | [documents.md](documents.md) | What lives where, the records and D1 tables, storage layout, uploads, access, privacy and retention |
 | [people.md](people.md) | People, accounts and organizations: the roll and Better Auth's organization plugin, joining, access, committee work and homes |
+| [violations.md](violations.md) | Violations and fines: the records, what the documents allow at each step (cure, notice, hearing, sanctions), and who sees what |
+| [money.md](money.md) | The ledger, dues, late fees and interest, payments through each association's Stripe account, and who sees what |
 | [ocr.md](ocr.md) | Turning every uploaded file into stored page records with Azure Document Intelligence Layout |
 | [evaluation.md](evaluation.md) | Datasets, scores, production evaluators and the prompt tuning loop in Langfuse |
 | [platform.md](platform.md) | Cloudflare services, limits, workflows, caching, errors, server functions, local development, CI/CD |

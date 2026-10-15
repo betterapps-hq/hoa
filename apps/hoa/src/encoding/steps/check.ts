@@ -13,7 +13,7 @@ type CheckInput = {
   /** The provisions citations may name; without them, citations aren't checked. */
   provisions?: readonly Pick<Provision, "key" | "label">[]
   documents?: readonly Pick<GoverningDocument, "key" | "kind">[]
-  /** Only problems on these records are reported; all of them when left out. */
+  /** Only these records are checked, the rest read only as what they may reference; all of them when left out. */
   about?: ReadonlySet<string>
 }
 
@@ -25,25 +25,28 @@ const checkOrganization = "check"
  * (a draft has no organization yet, and a core term given here is a refinement of itself).
  */
 export function recordProblems(input: CheckInput): StepProblem[] {
-  const issues = validateRulebook({
-    organization: { id: checkOrganization },
-    documents: (input.documents ?? []).map((document) => ({
-      key: document.key,
-      kind: document.kind,
-      issuedBy: null,
-      governs: null
-    })),
-    provisions: (input.provisions ?? []).map((provision) => ({
-      key: provision.key,
-      label: provision.label,
-      noRule: null
-    })),
-    terms: input.terms.map((term) => ({ ...term, organizationId: checkOrganization })),
-    proposedCore: [],
-    rules: [...(input.rules ?? [])],
-    settings: { clauses: {} },
-    questions: []
-  })
+  const issues = validateRulebook(
+    {
+      organization: { id: checkOrganization },
+      documents: (input.documents ?? []).map((document) => ({
+        key: document.key,
+        kind: document.kind,
+        issuedBy: null,
+        governs: null
+      })),
+      provisions: (input.provisions ?? []).map((provision) => ({
+        key: provision.key,
+        label: provision.label,
+        noRule: null
+      })),
+      terms: input.terms.map((term) => ({ ...term, organizationId: checkOrganization })),
+      proposedCore: [],
+      rules: [...(input.rules ?? [])],
+      settings: { clauses: {} },
+      questions: []
+    },
+    input.about
+  )
   return issues
     .filter((issue) => issue.code !== "coverage")
     .filter((issue) => input.provisions !== undefined || issue.code !== "citation-not-found")

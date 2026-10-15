@@ -901,8 +901,10 @@ type Check =
 7. **Remedy.** `not-met` takes the rule's remedy. `missing-information` is `provide-document` for a document check and
    `provide-information` otherwise.
 8. **Sanctions and limits**, for each `not-met` finding, as in [Deadlines, cure, sanctions and
-   limits](#deadlines-cure-sanctions-and-limits): `available` with the amount, `blocked` when a limit forbids it,
-   `missing-information` when a condition is unknown, or `not-applicable`.
+   limits](#deadlines-cure-sanctions-and-limits): `available` with the amount, `pending` until the cure period or its
+   own `after` period has run or a precondition it needs has happened, `blocked` when a limit forbids it,
+   `missing-information` when a condition is unknown, or `not-applicable`. `engine/sanctions.ts` evaluates them for the
+   rules a feature found broken ([violations.md](violations.md)).
 
 | Outcome | Means |
 | --- | --- |

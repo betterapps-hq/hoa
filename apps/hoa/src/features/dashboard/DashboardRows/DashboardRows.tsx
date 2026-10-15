@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router"
 import type { ReactElement, ReactNode } from "react"
 import { match } from "ts-pattern"
+import { DayTile } from "@/components/DayTile/DayTile"
 import { Badge } from "@/components/ui/badge"
 import { Item, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "@/components/ui/item"
 import { sentenceCase } from "@/lib/text"
@@ -67,6 +68,42 @@ export function AttentionRow({ area, subject, aside, detail, note, link, isSampl
           {detail ? <ItemDescription>{detail}</ItemDescription> : null}
           <p className="text-sm">{note}</p>
           <p className="text-xs text-muted-foreground">{area.label}</p>
+        </ItemContent>
+      </Item>
+    </li>
+  )
+}
+
+type UpcomingRowProps = {
+  area: Area
+  /** The day it's on. */
+  day: string
+  subject: string
+  /** What to know of it. */
+  note: string
+  /** Where it's dealt with; none for sample data. */
+  link: ReactElement | null
+  isSample?: boolean
+}
+
+/** Something coming up on a day, its day on a calendar leaf, opening where it's dealt with. */
+export function UpcomingRow({ area, day, subject, note, link, isSample = false }: UpcomingRowProps) {
+  return (
+    <li>
+      <Item variant="outline" size="sm" render={link ?? undefined}>
+        <ItemMedia className={mediaClass}>
+          <DayTile day={day} />
+        </ItemMedia>
+        <ItemContent className="min-w-0">
+          <ItemTitle>
+            {subject}
+            {isSample ? <SampleBadge /> : null}
+          </ItemTitle>
+          <p className="text-sm">{note}</p>
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <area.icon className="size-3" aria-hidden />
+            {area.label}
+          </p>
         </ItemContent>
       </Item>
     </li>
@@ -167,6 +204,27 @@ function EventSubject({ event, children }: { event: ActivityEvent; children: Rea
         {children}
       </Link>
     ))
+    .with({ type: "payment-recorded" }, ({ unit }) => (
+      <Link to="/ledger/$unitId" params={{ unitId: unit.id }} className={subjectClass}>
+        {children}
+      </Link>
+    ))
+    .with({ type: "dues-posted" }, () => (
+      <Link to="/dues" className={subjectClass}>
+        {children}
+      </Link>
+    ))
+    .with(
+      { type: "violation-reported" },
+      { type: "violation-noticed" },
+      { type: "violation-sanctioned" },
+      { type: "violation-cured" },
+      ({ violation }) => (
+        <Link to="/violations/$violationId" params={{ violationId: violation.id }} className={subjectClass}>
+          {children}
+        </Link>
+      )
+    )
     .exhaustive()
 }
 

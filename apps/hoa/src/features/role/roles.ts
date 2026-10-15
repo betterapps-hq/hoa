@@ -6,7 +6,16 @@ export type RoleId = (typeof roleIds)[number]
 
 export type NavItem = {
   title: string
-  to: "/" | "/rules" | "/project-types" | "/applications" | "/people" | "/settings"
+  to:
+    | "/"
+    | "/rules"
+    | "/project-types"
+    | "/applications"
+    | "/violations"
+    | "/ledger"
+    | "/dues"
+    | "/people"
+    | "/settings"
 }
 
 /** A group of the sidebar's links, under its heading; the first, the dashboard, has none. */
@@ -48,7 +57,8 @@ const committeePages: Record<CommitteeKind, NavItem[]> = {
   other: []
 }
 
-/** The roll, which the board keeps. */
+/** The dues the board sets up, and the roll it keeps. */
+const duesPage: NavItem = { title: "Dues", to: "/dues" }
 const peoplePage: NavItem = { title: "People", to: "/people" }
 
 /**
@@ -65,12 +75,18 @@ export function navigationFor(roleId: RoleId, committees: readonly Pick<Committe
     }
     return items.length > 0 ? [{ label: committee.name, items }] : []
   })
+  const isBoard = doesWorkOf(roleId, committees, "board")
   const organization: NavItem[] = [
     // Everyone sees their own applications; the architectural committee sees everyone's.
     { title: "Applications", to: "/applications" },
     ...(roleId === "administrator" ? committeePages.architectural.slice(1) : []),
+    // Everyone sees the violations they answer for; the board sees every one.
+    { title: "Violations", to: "/violations" },
+    // Everyone sees their own units' ledgers; the board sees every unit's.
+    { title: "Ledger", to: "/ledger" },
+    ...(isBoard ? [duesPage] : []),
     { title: "Rulebook", to: "/rules" },
-    ...(doesWorkOf(roleId, committees, "board") ? [peoplePage] : []),
+    ...(isBoard ? [peoplePage] : []),
     // What the documents don't say about the association, kept by an administrator.
     ...(roleId === "administrator" ? [{ title: "Settings", to: "/settings" } as const] : [])
   ]
