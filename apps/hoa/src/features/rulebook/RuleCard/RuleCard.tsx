@@ -22,7 +22,6 @@ import { Statement } from "../Statement/Statement"
 import { TermChip } from "../TermChip/TermChip"
 import { describeTermKind } from "../TermChip/TermChip.utils"
 import { useRulebookWorkspace } from "../useRulebookWorkspace"
-import { termUsage } from "../VocabularyTab/VocabularyTab.utils"
 import { cureLabel, kindLabel } from "./RuleCard.utils"
 
 export type RuleCardProps = { rule: T.Rule }
@@ -46,8 +45,7 @@ const reviewOrder: Record<T.Review["status"], number> = { proposed: 0, rejected:
  * review first. A term means the same in every rule that reads it, and approving the rule approves those still to review.
  */
 function TermsItUses({ rule }: { rule: T.Rule }) {
-  const { records, vocabulary, actions } = useRulebookWorkspace()
-  const usage = termUsage(records.rules)
+  const { records, vocabulary, actions, termUsage: usage } = useRulebookWorkspace()
   const keys = termKeysOf(rule)
   const terms = records.terms
     .filter((term) => keys.has(term.key))

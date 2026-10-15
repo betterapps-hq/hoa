@@ -261,6 +261,42 @@ describe("coverage", () => {
   })
 })
 
+describe("checking some records", () => {
+  it("reports what the whole check reports on them, with references to the rest resolved, and no coverage", () => {
+    const rulebook = exampleRulebook()
+    const changes: Change[] = [
+      withRule({ ...ex.metalVariations, overrides: ["guidelines:5.5.2#metal-hieght"] }),
+      withRule({ ...ex.maxHeight, remedy: null }),
+      withRule({ ...ex.fineLimit, limits: [ex.maintainLandscaping.key] }),
+      withTerm({ key: "gate", kind: "thing", nature: "object", labels: labels("gate") }),
+      (changed) => {
+        const [precondition] = changed.settings.clauses.sanctionPreconditions ?? []
+        if (precondition) {
+          precondition.except = [ex.maintainLandscaping.key]
+        }
+        changed.questions.push(
+          questionDraft.parse({ ...ex.interpretation, about: { rules: ["guidelines:9#height"], terms: [] } })
+        )
+        changed.provisions.push({ key: "guidelines:5.9", label: "5.9", noRule: null })
+      }
+    ]
+    for (const change of changes) {
+      change(rulebook)
+    }
+    const about = new Set([maxHeight, ex.fineLimit.key, "gate", "settings", "guidelines:5.9"])
+    const some = validateRulebook(rulebook, about)
+    expect(some).toEqual(
+      validateRulebook(rulebook).filter((found) => about.has(found.recordKey) && found.code !== "coverage")
+    )
+    expect(some.map(({ code, recordKey, path }) => issue(code, recordKey, path.join(".")))).toEqual([
+      issue("duplicate-key", "gate", "key"),
+      issue("invariant", maxHeight, "remedy"),
+      issue("invariant", ex.fineLimit.key, "limits.0"),
+      issue("invariant", "settings", "clauses.sanctionPreconditions.0.except.0")
+    ])
+  })
+})
+
 describe("terms", () => {
   it("gives organization terms the organization's id, and proposed core terms none", () => {
     const issues = issuesAfter(

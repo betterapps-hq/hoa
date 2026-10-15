@@ -607,13 +607,14 @@ export function scoreStructuring(
       return [...matches.values()].find((match) => match.pipeline === key)?.golden
     }
   }
+  const terms = output.terms.map(storedTerm)
   const agreements = valid.flatMap((pair) => {
     if (pair.found.rule === null) {
       return []
     }
     const result = checkAgreement({
       reference: { rule: stored(pair.expected), terms: golden.terms, documents: golden.documents },
-      pipeline: { rule: stored(pair.found.rule), terms: output.terms.map(storedTerm), documents: output.documents },
+      pipeline: { rule: stored(pair.found.rule), terms, documents: output.documents },
       keys,
       settings: golden.settings
     })

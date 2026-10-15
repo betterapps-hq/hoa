@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest"
 import {
   findLabels,
   fuzzyThreshold,
+  labelsMatch,
   levenshtein,
   matchLabel,
   partialRatio,
+  preparedLabel,
   ratio,
   similarity,
   tokenSetRatio
@@ -47,6 +49,29 @@ describe("scores", () => {
       const b = text(next(100))
       const total = a.length + b.length
       expect([a, b, ratio(a, b)]).toEqual([a, b, total === 0 ? 1 : (2 * tableSubsequence(a, b)) / total])
+    }
+  })
+
+  it("partial ratio skips only windows that can't beat the best, finding what every window finds", () => {
+    const everyWindow = (a: string, b: string) => {
+      const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a]
+      let best = 0
+      for (let start = 0; start + shorter.length <= longer.length; start += 1) {
+        best = Math.max(best, ratio(shorter, longer.slice(start, start + shorter.length)))
+      }
+      return best
+    }
+    // A fixed linear congruential sequence: statement-like lengths, one text often much longer than the other.
+    let seed = 13
+    const next = (limit: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed % limit
+    }
+    const text = (length: number) => Array.from({ length }, () => "abcde fg"[next(8)]).join("")
+    for (let round = 0; round < 300; round += 1) {
+      const a = text(1 + next(80))
+      const b = text(1 + next(300))
+      expect([a, b, partialRatio(a, b)]).toEqual([a, b, everyWindow(a, b)])
     }
   })
 
@@ -94,6 +119,32 @@ describe("matchLabel", () => {
     expect(matchLabel("fence", { text: "gate" })).toBeNull()
     expect(fuzzyThreshold(5)).toBe(0.9)
     expect(fuzzyThreshold(12)).toBe(0.85)
+  })
+})
+
+describe("labelsMatch", () => {
+  it("agrees with matchLabel either way round, exactly and fuzzily", () => {
+    // A fixed linear congruential sequence over words that share letters, with a typo, hyphens and stored plurals.
+    let seed = 11
+    const next = (limit: number) => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed % limit
+    }
+    const words = ["fence", "fences", "gate", "height", "hieght", "common", "area", "limited", "arc", "roof", "solar"]
+    const label = () => {
+      const text = Array.from({ length: 1 + next(3) }, () => words[next(words.length)]).join(next(4) ? " " : "-")
+      return next(3) ? { text } : { text, plural: `${text}s` }
+    }
+    const kinds = new Set<string>()
+    for (let round = 0; round < 400; round += 1) {
+      const a = label()
+      const b = label()
+      const found = [matchLabel(a.text, b), matchLabel(b.text, a)]
+      kinds.add(found.find((match) => match?.kind === "exact")?.kind ?? found.find(Boolean)?.kind ?? "none")
+      const expected = found.some(Boolean)
+      expect([a, b, labelsMatch(preparedLabel(a), preparedLabel(b))]).toEqual([a, b, expected])
+    }
+    expect([...kinds].toSorted()).toEqual(["exact", "fuzzy", "none"])
   })
 })
 

@@ -22,7 +22,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { sentenceCase } from "@/lib/text"
 import { termKeysOf } from "@/rulebook/review"
 import { pickableTerms } from "@/rulebook/ruleTerms"
-import { approvedRulesUsing, changesMeaning, mergeCandidates, type TermEdit } from "@/rulebook/termEdits"
+import { approvedRulesUsing, changesMeaning, type TermEdit } from "@/rulebook/termEdits"
 import type * as T from "@/schema/types"
 import { attempt } from "../attempt"
 import { ChoiceSelect } from "../ChoiceSelect/ChoiceSelect"
@@ -46,12 +46,12 @@ export function useTermEditing(term: T.Term | null | undefined): {
   merge: RowAction | null
   dialogs: ReactNode
 } {
-  const { records, vocabulary, actions } = useRulebookWorkspace()
+  const { mergeTargets, actions } = useRulebookWorkspace()
   const [dialog, setDialog] = useState<"edit" | "merge" | null>(null)
   if (!term || !actions) {
     return { edit: null, merge: null, dialogs: null }
   }
-  const candidates = mergeCandidates(vocabulary, pickableTerms(records.terms), term.key)
+  const candidates = mergeTargets(term.key)
   const close = (isOpen: boolean) => {
     if (!isOpen) {
       setDialog(null)

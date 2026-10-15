@@ -99,11 +99,15 @@ export function partialRatio(a: string, b: string) {
     return longer.length === 0 ? 1 : 0
   }
   const common = commonSubsequenceWith(shorter)
+  // A window one character on shares at most one character more with the shorter text, so after a window sharing
+  // `found`, the next `best - found` windows can't share more than the best: they're skipped.
   let best = 0
-  for (let start = 0; start + shorter.length <= longer.length && best < 1; start += 1) {
-    best = Math.max(best, (2 * common(longer.slice(start, start + shorter.length))) / (2 * shorter.length))
+  for (let start = 0; start + shorter.length <= longer.length && best < shorter.length;) {
+    const found = common(longer.slice(start, start + shorter.length))
+    best = Math.max(best, found)
+    start += best - found + 1
   }
-  return best
+  return best / shorter.length
 }
 
 const words = (text: string) => text.split(" ").filter(Boolean)
@@ -126,8 +130,11 @@ export function tokenSetRatio(a: string, b: string) {
 
 /** RapidFuzz's WRatio on normalized text: partial and token scores count for less as the lengths diverge. */
 export function similarity(a: string, b: string) {
-  const left = normalizeForMatching(a)
-  const right = normalizeForMatching(b)
+  return normalizedSimilarity(normalizeForMatching(a), normalizeForMatching(b))
+}
+
+/** `similarity` of texts already normalized. It is symmetric: every score it combines is. */
+function normalizedSimilarity(left: string, right: string) {
   if (left.length === 0 || right.length === 0) {
     return 0
   }
@@ -159,8 +166,35 @@ export function matchLabel(text: string, label: { text: string; plural?: string 
   if (threshold === null) {
     return null
   }
-  const score = Math.max(...forms.map((form) => similarity(stated, form)))
+  const score = Math.max(...forms.map((form) => normalizedSimilarity(stated, form)))
   return score >= threshold ? { kind: "fuzzy", score: round(score) } : null
+}
+
+/** A label's normalized text and forms, prepared once for matching it with many other labels. */
+export type PreparedLabel = { text: string; forms: string[] }
+
+export const preparedLabel = (label: { text: string; plural?: string | null }): PreparedLabel => ({
+  text: normalizeForMatching(label.text),
+  forms: labelForms(label)
+})
+
+/**
+ * Whether either label's text matches the other label, as `matchLabel` finds it either way round. Each pair of texts
+ * is scored once: both ways score the two texts against each other.
+ */
+export function labelsMatch(a: PreparedLabel, b: PreparedLabel) {
+  if (b.forms.includes(a.text) || a.forms.includes(b.text)) {
+    return true
+  }
+  const threshold = fuzzyThreshold(Math.min(a.text.length, b.text.length))
+  if (threshold === null) {
+    return false
+  }
+  const pairs = [
+    ...b.forms.map((form) => [a.text, form] as const),
+    ...a.forms.filter((form) => form !== a.text || !b.forms.includes(b.text)).map((form) => [b.text, form] as const)
+  ]
+  return pairs.some(([text, form]) => normalizedSimilarity(text, form) >= threshold)
 }
 
 const round = (score: number) => Math.round(score * 1000) / 1000

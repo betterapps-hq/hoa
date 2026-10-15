@@ -1,11 +1,14 @@
 import type { RulebookRecords } from "@/rulebook/assemble"
 import { coverageOf, type Coverage } from "@/rulebook/coverage"
 import { approvalContext, isBlocking } from "@/rulebook/review"
+import { pickableTerms } from "@/rulebook/ruleTerms"
+import { mergeTargets } from "@/rulebook/termEdits"
 import type * as T from "@/schema/types"
 import type { RulebookIssue } from "@/schema/validate"
 import { createVocabulary } from "@/schema/vocabulary"
 import { citationIndex } from "../rulebookRecords"
 import type { RulebookActions, RulebookSource, RulebookWorkspaceValue } from "../useRulebookWorkspace"
+import { termSubjects, termUsage } from "../VocabularyTab/VocabularyTab.utils"
 
 const noIssues = new Map<string, RulebookIssue[]>()
 
@@ -75,9 +78,14 @@ export function workspaceOf(
   }
 ): RulebookWorkspaceValue {
   const approval = actions ? approvalContext(records) : null
+  const vocabulary = approval?.vocabulary ?? createVocabulary(records.terms)
+  const usage = termUsage(records.rules)
   return {
     records,
-    vocabulary: approval?.vocabulary ?? createVocabulary(records.terms),
+    vocabulary,
+    mergeTargets: mergeTargets(vocabulary, pickableTerms(records.terms)),
+    termUsage: usage,
+    termSubjects: termSubjects(records.terms, { vocabulary, usage }),
     citations: citationIndex(records),
     coverage: coverageOf(records),
     issues: approval?.issues ?? noIssues,

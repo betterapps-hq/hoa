@@ -5,11 +5,11 @@ import { rule as ruleSchema, term as termSchema, type TermContent } from "@/sche
 import type { RulebookRecords } from "./assemble"
 import { mapTermKeys, termKeysOf } from "./review"
 import {
-  isSameValueType,
   keyPart,
   keysNamedBy,
   pickableTerms,
   termRefFields,
+  valueKindOf,
   withTermsReplaced,
   type ChangeStamp
 } from "./ruleTerms"
@@ -171,42 +171,49 @@ function mentions(value: unknown, key: T.TermKey): boolean {
  * without it.
  */
 export function mergeCandidates(vocabulary: Vocabulary, terms: TermContent[], from: T.TermKey) {
-  const term = vocabulary.get(from)
-  const hasDependents = terms.some(
-    (item) =>
-      ((item.kind === "property" || item.kind === "category") && item.of === from) ||
-      (item.kind === "value" && item.set === from)
+  return mergeTargets(vocabulary, terms)(from)
+}
+
+/**
+ * `mergeCandidates` for any term, with the terms sorted once by the place they fit: the terms tab offers a merge on
+ * every term it shows, and each would otherwise search all the terms.
+ */
+export function mergeTargets(vocabulary: Vocabulary, terms: TermContent[]) {
+  const held = new Set(
+    terms.flatMap((item) => {
+      if (item.kind === "property" || item.kind === "category") {
+        return [item.of]
+      }
+      return item.kind === "value" ? [item.set] : []
+    })
   )
-  if (!term || hasDependents) {
-    return []
-  }
   const natureOf = (key: T.TermKey) => {
     const thing = vocabulary.get(vocabulary.thingOf(key))
     return thing?.kind === "thing" ? thing.nature : null
   }
-  const fits = match(term)
-    .returnType<(candidate: TermContent) => boolean>()
-    .with(
-      { kind: P.union("thing", "category") },
-      () => (candidate) =>
-        (candidate.kind === "thing" || candidate.kind === "category") && natureOf(candidate.key) === natureOf(from)
-    )
-    .with(
-      { kind: "property" },
-      (property) => (candidate) =>
-        candidate.kind === "property" &&
-        candidate.many === property.many &&
-        vocabulary.thingOf(candidate.of) === vocabulary.thingOf(property.of) &&
-        isSameValueType(vocabulary, candidate.valueType, property.valueType)
-    )
-    .with({ kind: "value" }, (value) => (candidate) => candidate.kind === "value" && candidate.set === value.set)
-    .with(
-      { kind: "unit" },
-      (unit) => (candidate) => candidate.kind === "unit" && candidate.dimension === unit.dimension
-    )
-    .with({ kind: "value-set" }, () => () => false)
-    .exhaustive()
-  return terms.filter((candidate) => candidate.key !== from && fits(candidate))
+  // Two terms fit in the same place when one can be merged into the other; a list fits nowhere.
+  const placeOf = (term: TermContent) =>
+    match(term)
+      .returnType<unknown[] | null>()
+      .with({ kind: P.union("thing", "category") }, () => ["thing", natureOf(term.key)])
+      .with({ kind: "property" }, (property) => [
+        "property",
+        property.many,
+        vocabulary.thingOf(property.of),
+        valueKindOf(vocabulary, property.valueType)
+      ])
+      .with({ kind: "value" }, (value) => ["value", value.set])
+      .with({ kind: "unit" }, (unit) => ["unit", unit.dimension])
+      .with({ kind: "value-set" }, () => null)
+      .exhaustive()
+  const byPlace = Map.groupBy(terms, (term) => JSON.stringify(placeOf(term)))
+  return (from: T.TermKey) => {
+    const term = vocabulary.get(from)
+    const place = term && !held.has(from) ? placeOf(term) : null
+    return place === null
+      ? []
+      : (byPlace.get(JSON.stringify(place)) ?? []).filter((candidate) => candidate.key !== from)
+  }
 }
 
 /**

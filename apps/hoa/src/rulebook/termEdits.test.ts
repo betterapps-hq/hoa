@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest"
 import type * as T from "@/schema/types"
 import { createVocabulary } from "@/schema/vocabulary"
+import type { TermContent } from "@/schema/zod"
 import { sampleRulesFile } from "@/tests/sampleRulesFile"
 import type { RulebookRecords } from "./assemble"
 import { termKeysOf } from "./review"
 import { pickableTerms } from "./ruleTerms"
-import { addChoice, editTerm, mergeCandidates, mergeTerm, type TermEdit } from "./termEdits"
+import { addChoice, editTerm, mergeCandidates, mergeTargets, mergeTerm, type TermEdit } from "./termEdits"
 
 const stamp = { by: "admin", at: "2026-10-12T00:00:00Z" }
 const approved: T.Review = { status: "approved", by: "admin", at: stamp.at, note: null }
@@ -108,6 +109,70 @@ describe("mergeTerm", () => {
     const terms = pickableTerms(records.terms)
     expect(mergeCandidates(vocabulary, terms, principal).map((term) => term.key)).toContain(partOf)
     expect(mergeCandidates(vocabulary, terms, "leased-premises")).toEqual([])
+  })
+
+  it("finds every term's candidates by where it fits, as trying it against every other term would", () => {
+    const records = approvedRecords()
+    const vocabulary = createVocabulary(records.terms)
+    const terms = pickableTerms(records.terms)
+    // The fit written out pair by pair: the same place, and for a detail the same thing and kind of value.
+    const natureOf = (key: string) => {
+      const thing = vocabulary.get(vocabulary.thingOf(key))
+      return thing?.kind === "thing" ? thing.nature : null
+    }
+    const dimensionOf = (key: string) => {
+      const unit = vocabulary.get(key)
+      return unit?.kind === "unit" ? unit.dimension : null
+    }
+    const sameValue = (a: T.ValueType, b: T.ValueType) => {
+      switch (a.type) {
+        case "quantity":
+          return b.type === "quantity" && dimensionOf(a.unit) === dimensionOf(b.unit)
+        case "choice":
+          return b.type === "choice" && b.set === a.set
+        case "reference":
+          return b.type === "reference" && b.to === a.to
+        default:
+          return a.type === b.type
+      }
+    }
+    const fits = (term: TermContent, other: TermContent) => {
+      switch (term.kind) {
+        case "thing":
+        case "category":
+          return (other.kind === "thing" || other.kind === "category") && natureOf(other.key) === natureOf(term.key)
+        case "property":
+          return (
+            other.kind === "property" &&
+            other.many === term.many &&
+            vocabulary.thingOf(other.of) === vocabulary.thingOf(term.of) &&
+            sameValue(other.valueType, term.valueType)
+          )
+        case "value":
+          return other.kind === "value" && other.set === term.set
+        case "unit":
+          return other.kind === "unit" && other.dimension === term.dimension
+        default:
+          return false
+      }
+    }
+    const isHeld = (key: string) =>
+      terms.some(
+        (item) =>
+          ((item.kind === "property" || item.kind === "category") && item.of === key) ||
+          (item.kind === "value" && item.set === key)
+      )
+    const tried = (key: string) => {
+      const term = vocabulary.get(key)
+      return !term || isHeld(key) ? [] : terms.filter((other) => other.key !== key && fits(term, other))
+    }
+    const targets = mergeTargets(vocabulary, terms)
+    const keys = [...new Set([...terms, ...records.terms].map((term) => term.key))]
+    for (const key of keys) {
+      expect([key, targets(key).map((term) => term.key)]).toEqual([key, tried(key).map((term) => term.key)])
+    }
+    const merged = keys.filter((key) => targets(key).length > 0).map((key) => vocabulary.get(key)?.kind)
+    expect(new Set(merged)).toEqual(new Set(["thing", "category", "property", "value", "unit"]))
   })
 
   it("has every rule use the other term, sends them back to review and rejects the merged one", () => {
