@@ -20,8 +20,8 @@
     "prepare": "lefthook install"
   },
   "devDependencies": {
-    "knip": "^6.16.1",
-    "lefthook": "^2.1.9",
+    "knip": "^6.41.0",
+    "lefthook": "^2.2.1",
     "npm-run-all2": "^9.0.2",
     "oxfmt": "^0.72.0",
     "oxlint": "^1.72.0",
