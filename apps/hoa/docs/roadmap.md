@@ -35,8 +35,14 @@ against the covenants. The window is open, but not for long.
   signatures at the end ([design/document-requirements.md](design/document-requirements.md)).
 - **Applications:** homeowners apply, upload files, and get an AI review against the rulebook; the committee decides
   ([design/application-review.md](design/application-review.md)).
-- **Owner portal:** the homeowner's dashboard ([dashboard.md](dashboard.md)): what waits on them, where their
-  applications stand, the rules in force and recent activity. It grows with the modules below.
+- **Owner portal:** the homeowner's dashboard ([dashboard.md](dashboard.md)): each home's balance and what's next due,
+  what waits on them, where their applications and violations stand, the rules in force and recent activity. The
+  board's dashboard shows the association's money, violations and applications. Both grow with the modules below.
+- **Violations:** reported on the published rulebook with photos; the notice, hearing, cure and sanctions the documents
+  set out, with fines checked against their amounts and limits ([design/violations.md](design/violations.md)).
+- **Money:** each unit's ledger of charges, payments, credits and reversals; payments by check or cash recorded by
+  hand; fines posted to the ledger; dues and special assessments posted on a schedule
+  ([design/money.md](design/money.md)).
 - **Accounts:** sign-in by email code, Google or password, invitations, and an account page with the person's details,
   homes, committee seats, sign-in methods and sessions; deleting the account
   ([design/people.md](design/people.md)).
@@ -191,9 +197,9 @@ The P1 work, in order:
 
 1. **People:** built. Still to come: importing an association's data, export, tags and custom fields, the resident
    directory and two-step login.
-2. **Violations and fines:** reports with photos citing the rule, the documents' enforcement steps, and fines.
-3. **Dues and payments:** each unit's ledger, dues and assessments, payments and autopay, late fees and payment plans;
-   fines land on the same ledger.
+2. **Violations and fines:** built. Still to come: inspections on a phone, and one violation covering several units.
+3. **Dues and payments:** the ledger, fines and dues are built. Still to come: payments and autopay through Stripe,
+   late fees and interest, payment plans, reminders and monthly statements.
 4. **QuickBooks sync:** each unit's charges and payments sent to the association's books.
 5. **Notifications:** email and text; every module sends through them.
 6. **Applications:** neighbor sign-off, online signatures and committee decisions, on the module that's built.
@@ -212,8 +218,8 @@ Every PayHOA plan has every feature. What it does, and where this app stands:
 | Owners and units | Import, tags, custom fields, ownership change, tenants as contacts only | **Built:** owners, residents and renters with dates, ownership change, renters' own sign-in; import, tags and custom fields planned |
 | Roles | Read or edit per module, no named roles | **Built:** administrators, and committees with chairs, officers and terms |
 | Sign-in | One login for several units, optional two-step login | **Built:** one login for several units, by email code, Google or password; two-step login planned |
-| Invoices and dues | One-time and recurring, bulk by tag, emailed or mailed | Planned: Money |
-| Payments | Stripe bank and card, autopay, lockbox, pass-through fees | Planned: Money |
+| Invoices and dues | One-time and recurring, bulk by tag, emailed or mailed | **Built:** dues and assessments on a schedule, each unit's own amount, posted to its ledger; emailed and mailed invoices planned |
+| Payments | Stripe bank and card, autopay, lockbox, pass-through fees | Checks and cash recorded by hand **built**; Stripe bank and card, and autopay, planned |
 | Late fees and collections | Flat, percentage or compounding; reminders; payment plans; account lock | Planned: Money |
 | Books | Ledger, chart of accounts, bank feeds, reconciliation (with AI), budgets, 30+ reports, board packets | Not planned: QuickBooks sync instead |
 | Payables | Invoice inbox read automatically, approval chains, mailed checks, 1099s | Not planned: QuickBooks |
@@ -224,12 +230,12 @@ Every PayHOA plan has every feature. What it does, and where this app stands:
 | Message boards | Open, private and announcement boards | Planned: Community |
 | Website | Builder, its own address, Penny chatbot | Planned: Community and AI assistants |
 | Calendar | Events, reminders, Google Calendar | Planned: Meetings |
-| Violations | Photos, statuses that change the letter, fines, mailing | Planned: Violations, plus enforcement steps and phone inspections |
+| Violations | Photos, statuses that change the letter, fines, mailing | **Built:** photos, notice, hearing, cure and fines as the documents set out; phone inspections planned |
 | Requests | Custom forms, statuses, named approvers approve or deny | **Built** for applications, with AI review; maintenance planned |
 | Documents | Unlimited folders, sharing by group or unit | Governing documents **built**; folders planned |
 | Voting and surveys | Ranked choice, paper ballots with QR codes, quorum, weighted, anonymous | Planned: Meetings and votes, plus thresholds from the documents |
 | Meetings and minutes | Minutes stored as documents only | Planned: Meetings, with AI-drafted minutes |
-| Owner portal | Balance, payments, requests, violations, documents | **Built** as the homeowner's dashboard; grows with each module |
+| Owner portal | Balance, payments, requests, violations, documents | **Built** as the homeowner's dashboard, with balances, violations and applications; grows with each module |
 | Mobile app | None ("in the works") | Planned: Community |
 | Amenities | Bookings with rules, fees, waivers and approval | Planned: Community |
 | Resale documents | Through HomeWiseDocs | Planned: Community |
