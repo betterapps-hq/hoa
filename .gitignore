@@ -27,3 +27,5 @@ coverage
 /.claude/settings.local.json
 /.claude/launch.json
 /.claude/skills/
+# Terraform's providers and modules, which terraform init downloads.
+.terraform/

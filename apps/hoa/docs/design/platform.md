@@ -336,6 +336,7 @@ other jobs with its `setup` action. Dependabot moves the pins.
 | `pull-request.yml` | Pull request opened or pushed | `verify`, then `preview`: builds the app, runs `wrangler preview --name pr-<number>` and comments the preview URL on the pull request, updating the comment on every push. A new push cancels the previous run. Dependabot's and forks' pull requests get no preview. |
 | `deploy.yml` | Merge to `main` | `verify`, then `deploy`: builds the app and runs `wrangler deploy`. Deploys run one at a time in merge order and are never cancelled. |
 | `preview-cleanup.yml` | Pull request closed | Deletes the pull request's preview |
+| `terraform.yml` | Pull request or merge to `main` that changes `infra/**` | `plan` on pull requests, `apply` on `main`, for `infra/web`, through the shared `terraform-plan` and `terraform-apply` templates |
 
 - **Credentials.** The jobs read the repository secret `CLOUDFLARE_API_TOKEN` and the variable `CLOUDFLARE_ACCOUNT_ID`.
   Until the variable is set, the Cloudflare jobs are skipped and only `verify` runs. Dependabot's runs get only
@@ -357,5 +358,34 @@ other jobs with its `setup` action. Dependabot moves the pins.
   the demo after merging.
 - **Access.** Cloudflare Access can protect the demo's `workers.dev` hostname and preview URLs. Without it they're
   public, and anyone with a link can run model calls on the project's keys.
+- **Infrastructure as code.** [`infra/web`](../../../../infra/web/main.tf) describes where the app deploys with the
+  shared `cloudflare-web` Terraform module, at the commit of a `betterapps-hq/pipelines` release, as the first step of
+  moving the previews and the demo's deploy onto the shared web templates. It manages:
+  - **The `hoa` Worker:** that it exists, on `workers.dev` with preview URLs, as `wrangler.jsonc` has it. It's imported,
+    not made again. Deploys still own its code, bindings, triggers and observability.
+  - **The demo's settings in GitHub:** `CLOUDFLARE_ACCOUNT_ID`, `WEB_WORKER` (`hoa`), `WEB_URL` (its `workers.dev`
+    address, the one `DEMO_URL` holds) and the secret `WEB_CLOUDFLARE_API_TOKEN`, written into the existing `demo`
+    environment, which the module doesn't own.
+  - **A `preview` environment** the module owns, naming `hoa` as the Worker previews are made of, with the same
+    variables and token.
+  - **One account-owned Cloudflare API token,** `hoa web deploys`, with Workers Scripts Write and D1 Write.
+
+  Nothing reads these yet: `pull-request.yml`, `deploy.yml` and `preview-cleanup.yml` keep using the repository's
+  `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` until they move onto the templates. `hoa-preview` isn't managed:
+  the module gives each Worker a GitHub environment to deploy to, and one off `workers.dev` needs a custom domain,
+  while `hoa-preview` has neither and deploys from `deploy.yml`.
+- **Plans and applies.** A pull request that changes `infra/` is planned with read-only credentials and gets the plan
+  as a comment; once it merges, `main` plans again and applies in the `infrastructure` environment, which holds the
+  write credentials. The state is in R2, at `hoa/web/terraform.tfstate` in the bucket the `TF_STATE_BUCKET` and
+  `TF_STATE_ENDPOINT` repository variables name. It holds the deploy token's value, so the bucket stays private.
+- **What Terraform is waiting on.** Until the credentials exist, the plan only checks formatting and validates, and the
+  apply skips, each with a notice. Plans need the repository secrets `TF_STATE_READ_ACCESS_KEY_ID` and
+  `TF_STATE_READ_SECRET_ACCESS_KEY` (R2 Object Read on the state bucket), `CLOUDFLARE_READ_API_TOKEN` (Workers Scripts
+  Read and Account API Tokens Read) and `TF_GITHUB_READ_TOKEN` (read access to the repository's environments and their
+  variables and secrets). Applies need the `infrastructure` environment's `TF_STATE_ACCESS_KEY_ID` and
+  `TF_STATE_SECRET_ACCESS_KEY` (R2 Object Read & Write), `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit and Account API
+  Tokens Edit) and `TF_GITHUB_TOKEN` (Environments and Administration write, Actions read), with its deployment
+  branches kept to `main`. A private repository on GitHub Free can't require reviewers, so a merge applies without
+  waiting for anyone.
 - **Why not Workers Builds.** Cloudflare's GitHub integration needs no API token, but it deploys whether or not CI
   passes, and it's configured only in the dashboard, which is awkward for a pnpm monorepo.
