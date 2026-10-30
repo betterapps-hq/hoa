@@ -339,7 +339,7 @@ other jobs with its `setup` action. Dependabot moves the pins.
 
 - **Credentials.** The jobs read the repository secret `CLOUDFLARE_API_TOKEN` and the variable `CLOUDFLARE_ACCOUNT_ID`.
   Until the variable is set, the Cloudflare jobs are skipped and only `verify` runs. Dependabot's runs get only
-  Dependabot secrets, so they skip the Cloudflare jobs.
+  Dependabot secrets, so its pull requests, like forks', get no preview.
 - **Turborepo's remote cache.** `verify` points Turbo at the cache every monorepo shares, `https://turbo.copacker.ai`,
   as team `hoa`, with the `TURBO_TOKEN` and `TURBO_REMOTE_CACHE_SIGNATURE_KEY` secrets. Until the repository has those,
   Turbo uses only its local cache.

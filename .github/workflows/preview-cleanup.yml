@@ -15,11 +15,11 @@ permissions:
   contents: read
 
 jobs:
-  # Skipped where the run gets no Cloudflare token, as with Dependabot's and forks' pull requests, which get no preview.
+  # Dependabot's and forks' pull requests never get a preview (pull-request.yml), so there's nothing to delete.
   delete:
     name: Delete the preview
     if: >-
-      vars.CLOUDFLARE_ACCOUNT_ID != '' && github.actor != 'dependabot[bot]' &&
+      vars.CLOUDFLARE_ACCOUNT_ID != '' && github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     env:

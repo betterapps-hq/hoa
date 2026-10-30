@@ -28,12 +28,13 @@ jobs:
 
   # Every pull request gets its own Worker Preview, kept up to date on each push.
   # Skipped until the Cloudflare account is connected (see apps/hoa/docs/setup.md), and for Dependabot's and forks'
-  # pull requests, which don't get the Cloudflare token.
+  # pull requests, whose runs don't get the Cloudflare token. Going by the author rather than who started the run keeps
+  # the choice the same for every run of a pull request, so preview-cleanup.yml skips the same ones.
   preview:
     name: Deploy a preview
     needs: verify
     if: >-
-      vars.CLOUDFLARE_ACCOUNT_ID != '' && github.actor != 'dependabot[bot]' &&
+      vars.CLOUDFLARE_ACCOUNT_ID != '' && github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
