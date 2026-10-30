@@ -5,7 +5,7 @@ nodeLinker: hoisted
 verifyDepsBeforeRun: error
 # Versions locked once for the whole monorepo. Reference them with "catalog:".
 catalog:
-  "@types/node": 26.6.4
+  "@types/node": 26.6.5
   typescript: 7.0.2
 # React and React DOM must resolve to one exact, identical version: react-dom throws on a
 # mismatch, and the registry mirror tags canaries as "latest", so a bare install drifts.
