@@ -9,10 +9,24 @@ concurrency:
   group: deploy-demo
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
+  # The required verification, `pnpm verify`, through the shared template, as pull-request.yml calls it. Grouped by the
+  # run, so a verification on main never cancels another.
   verify:
-    uses: ./.github/workflows/verify.yml
-    secrets: inherit
+    uses: betterapps-hq/pipelines/.github/workflows/ci-verify.yml@ee2dce3e338d7684c9a8ec2a733d37d1bd5cf7dc # v1.3.0
+    with:
+      concurrency-key: ${{ github.event.pull_request.number || github.run_id }}
+      # Turborepo's remote cache, the one every monorepo shares (turbo.json signs its artifacts). Until the repository
+      # has the TURBO_TOKEN and TURBO_REMOTE_CACHE_SIGNATURE_KEY secrets, Turbo uses only its local cache.
+      env: |
+        TURBO_API=https://turbo.copacker.ai
+        TURBO_TEAM=hoa
+    secrets:
+      TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+      TURBO_REMOTE_CACHE_SIGNATURE_KEY: ${{ secrets.TURBO_REMOTE_CACHE_SIGNATURE_KEY }}
 
   # Skipped until the Cloudflare account is connected (see apps/hoa/docs/setup.md).
   deploy:
@@ -27,8 +41,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
+      - uses: betterapps-hq/pipelines/github/actions/setup@ee2dce3e338d7684c9a8ec2a733d37d1bd5cf7dc # v1.3.0
       - run: pnpm --filter hoa build
       # Migrations run before the new code, so they must stay backward compatible.
       - run: pnpm --filter hoa run db:migrate:demo

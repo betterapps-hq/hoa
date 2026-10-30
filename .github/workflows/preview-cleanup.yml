@@ -11,18 +11,23 @@ concurrency:
   group: pull-request-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
+  # Dependabot's and forks' pull requests never get a preview (pull-request.yml), so there's nothing to delete.
   delete:
     name: Delete the preview
-    if: vars.CLOUDFLARE_ACCOUNT_ID != ''
+    if: >-
+      vars.CLOUDFLARE_ACCOUNT_ID != '' && github.event.pull_request.user.login != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       PREVIEW_NAME: pr-${{ github.event.pull_request.number }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup
+      - uses: betterapps-hq/pipelines/github/actions/setup@ee2dce3e338d7684c9a8ec2a733d37d1bd5cf7dc # v1.3.0
       # The Worker is named explicitly: on a closed pull request Wrangler didn't always resolve it from the config.
       # A pull request closed before its preview deployed has nothing to delete. Merging also deploys the Worker, and
       # while that runs Cloudflare can report the Worker missing, so that error is retried.
