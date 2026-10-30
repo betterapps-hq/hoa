@@ -366,14 +366,15 @@ other jobs with its `setup` action. Dependabot moves the pins.
   - **The demo's settings in GitHub:** `CLOUDFLARE_ACCOUNT_ID`, `WEB_WORKER` (`hoa`), `WEB_URL` (its `workers.dev`
     address, the one `DEMO_URL` holds) and the secret `WEB_CLOUDFLARE_API_TOKEN`, written into the existing `demo`
     environment, which the module doesn't own.
+  - **The `hoa-preview` Worker:** that it exists, off `workers.dev` with preview URLs, as `wrangler.jsonc`'s
+    `preview-workflows` environment has it, with no custom domain and nothing in GitHub. It's imported too, and
+    `deploy.yml` still deploys it.
   - **A `preview` environment** the module owns, naming `hoa` as the Worker previews are made of, with the same
     variables and token.
   - **One account-owned Cloudflare API token,** `hoa web deploys`, with Workers Scripts Write and D1 Write.
 
   Nothing reads these yet: `pull-request.yml`, `deploy.yml` and `preview-cleanup.yml` keep using the repository's
-  `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` until they move onto the templates. `hoa-preview` isn't managed:
-  the module gives each Worker a GitHub environment to deploy to, and one off `workers.dev` needs a custom domain,
-  while `hoa-preview` has neither and deploys from `deploy.yml`.
+  `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` until they move onto the templates.
 - **Plans and applies.** A pull request that changes `infra/` is planned with read-only credentials and gets the plan
   as a comment; once it merges, `main` plans again and applies in the `infrastructure` environment. The workflow forwards
   write credentials by name from organization or repository secrets; matching environment secrets override them.
