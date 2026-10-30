@@ -12,9 +12,7 @@ updates:
           - minor
           - patch
   - package-ecosystem: github-actions
-    # The shared setup action isn't under .github/workflows, so it's listed too.
-    directories:
-      - /
-      - /.github/actions/setup
+    # The workflows' actions, and their pins on the shared pipelines (betterapps-hq/pipelines).
+    directory: /
     schedule:
       interval: weekly

@@ -327,16 +327,22 @@ Layout reads Word text. Azure is called with `fetch`, and ids come from `crypto.
 ## CI/CD
 
 Hosted on GitHub as a private repository, `AndrewCraswell/hoa`. Everything runs in GitHub Actions, and a deploy only
-happens after `pnpm verify` passes. Both pipelines call the same verification (`verify.yml`).
+happens after `pnpm verify` passes. Both pipelines run it through the shared `ci-verify` template from
+[`betterapps-hq/pipelines`](https://github.com/betterapps-hq/pipelines), pinned to a release's commit, and set up their
+other jobs with its `setup` action. Dependabot moves the pins.
 
 | Workflow | Trigger | Jobs |
 | --- | --- | --- |
-| `pull-request.yml` | Pull request opened or pushed | `verify`, then `preview`: builds the app, runs `wrangler preview --name pr-<number>` and comments the preview URL on the pull request, updating the comment on every push. A new push cancels the previous run. |
+| `pull-request.yml` | Pull request opened or pushed | `verify`, then `preview`: builds the app, runs `wrangler preview --name pr-<number>` and comments the preview URL on the pull request, updating the comment on every push. A new push cancels the previous run. Dependabot's and forks' pull requests get no preview. |
 | `deploy.yml` | Merge to `main` | `verify`, then `deploy`: builds the app and runs `wrangler deploy`. Deploys run one at a time in merge order and are never cancelled. |
 | `preview-cleanup.yml` | Pull request closed | Deletes the pull request's preview |
 
 - **Credentials.** The jobs read the repository secret `CLOUDFLARE_API_TOKEN` and the variable `CLOUDFLARE_ACCOUNT_ID`.
-  Until the variable is set, the Cloudflare jobs are skipped and only `verify` runs.
+  Until the variable is set, the Cloudflare jobs are skipped and only `verify` runs. Dependabot's runs get only
+  Dependabot secrets, so they skip the Cloudflare jobs.
+- **Turborepo's remote cache.** `verify` points Turbo at the cache every monorepo shares, `https://turbo.copacker.ai`,
+  as team `hoa`, with the `TURBO_TOKEN` and `TURBO_REMOTE_CACHE_SIGNATURE_KEY` secrets. Until the repository has those,
+  Turbo uses only its local cache.
 - **Migrations and the preview Workflows.** `deploy` runs
   `wrangler d1 migrations apply hoa --remote`, `wrangler deploy`, then `wrangler deploy --env preview-workflows` (so
   previews' Workflows follow `main`). `preview` runs `wrangler d1 migrations apply hoa-preview --remote --env preview-workflows`
