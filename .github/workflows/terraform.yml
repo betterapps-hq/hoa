@@ -1,6 +1,7 @@
 name: Terraform
 
 on:
+  workflow_dispatch:
   pull_request:
     paths: ["infra/**", ".github/workflows/terraform.yml"]
   push:
@@ -30,12 +31,17 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_READ_API_TOKEN }}
       TF_GITHUB_TOKEN: ${{ secrets.TF_GITHUB_READ_TOKEN }}
 
-  # The infrastructure environment holds the write credentials, kept to main by its branch rules.
+  # Forward organization/repository credentials, with environment secrets taking precedence when available.
   apply:
-    if: github.event_name == 'push'
-    uses: betterapps-hq/pipelines/.github/workflows/terraform-apply.yml@ed34ffcba2ef6748b0210c763582e8995c81501b # v1.6.0
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    uses: betterapps-hq/pipelines/.github/workflows/terraform-apply.yml@15006bbaab8196e9899f7beabab2db5dc271eaf3 # shared credentials (pipelines #19)
     with:
       environment: infrastructure
       working-directory: infra/web
       state-bucket: ${{ vars.TF_STATE_BUCKET }}
       state-endpoint: ${{ vars.TF_STATE_ENDPOINT }}
+    secrets:
+      TF_STATE_ACCESS_KEY_ID: ${{ secrets.TF_STATE_ACCESS_KEY_ID }}
+      TF_STATE_SECRET_ACCESS_KEY: ${{ secrets.TF_STATE_SECRET_ACCESS_KEY }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      TF_GITHUB_TOKEN: ${{ secrets.TF_GITHUB_TOKEN }}

@@ -375,17 +375,24 @@ other jobs with its `setup` action. Dependabot moves the pins.
   the module gives each Worker a GitHub environment to deploy to, and one off `workers.dev` needs a custom domain,
   while `hoa-preview` has neither and deploys from `deploy.yml`.
 - **Plans and applies.** A pull request that changes `infra/` is planned with read-only credentials and gets the plan
-  as a comment; once it merges, `main` plans again and applies in the `infrastructure` environment, which holds the
-  write credentials. The state is in R2, at `hoa/web/terraform.tfstate` in the bucket the `TF_STATE_BUCKET` and
+  as a comment; once it merges, `main` plans again and applies in the `infrastructure` environment. The workflow forwards
+  write credentials by name from organization or repository secrets; matching environment secrets override them.
+  Manual runs also apply only from `main`. The state is in R2, at `hoa/web/terraform.tfstate` in the bucket the `TF_STATE_BUCKET` and
   `TF_STATE_ENDPOINT` repository variables name. It holds the deploy token's value, so the bucket stays private.
 - **What Terraform is waiting on.** Until the credentials exist, the plan only checks formatting and validates, and the
   apply skips, each with a notice. Plans need the repository secrets `TF_STATE_READ_ACCESS_KEY_ID` and
   `TF_STATE_READ_SECRET_ACCESS_KEY` (R2 Object Read on the state bucket), `CLOUDFLARE_READ_API_TOKEN` (Workers Scripts
   Read and Account API Tokens Read) and `TF_GITHUB_READ_TOKEN` (read access to the repository's environments and their
-  variables and secrets). Applies need the `infrastructure` environment's `TF_STATE_ACCESS_KEY_ID` and
+  variables and secrets). Applies need `TF_STATE_ACCESS_KEY_ID` and
   `TF_STATE_SECRET_ACCESS_KEY` (R2 Object Read & Write), `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit and Account API
   Tokens Edit) and `TF_GITHUB_TOKEN` (Environments and Administration write, Actions read), with its deployment
-  branches kept to `main`. A private repository on GitHub Free can't require reviewers, so a merge applies without
-  waiting for anyone.
+  branches kept to `main` where the plan supports environment protection. These names follow the shared pipelines'
+  Terraform guide. HOA currently lives under a personal account, so it uses repository secrets and variables; it cannot
+  receive `betterapps-hq` organization secrets there. A private repository in a GitHub Free organization also cannot
+  receive organization secrets. Organization write secrets are available to selected repositories' workflows outside
+  environments too, so only trusted repositories should be selected.
+- **Enabling applies.** Configure `infrastructure` to deploy only from `main`, then set its environment variable
+  `TF_APPLY_ENABLED` to `true`. The shared apply skips if that setting is absent, even when forwarded state keys exist.
+  Do not set the marker at repository or organization level.
 - **Why not Workers Builds.** Cloudflare's GitHub integration needs no API token, but it deploys whether or not CI
   passes, and it's configured only in the dashboard, which is awkward for a pnpm monorepo.
