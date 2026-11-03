@@ -326,7 +326,7 @@ Layout reads Word text. Azure is called with `fetch`, and ids come from `crypto.
 
 ## CI/CD
 
-Hosted on GitHub as a private repository, `AndrewCraswell/hoa`. Everything runs in GitHub Actions, and a deploy only
+Hosted on GitHub as a public repository, `betterapps-hq/hoa`. Everything runs in GitHub Actions, and a deploy only
 happens after `pnpm verify` passes. Both pipelines run it through the shared `ci-verify` template from
 [`betterapps-hq/pipelines`](https://github.com/betterapps-hq/pipelines), pinned to a release's commit, and set up their
 other jobs with its `setup` action. Dependabot moves the pins.
@@ -387,9 +387,9 @@ other jobs with its `setup` action. Dependabot moves the pins.
   `TF_STATE_SECRET_ACCESS_KEY` (R2 Object Read & Write), `CLOUDFLARE_API_TOKEN` (Workers Scripts Edit and Account API
   Tokens Edit) and `TF_GITHUB_TOKEN` (Environments and Administration write, Actions read), with its deployment
   branches kept to `main` where the plan supports environment protection. These names follow the shared pipelines'
-  Terraform guide. HOA currently lives under a personal account, so it uses repository secrets and variables; it cannot
-  receive `betterapps-hq` organization secrets there. A private repository in a GitHub Free organization also cannot
-  receive organization secrets. Organization write secrets are available to selected repositories' workflows outside
+  Terraform guide. HOA uses repository secrets and variables. It lives in the `betterapps-hq` organization as a public
+  repository, so organization secrets can be shared with it too; a private repository in a GitHub Free organization
+  can't receive them. Organization write secrets are available to selected repositories' workflows outside
   environments too, so only trusted repositories should be selected.
 - **Enabling applies.** Configure `infrastructure` to deploy only from `main`, then set its environment variable
   `TF_APPLY_ENABLED` to `true`. The shared apply skips if that setting is absent, even when forwarded state keys exist.
