@@ -28,7 +28,7 @@ terraform {
   }
 }
 
-# CLOUDFLARE_API_TOKEN and GITHUB_TOKEN come from the environment.
+# CLOUDFLARE_API_TOKEN and GITHUB_TOKEN come from the environment (token test).
 provider "cloudflare" {}
 
 provider "github" {
