@@ -32,7 +32,7 @@ terraform {
 provider "cloudflare" {}
 
 provider "github" {
-  owner = "AndrewCraswell"
+  owner = "betterapps-hq"
 }
 
 locals {
