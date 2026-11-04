@@ -41,7 +41,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - uses: betterapps-hq/pipelines/github/actions/setup@ee2dce3e338d7684c9a8ec2a733d37d1bd5cf7dc # v1.3.0
+      - uses: betterapps-hq/pipelines/github/actions/setup@efa1c3e00652cca72174fdf3abdb911a5c501c45 # v1.11.1
       - run: pnpm --filter hoa build
       # Migrations run before the new code, so they must stay backward compatible.
       - run: pnpm --filter hoa run db:migrate:demo
