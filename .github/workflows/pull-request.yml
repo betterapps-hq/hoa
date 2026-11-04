@@ -14,7 +14,7 @@ permissions:
 jobs:
   # The required verification, `pnpm verify`, through the shared template. deploy.yml calls it the same way.
   verify:
-    uses: betterapps-hq/pipelines/.github/workflows/ci-verify.yml@ee2dce3e338d7684c9a8ec2a733d37d1bd5cf7dc # v1.3.0
+    uses: betterapps-hq/pipelines/.github/workflows/ci-verify.yml@main
     with:
       concurrency-key: ${{ github.event.pull_request.number || github.run_id }}
       # Turborepo's remote cache, the one every monorepo shares (turbo.json signs its artifacts). Until the repository
@@ -45,7 +45,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
       PREVIEW_NAME: pr-${{ github.event.pull_request.number }}
     steps:
-      - uses: betterapps-hq/pipelines/github/actions/setup@ee2dce3e338d7684c9a8ec2a733d37d1bd5cf7dc # v1.3.0
+      - uses: betterapps-hq/pipelines/github/actions/setup@main
       - run: pnpm --filter hoa build
       # Every preview shares the preview database, so migrations must stay backward compatible.
       - run: pnpm --filter hoa run db:migrate:preview
