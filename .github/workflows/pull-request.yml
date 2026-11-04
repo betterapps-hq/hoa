@@ -14,7 +14,7 @@ permissions:
 jobs:
   # The required verification, `pnpm verify`, through the shared template. deploy.yml calls it the same way.
   verify:
-    uses: betterapps-hq/pipelines/.github/workflows/ci-verify.yml@ee2dce3e338d7684c9a8ec2a733d37d1bd5cf7dc # v1.3.0
+    uses: betterapps-hq/pipelines/.github/workflows/ci-verify.yml@efa1c3e00652cca72174fdf3abdb911a5c501c45 # v1.11.1
     with:
       concurrency-key: ${{ github.event.pull_request.number || github.run_id }}
       # Turborepo's remote cache, the one every monorepo shares (turbo.json signs its artifacts). Until the repository

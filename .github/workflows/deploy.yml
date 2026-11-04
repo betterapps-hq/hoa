@@ -16,7 +16,7 @@ jobs:
   # The required verification, `pnpm verify`, through the shared template, as pull-request.yml calls it. Grouped by the
   # run, so a verification on main never cancels another.
   verify:
-    uses: betterapps-hq/pipelines/.github/workflows/ci-verify.yml@ee2dce3e338d7684c9a8ec2a733d37d1bd5cf7dc # v1.3.0
+    uses: betterapps-hq/pipelines/.github/workflows/ci-verify.yml@efa1c3e00652cca72174fdf3abdb911a5c501c45 # v1.11.1
     with:
       concurrency-key: ${{ github.event.pull_request.number || github.run_id }}
       # Turborepo's remote cache, the one every monorepo shares (turbo.json signs its artifacts). Until the repository
