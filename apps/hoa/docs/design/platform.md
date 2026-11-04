@@ -328,8 +328,8 @@ Layout reads Word text. Azure is called with `fetch`, and ids come from `crypto.
 
 Hosted on GitHub as a public repository, `betterapps-hq/hoa`. Everything runs in GitHub Actions, and a deploy only
 happens after `pnpm verify` passes. Both pipelines run it through the shared `ci-verify` template from
-[`betterapps-hq/pipelines`](https://github.com/betterapps-hq/pipelines), pinned to a release's commit, and set up their
-other jobs with its `setup` action. Dependabot moves the pins.
+[`betterapps-hq/pipelines`](https://github.com/betterapps-hq/pipelines), at `main`, so HOA gets each change as it merges,
+and set up their other jobs with its `setup` action.
 
 | Workflow | Trigger | Jobs |
 | --- | --- | --- |

@@ -12,7 +12,7 @@ updates:
           - minor
           - patch
   - package-ecosystem: github-actions
-    # The workflows' actions, and their pins on the shared pipelines (betterapps-hq/pipelines).
+    # The workflows' third-party actions. The shared pipelines (betterapps-hq/pipelines) are used at main.
     directory: /
     schedule:
       interval: weekly

@@ -42,7 +42,7 @@ locals {
 }
 
 module "web" {
-  source = "git::https://github.com/betterapps-hq/pipelines.git//terraform/cloudflare-web?ref=ed9b5cccdf2983fda3cb8e4827339ad0b2a15a6f" # v1.9.0
+  source = "git::https://github.com/betterapps-hq/pipelines.git//terraform/cloudflare-web?ref=main"
 
   account_id  = local.account_id
   repository  = "hoa"
