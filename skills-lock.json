@@ -1,11 +1,23 @@
 {
   "version": 1,
   "skills": {
+    "brand-voice": {
+      "source": "betterapps-hq/playbook",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/brand-voice/SKILL.md",
+      "computedHash": "b18ac30bb62b3cd0945e310f9ab9895b9e76f3d55d83227fe9161db1c5edd02c"
+    },
     "brandkit": {
       "source": "Leonxlnx/taste-skill",
       "sourceType": "github",
       "skillPath": "skills/brandkit/SKILL.md",
       "computedHash": "735007879f5110aeae1e981a53fe74a12afde70347f9773dacd50e4697a091bf"
+    },
+    "copy-editing": {
+      "source": "betterapps-hq/playbook",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/copy-editing/SKILL.md",
+      "computedHash": "ea326770577d54cd2cbff3b09fa90f6ac09ab71164666838ec0765f91e4e71fa"
     },
     "design-taste-frontend": {
       "source": "Leonxlnx/taste-skill",
@@ -18,6 +30,12 @@
       "sourceType": "github",
       "skillPath": "skills/taste-skill-v1/SKILL.md",
       "computedHash": "0a226c13d69639553cf8a7c40aa5527b026820f8ddaf7a6b263988e32ab44a27"
+    },
+    "deslopify-writing": {
+      "source": "betterapps-hq/playbook",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/deslopify-writing/SKILL.md",
+      "computedHash": "01f4017a42de0384e0929ea7cf5b9bca369df0858776b2da38b49f9685004920"
     },
     "full-output-enforcement": {
       "source": "Leonxlnx/taste-skill",
@@ -90,6 +108,12 @@
       "sourceType": "github",
       "skillPath": "skills/stitch-skill/SKILL.md",
       "computedHash": "c96b580192b34167efa01f460bbc669ff4315cf97f3cf6ff85ded8029aa720b8"
+    },
+    "writing-style-guide": {
+      "source": "betterapps-hq/playbook",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/writing-style-guide/SKILL.md",
+      "computedHash": "c240f23404ccdd292e59ef104e7541f61d0640f7b475aede5714748c287e13c8"
     }
   }
 }

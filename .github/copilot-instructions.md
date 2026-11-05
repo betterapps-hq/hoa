@@ -1,9 +1,85 @@
+# AGENTS.md
+
+## Permission to change guidance
+
+Treat repository rules, agent instructions, skills, and best practices as read-only unless the user explicitly
+authorizes a concrete change. This covers this rule itself, every `AGENTS.md` and `CLAUDE.md`, instructions loaded
+from other files, and everything in [best-practices/](best-practices/README.md). It applies to creating, editing,
+formatting, moving, renaming, and deleting protected files, including changes made by tools or scripts.
+
+When permission is needed, show the proposed changes in a table with **File**, **Before**, and **After** columns.
+Give the exact affected wording or paths, with a row for each change. For additions or deletions, mark the absent
+side as “absent.” Ask for approval of that table and wait before applying it. If the user has already explicitly
+authorized the concrete change, apply only that change. A feature request, review, or failing check does not authorize
+changing the rules.
+
+## Repository instructions
+
+- Start at the [best-practices index](best-practices/README.md). For every code change, apply the
+  [coding principles](best-practices/principles.md) and [conventions](best-practices/conventions.md).
+- Check the [preferred tech stack](best-practices/tech-stack.md) and discuss new libraries before adding them.
+- Before adding a script to any `package.json`, get explicit user permission for the script name and command.
+  If an existing script or a direct `vp` command covers the task, use it.
+
+## Copy and UX
+
+- Review every new or changed user-facing string with at least one writing skill before opening a PR. Use
+  [writing-style-guide](.agents/skills/writing-style-guide/SKILL.md) for interface text, including labels, errors,
+  empty states, and accessible names. Use [copy-editing](.agents/skills/copy-editing/SKILL.md) for marketing copy.
+  Apply [brand-voice](.agents/skills/brand-voice/SKILL.md) when shaping the voice or
+  [deslopify-writing](.agents/skills/deslopify-writing/SKILL.md) when checking for formulaic phrasing.
+- Exercise changed user workflows in the running app with the integrated browser. Check desktop and mobile layouts,
+  keyboard use, and accessible names.
+
+## Documentation and data
+
+- Update product documentation alongside behavior changes. Keep each page focused on one topic. Review prose, evidence
+  ledgers, status tables, and narrative records directly. Reserve executable tests for code and generated artifacts
+  that affect behavior, fabrication, or an external interface.
+- Treat stale prototype data as disposable. Only migrate or repair it on explicit request. Preserve integration
+  credentials and unrelated external configuration during a data reset unless the user explicitly requests a full reset.
+
+## Before opening a PR
+
+- Open pull requests on GitHub, where these repositories are hosted.
+- When the change is ready for review, run the relevant focused checks, fix related failures together, and run
+  `pnpm verify`.
+- Only bypass a Git hook with explicit user permission for an unrelated failure. Run focused checks on the files
+  being committed and report the blocker and checks in the handoff.
+
+# Project-specific guidance
+
+Project-specific requirements below take precedence over shared recommendations when they differ.
+
+# HOA agent guidance
+
+- **Lint:** `oxlint` (not eslint). **Format:** `oxfmt` (not prettier).
+- **Type-check:** native TypeScript 7.0.2 (pinned in the `pnpm-workspace.yaml` catalog) via `pnpm check:types`.
+- **Test:** Vitest via `pnpm test`. **Build:** Vite (TanStack Start on Cloudflare Workers) via `pnpm build`.
+- **Package manager:** pnpm `>=12` on Node `>=26`. **Tasks:** Turborepo.
+- **Git hooks:** lefthook (pre-commit: `oxlint --fix` and `oxfmt`; pre-push: `check:types`). Don't use `--no-verify`.
+- **AI:** Vercel AI SDK through OpenRouter. Every prompt lives in Langfuse prompt management and every model call is
+  traced to Langfuse. See [apps/hoa/docs/ai.md](apps/hoa/docs/ai.md).
+- **UI:** real shadcn/ui components (preset `bd1gAJNo`, `base-vega` on Base UI). Add missing ones with
+  `pnpm dlx shadcn@latest add` in `apps/hoa` or the shadcn MCP server; never hand-build or hand-edit
+  `src/components/ui/`.
+- **Reuse first:** prefer `@mantine/hooks`, `ts-extras`, `ts-pattern`, and `tiny-invariant` over hand-rolled hooks /
+  type helpers; narrow with type guards, not `as`.
+- **Product copy:** never use `·`, `•`, or another dot glyph as a visual separator.
+- **Docs:** root [`docs/`](docs/README.md) is for monorepo-wide engineering only. Anything specific to one app or
+  package goes in that app or package's own `docs/` folder, indexed by its `docs/README.md`.
+- **UX acceptance:** verify every UX change through the integrated browser before calling it complete. Component tests
+  alone are not sufficient.
+
+Verify loop: **`pnpm verify`** must be clean before finishing. See
+[docs/conventions.md](docs/conventions.md#quality-gates).
+
 # HOA Monorepo Project Guidelines
 
 A Turborepo and pnpm monorepo for hoa, an AI-native HOA management platform built on each community's governing
 documents. Architectural review is its first module. The app is React 19 and TypeScript. Shared config lives in
-`@repo/*` packages under `packages/`. See [README.md](../README.md) for setup and the [docs index](../docs/README.md)
-for conventions.
+`@repo/*` packages under `packages/`. See [README.md](README.md) for setup and the [docs index](docs/README.md) for
+conventions.
 
 ## Tooling (differs from common defaults)
 
@@ -17,7 +93,7 @@ for conventions.
 ## Build and verify loop
 
 Run `pnpm verify` before declaring work done; it must be clean. When to run checks, what `pnpm verify` covers and the
-lefthook rules are in [conventions.md](../docs/conventions.md#quality-gates).
+lefthook rules are in [conventions.md](docs/conventions.md#quality-gates).
 
 ## Workspace layout
 
@@ -28,13 +104,13 @@ lefthook rules are in [conventions.md](../docs/conventions.md#quality-gates).
 
 ## Conventions
 
-Coding conventions live in the [`docs/`](../docs/README.md) folder. Start at the index and read the relevant page before
+Coding conventions live in the [`docs/`](docs/README.md) folder. Start at the index and read the relevant page before
 writing code. Working in an app or package, read its own `docs/README.md` too. Two points worth stating up front: the
 **React Compiler is on** (don't hand-write `useMemo`/`useCallback`/`memo`), and **reuse before building**: check
-[hooks.md](../docs/hooks.md) and [typescript.md](../docs/typescript.md) for what the preferred libraries already provide
+[hooks.md](docs/hooks.md) and [typescript.md](docs/typescript.md) for what the preferred libraries already provide
 before writing a hook or type helper.
 
-Prefer the tools in the [preferred tech stack](../docs/tech-stack.md); **introducing a library that isn't already used
+Prefer the tools in the [preferred tech stack](docs/tech-stack.md); **introducing a library that isn't already used
 needs a human discussion**, not a silent add.
 
 ## AI features
@@ -54,12 +130,12 @@ needs a human discussion**, not a silent add.
   knowledge lives only in rulebook data (term definitions, scope notes, value relations). Tune on some cases and measure
   on held-out ones, including whole project types; change expected data only with a cited reason.
 - **Every model stage is measured.** How each stage is evaluated, and what runs in production, is in
-  [apps/hoa/docs/design/evaluation.md](../apps/hoa/docs/design/evaluation.md).
+  [apps/hoa/docs/design/evaluation.md](apps/hoa/docs/design/evaluation.md).
 
 ## Documentation
 
 - **Keep this file brief.** It's the entry point; link to `docs/` articles rather than duplicating detail.
-- **Docs live with what they describe.** The root [`docs/`](../docs/README.md) is only for engineering across the whole
+- **Docs live with what they describe.** The root [`docs/`](docs/README.md) is only for engineering across the whole
   monorepo. Everything specific to one app or package goes in that app or package's own `docs/` folder, indexed by its
   `docs/README.md`. A new app or package gets a `docs/` folder with its first doc, and a link from the root index.
 - **One topic per page, kept short**, and updated (with its folder's `README.md` index) in the same change as the
@@ -70,8 +146,8 @@ needs a human discussion**, not a silent add.
 
 ## Product copy and UX acceptance
 
-- Follow [apps/hoa/docs/ux.md](../apps/hoa/docs/ux.md): quiet views with one primary action, required fields marked with
-  a red asterisk and optional ones unmarked, at most one help affordance per field, shared inputs for quantities, files,
+- Follow [apps/hoa/docs/ux.md](apps/hoa/docs/ux.md): quiet views with one primary action, required fields marked with a
+  red asterisk and optional ones unmarked, at most one help affordance per field, shared inputs for quantities, files,
   tables, search and citations.
 - Never use a dot glyph, including `·` or `•`, as a visual separator. Use layout, separate text elements, or a clearly
   worded phrase instead.
@@ -81,7 +157,6 @@ needs a human discussion**, not a silent add.
 
 ## Gotchas
 
-- Hosted on **GitHub** — use GitHub for PRs and issues.
 - oxlint rules live in the shared `@repo/oxlint-config` base; add new rules there so every package benefits.
 - `apps/hoa/src/routeTree.gen.ts` is generated by TanStack Start on `dev` and `build`, and committed so `check:types`
   works without a build. Don't edit it; run `dev` after adding or renaming a route.
@@ -95,7 +170,7 @@ needs a human discussion**, not a silent add.
 - **Correctness over expediency.** Fix root causes and keep contracts coherent, even when a shortcut is faster.
 - **No backward compatibility by default.** Replace obsolete contracts and implementations directly. If a change would
   break something that might need to keep working, ask first; with no one to ask, assume it doesn't. The exception is D1
-  migrations ([apps/hoa/docs/setup.md](../apps/hoa/docs/setup.md#schema-and-binding-changes)).
+  migrations ([apps/hoa/docs/setup.md](apps/hoa/docs/setup.md#schema-and-binding-changes)).
 - **One canonical implementation.** No version-suffixed files, symbols, schemas, routes or APIs (`V2`, `Phase2`,
   `legacy`) and no compatibility aliases. Fix forward instead of adding shims, fallbacks or dual paths for unreleased
   behavior.

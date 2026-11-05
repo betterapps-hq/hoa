@@ -20,6 +20,11 @@
     "**/worker-configuration.d.ts",
     "**/.wrangler/**",
     ".agents/**",
+    ".claude/skills/**",
+    "best-practices/**",
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".github/copilot-instructions.md",
     ".fixtures/**",
     ".vscode/mcp.json",
     "pnpm-lock.yaml"

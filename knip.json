@@ -3,7 +3,9 @@
   "ignoreExportsUsedInFile": true,
   "tags": ["-vendored"],
   "workspaces": {
-    ".": {},
+    ".": {
+      "ignoreDependencies": ["rulesync"]
+    },
     "apps/hoa": {
       "entry": ["src/routes/**/*.tsx"],
       "ignoreIssues": {
